@@ -55,28 +55,9 @@ Run `npm run check` before every commit. It stops at the first failure.
 `playwright-core` ships no browser. Install the pinned headless shell once
 with `npx playwright-core install chromium-headless-shell`.
 
-The suites map to the layers the brief requires:
-
-- **Geometry** (`server/test/geometry.test.ts`): extrude dimensions/volumes,
-  boolean cut volume, fillet volume delta, face/edge/vertex counts and
-  persistent names, parametric regeneration after upstream edits, timeline
-  rollback, broken-reference error reporting.
-- **Face extrude** (`server/test/faceExtrude.test.ts`): extruding body faces
-  directly (boss + pocket).
-- **Solver** (`shared/test/solver.test.ts`): dimensioned rectangle converges
-  exactly, DOF classification, conflicting constraints detected, tangent,
-  drag-with-polish.
-- **Profiles** (`shared/test/profiles.test.ts`): region extraction, holes,
-  shared-edge subdivision, stable profile ids.
-- **Persistence** (`server/test/store.test.ts`): round-trip, duplicate, list,
-  delete, path-traversal rejection.
-- **Export** (`server/test/export.test.ts`): binary STL structure + bounds,
-  3MF unzips with named objects and millimetre units.
-- **API integration** (`server/test/api.test.ts`): the complete MVP workflow
-  over real HTTP, ending in reload-and-verify.
-- **Client** (`client/test/`, DOM tests in `client/test/dom/`): sketch-mode
-  preservation, authoritative solved positions, undoing the sketch creation,
-  and repeated undo input while a request is pending.
+The public repository carries the shared suites in `shared/test/`: solver,
+profiles, sketch edits, offsets, units, placement and DXF/SVG import. The
+server, client, DOM and browser suites stay in the team's working copies.
 
 Write geometry tests as _reproducible numeric models_ (exact volumes, bounding
 boxes, face counts). Never rely on visual confirmation alone.

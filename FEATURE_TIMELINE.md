@@ -39,10 +39,8 @@ after feature _k_. While rolled back you can:
 - then return to the end of the timeline.
 
 Later features rebuild against the modified model through their persistent
-references. This is exercised end-to-end by
-`server/test/geometry.test.ts` and `server/test/api.test.ts` (the MVP
-workflow: 100×50 plate → hole → fillet → roll back → widen to 120 → roll
-forward → hole and fillet regenerate).
+references. The MVP workflow exercises this end to end: 100×50 plate → hole →
+fillet → roll back → widen to 120 → roll forward → hole and fillet regenerate.
 
 ## Dependencies and failures
 

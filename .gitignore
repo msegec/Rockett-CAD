@@ -31,3 +31,15 @@ backups/
 *.tfvars*
 compose.override.*
 docker-compose.override.*
+
+# Kept locally, never published
+AGENTS.md
+CLAUDE.md
+WORK-ORDER.md
+LAST-RUN.md
+Brief.md
+docs/internals/
+scripts/check-work-order.sh
+scripts/test-work-order.sh
+server/test/
+client/test/

@@ -24,11 +24,6 @@ client/src/three/revolveGhost.ts 9
 client/src/three/sketchRender.ts 13
 client/src/three/toolPreview.ts 10
 client/src/viewportRef.ts 2
-client/test/constructionTools.test.ts 2
-client/test/dimEntry.test.ts 4
-client/test/dimensionDedupe.test.ts 2
-client/test/perpSnap.test.ts 13
-client/test/reopen.test.ts 11
 client/vite.config.ts 1
 server/src/api/routes.ts 22
 server/src/geometry/engine.ts 22
@@ -43,14 +38,6 @@ server/src/geometry/tangentEdges.ts 6
 server/src/geometry/tessellate.ts 10
 server/src/index.ts 8
 server/src/store/projectQueue.ts 1
-server/test/api.test.ts 21
-server/test/chamferEnvelope.test.ts 7
-server/test/export.test.ts 1
-server/test/faceExtrude.test.ts 2
-server/test/featureGolden.test.ts 22
-server/test/geometry.test.ts 12
-server/test/signedExtrude.test.ts 1
-server/test/unifyFaces.test.ts 3
 shared/src/api.ts 16
 shared/src/model.ts 84
 shared/src/projection.ts 1
