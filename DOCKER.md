@@ -53,6 +53,9 @@ label shows the tag and its tooltip the commit. Before promoting,
 `docker image inspect` must print `COMMIT`. If prod uses another engine, move
 the image there with `docker save` and `docker load`; do not rebuild it.
 
+Supply deployment values through your shell outside this repository. Never
+commit environment files, host addresses, deployment ports or operational data.
+
 Roll prod back by rerunning the prod command with the previous `REV`; keep
 that image until the new one is trusted. Confirm what is running with
 `curl http://<host>:<port>/api/health`, whose `commit` must match the intended

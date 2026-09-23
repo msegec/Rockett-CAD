@@ -17,9 +17,10 @@ Mark
 Team Rocket blasts off at the speed of light!
 Surrender now, or prepare to fight!
 
-Self-hosted, browser-based **parametric CAD** for designing 3D-printable parts.
-A deliberately simplified, self-hostable take on the parametric solid-modelling
-portion of Fusion 360:
+Self-hosted, browser-based **parametric CAD** with a B-Rep kernel and a feature
+timeline. The aim is Fusion features for design and manufacture workspaces: CNC
+toolpaths, PCB and electrical plugins, from the model to a finished part.
+Additive work is STL and 3MF export today, and can become a plugin later.
 
 > **Sketch → constrain → feature → body → timeline → modify → regenerate → export**
 
