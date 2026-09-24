@@ -50,8 +50,12 @@ function releaseSnapshots(
   const keptShapes = new Set(kept.map((b) => b.shape));
   const keptNames = new Set(kept.map((b) => b.names));
   const dropped = bodies(discarded);
-  for (const shape of new Set(dropped.map((b) => b.shape)))
-    if (!keptShapes.has(shape)) shape.delete();
+  const freed = dropped.filter((b) => !keptShapes.has(b.shape));
+  for (const body of freed) {
+    const key = cacheKey(body);
+    if (tessCache.entries.get(key)?.shape === body.shape) evict(key);
+  }
+  for (const shape of new Set(freed.map((b) => b.shape))) shape.delete();
   for (const names of new Set(dropped.map((b) => b.names)))
     if (!keptNames.has(names)) names.release();
 }
@@ -82,27 +86,69 @@ export function featureKey(feature: CadDocument["features"][number]): string {
   return JSON.stringify(geometric);
 }
 
-const TESS_CACHE_BYTES = 256 * 1024 * 1024;
+interface Tessellation {
+  shape: Shape;
+  payload: BodyPayload;
+  bytes: number;
+}
 
-function payloadBytes(p: BodyPayload): number {
-  let numbers = p.positions.length + p.normals.length + p.indices.length;
-  for (const edge of p.edges) numbers += edge.polyline.length;
-  return numbers * 8;
+export const tessCache = {
+  limit: 256 * 1024 * 1024,
+  bytes: 0,
+  entries: new Map<string, Tessellation>(),
+};
+
+function payloadBytes(value: unknown): number {
+  if (typeof value === "number" || typeof value === "boolean") return 8;
+  if (typeof value === "string") return value.length * 2;
+  if (!value || typeof value !== "object") return 0;
+  if (Array.isArray(value) && typeof value[0] === "number")
+    return value.length * 8;
+  let bytes = 0;
+  for (const v of Object.values(value)) bytes += payloadBytes(v);
+  return bytes;
 }
 
 function cacheKey(body: NamedBody): string {
   return `${body.bodyId}:${shapeHash(body.shape)}`;
 }
 
-interface Tessellation {
-  shape: Shape;
-  payload: BodyPayload;
+function evict(key: string): void {
+  const entry = tessCache.entries.get(key);
+  if (!entry) return;
+  tessCache.entries.delete(key);
+  tessCache.bytes -= entry.bytes;
+}
+
+function store(body: NamedBody, payload: BodyPayload): void {
+  const key = cacheKey(body);
+  evict(key);
+  const bytes = payloadBytes(payload);
+  tessCache.entries.set(key, { shape: body.shape, payload, bytes });
+  tessCache.bytes += bytes;
+  for (const old of tessCache.entries.keys()) {
+    if (tessCache.bytes <= tessCache.limit) break;
+    evict(old);
+  }
+}
+
+function cached(body: NamedBody): BodyPayload | undefined {
+  const key = cacheKey(body);
+  const entry = tessCache.entries.get(key);
+  if (!entry) return undefined;
+  if (entry.shape.isDeleted()) {
+    evict(key);
+    return undefined;
+  }
+  if (body.shape.isDeleted() || !entry.shape.IsSame(body.shape))
+    return undefined;
+  tessCache.entries.delete(key);
+  tessCache.entries.set(key, entry);
+  return entry.payload;
 }
 
 class DocumentEngine {
   private snapshots: Snapshot[] = [];
-  private tessCache = new Map<string, Tessellation>();
-  private tessBytes = 0;
 
   evaluate(
     doc: CadDocument,
@@ -214,41 +260,16 @@ class DocumentEngine {
   }
 
   private tessellated(body: StateBody, name: string): BodyPayload {
-    const hit = this.cached(body);
+    const hit = cached(body);
     if (hit) return hit;
     const payload =
       this.moved(body) ?? tessellateBody(body, { name, visible: true });
-    const key = cacheKey(body);
-    const stale = this.tessCache.get(key);
-    this.tessCache.delete(key);
-    if (stale) this.tessBytes -= payloadBytes(stale.payload);
-    this.tessCache.set(key, { shape: body.shape, payload });
-    this.tessBytes += payloadBytes(payload);
-    for (const [old, entry] of this.tessCache) {
-      if (this.tessBytes <= TESS_CACHE_BYTES) break;
-      this.tessCache.delete(old);
-      this.tessBytes -= payloadBytes(entry.payload);
-    }
+    store(body, payload);
     return payload;
   }
 
-  private cached(body: NamedBody): BodyPayload | undefined {
-    const key = cacheKey(body);
-    const entry = this.tessCache.get(key);
-    if (
-      !entry ||
-      entry.shape.isDeleted() ||
-      body.shape.isDeleted() ||
-      !entry.shape.IsSame(body.shape)
-    )
-      return undefined;
-    this.tessCache.delete(key);
-    this.tessCache.set(key, entry);
-    return entry.payload;
-  }
-
   private moved({ bodyId, copyOf }: StateBody): BodyPayload | undefined {
-    const source = copyOf && this.cached(copyOf.source);
+    const source = copyOf && cached(copyOf.source);
     return source && movePayload(source, bodyId, copyOf.offset, copyOf.prefix);
   }
 
@@ -270,8 +291,6 @@ class DocumentEngine {
   invalidate(): void {
     releaseSnapshots(this.snapshots, []);
     this.snapshots = [];
-    this.tessCache.clear();
-    this.tessBytes = 0;
   }
 }
 
