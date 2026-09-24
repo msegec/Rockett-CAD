@@ -13,6 +13,7 @@ export type OC = any;
 export type Shape = any; // TopoDS_Shape
 
 let oc: OC | null = null;
+let range: any = null;
 let initPromise: Promise<OC> | null = null;
 
 export async function initKernel(): Promise<OC> {
@@ -23,8 +24,10 @@ export async function initKernel(): Promise<OC> {
         // @ts-ignore — dist/node.js has no type declarations
         "opencascade.js/dist/node.js"
       );
-      oc = await initOpenCascade();
-      return oc;
+      const kernel = await initOpenCascade();
+      range = new kernel.Message_ProgressRange_1();
+      oc = kernel;
+      return kernel;
     })();
   }
   return initPromise;
@@ -168,8 +171,8 @@ export function transformOp(shape: Shape, trsf: any): any {
 }
 
 export function progress(): any {
-  const k = getKernel();
-  return new k.Message_ProgressRange_1();
+  getKernel();
+  return range;
 }
 
 /** Volume of a solid shape in mm³. */

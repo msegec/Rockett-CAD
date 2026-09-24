@@ -60,7 +60,9 @@ feature evaluates are released when it ends unless a body in its result holds
 them.
 A caller that needs a shape after its engine is dropped reads what it needs
 first. Short-lived handles, such as explored faces and edges, name lookups
-and adaptors, are deleted by the code that made them.
+and adaptors, are deleted by the code that made them. Kernel calls share the
+one progress range `progress()` returns, which lives as long as the kernel
+and which no caller deletes.
 
 If an upstream change removes geometry a downstream feature references, that
 feature is marked in the timeline:

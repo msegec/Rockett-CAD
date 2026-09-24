@@ -15,6 +15,7 @@ import {
   pnt,
   dir,
   progress,
+  release,
   scoped,
   shapeHash,
   type Shape,
@@ -139,12 +140,14 @@ function buildWire(
       if (oc.reversed) [s, e] = [e, s];
       const p1 = to3d(s);
       const p2 = to3d(e);
-      const mk = new k.BRepBuilderAPI_MakeEdge_3(
-        pnt(p1[0], p1[1], p1[2]),
-        pnt(p2[0], p2[1], p2[2]),
+      edge = scoped((own) =>
+        own(
+          new k.BRepBuilderAPI_MakeEdge_3(
+            own(pnt(p1[0], p1[1], p1[2])),
+            own(pnt(p2[0], p2[1], p2[2])),
+          ),
+        ).Edge(),
       );
-      edge = mk.Edge();
-      mk.delete();
     } else if (arc || (circle && oc.trim)) {
       // arcs, and pieces of a circle split by crossings (trim = CCW start/end)
       const c = maps.points.get(arc ? arc.center : circle!.center)!;
@@ -159,22 +162,23 @@ function buildWire(
     } else if (circle) {
       const c = maps.points.get(circle.center)!;
       const c3 = to3d([c.x, c.y]);
-      const ax2 = new k.gp_Ax2_2(
-        pnt(c3[0], c3[1], c3[2]),
-        dir(frame.normal[0], frame.normal[1], frame.normal[2]),
-        dir(frame.xAxis[0], frame.xAxis[1], frame.xAxis[2]),
-      );
-      const circ = new k.gp_Circ_2(ax2, circle.radius);
-      const mk = new k.BRepBuilderAPI_MakeEdge_8(circ);
-      edge = mk.Edge();
-      mk.delete();
-      circ.delete();
-      ax2.delete();
+      edge = scoped((own) => {
+        const ax2 = own(
+          new k.gp_Ax2_2(
+            own(pnt(c3[0], c3[1], c3[2])),
+            own(dir(frame.normal[0], frame.normal[1], frame.normal[2])),
+            own(dir(frame.xAxis[0], frame.xAxis[1], frame.xAxis[2])),
+          ),
+        );
+        const circ = own(new k.gp_Circ_2(ax2, circle.radius));
+        return own(new k.BRepBuilderAPI_MakeEdge_8(circ)).Edge();
+      });
     }
     if (!edge)
       throw new Error(`profile references unknown entity ${oc.entityId}`);
     edgeEntity.set(shapeHash(edge), oc.entityId);
     wireMaker.Add_1(edge);
+    edge.delete();
     if (!wireMaker.IsDone()) {
       wireMaker.delete();
       throw new Error(
@@ -220,7 +224,8 @@ function matchEdgesToEntities(
     k.TopAbs_ShapeEnum.TopAbs_SHAPE,
   );
   while (ex.More()) {
-    const edge = k.TopoDS.Edge_1(ex.Current());
+    const current = ex.Current();
+    const edge = k.TopoDS.Edge_1(current);
     const curve = new k.BRepAdaptor_Curve_2(edge);
     const tMid = (curve.FirstParameter() + curve.LastParameter()) / 2;
     const mid3d = curve.Value(tMid);
@@ -257,6 +262,7 @@ function matchEdgesToEntities(
     if (best && best.d < 1e-4) {
       result.set(shapeHash(edge), best.id);
     }
+    release([current, edge]);
     ex.Next();
   }
   ex.delete();
@@ -429,30 +435,33 @@ export function buildProfileFace(
 
     const outerWire = buildWire(profile.outer, maps, frame, snap, edgeEntity);
 
-    const pln = new k.gp_Pln_3(
-      pnt(frame.origin[0], frame.origin[1], frame.origin[2]),
-      dir(frame.normal[0], frame.normal[1], frame.normal[2]),
-    );
-    const faceMk = new k.BRepBuilderAPI_MakeFace_16(pln, outerWire, true);
-    if (!faceMk.IsDone()) {
-      faceMk.delete();
-      throw new Error("failed to build profile face");
-    }
-    let face = faceMk.Face();
-    faceMk.delete();
-    pln.delete();
+    let face = scoped((own) => {
+      const pln = own(
+        new k.gp_Pln_3(
+          own(pnt(frame.origin[0], frame.origin[1], frame.origin[2])),
+          own(dir(frame.normal[0], frame.normal[1], frame.normal[2])),
+        ),
+      );
+      const faceMk = own(
+        new k.BRepBuilderAPI_MakeFace_16(pln, own(outerWire), true),
+      );
+      if (!faceMk.IsDone()) throw new Error("failed to build profile face");
+      return faceMk.Face();
+    });
 
     for (const hole of profile.holes) {
-      const holeWire = buildWire(hole, maps, frame, snap, edgeEntity);
-      // Hole wires must oppose the outer wire orientation.
-      const reversedWire = k.TopoDS.Wire_1(holeWire.Reversed());
-      const withHole = new k.BRepBuilderAPI_MakeFace_22(face, reversedWire);
-      if (!withHole.IsDone()) {
-        withHole.delete();
-        throw new Error("failed to add hole to profile face");
-      }
-      face = withHole.Face();
-      withHole.delete();
+      const outer = face;
+      face = scoped((own) => {
+        own(outer);
+        const holeWire = own(buildWire(hole, maps, frame, snap, edgeEntity));
+        const reversedWire = own(k.TopoDS.Wire_1(own(holeWire.Reversed())));
+        const withHole = own(
+          new k.BRepBuilderAPI_MakeFace_22(outer, reversedWire),
+        );
+        if (!withHole.IsDone())
+          throw new Error("failed to add hole to profile face");
+        return withHole.Face();
+      });
     }
 
     // Re-derive edge → entity mapping from the final face geometry.

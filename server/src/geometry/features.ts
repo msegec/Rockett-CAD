@@ -295,7 +295,14 @@ function registerPieces(
   bodyId: string,
   pieces: BodyPiece[],
 ): void {
-  for (const [id, { shape, names }] of assignBodyIds(bodyId, pieces))
+  let named: [string, BodyPiece][];
+  try {
+    named = assignBodyIds(bodyId, pieces);
+  } catch (err) {
+    release(pieces.map((p) => p.shape));
+    throw err;
+  }
+  for (const [id, { shape, names }] of named)
     state.bodies.set(id, { bodyId: id, shape, names });
 }
 
@@ -306,28 +313,32 @@ function registerNewBodies(
   regions: ProfileFace[],
 ): void {
   const unified = tools.map((t) => unifyTool(t, featureId));
-  if (unified[0]?.names.version === 2) {
-    registerPieces(
-      state,
-      `b:${featureId}`,
-      unified.flatMap((u, i) =>
-        solids(u.shape).map((shape) => ({
-          shape,
-          names: u.names,
-          region: regions[i]!.profileId,
-        })),
+  try {
+    if (unified[0]?.names.version === 2) {
+      registerPieces(
+        state,
+        `b:${featureId}`,
+        unified.flatMap((u, i) =>
+          solids(u.shape).map((shape) => ({
+            shape,
+            names: u.names,
+            region: regions[i]!.profileId,
+          })),
+        ),
+      );
+      return;
+    }
+    unified.forEach((u, i) =>
+      registerBodySolids(
+        state,
+        i === 0 ? `b:${featureId}` : `b:${featureId}:${i + 1}`,
+        u.shape,
+        u.names,
       ),
     );
-    return;
+  } finally {
+    release(new Set([...tools, ...unified].map((t) => t.shape)));
   }
-  unified.forEach((u, i) =>
-    registerBodySolids(
-      state,
-      i === 0 ? `b:${featureId}` : `b:${featureId}:${i + 1}`,
-      u.shape,
-      u.names,
-    ),
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -396,8 +407,10 @@ function unifyTool(tool: ToolResult, featureId: string): ToolResult {
     release(seams);
     uni.Build();
     const merged = uni.Shape();
-    if (facesOf(merged).length === 0) {
-      uni.delete();
+    const mergedFaces = facesOf(merged);
+    release(mergedFaces);
+    if (mergedFaces.length === 0) {
+      release([merged, uni]);
       return tool;
     }
     const history = uni.History_1();
@@ -558,6 +571,7 @@ function applyToolOperation(
       );
       op.delete();
       registerBodySolids(state, body.bodyId, result, names);
+      result.delete();
     }
     if (!any) throw new Error("cut tool does not intersect any body");
     return;
@@ -685,7 +699,8 @@ function buildPrism(
 
     const provisional = new ShapeMap<string>();
     // side faces from profile edges
-    for (const e of edgesOf(face)) {
+    const faceEdges = edgesOf(face);
+    for (const e of faceEdges) {
       const entityId = offsetEdgeEntity.get(shapeHash(e));
       if (!entityId) continue;
       const gen = listToArray(prism.Generated(e));
@@ -696,15 +711,19 @@ function buildPrism(
       }
       release(gen);
     }
+    release(faceEdges);
     // caps
     const firstShape = prism.FirstShape_1();
-    for (const cap of facesOf(firstShape)) {
+    const startCaps = facesOf(firstShape);
+    for (const cap of startCaps) {
       provisional.set(cap, `f:${featureId}:cap:start`);
     }
     const lastShape = prism.LastShape_1();
-    for (const cap of facesOf(lastShape)) {
+    const endCaps = facesOf(lastShape);
+    for (const cap of endCaps) {
       provisional.set(cap, `f:${featureId}:cap:end`);
     }
+    release([firstShape, lastShape, ...startCaps, ...endCaps]);
     const names = finalizeNames(shape, provisional, featureId);
     prism.delete();
     v.delete();
@@ -777,6 +796,7 @@ function evalExtrude(state: EvalState, f: ExtrudeFeature): void {
       tools.push(buildPrism(f.id, pf, n, dist + d2, base - d2, copy));
     }
   }
+  release(new Set(sources.map(({ pf }) => pf.face)));
 
   if (f.operation === "newBody") {
     registerNewBodies(
@@ -789,12 +809,19 @@ function evalExtrude(state: EvalState, f: ExtrudeFeature): void {
   }
 
   // merge multiple profile prisms into one tool
+  const made = new Set(tools.map((t) => t.shape));
   let tool = tools[0]!;
   for (let i = 1; i < tools.length; i++) {
     tool = fuseNamed(tool, tools[i]!, f.id, "failed to merge profile solids");
+    made.add(tool.shape);
   }
-
-  applyToolOperation(state, f.id, unifyTool(tool, f.id), f.operation);
+  const unified = unifyTool(tool, f.id);
+  made.add(unified.shape);
+  try {
+    applyToolOperation(state, f.id, unified, f.operation);
+  } finally {
+    release(made);
+  }
 }
 
 function evalRevolve(state: EvalState, f: RevolveFeature): void {
@@ -808,13 +835,18 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
   const tools: ToolResult[] = [];
   for (const pf of profileFaces) {
     const tool = kernelCall("revolve", () => {
-      const ax1 = new k.gp_Ax1_2(
-        pnt(axis.origin[0], axis.origin[1], axis.origin[2]),
-        dir(
-          sign * axis.direction[0],
-          sign * axis.direction[1],
-          sign * axis.direction[2],
-        ),
+      const ax1 = scoped(
+        (own) =>
+          new k.gp_Ax1_2(
+            own(pnt(axis.origin[0], axis.origin[1], axis.origin[2])),
+            own(
+              dir(
+                sign * axis.direction[0],
+                sign * axis.direction[1],
+                sign * axis.direction[2],
+              ),
+            ),
+          ),
       );
       const revol = full
         ? new k.BRepPrimAPI_MakeRevol_2(pf.face, ax1, false)
@@ -829,7 +861,8 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
       const shape = revol.Shape();
       const provisional = new ShapeMap<string>();
       const profileEdges: Array<[Shape, string]> = [];
-      for (const e of edgesOf(pf.face)) {
+      const faceEdges = edgesOf(pf.face);
+      for (const e of faceEdges) {
         const entityId = pf.edgeEntity.get(shapeHash(e));
         if (!entityId) continue;
         const name = `f:${f.id}:s:${entityId}`;
@@ -851,6 +884,7 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
         }
       }
       nameFromEdges(shape, provisional, profileEdges);
+      release(faceEdges);
       const names = finalizeNames(shape, provisional, f.id);
       revol.delete();
       ax1.delete();
@@ -858,6 +892,7 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
     });
     tools.push(tool);
   }
+  release(profileFaces.map((pf) => pf.face));
 
   if (f.operation === "newBody") {
     registerNewBodies(state, f.id, tools, profileFaces);

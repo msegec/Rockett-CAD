@@ -182,7 +182,7 @@ export function nameFromEdges(
           face,
           k.Extrema_ExtFlag.Extrema_ExtFlag_MIN,
           k.Extrema_ExtAlgo.Extrema_ExtAlgo_Grad,
-          own(progress()),
+          progress(),
         ),
       );
       if (!dist.IsDone()) throw new Error("edge naming distance check failed");
