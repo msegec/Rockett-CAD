@@ -2,9 +2,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import {
   createEmptyDocument,
-  createManifest,
   DAY,
-  DOCUMENT_TYPES,
   emptyView,
   MB,
   MINUTE,
@@ -13,26 +11,21 @@ import {
   VIEW_VERSION,
   withShown,
   type CadDocument,
-  type ProjectManifest,
   type ProjectSummary,
   type ProjectView,
 } from "@rockett/shared";
 import { build } from "../build.js";
 import { BlobStore, HASH_RE, PendingBlobs, Uploads } from "./blobStore.js";
-import { JsonStore, sha256, StoreError, type Inventory } from "./jsonStore.js";
-import {
-  documentMigrations,
-  manifestMigrations,
-  TooNewError,
-} from "./migrations.js";
+import { JsonStore, sha256, StoreError } from "./jsonStore.js";
+import type { Inventory, Write } from "./jsonStore.js";
+import { checkManifest, ID_RE, ManifestStore } from "./manifestStore.js";
+import { documentMigrations, TooNewError } from "./migrations.js";
 import type { Storage } from "./storage.js";
 
 export { StoreError };
 
-const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const LEGACY = "document.json";
 const DOCUMENTS = "documents";
-const MANIFEST = "project.json";
 const PNG_HEAD = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 
 export const IMAGE_LIMIT_MB = 25;
@@ -72,21 +65,6 @@ function imageMime(data: Buffer, label: string): string {
   return type.mime;
 }
 
-function checkManifest(id: string, manifest: ProjectManifest): void {
-  const types = new Set<unknown>(DOCUMENT_TYPES);
-  if (!Array.isArray(manifest.documents))
-    throw new Error("documents is not a list");
-  for (const document of manifest.documents) {
-    if (!types.has(document?.type))
-      throw new Error(`unknown document type ${String(document?.type)}`);
-    if (typeof document.id !== "string" || !ID_RE.test(document.id))
-      throw new Error(`invalid document id ${String(document.id)}`);
-  }
-  const [first] = manifest.documents;
-  if (first?.id !== id || first.type !== "part")
-    throw new Error(`the first document is not part ${id}`);
-}
-
 function stepBlobs(doc: CadDocument): string[] {
   return doc.features.flatMap((f) => (f.type === "importStep" ? [f.blob] : []));
 }
@@ -100,7 +78,7 @@ function imageBlobs(doc: CadDocument): string[] {
 export class ProjectStore {
   private documents: JsonStore<CadDocument, PendingBlobs>;
   private views: JsonStore<ProjectView>;
-  private manifests: JsonStore<ProjectManifest>;
+  private manifests: ManifestStore;
   readonly uploads: Uploads;
 
   constructor(
@@ -124,14 +102,7 @@ export class ProjectStore {
       unbacked: async () => true,
       validate: (view) => parse(projectView, view),
     });
-    this.manifests = new JsonStore({
-      storage,
-      root: "projects",
-      name: "project",
-      key: ID_RE,
-      file: () => MANIFEST,
-      migrations: manifestMigrations,
-    });
+    this.manifests = new ManifestStore(storage);
     this.documents = new JsonStore({
       storage,
       root: "projects",
@@ -154,8 +125,8 @@ export class ProjectStore {
             out.set(
               ...this.views.encode(id, withShown(emptyView(), pending.shown)),
             );
-          if (!(await storage.list(this.documents.dir(id))).includes(MANIFEST))
-            out.set(...this.manifests.encode(id, createManifest(id)));
+          if (await this.manifests.missing(id))
+            out.set(...this.manifests.created(id));
           return out;
         },
         retire: (id) => storage.remove(this.assetDir(id)),
@@ -215,9 +186,7 @@ export class ProjectStore {
 
   private async add(doc: CadDocument): Promise<void> {
     await this.save(doc);
-    await this.storage.writeAtomic(
-      ...this.manifests.encode(doc.id, createManifest(doc.id)),
-    );
+    await this.storage.writeAtomic(...this.manifests.created(doc.id));
   }
 
   load(id: string): Promise<CadDocument> {
@@ -237,21 +206,13 @@ export class ProjectStore {
   }
 
   private async part(id: string, documentId: string) {
-    const { documents } = await this.manifest(id);
-    if (!documents.some((d) => d.id === documentId))
+    const manifest = await this.manifests.read(id);
+    this.valid(id, () => checkManifest(id, manifest));
+    if (!manifest.documents.some((d) => d.id === documentId))
       throw new StoreError(`document ${documentId} not found`, "not_found");
     const { value, context } = await this.documents.migrated(id, documentId);
     this.valid(id, () => this.validate(value));
     return { doc: value, context };
-  }
-
-  private async manifest(id: string): Promise<ProjectManifest> {
-    const manifest = await this.manifests.read(id).catch((err) => {
-      if (!(err instanceof StoreError && err.code === "not_found")) throw err;
-      return createManifest(id);
-    });
-    this.valid(id, () => checkManifest(id, manifest));
-    return manifest;
   }
 
   private valid(id: string, check: () => void): void {
@@ -265,14 +226,15 @@ export class ProjectStore {
     }
   }
 
-  async save(doc: CadDocument): Promise<void> {
+  async save(doc: CadDocument, write?: Write): Promise<void> {
     const snapshot = structuredClone(doc);
     snapshot.modifiedAt = new Date().toISOString();
     snapshot.savedWith = build();
-    await this.documents.update(doc.id, (previous) => {
+    const next = (previous?: CadDocument) => {
       snapshot.revision = (previous?.revision ?? 0) + 1;
       return snapshot;
-    });
+    };
+    await this.documents.update(doc.id, next, write);
     doc.modifiedAt = snapshot.modifiedAt;
     doc.revision = snapshot.revision;
     doc.savedWith = snapshot.savedWith;
@@ -302,8 +264,12 @@ export class ProjectStore {
     return files.includes("view.json");
   }
 
+  exclusive<R>(id: string, operation: () => Promise<R>): Promise<R> {
+    return this.documents.exclusive(id, operation);
+  }
+
   duplicate(id: string, newName?: string): Promise<CadDocument> {
-    return this.documents.exclusive(id, () => this.copy(id, newName));
+    return this.exclusive(id, () => this.copy(id, newName));
   }
 
   private async copy(id: string, newName?: string): Promise<CadDocument> {

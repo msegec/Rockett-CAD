@@ -110,6 +110,12 @@ export class LocalStorage implements Storage {
   }
 
   async remove(target: string): Promise<void> {
-    await this.fs.rm(this.resolve(target), { recursive: true, force: true });
+    const full = this.resolve(target);
+    await this.fs.rm(full, { recursive: true, force: true });
+    try {
+      await this.sync(path.dirname(full), "r");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    }
   }
 }

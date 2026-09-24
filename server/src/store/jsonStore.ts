@@ -20,6 +20,9 @@ export class StoreError extends Error {
 }
 
 export type Files = ReadonlyMap<string, string | Uint8Array>;
+export type Write = (file: string, text: string) => Promise<void>;
+
+const TRANSACTION = "tx";
 
 export interface MigrationEffects<C extends MigrationContext> {
   context(key: string, stored: unknown): Promise<C>;
@@ -64,8 +67,8 @@ export class NamespaceBackup {
     this.record = path.posix.join(this.root, "migrating.json");
   }
 
-  async backup(version: string): Promise<string> {
-    const name = await this.write(version);
+  async backup(version: string, names?: string[]): Promise<string> {
+    const name = await this.write(version, names);
     await this.verify(name);
     return name;
   }
@@ -74,8 +77,9 @@ export class NamespaceBackup {
     version: string,
     created: Files,
     apply: () => Promise<void>,
+    names?: string[],
   ): Promise<void> {
-    const backup = await this.backup(version);
+    const backup = await this.backup(version, names);
     await this.storage.writeAtomic(
       this.record,
       JSON.stringify({
@@ -86,6 +90,40 @@ export class NamespaceBackup {
     await writeAll(this.storage, created);
     await apply();
     await this.storage.remove(this.record);
+  }
+
+  async commit(build: () => Promise<Files>): Promise<void> {
+    await this.settle();
+    const files = await build();
+    const created = new Map<string, string | Uint8Array>();
+    const replaced = new Map<string, string | Uint8Array>();
+    for (const [file, data] of files) {
+      const live = await this.storage.list(path.posix.dirname(file));
+      (live.includes(path.posix.basename(file)) ? replaced : created).set(
+        file,
+        data,
+      );
+    }
+    try {
+      await this.migrate(
+        TRANSACTION,
+        created,
+        () => writeAll(this.storage, replaced),
+        [...replaced.keys()].map((file) => path.posix.relative(this.dir, file)),
+      );
+    } finally {
+      await this.settle();
+    }
+  }
+
+  private async settle(): Promise<void> {
+    await this.recover();
+    const names = await this.storage.list(this.root);
+    const journal = names.filter((n) => n.startsWith(`${TRANSACTION}-`));
+    for (const name of journal)
+      await this.storage.remove(path.posix.join(this.root, name));
+    if (names.length && journal.length === names.length)
+      await this.storage.remove(this.root);
   }
 
   async recover(): Promise<boolean> {
@@ -143,9 +181,9 @@ export class NamespaceBackup {
     return data;
   }
 
-  private async write(version: string): Promise<string> {
+  private async write(version: string, only?: string[]): Promise<string> {
     const { storage, dir } = this;
-    const names = await storage.files(dir);
+    const names = only ?? (await storage.files(dir));
     names.sort();
     const sums = new Map<string, string>();
     for (const name of names)
@@ -254,11 +292,15 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
     return this.update(key, () => value);
   }
 
-  update(key: string, change: (previous: T | undefined) => T): Promise<void> {
+  update(
+    key: string,
+    change: (previous: T | undefined) => T,
+    write: Write = (file, text) => this.options.storage.writeAtomic(file, text),
+  ): Promise<void> {
     return this.writes.run(key, async () => {
       const [file, text] = this.encode(key, change(await this.previous(key)));
       await this.upgrade(key);
-      await this.options.storage.writeAtomic(file, text);
+      await write(file, text);
     });
   }
 

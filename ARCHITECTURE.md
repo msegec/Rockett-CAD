@@ -58,8 +58,14 @@ JSON files, queues writes per key and migrates each file on read through its
 `Migrations` table. Before a migrated file is first written, it backs up the
 file's whole directory; a temporary project gets no backup. `BlobStore` keeps
 a project's source files and images by sha256. `ProjectStore` assembles a
-project from its `project.json` manifest, its part document, `view.json` and
-blobs. DOCKER.md shows the layout on disk and the backup and restore rules.
+project from its `project.json` manifest (`ManifestStore`), its part
+document, `view.json` and blobs. `HistoryStore` keeps a project's undo
+history in `history/`: a log of at most 50 labelled entries plus
+checkpoints, a cursor, and gzip snapshots of the document named by the sha256
+of their stored bytes. A history save writes the document, its snapshot, the
+log and the cursor as one transaction: the migration recovery record lists
+it, and a failure or restart rolls it back. No route records history yet.
+DOCKER.md shows the layout on disk and the backup and restore rules.
 
 **Shared parametric code.** The constraint solver and profile detection are
 plain TypeScript used by _both_ sides: the browser solves interactively while
