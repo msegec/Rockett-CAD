@@ -90,9 +90,11 @@ Bodies get stable ids derived from the feature that created them:
 - Under `namingVersion` 1 a join fuses its whole tool into the first body its
   bounding box overlaps, so tool solids over other bodies become `b:{body}:n`.
   Under version 2 each tool solid fuses into every body it touches or
-  overlaps, found by bounding box and then by kernel distance, and each
-  result is unified. Bodies one tool solid bridges become one body under the
-  first id, digit runs compared as numbers, so `b:x:2` wins over `b:x:10`.
+  overlaps, found by bounding box, then by kernel distance, then by a fuse
+  that must give one solid, so a tool solid meeting a body only along an edge
+  or at a vertex stays a new body. Each result is unified. Bodies one tool
+  solid bridges become one body under the first id, digit runs compared as
+  numbers, so `b:x:2` wins over `b:x:10`.
   Tool solids that touch no body become `b:{featureId}`,
   `b:{featureId}:2`, … in face name order.
 - An operation that leaves multiple solids appends ordinal suffixes

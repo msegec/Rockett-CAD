@@ -446,7 +446,15 @@ function touches(a: Shape, b: Shape): boolean {
   const value = done ? dist.Value() : 0;
   dist.delete();
   if (!done) throw new Error("join contact check failed");
-  return value <= LINEAR_TOL;
+  if (value > LINEAR_TOL) return false;
+  return scoped((own) => {
+    const op = own(new k.BRepAlgoAPI_Fuse_3(a, b, progress()));
+    op.Build(progress());
+    if (!op.IsDone()) throw new Error("join contact check failed");
+    const pieces = solids(own(op.Shape()));
+    release(pieces);
+    return pieces.length === 1;
+  });
 }
 
 function joinEvery(
