@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useStore, type Selection } from "../store";
 import { viewportHandle } from "../viewportRef";
 import { ContextMenu, type MenuItem } from "./ContextMenu";
@@ -37,15 +38,19 @@ function viewItems(): MenuItem[] {
   ];
 }
 
-function relationItems(): MenuItem[] {
-  const s = useStore.getState();
-  if (s.mode.name !== "sketch" || !s.draftSketch) return [];
-  return relationsFor(s.draftSketch, sketchSelectionIds(s.selection)).map(
-    (r) => ({
-      label: r.label,
-      action: () => void addSketchConstraints(r.constraints),
-    }),
+function useRelationItems(): MenuItem[] {
+  const draft = useStore((s) =>
+    s.mode.name === "sketch" ? s.draftSketch : null,
   );
+  const selection = useStore((s) => s.selection);
+  const relations = useMemo(
+    () => (draft ? relationsFor(draft, sketchSelectionIds(selection)) : []),
+    [draft, selection],
+  );
+  return relations.map((r) => ({
+    label: r.label,
+    action: () => void addSketchConstraints(r.constraints),
+  }));
 }
 
 export function ViewportContextMenu({
@@ -66,7 +71,7 @@ export function ViewportContextMenu({
 }) {
   const { sel } = menu;
   const s = useStore.getState();
-  const items = relationItems();
+  const items = useRelationItems();
   const shown = () => (
     <ContextMenu x={menu.x} y={menu.y} items={items} onClose={onClose} />
   );

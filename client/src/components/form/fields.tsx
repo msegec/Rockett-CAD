@@ -225,14 +225,38 @@ function numbered(kind: string, index: number, owner?: string): string {
   return owner ? `${name}, ${owner}` : name;
 }
 
+type Ranked<T> = { item: T; rank: number };
+
+const ranks = new WeakMap<readonly object[], Map<string, Ranked<object>>>();
+
+function ranked<T extends object>(
+  list: readonly T[],
+  id: (x: T) => string,
+  group: (x: T) => string = () => "",
+): Map<string, Ranked<T>> {
+  const hit = ranks.get(list);
+  if (hit) return hit as Map<string, Ranked<T>>;
+  const counts = new Map<string, number>();
+  const made = new Map<string, Ranked<T>>();
+  for (const item of list) {
+    const key = group(item);
+    const rank = counts.get(key) ?? 0;
+    counts.set(key, rank + 1);
+    if (!made.has(id(item))) made.set(id(item), { item, rank });
+  }
+  ranks.set(list, made);
+  return made;
+}
+
 function pickLabel(
   pick: Selection,
   document: CadDocument | null,
   evaluation: EvaluateResult | null,
   bodies: BodyPayload[],
 ): string {
-  const featureName = (id: string) =>
-    document?.features.find((f) => f.id === id)?.name;
+  const feature = (id: string) =>
+    document && ranked(document.features, (f) => f.id).get(id)?.item;
+  const featureName = (id: string) => feature(id)?.name;
   if (pick.kind === "plane") {
     const ref = pick.ref;
     if (ref.kind === "origin") return `${ref.plane} Plane`;
@@ -241,9 +265,13 @@ function pickLabel(
     return pickLabel(ref.face, document, evaluation, bodies);
   }
   if ("bodyId" in pick) {
-    const body = bodies.find((b) => b.bodyId === pick.bodyId);
+    const body = ranked(bodies, (b) => b.bodyId).get(pick.bodyId)?.item;
     if (pick.kind === "body") return body?.name ?? "Body";
-    const [kind, list, name] =
+    const [kind, list, name]: [
+      string,
+      readonly { name: string }[] | undefined,
+      string,
+    ] =
       pick.kind === "face"
         ? ["Face", body?.faces, pick.faceName]
         : pick.kind === "edge"
@@ -251,33 +279,36 @@ function pickLabel(
           : ["Vertex", body?.vertices, pick.vertexName];
     return numbered(
       kind,
-      list?.findIndex((x) => x.name === name) ?? -1,
+      (list && ranked(list, (x) => x.name).get(name)?.rank) ?? -1,
       body?.name,
     );
   }
   const sketch = featureName(pick.sketchId);
   if (pick.kind === "sketch") return sketch ?? "Sketch";
   if (pick.kind === "profile") {
-    const profiles = evaluation?.sketches.find(
-      (s) => s.featureId === pick.sketchId,
-    )?.profiles;
+    const profiles =
+      evaluation &&
+      ranked(evaluation.sketches, (s) => s.featureId).get(pick.sketchId)?.item
+        .profiles;
     return numbered(
       "Profile",
-      profiles?.findIndex((x) => x.id === pick.profileId) ?? -1,
+      (profiles && ranked(profiles, (x) => x.id).get(pick.profileId)?.rank) ??
+        -1,
       sketch,
     );
   }
-  const entities =
-    (document?.features.find((f) => f.id === pick.sketchId) as SketchFeature)
-      ?.entities ?? [];
-  const entity = entities.find((e) => e.id === pick.entityId);
+  const entities = (feature(pick.sketchId) as SketchFeature | undefined)
+    ?.entities;
+  const entity =
+    entities &&
+    ranked(
+      entities,
+      (e) => e.id,
+      (e) => e.kind,
+    ).get(pick.entityId);
   if (!entity) return numbered("Entity", -1, sketch);
-  const same = entities.filter((e) => e.kind === entity.kind);
-  return numbered(
-    entity.kind[0]!.toUpperCase() + entity.kind.slice(1),
-    same.indexOf(entity),
-    sketch,
-  );
+  const { kind } = entity.item;
+  return numbered(kind[0]!.toUpperCase() + kind.slice(1), entity.rank, sketch);
 }
 
 export function SelInfo({
