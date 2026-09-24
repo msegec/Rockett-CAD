@@ -3,11 +3,13 @@ import type { EvaluateResult } from "@rockett/shared";
 import { api } from "./api";
 import { createLivePreview } from "./livePreview";
 import { useStore } from "./store";
+import { TIMING_MS } from "./tunables";
 
 function createTimelinePeek(blocked: () => boolean) {
   let shown: { saved: EvaluateResult; peek: EvaluateResult } | null = null;
   let seq = 0;
   const live = createLivePreview({
+    dwellMs: TIMING_MS.timelinePeekDwell,
     send: async (fid) => {
       const { document, evaluation } = useStore.getState();
       const index = document?.features.findIndex((f) => f.id === fid) ?? -1;

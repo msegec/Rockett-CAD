@@ -1,5 +1,6 @@
 export const TIMING_MS = {
-  previewDwell: 300,
+  previewDebounce: 30,
+  timelinePeekDwell: 300,
   dragThrottle: 250,
   viewTurn: 300,
   wheelGestureIdle: 150,

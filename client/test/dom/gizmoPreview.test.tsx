@@ -13,7 +13,7 @@ import {
 import { FeatureDialog } from "../../src/components/FeatureDialog";
 import { ViewportView } from "../../src/components/ViewportView";
 import { openFeatureEditor } from "../../src/components/Timeline";
-import { PREVIEW_DWELL_MS } from "../../src/livePreview";
+import { PREVIEW_DEBOUNCE_MS } from "../../src/livePreview";
 import { useStore, type Mode, type Selection } from "../../src/store";
 import { viewportHandle } from "../../src/viewportRef";
 import { themeColor, type ThemeColor } from "../../src/theme/tokens";
@@ -210,7 +210,7 @@ async function drag(from: THREE.Vector3, by: THREE.Vector3) {
 
 async function dragsAfterPreview(colour: ThemeColor, by: THREE.Vector3) {
   expect(shaft(colour), "handle before the preview").not.toBeNull();
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(useStore.getState().previewBaseline).not.toBeNull();
   const handle = shaft(colour);
   expect(handle, "handle after the preview").not.toBeNull();
@@ -275,7 +275,7 @@ it("keeps the extrude handle on a face when editing a join", async () => {
   const handle = shaft("gizmo");
   expect(handle, "handle on the saved extrude").not.toBeNull();
   await drag(handle!, new THREE.Vector3(0, 0, 3));
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(useStore.getState().dialogParams.distance).toBeGreaterThan(5);
   expect(shaft("gizmo"), "handle after the preview").not.toBeNull();
 });

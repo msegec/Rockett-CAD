@@ -192,7 +192,7 @@ selection.
 While a feature dialog is open, new or edit, the model shows as it was before
 that feature, so its picks stay highlighted and you can click any original edge
 or face, including one the feature consumed. The dialog previews its result
-0.3 seconds after your last change as a see-through ghost of only the faces it
+30 ms after your last change as a see-through ghost of only the faces it
 adds, and a new body whole: green when the feature adds material, red when it
 removes material (cut, intersect, deboss, shell, fillet, chamfer, a negative
 face offset). An edit that adds no face ghosts the faces that moved. The ghost

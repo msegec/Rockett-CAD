@@ -11,7 +11,7 @@ import {
 import { FeatureDialog } from "../../src/components/FeatureDialog";
 import { ViewportView } from "../../src/components/ViewportView";
 import { openFeatureEditor } from "../../src/components/Timeline";
-import { PREVIEW_DWELL_MS } from "../../src/livePreview";
+import { PREVIEW_DEBOUNCE_MS } from "../../src/livePreview";
 import { useStore } from "../../src/store";
 import { viewportHandle } from "../../src/viewportRef";
 import { themeColor } from "../../src/theme/tokens";
@@ -241,7 +241,7 @@ it("returns to the saved evaluation on Cancel without another evaluation", async
 it("returns to the committed evaluation on OK", async () => {
   await editFillet();
   await click([S, 0, S - 0.4]);
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(shownKeys()).toEqual(["box"]);
   await act(async () => button("OK").click());
   await wait(0);

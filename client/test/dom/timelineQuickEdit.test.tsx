@@ -7,7 +7,7 @@ import {
   type Feature,
 } from "@rockett/shared";
 import { Timeline } from "../../src/components/Timeline";
-import { PREVIEW_DWELL_MS } from "../../src/livePreview";
+import { PREVIEW_DEBOUNCE_MS } from "../../src/livePreview";
 import { useStore } from "../../src/store";
 import { api } from "../../src/api";
 
@@ -168,10 +168,10 @@ it("sends one preview carrying the last of five keystrokes inside the dwell", as
   const radius = field("Radius (mm)");
   for (const value of ["3", "3.", "3.5", "3.52", "3.525"]) {
     await type(radius, value);
-    await wait(PREVIEW_DWELL_MS / 5);
+    await wait(PREVIEW_DEBOUNCE_MS / 5);
   }
   expect(api.updateFeature).not.toHaveBeenCalled();
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(vi.mocked(api.updateFeature).mock.calls).toEqual([
     ["proj", "fillet1", { radius: 3.525 }],
   ]);
@@ -182,7 +182,7 @@ it("commits on Enter as one undo entry that undoes to the original", async () =>
   await quickEdit("Fillet1");
   const radius = field("Radius (mm)");
   await type(radius, "4");
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   await type(radius, "5");
   await press(radius, "Enter");
   await wait(0);
@@ -197,7 +197,7 @@ it("restores the original document on Escape", async () => {
   await quickEdit("Fillet1");
   const radius = field("Radius (mm)");
   await type(radius, "4");
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect((useStore.getState().document!.features[1] as any).radius).toBe(4);
   await press(radius, "Escape");
   await wait(0);
@@ -210,7 +210,7 @@ it("restores the original document on Escape", async () => {
 it("restores the original document on a pointer down outside", async () => {
   await quickEdit("Fillet1");
   await type(field("Radius (mm)"), "4");
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   await act(async () => {
     document.body.dispatchEvent(
       new PointerEvent("pointerdown", { bubbles: true }),

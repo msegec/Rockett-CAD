@@ -4,11 +4,11 @@ import { TIMING_MS } from "./tunables";
 
 type Send = (featureId: string, patch: Partial<Feature>) => Promise<void>;
 
-export const PREVIEW_DWELL_MS = TIMING_MS.previewDwell;
+export const PREVIEW_DEBOUNCE_MS = TIMING_MS.previewDebounce;
 
 export function createLivePreview({
   send,
-  dwellMs = PREVIEW_DWELL_MS,
+  dwellMs = PREVIEW_DEBOUNCE_MS,
   now = () => performance.now(),
 }: {
   send: Send;

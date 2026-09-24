@@ -8,7 +8,7 @@ import {
   type Feature,
 } from "@rockett/shared";
 import { FeatureDialog } from "../../src/components/FeatureDialog";
-import { PREVIEW_DWELL_MS } from "../../src/livePreview";
+import { PREVIEW_DEBOUNCE_MS } from "../../src/livePreview";
 import { useStore, type Selection } from "../../src/store";
 import { api } from "../../src/api";
 
@@ -139,16 +139,17 @@ const button = (label: string) =>
 const radii = () =>
   vi.mocked(api.updateFeature).mock.calls.map(([, , p]) => (p as any).radius);
 
-it("sends one preview carrying the last of five keystrokes inside the dwell", async () => {
+it("sends one preview 30 ms after the last of five keystrokes 10 ms apart", async () => {
   await open([edge], "fillet1", { name: "Fillet1", radius: 2 });
-  await wait(PREVIEW_DWELL_MS * 3);
+  await wait(PREVIEW_DEBOUNCE_MS * 3);
   expect(api.updateFeature).not.toHaveBeenCalled();
   for (const value of ["3", "4", "5", "6", "7"]) {
+    await wait(10);
     await type(value);
-    await wait(PREVIEW_DWELL_MS / 5);
   }
+  await wait(29);
   expect(api.updateFeature).not.toHaveBeenCalled();
-  await wait(PREVIEW_DWELL_MS);
+  await wait(1);
   expect(radii()).toEqual([7]);
   expect((useStore.getState().document!.features[0] as any).radius).toBe(7);
 });
@@ -158,11 +159,11 @@ it("sends only the newest input after a slow preview settles", async () => {
   let release!: () => void;
   hold = new Promise((resolve) => (release = resolve));
   await type("3");
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   await type("4");
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   await type("5");
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(radii()).toEqual([3]);
   hold = null;
   release();
@@ -173,13 +174,13 @@ it("sends only the newest input after a slow preview settles", async () => {
 
 it("previews a new feature once, and OK keeps one feature and one undo entry", async () => {
   await open([edge]);
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(api.addFeature).toHaveBeenCalledOnce();
   expect(useStore.getState().document!.features).toMatchObject([
     { type: "fillet", name: "Fillet1", radius: 2 },
   ]);
   await type("3");
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(radii()).toEqual([3]);
 
   await act(async () => button("OK").click());
@@ -213,7 +214,7 @@ it.each([
 ])("%s removes the provisional feature", async (_how, leave) => {
   await open([edge]);
   await type("4");
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(server.features).toHaveLength(1);
   await act(async () => leave());
   await wait(0);
@@ -227,7 +228,7 @@ it.each([
 it("sends nothing while the inputs are invalid", async () => {
   await open([]);
   await type("5");
-  await wait(PREVIEW_DWELL_MS * 3);
+  await wait(PREVIEW_DEBOUNCE_MS * 3);
   expect(api.addFeature).not.toHaveBeenCalled();
   expect(api.updateFeature).not.toHaveBeenCalled();
   expect(useStore.getState().error).toBeNull();
@@ -235,14 +236,14 @@ it("sends nothing while the inputs are invalid", async () => {
 
 it("commits the latest typed value on Enter inside the dwell", async () => {
   await open([edge]);
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   await type("9");
   await act(async () => {
     radius().dispatchEvent(
       new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
     );
   });
-  await wait(PREVIEW_DWELL_MS * 3);
+  await wait(PREVIEW_DEBOUNCE_MS * 3);
   expect(radii()).toEqual([9]);
   expect(api.addFeature).toHaveBeenCalledOnce();
   expect(useStore.getState().document!.features).toMatchObject([
@@ -254,10 +255,10 @@ it("commits the latest typed value on Enter inside the dwell", async () => {
 it("shows the latest preview error and clears it after a good preview", async () => {
   await open([edge], "fillet1", { name: "Fillet1", radius: 2 });
   for (const value of ["500", "600"]) await type(value);
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(useStore.getState().error).toBe("Radius is too large");
   await type("4");
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
   expect(radii()).toEqual([600, 4]);
   expect(useStore.getState().error).toBeNull();
 });

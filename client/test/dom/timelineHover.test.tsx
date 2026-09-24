@@ -8,7 +8,7 @@ import {
   type Feature,
 } from "@rockett/shared";
 import { Timeline } from "../../src/components/Timeline";
-import { PREVIEW_DWELL_MS } from "../../src/livePreview";
+import { TIMING_MS } from "../../src/tunables";
 import { useStore } from "../../src/store";
 import { api } from "../../src/api";
 
@@ -108,19 +108,19 @@ async function reply(value: EvaluateResult) {
 
 it("sends nothing for a hover shorter than the dwell", async () => {
   await over(chip("B1"));
-  await wait(PREVIEW_DWELL_MS - 1);
+  await wait(TIMING_MS.timelinePeekDwell - 1);
   await out(chip("B1"));
-  await wait(PREVIEW_DWELL_MS * 3);
+  await wait(TIMING_MS.timelinePeekDwell * 3);
   expect(api.evaluate).not.toHaveBeenCalled();
 });
 
 it("shows the model after the hovered feature once the dwell passes, and leaving restores it", async () => {
   await over(chip("B1"));
-  await wait(PREVIEW_DWELL_MS);
+  await wait(TIMING_MS.timelinePeekDwell);
   expect(vi.mocked(api.evaluate).mock.calls).toEqual([["proj", 2]]);
   await reply(past);
   expect(useStore.getState().evaluation).toBe(past);
-  await wait(PREVIEW_DWELL_MS * 3);
+  await wait(TIMING_MS.timelinePeekDwell * 3);
   expect(api.evaluate).toHaveBeenCalledOnce();
   await out(chip("B1"));
   const s = useStore.getState();
@@ -134,20 +134,20 @@ it("shows the model after the hovered feature once the dwell passes, and leaving
 
 it("sends nothing while crossing chips inside the dwell, then previews only the chip it rests on", async () => {
   await over(chip("A1"));
-  await wait(PREVIEW_DWELL_MS / 2);
+  await wait(TIMING_MS.timelinePeekDwell / 2);
   await out(chip("A1"), chip("B1"));
   await over(chip("B1"), chip("A1"));
-  await wait(PREVIEW_DWELL_MS / 2);
+  await wait(TIMING_MS.timelinePeekDwell / 2);
   await out(chip("B1"), chip("C1"));
   await over(chip("C1"), chip("B1"));
   expect(api.evaluate).not.toHaveBeenCalled();
-  await wait(PREVIEW_DWELL_MS);
+  await wait(TIMING_MS.timelinePeekDwell);
   expect(vi.mocked(api.evaluate).mock.calls).toEqual([["proj", 3]]);
 });
 
 it("drops an answer that arrives after the chip is left", async () => {
   await over(chip("A1"));
-  await wait(PREVIEW_DWELL_MS);
+  await wait(TIMING_MS.timelinePeekDwell);
   await out(chip("A1"));
   await reply(past);
   expect(useStore.getState().evaluation).toBe(current);
@@ -155,7 +155,7 @@ it("drops an answer that arrives after the chip is left", async () => {
 
 it("restores the current model when an edit starts", async () => {
   await over(chip("A1"));
-  await wait(PREVIEW_DWELL_MS);
+  await wait(TIMING_MS.timelinePeekDwell);
   await reply(past);
   expect(useStore.getState().evaluation).toBe(past);
   await act(async () => {
@@ -169,7 +169,7 @@ it("does not preview while a dialog or a quick edit is open", async () => {
     useStore.setState({ mode: { name: "dialog", dialog: "shell" } });
   });
   await over(chip("A1"));
-  await wait(PREVIEW_DWELL_MS * 2);
+  await wait(TIMING_MS.timelinePeekDwell * 2);
   await out(chip("A1"));
   await act(async () => {
     useStore.setState({ mode: { name: "idle" } });
@@ -184,6 +184,6 @@ it("does not preview while a dialog or a quick edit is open", async () => {
   ) as HTMLButtonElement;
   await act(async () => item.click());
   await over(chip("B1"));
-  await wait(PREVIEW_DWELL_MS * 2);
+  await wait(TIMING_MS.timelinePeekDwell * 2);
   expect(api.evaluate).not.toHaveBeenCalled();
 });

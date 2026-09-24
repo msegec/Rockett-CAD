@@ -11,7 +11,7 @@ import {
 } from "@rockett/shared";
 import { FeatureDialog } from "../../src/components/FeatureDialog";
 import { ViewportView } from "../../src/components/ViewportView";
-import { PREVIEW_DWELL_MS } from "../../src/livePreview";
+import { PREVIEW_DEBOUNCE_MS } from "../../src/livePreview";
 import { useStore } from "../../src/store";
 import { viewportHandle } from "../../src/viewportRef";
 import { api } from "../../src/api";
@@ -158,7 +158,7 @@ async function previewExtrude(operation: string) {
       </>,
     ),
   );
-  await wait(PREVIEW_DWELL_MS);
+  await wait(PREVIEW_DEBOUNCE_MS);
 }
 
 function colours() {

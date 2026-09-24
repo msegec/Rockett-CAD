@@ -2,7 +2,7 @@ import { expect, it, vi } from "vitest";
 import type { BodyPayload, Feature } from "@rockett/shared";
 import {
   createLivePreview,
-  PREVIEW_DWELL_MS,
+  PREVIEW_DEBOUNCE_MS,
   previewTints,
 } from "../src/livePreview";
 import { TIMING_MS } from "../src/tunables";
@@ -77,14 +77,15 @@ it("commit always sends the last patch", () => {
   expect(send).toHaveBeenLastCalledWith("f", { distance: 3 });
 });
 
-it("sends one dwell preview with the last of five quick inputs", () => {
+it("sends one preview 30 ms after the last of five keystrokes 10 ms apart", () => {
   vi.useFakeTimers();
   const send = vi.fn(async () => {});
   const live = createLivePreview({ send });
   for (let i = 1; i <= 5; i++) {
+    vi.advanceTimersByTime(10);
     live.dwell("f", { distance: i } as any);
-    vi.advanceTimersByTime(PREVIEW_DWELL_MS - 1);
   }
+  vi.advanceTimersByTime(29);
   expect(send).not.toHaveBeenCalled();
   vi.advanceTimersByTime(1);
   expect(send).toHaveBeenCalledOnce();
@@ -100,7 +101,7 @@ it("cancel and commit drop a pending dwell", () => {
   live.cancel();
   live.dwell("f", { distance: 2 } as any);
   live.commit("f", { distance: 3 } as any);
-  vi.advanceTimersByTime(PREVIEW_DWELL_MS * 2);
+  vi.advanceTimersByTime(PREVIEW_DEBOUNCE_MS * 2);
   expect(send).toHaveBeenCalledOnce();
   expect(send).toHaveBeenCalledWith("f", { distance: 3 });
   vi.useRealTimers();
