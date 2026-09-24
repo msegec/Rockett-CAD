@@ -378,7 +378,7 @@ export function createApiRouter(
     wrap(async (req, res) => {
       const doc = await editable(req, res);
       doc.name = (req.body.name ?? doc.name).slice(0, 200);
-      await store.save(doc);
+      await history.save(doc);
       send(res, doc);
     }),
   );

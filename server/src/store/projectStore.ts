@@ -227,7 +227,7 @@ export class ProjectStore {
     }
   }
 
-  async save(doc: CadDocument, write?: Write): Promise<void> {
+  async save(doc: CadDocument, write?: Write<CadDocument>): Promise<void> {
     const snapshot = {
       ...doc,
       modifiedAt: new Date().toISOString(),

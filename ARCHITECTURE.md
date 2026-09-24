@@ -52,11 +52,11 @@ revision it last read, and a stale one gets 409 with nothing written (see
 API.md, Document revisions). Every document edit except a project rename runs
 through `mutateProject` in `server/src/api/routes.ts`: it checks the revision,
 applies the edit, evaluates, names new bodies, then saves the document with
-one labelled history entry in a single write (see API.md, History).
+one labelled history entry (see API.md, History).
 
 **Storage.** `server/src/store/` owns persistence. `Storage` reads, stamps,
-writes atomically, moves, lists and removes paths under the data root, and
-`LocalStorage` is its one implementation. A stamp is a file's inode, size and
+writes atomically, appends, moves, lists and removes paths under the data
+root, and `LocalStorage` is its one implementation. A stamp is a file's inode, size and
 change times. `JsonStore` keeps one namespace of JSON files, queues writes per
 key and migrates each file on read through its `Migrations` table. Before a
 migrated file is first written, it backs up the file's whole directory; a
@@ -67,11 +67,15 @@ file moves its stamp and the next save reads it again. `BlobStore` keeps
 a project's source files and images by sha256. `ProjectStore` assembles a
 project from its `project.json` manifest (`ManifestStore`), its part
 document, `view.json` and blobs. `HistoryStore` keeps a project's undo
-history in `history/`: a log of at most 50 labelled entries, the current
-position and checkpoints, and gzip snapshots of the document named by the
-sha256 of their stored bytes. A history save writes the document, its
-snapshot and the log as one transaction: the migration recovery record lists
-it, and a failure or restart rolls it back.
+history in `history/log.bin`, an append-only log of records: the base
+snapshot, labelled entries with their revision and checkpoints. Snapshots are
+gzip documents named by the sha256 of their stored bytes. The history is the
+last 50 entries, the state before the oldest and every checkpoint. A history
+save appends one entry record, fsyncs it, then writes the document
+atomically. On open, a torn last record is dropped, and so is a last entry
+whose revision the document never reached, so a failure or restart leaves
+the old or the new generation. Once 50 snapshots are unused, the log is
+rewritten without them after the save that found them.
 DOCKER.md shows the layout on disk and the backup and restore rules.
 
 **Shared parametric code.** The constraint solver and profile detection are

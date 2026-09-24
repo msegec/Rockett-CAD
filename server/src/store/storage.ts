@@ -8,6 +8,7 @@ export interface Storage {
   read(file: string): Promise<Buffer>;
   stamp(file: string): Promise<string | undefined>;
   writeAtomic(file: string, data: Data): Promise<void>;
+  append(file: string, data: Uint8Array): Promise<void>;
   move(from: string, to: string): Promise<void>;
   list(dir: string): Promise<string[]>;
   files(dir: string): Promise<string[]>;
@@ -67,6 +68,21 @@ export class LocalStorage implements Storage {
       await this.fs.rm(tmp, { force: true });
     }
     await this.sync(dir, "r");
+  }
+
+  async append(file: string, data: Uint8Array): Promise<void> {
+    const full = this.resolve(file);
+    await this.fs.mkdir(path.dirname(full), { recursive: true });
+    const handle = await this.fs.open(full, "a");
+    let created: boolean;
+    try {
+      await handle.writeFile(data);
+      await handle.sync();
+      created = (await handle.stat()).size === data.byteLength;
+    } finally {
+      await handle.close();
+    }
+    if (created) await this.sync(path.dirname(full), "r");
   }
 
   async move(from: string, to: string): Promise<void> {

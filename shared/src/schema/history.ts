@@ -1,6 +1,6 @@
 import { Type, type Static } from "typebox";
 
-export const HISTORY_VERSION = 1;
+export const HISTORY_VERSION = 2;
 export const HISTORY_LIMIT = 50;
 export const LABEL_LIMIT = 200;
 export const TX_HEADER = "X-Rockett-Tx";
@@ -10,16 +10,17 @@ const txId = Type.String({ pattern: TX_ID.source });
 
 const snapshot = Type.String({ pattern: "^[0-9a-f]{64}$" });
 const label = Type.String({ minLength: 1, maxLength: LABEL_LIMIT });
-const mark = Type.Object({ label, at: Type.String(), snapshot });
-const entry = Type.Object({
-  label,
-  at: Type.String(),
-  snapshot,
+const markFields = { label, at: Type.String(), snapshot };
+const mark = Type.Object(markFields);
+const entryFields = {
+  ...markFields,
   tx: Type.Optional(txId),
-});
+  revision: Type.Optional(Type.Integer({ minimum: 1 })),
+};
+const entry = Type.Object(entryFields);
 
 export const historyLog = Type.Object({
-  version: Type.Literal(HISTORY_VERSION),
+  version: Type.Literal(1),
   base: snapshot,
   entries: Type.Array(entry, { maxItems: HISTORY_LIMIT }),
   position: Type.Integer({ minimum: 0 }),
@@ -27,3 +28,16 @@ export const historyLog = Type.Object({
 });
 
 export type HistoryLog = Static<typeof historyLog>;
+
+export const historyRecord = Type.Union([
+  Type.Object({
+    kind: Type.Literal("base"),
+    version: Type.Integer({ minimum: 1 }),
+    snapshot,
+  }),
+  Type.Object({ kind: Type.Literal("snapshot"), snapshot }),
+  Type.Object({ kind: Type.Literal("checkpoint"), ...markFields }),
+  Type.Object({ kind: Type.Literal("entry"), ...entryFields }),
+]);
+
+export type HistoryRecord = Static<typeof historyRecord>;

@@ -20,9 +20,7 @@ export class StoreError extends Error {
 }
 
 export type Files = ReadonlyMap<string, string | Uint8Array>;
-export type Write = (file: string, text: string) => Promise<void>;
-
-const TRANSACTION = "tx";
+export type Write<T> = (file: string, text: string, value: T) => Promise<void>;
 
 export interface MigrationEffects<C extends MigrationContext> {
   context(key: string, stored: unknown): Promise<C>;
@@ -95,29 +93,6 @@ export class NamespaceBackup {
     );
   }
 
-  async commit(build: () => Promise<Files>): Promise<void> {
-    await this.settle();
-    const files = await build();
-    const created = new Map<string, string | Uint8Array>();
-    const replaced: string[] = [];
-    for (const [file, data] of files) {
-      const live = await this.storage.list(path.posix.dirname(file));
-      if (live.includes(path.posix.basename(file)))
-        replaced.push(path.posix.relative(this.dir, file));
-      else created.set(file, data);
-    }
-    try {
-      await this.journal(
-        TRANSACTION,
-        created,
-        () => writeAll(this.storage, files),
-        replaced,
-      );
-    } finally {
-      await this.settle();
-    }
-  }
-
   private async journal(
     version: string,
     created: Files,
@@ -134,19 +109,6 @@ export class NamespaceBackup {
     );
     await apply();
     await this.storage.remove(this.record);
-  }
-
-  private async settle(): Promise<void> {
-    await this.recover();
-    const names = await this.storage.list(this.root);
-    const journal = names.filter((n) => n.startsWith(`${TRANSACTION}-`));
-    if (names.length && journal.length === names.length)
-      return this.storage.remove(this.root);
-    await settled(
-      journal.map((name) =>
-        this.storage.remove(path.posix.join(this.root, name)),
-      ),
-    );
   }
 
   async recover(): Promise<boolean> {
@@ -335,7 +297,7 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
   update(
     key: string,
     change: (previous: Partial<T> | undefined) => T,
-    write?: Write,
+    write?: Write<T>,
   ): Promise<void> {
     return this.writes.run(key, async () => {
       await this.put(key, change(await this.recall(key)), write);
@@ -356,12 +318,13 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
   private async put(
     key: string,
     value: T,
-    write: Write = (file, text) => this.options.storage.writeAtomic(file, text),
+    write: Write<T> = (file, text) =>
+      this.options.storage.writeAtomic(file, text),
   ): Promise<void> {
     const [file, text] = this.encode(key, value);
     await this.upgrade(key);
     this.known.delete(key);
-    await write(file, text);
+    await write(file, text, value);
     this.remember(key, await this.stamp(key), value);
   }
 

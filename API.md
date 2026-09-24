@@ -98,7 +98,8 @@ document edit.
 ### History
 
 Every document edit except the project rename saves the document and one
-undo history entry in the same write. Labels read `Add Extrude2`,
+undo history entry; after a failure or restart the project holds both or
+neither. Labels read `Add Extrude2`,
 `Edit Fillet1`, `Delete Sketch3`, `Roll timeline`, `Rename Body1`,
 `Edit groups`, `Import part.step`, `Replace document` and `Upgrade naming`.
 The server evaluates before it saves, so names given to new bodies land in

@@ -98,7 +98,7 @@ docker run -d --name rockett-cad \
 │       ├── v{schema}-{hash}/   # the project as it was before a migration
 │       │   ├── SHA256SUMS      # written last; the backup is complete once it exists
 │       │   └── files/          # byte-for-byte copy of the project directory
-│       └── tx-{hash}/          # present only while a history write runs: the files it replaces
+│       └── history1-{hash}/    # the version 1 history files, copied before they moved into log.bin
 ├── folders/
 │   └── folders.json        # the shared folder tree and project placement
 ├── uploads/                # model imports while they stream in; each is removed when its request ends
@@ -110,7 +110,7 @@ docker run -d --name rockett-cad \
         ├── view.json       # hidden bodies and features, outside the document
         ├── temporary.json  # present only on a temporary copy of a browser project
         ├── blobs/          # reference images and STEP, IGES and BREP sources, each named by its sha256
-        ├── history/        # undo history: log.json and snapshots/ (gzip documents named by sha256)
+        ├── history/        # undo history: log.bin, an append-only log of records holding gzip snapshots
         └── exports/        # server-retained exports (opt-in per export)
 ```
 
@@ -137,16 +137,20 @@ project, the server copy of a project kept in the browser, is never backed up
 before migration; the server deletes it after 24 hours without a request.
 Backups are never pruned.
 
-A history write replaces the document and `history/log.json` and adds a
-snapshot. It first copies the files it replaces to `tx-{hash}/` and lists
-that copy and the files it adds in `migrating.json`, then writes the new files
-together, so startup, or the next write, restores the previous generation
-after a failure, as for a migration. The copy and a backups
-directory holding nothing else are removed once the write ends. The log keeps
-the 50 most recent entries, the state before the oldest of them and every
-checkpoint; a snapshot none of them names is deleted on the next history
-write. To
-restore one by hand, stop the container, run `sha256sum -c ../SHA256SUMS`
+A history write appends one record, the entry's label, transaction id,
+revision and gzip snapshot, to `history/log.bin` and fsyncs it, then writes
+the document. The next time the history is opened after a failure or
+restart, a torn last record is dropped, and so is a last entry whose revision
+the document never reached, so the project holds the old or the new
+generation. The log keeps the 50 most recent entries, the state before the
+oldest of them and every checkpoint; once it holds 50 snapshots none of them
+names, it is rewritten without them. History still in the version 1 layout,
+`history/log.json` and `history/snapshots/`, moves into `log.bin` when it is
+first opened, after a copy of those files to `history1-{hash}/`; a temporary
+project gets no copy. To go back to that copy, stop the container, delete
+`history/log.bin` and copy its `files/history/` into the project.
+
+To restore a migration backup by hand, stop the container, run `sha256sum -c ../SHA256SUMS`
 inside its `files/` directory, and replace the project directory with a copy
 of `files/`. Copying over it would keep a later `documents/{projectId}.json`,
 which is read in preference to a restored `document.json`.
