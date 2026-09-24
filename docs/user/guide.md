@@ -196,8 +196,10 @@ or face, including one the feature consumed. The dialog previews its result
 adds, and a new body whole: green when the feature adds material, red when it
 removes material (cut, intersect, deboss, shell, fillet, chamfer, a negative
 face offset). An edit that adds no face ghosts the faces that moved. The ghost
-cannot be picked. OK keeps the previewed feature as one undo step and shows the
-result; Cancel, Escape or closing the dialog returns to the saved model.
+shows the model right after the feature, so later features never appear in it.
+The ghost cannot be picked. OK keeps the previewed feature as one undo step and
+shows the result; Cancel, Escape or closing the dialog returns to the saved
+model.
 
 A feature dialog lists its picks under each selection box, one row per edge,
 face, body, profile, plane or sketch line, such as `Edge 3, Body 1`. Hover a row
