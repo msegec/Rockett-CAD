@@ -729,7 +729,8 @@ button:focus-visible,
 .dialog-panel.controls-help {
   left: 12px;
   right: auto;
-  width: min(90vw, calc(100% - 150px));
+  width: 60vw;
+  height: 60vh;
   min-width: min(265px, 90vw);
   max-width: 90vw;
   min-height: 160px;
