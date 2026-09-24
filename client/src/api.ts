@@ -311,6 +311,9 @@ export const api = {
     send(ROUTES.updateFolder, { id }, { body: { parentId } }),
   deleteFolder: (id: string) => send(ROUTES.deleteFolder, { id }),
 
+  forgetMeshes: () => {
+    meshes = new Map();
+  },
   evaluate: async (id: string, position?: number) => {
     const [wire, held] = await sendHeld(ROUTES.evaluate, { id }, {}, position);
     const evaluation = refill(wire, held);

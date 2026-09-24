@@ -538,6 +538,7 @@ export const useStore = create<State>((set, get) => ({
   closeProject() {
     void get().cancelPreview();
     unsent = [];
+    api.forgetMeshes();
     set({
       recovery: null,
       saveState: "saved",
