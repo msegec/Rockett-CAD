@@ -119,16 +119,13 @@ export function constraintFor(
         return { id, type: "pointOnCircle", point, circle };
       if (point && line && !own(line).includes(point))
         return { id, type: "pointOnLine", point, line };
-      if (!point && line && circle)
-        return {
-          id,
-          type: "pointOnCircle",
-          point: own(line).reduce((a, b) =>
-            offCurve(b) < offCurve(a) ? b : a,
-          ),
-          circle,
-        };
-      return null;
+      if (point || !line || !circle) return null;
+      const end = own(line).reduce((a, b) =>
+        offCurve(b) < offCurve(a) ? b : a,
+      );
+      return own(circle).includes(end)
+        ? null
+        : { id, type: "pointOnCircle", point: end, circle };
     }
     case "parallel":
     case "perpendicular":
@@ -184,6 +181,15 @@ export function relationsFor(draft: Draft, ids: string[]): Relation[] {
   return CONSTRAINTS.flatMap(({ type, label }): Relation[] => {
     if (type === "horizontal" || type === "vertical") {
       if (lines.length !== ids.length) return [];
+      if (
+        draft.constraints.some(
+          (c) =>
+            (c.type === "horizontal" || c.type === "vertical") &&
+            c.type !== type &&
+            lines.includes(c.line),
+        )
+      )
+        return [];
       const constraints = lines
         .map((line) => constraintFor(draft, [line], type))
         .filter(fresh) as SketchConstraint[];
