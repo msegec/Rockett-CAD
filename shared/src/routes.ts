@@ -205,7 +205,7 @@ export const ROUTES = {
       entityId: Type.String({ minLength: 1, maxLength: 100 }),
     }),
   ),
-  deleteFeature: route<never, MutationResponse>()(
+  deleteFeature: route<HeldMeshes, WireMutationResponse>()(
     "DELETE",
     "/projects/:id/features/:fid",
   ),

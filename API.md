@@ -35,9 +35,9 @@ and bbox, without its name or visibility. The client keeps a body's viewport
 objects while its key is unchanged. A JSON response of 64 KiB or more is
 gzipped when the request accepts gzip.
 
-A mutating request with a JSON body, and `POST /projects/:id/evaluate`, may
-carry `held`, the `meshKey`s the client already holds (`HeldMeshes`). A body
-whose key is in `held` comes back as `HeldBodyPayload`,
+A mutating request with a JSON body, `POST /projects/:id/evaluate` and
+`DELETE /projects/:id/features/:fid` may carry `held`, the `meshKey`s the
+client already holds (`HeldMeshes`). A body whose key is in `held` comes back as `HeldBodyPayload`,
 `{ bodyId, name, visible, meshKey }`, with no mesh, faces, edges, vertices or
 bbox; every other body comes in full (`WireEvaluateResult`). Without `held`
 every body comes in full. A `held` that is not an array of strings is 400
@@ -47,6 +47,7 @@ including when it evaluates at an earlier position, and refills each omitted
 body from the payloads it held when it sent that request, so its callers get
 full `BodyPayload`s. Evaluate is `POST` because 1,000 keys of 64 hex
 characters, about 65 KB, exceed Node's 16 KB request header limit in a URL.
+Feature delete stays `DELETE` and sends `{ held }` as its JSON body.
 
 `POST /projects/:id/evaluate`, `PUT /projects/:id/features/:fid`, and
 `PUT /projects/:id/document` accept an optional `?position=N` for the returned
@@ -207,7 +208,7 @@ the document, and uploads that take the document beyond 40 MB are rejected.
 | `PUT /projects/:id/document`         | `{ document }`          | Full replace (undo/redo restore); validated; 404 if project no longer exists |
 | `POST /projects/:id/features`        | `{ feature }`           | Insert **at the timeline marker**; empty `name` → server assigns `Extrude2`… |
 | `PUT /projects/:id/features/:fid`    | `{ feature }` (partial) | Edit parameters/name/suppressed; id immutable                                |
-| `DELETE /projects/:id/features/:fid` | none                    | Marker adjusts if needed                                                     |
+| `DELETE /projects/:id/features/:fid` | `{ held? }`             | Marker adjusts if needed                                                     |
 | `POST /projects/:id/timeline`        | `{ position }`          | Move the rollback marker                                                     |
 | `PUT /projects/:id/bodies/:bodyId`   | `{ name?, visible? }`   | Rename a body; `visible` writes `view.json`, as below                        |
 | `PUT /projects/:id/groups`           | `{ groups }`            | Replace the model tree groups; never changes evaluation                      |

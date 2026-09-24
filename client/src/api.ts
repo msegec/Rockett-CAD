@@ -336,7 +336,7 @@ export const api = {
       position,
     ),
   deleteFeature: (id: string, fid: string) =>
-    send(ROUTES.deleteFeature, { id, fid }),
+    holding(ROUTES.deleteFeature, { id, fid }, {}),
   setTimeline: (id: string, position: number) =>
     holding(ROUTES.setTimeline, { id }, { position }),
   replaceDocument: (id: string, document: CadDocument, position?: number) =>
