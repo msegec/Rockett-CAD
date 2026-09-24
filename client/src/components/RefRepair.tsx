@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import type {
   BodyPayload,
   CadDocument,
@@ -6,9 +6,15 @@ import type {
   EvaluateResult,
   FaceRef,
   Feature,
+  NamingCandidate,
+  NamingDecision,
+  NamingMapping,
+  NamingTarget,
+  NamingUpgradeProposal,
   RefCandidate,
   UnresolvedRef,
 } from "@rockett/shared";
+import { api } from "../api";
 import {
   previewBodies,
   selectionKey,
@@ -28,41 +34,47 @@ const pickOf = (
     ? { kind, bodyId, faceName: name }
     : { kind, bodyId, edgeName: name };
 
-function proposed({
-  ref,
-  status,
-  candidates,
-}: UnresolvedRef): Selection | null {
-  const to = candidates[0];
-  return status === "candidate" && to ? pickOf(ref.kind, to) : null;
+type Found<C> = {
+  status: NamingMapping["status"];
+  candidates: C[];
+  suggestions: C[];
+};
+
+const lone = <C,>({ status, candidates }: Found<C>) =>
+  status === "candidate" ? candidates[0] : undefined;
+
+function proposed(problem: UnresolvedRef): Selection | null {
+  const to = lone(problem);
+  return to ? pickOf(problem.ref.kind, to) : null;
 }
 
-function choices({ ref, status, candidates, suggestions }: UnresolvedRef) {
-  if (status === "candidate") return [];
+function choices<C extends RefCandidate | NamingCandidate, T>(
+  { status, candidates, suggestions }: Found<C>,
+  as: (c: C) => T,
+) {
+  if (status === "candidate" || status === "proven") return [];
   return [
-    ...candidates.map((c) => ({
-      pick: pickOf(ref.kind, c),
-      from: `found by ${c.basis}`,
-    })),
-    ...suggestions.map((c) => ({
-      pick: pickOf(ref.kind, c),
-      from: "on another body",
-    })),
+    ...candidates.map((c) => ({ pick: as(c), from: `found by ${c.basis}` })),
+    ...suggestions.map((c) => ({ pick: as(c), from: "on another body" })),
   ];
 }
 
-function note(
-  problem: UnresolvedRef,
-  label: (pick: Selection) => string,
+function describe<C extends RefCandidate | NamingCandidate>(
+  head: string,
+  found: Found<C>,
+  label: (c: C) => string,
 ): string {
-  const head = `${label(problem.ref)}: ${problem.status}`;
-  const to = proposed(problem);
-  if (to)
-    return `${head} ${label(to)}, found by ${problem.candidates[0]!.basis}`;
-  if (problem.status === "ambiguous")
-    return `${head}, ${problem.candidates.length} candidates`;
-  return head;
+  const to = lone(found);
+  if (to) return `${head}: candidate ${label(to)}, found by ${to.basis}`;
+  if (found.status === "ambiguous")
+    return `${head}: ambiguous, ${found.candidates.length} candidates`;
+  return `${head}: ${found.status}`;
 }
+
+const note = (problem: UnresolvedRef, label: (pick: Selection) => string) =>
+  describe(label(problem.ref), problem, (c) =>
+    label(pickOf(problem.ref.kind, c)),
+  );
 
 export function refNotes(
   problems: UnresolvedRef[],
@@ -144,23 +156,43 @@ function PickButton({ refFor }: { refFor: Ref }) {
   );
 }
 
+function AcceptButton({
+  label,
+  onAccept,
+}: {
+  label: string;
+  onAccept: () => void;
+}) {
+  const busy = useStore((s) => s.busy);
+  return (
+    <button
+      className="btn"
+      disabled={busy}
+      aria-label={`Accept ${label}`}
+      onClick={onAccept}
+    >
+      Accept
+    </button>
+  );
+}
+
 function RepairRow({
   text,
-  pick,
+  pick = null,
   hover,
   children,
 }: {
   text: string;
-  pick: Selection | null;
-  hover: (pick: Selection | null) => void;
-  children: ReactNode;
+  pick?: Selection | null;
+  hover?: (pick: Selection | null) => void;
+  children?: ReactNode;
 }) {
   return (
     <div
       role="listitem"
       className="measure-row"
-      onMouseEnter={() => hover(pick)}
-      onMouseLeave={() => hover(null)}
+      onMouseEnter={hover && (() => hover(pick))}
+      onMouseLeave={hover && (() => hover(null))}
     >
       <span>{text}</span>
       {children}
@@ -168,30 +200,24 @@ function RepairRow({
   );
 }
 
-export function RefRepair() {
+function RefProblems({ fid }: { fid: string }) {
   const mode = useStore((s) => s.mode);
   const document = useStore((s) => s.document);
   const evaluation = useStore((s) => s.evaluation);
-  const busy = useStore((s) => s.busy);
   const picking: Ref | undefined = useStore((s) => s.dialogParams.repick);
   const hover = useHoverPick();
-  const fid = mode.name === "dialog" ? mode.editFeatureId : undefined;
   const problems = evaluation?.featureStatuses.find(
     (st) => st.featureId === fid,
   )?.refs;
-  if (!fid || !problems?.length) return null;
+  if (!problems?.length) return null;
   const bodies = previewBodies({ mode, evaluation });
   const label = (pick: Selection) =>
     pickLabel(pick, document, evaluation, bodies);
   const acceptButton = (ref: Ref, to: Selection) => (
-    <button
-      className="btn"
-      disabled={busy}
-      aria-label={`Accept ${label(to)}`}
-      onClick={() => void accept(fid, ref, to)}
-    >
-      Accept
-    </button>
+    <AcceptButton
+      label={label(to)}
+      onAccept={() => void accept(fid, ref, to)}
+    />
   );
   return (
     <>
@@ -216,20 +242,208 @@ export function RefRepair() {
                   <PickButton refFor={problem.ref} />
                 )}
               </RepairRow>
-              {choices(problem).map(({ pick, from }) => (
-                <RepairRow
-                  key={selectionKey(pick)}
-                  text={`${label(pick)}, ${from}`}
-                  pick={pick}
-                  hover={hover}
-                >
-                  {acceptButton(problem.ref, pick)}
-                </RepairRow>
-              ))}
+              {choices(problem, (c) => pickOf(problem.ref.kind, c)).map(
+                ({ pick, from }) => (
+                  <RepairRow
+                    key={selectionKey(pick)}
+                    text={`${label(pick)}, ${from}`}
+                    pick={pick}
+                    hover={hover}
+                  >
+                    {acceptButton(problem.ref, pick)}
+                  </RepairRow>
+                ),
+              )}
             </Fragment>
           );
         })}
       </div>
+    </>
+  );
+}
+
+type Report =
+  | { state: "loading" }
+  | { state: "failed"; message: string }
+  | { state: "ready"; proposal: NamingUpgradeProposal };
+
+const STATUSES = ["proven", "candidate", "ambiguous", "missing"] as const;
+
+const target = ({ bodyId, name }: NamingTarget) =>
+  name === undefined ? bodyId : `${name} on ${bodyId}`;
+
+const plain = ({ bodyId, name }: NamingTarget): NamingTarget =>
+  name === undefined ? { bodyId } : { bodyId, name };
+
+const counts = (mappings: NamingMapping[]) =>
+  STATUSES.map(
+    (st) => `${mappings.filter((m) => m.status === st).length} ${st}`,
+  ).join(", ");
+
+const unchosen = (m: NamingMapping) =>
+  !m.to && (m.status === "candidate" || m.status === "ambiguous");
+
+const decisions = (mappings: NamingMapping[]): NamingDecision[] =>
+  mappings.flatMap(({ featureId, path, status, to }) =>
+    to && status !== "proven" ? [{ featureId, path, to }] : [],
+  );
+
+function mappingNote(m: NamingMapping, where: string): string {
+  const head = `${where} ${m.path}, ${target(m.from)}`;
+  if (!m.to) return describe(head, m, target);
+  if (m.status === "proven") return `${head}: proven ${target(m.to)}`;
+  return `${head}: ${m.status}, accepted ${target(m.to)}`;
+}
+
+async function applyUpgrade(id: string, chosen: NamingDecision[]) {
+  const s = useStore.getState();
+  try {
+    await s.mutate(() => api.commitNamingUpgrade(id, chosen));
+  } catch {
+    return;
+  }
+  s.setMode({ name: "idle" });
+}
+
+function MappingRows({
+  mappings,
+  stage,
+}: {
+  mappings: NamingMapping[];
+  stage: (accept: NamingDecision[]) => void;
+}) {
+  const features = useStore((s) => s.document?.features);
+  const where = (fid: string | null) =>
+    fid === null
+      ? "Final body"
+      : (features?.find((f) => f.id === fid)?.name ?? fid);
+  const acceptButton = (m: NamingMapping, to: NamingTarget) => (
+    <AcceptButton
+      label={target(to)}
+      onAccept={() =>
+        stage([
+          ...decisions(mappings.filter((other) => other !== m)),
+          { featureId: m.featureId, path: m.path, to: plain(to) },
+        ])
+      }
+    />
+  );
+  if (!mappings.length) return <RepairRow text="No references to map" />;
+  return mappings.map((m) => {
+    const only = m.to ? undefined : lone(m);
+    return (
+      <Fragment key={`${m.featureId}\n${m.path}`}>
+        <RepairRow text={mappingNote(m, where(m.featureId))}>
+          {only && acceptButton(m, only)}
+        </RepairRow>
+        {choices(m, (c) => c).map(({ pick, from }) => (
+          <RepairRow key={target(pick)} text={`${target(pick)}, ${from}`}>
+            {acceptButton(m, pick)}
+          </RepairRow>
+        ))}
+      </Fragment>
+    );
+  });
+}
+
+function ApplyRows({
+  id,
+  proposal: { backup, mappings },
+}: {
+  id: string;
+  proposal: NamingUpgradeProposal;
+}) {
+  const busy = useStore((s) => s.busy);
+  const open = mappings.filter(unchosen).length;
+  return (
+    <>
+      <div className="measure-row">
+        <span>Backup</span>
+        <b>{backup}</b>
+      </div>
+      <div className="measure-row">
+        <span>{open ? `${open} to accept` : "Ready"}</span>
+        <button
+          className="btn"
+          disabled={busy || open > 0}
+          onClick={() => void applyUpgrade(id, decisions(mappings))}
+        >
+          Apply upgrade
+        </button>
+      </div>
+    </>
+  );
+}
+
+function NamingUpgrade({ id, revision }: { id: string; revision: number }) {
+  const busy = useStore((s) => s.busy);
+  const [report, setReport] = useState<Report | null>(null);
+  const stage = async (chosen: NamingDecision[]) => {
+    setReport({ state: "loading" });
+    try {
+      const proposal = await api.stageNamingUpgrade(id, chosen);
+      setReport({ state: "ready", proposal });
+    } catch (e) {
+      setReport({ state: "failed", message: (e as Error).message });
+    }
+  };
+  const ready =
+    report?.state === "ready" && report.proposal.revision === revision
+      ? report.proposal
+      : null;
+  return (
+    <>
+      <div className="sel-info">
+        <span>Naming</span>
+        <b>{ready ? counts(ready.mappings) : "version 1"}</b>
+      </div>
+      {report?.state === "failed" && (
+        <div className="error-banner" role="alert">
+          Naming report did not load: {report.message}
+        </div>
+      )}
+      {(ready || report?.state === "loading") && (
+        <div role="list" aria-label="Naming upgrade">
+          {ready ? (
+            <MappingRows
+              mappings={ready.mappings}
+              stage={(a) => void stage(a)}
+            />
+          ) : (
+            <RepairRow text="Checking references" />
+          )}
+        </div>
+      )}
+      {ready ? (
+        <ApplyRows id={id} proposal={ready} />
+      ) : (
+        <div className="measure-row">
+          <span>Map references to version 2</span>
+          <button
+            className="btn"
+            disabled={busy || report?.state === "loading"}
+            onClick={() => void stage([])}
+          >
+            Upgrade naming
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function RefRepair() {
+  const fid = useStore((s) =>
+    s.mode.name === "dialog" ? s.mode.editFeatureId : undefined,
+  );
+  const document = useStore((s) => s.document);
+  if (!fid || !document) return null;
+  return (
+    <>
+      <RefProblems fid={fid} />
+      {document.namingVersion === 1 && (
+        <NamingUpgrade id={document.id} revision={document.revision} />
+      )}
     </>
   );
 }

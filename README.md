@@ -57,6 +57,7 @@ everything downstream against persistent topology references.
 - **Reference images**: place PNG, JPEG or WebP images on planes and calibrate them to real size.
 - **Feature timeline**: rename, edit, quick edit, hover preview, suppress, delete, roll back, insert features; broken references are flagged, never guessed or dropped.
 - **Reference repair**: in the feature's dialog, accept or choose a proposed face or edge for a broken reference, or re-pick it.
+- **Naming upgrade**: from a version 1 project's feature dialog, review every reference mapping, choose uncertain ones, apply, and undo.
 
 ### Inspect
 

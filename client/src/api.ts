@@ -233,17 +233,14 @@ async function sendHeld<P extends string, Req, Res>(
   return [response, held];
 }
 
-async function holding<P extends string, Req>(
-  route: Route<P, Req & HeldMeshes, WireMutationResponse>,
+async function holding<P extends string, Req, Res extends WireMutationResponse>(
+  route: Route<P, Req & HeldMeshes, Res>,
   params: PathParams<P>,
   body: Req,
   position?: number,
-): Promise<MutationResponse> {
+): Promise<Omit<Res, "evaluation"> & MutationResponse> {
   const [response, held] = await sendHeld(route, params, body, position);
-  return {
-    document: response.document,
-    evaluation: keep(refill(response.evaluation, held)),
-  };
+  return { ...response, evaluation: keep(refill(response.evaluation, held)) };
 }
 
 function fileForm(name: string, file: File): FormData {
