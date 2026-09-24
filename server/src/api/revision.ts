@@ -29,6 +29,18 @@ export function checkRevision(doc: CadDocument, expected: number): CadDocument {
   return doc;
 }
 
+export function keepNamingVersion<T extends { doc: CadDocument }>(
+  opened: T,
+  sent: CadDocument,
+): T {
+  if (sent.namingVersion !== opened.doc.namingVersion)
+    throw new StoreError(
+      `namingVersion stays ${opened.doc.namingVersion} for this project; a document write cannot change it.`,
+      "conflict",
+    );
+  return opened;
+}
+
 export function reply(
   res: { set(field: string, value: string): { json(body: unknown): unknown } },
   body: { document: CadDocument; evaluation?: EvaluateResult },

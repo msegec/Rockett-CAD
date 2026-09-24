@@ -303,6 +303,11 @@ it without validating.
 
 Every validation failure returns 400 and nothing is saved.
 
+`PUT /projects/:id/document` keeps the stored `namingVersion`. A document with
+a different value gets 409 `conflict` naming the field, without `revision`,
+and nothing is saved. The client sends back documents it received, so they
+carry the stored value.
+
 ## WebSockets
 
 Not used. Evaluation is fast enough to return synchronously for single-user

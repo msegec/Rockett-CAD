@@ -69,6 +69,7 @@ import {
 import {
   checkRevision,
   ifMatchRevision,
+  keepNamingVersion,
   reply,
   RevisionConflict,
 } from "./revision.js";
@@ -372,7 +373,7 @@ export function createApiRouter(
       const incoming = doc as unknown as CadDocument;
       const position = evaluationPosition(req, incoming);
       // Replacement is an edit, not creation (e.g. a delayed undo after delete).
-      const { view } = await editable(req, res);
+      const { view } = keepNamingVersion(await editable(req, res), incoming);
       await store.save(incoming);
       const next = await store.setVisible(incoming.id, view, shown);
       const evaluation = await evaluateAndSync(incoming, position);

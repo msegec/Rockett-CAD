@@ -456,9 +456,9 @@ name map, so edge and vertex names computed later for tessellation,
 measurement or projection follow the same rules. The 11 to 12 migration sets
 `namingVersion: 1` on every existing document, backed up with the rest of
 the project before its first save, so saved references keep resolving as
-before. New projects get 2. No route upgrades a document, but `PUT /document`
-saves the value the client sends; the engine drops its cached timeline when
-the version changes.
+before. New projects get 2. No route changes a stored `namingVersion`:
+`PUT /document` answers 409 to a different value. The engine drops its cached
+timeline when the version changes.
 
 ## Tangent edge chains
 
