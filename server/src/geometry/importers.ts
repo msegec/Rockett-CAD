@@ -112,21 +112,9 @@ export interface MeshPart {
 }
 
 function triangulation(handle: any): MeshPart {
-  const mesh = handle.IsNull() ? undefined : handle.get(),
-    nodes: number[] = [],
-    triangles: number[] = [];
   try {
-    for (let i = 1; i <= (mesh?.NbNodes() ?? 0); i++) {
-      const p = mesh.Node(i);
-      nodes.push(p.X(), p.Y(), p.Z());
-      p.delete();
-    }
-    for (let i = 1; i <= (mesh?.NbTriangles() ?? 0); i++) {
-      const t = mesh.Triangle(i);
-      triangles.push(t.Value(1) - 1, t.Value(2) - 1, t.Value(3) - 1);
-      t.delete();
-    }
-    return { nodes, triangles };
+    const { positions, indices } = getKernel().meshTriangulation(handle);
+    return { nodes: positions, triangles: indices };
   } finally {
     handle.delete();
   }

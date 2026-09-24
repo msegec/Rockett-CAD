@@ -100,7 +100,7 @@ export function tessellateBody(
   const edgeInfos: EdgeInfo[] = [];
   try {
     for (const [name, edge] of edgeNames) {
-      const polyline = sampleEdge(edge);
+      const polyline = Array.from<number>(k.sampleEdge(edge));
       if (polyline.length < 6) continue;
       edgeInfos.push({
         name,
@@ -297,31 +297,4 @@ export function curveInfo(edge: Shape): EdgeInfo["curve"] {
   } catch {
     return { type: "other" };
   }
-}
-
-function sampleEdge(edge: Shape): number[] {
-  const k = getKernel();
-  const out: number[] = [];
-  try {
-    const curve = new k.BRepAdaptor_Curve_2(edge);
-    const first = curve.FirstParameter();
-    const last = curve.LastParameter();
-    const type = curve.GetType();
-    let samples = 32;
-    if (type === k.GeomAbs_CurveType.GeomAbs_Line) samples = 1;
-    else if (type === k.GeomAbs_CurveType.GeomAbs_Circle) {
-      const span = Math.abs(last - first);
-      samples = Math.max(8, Math.ceil((span / (Math.PI * 2)) * 64));
-    }
-    for (let i = 0; i <= samples; i++) {
-      const t = first + ((last - first) * i) / samples;
-      const p = curve.Value(t);
-      out.push(p.X(), p.Y(), p.Z());
-      p.delete();
-    }
-    curve.delete();
-  } catch {
-    return [];
-  }
-  return out;
 }
