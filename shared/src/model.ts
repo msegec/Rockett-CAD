@@ -71,9 +71,12 @@ export type PlaneRef =
   | { kind: "construction"; featureId: string }
   | { kind: "face"; face: FaceRef };
 
+export const ORIGIN_AXES = ["X", "Y", "Z"] as const;
+export type OriginAxis = (typeof ORIGIN_AXES)[number];
+
 /** An axis for revolve / circular pattern. */
 export type AxisRef =
-  | { kind: "originAxis"; axis: "X" | "Y" | "Z" }
+  | { kind: "originAxis"; axis: OriginAxis }
   | { kind: "sketchLine"; sketchId: string; entityId: string }
   | { kind: "edge"; edge: EdgeRef };
 
@@ -323,7 +326,7 @@ export interface LinearPatternFeature extends FeatureBase {
   type: "linearPattern";
   bodies: string[];
   direction:
-    { kind: "axis"; axis: "X" | "Y" | "Z" } | { kind: "edge"; edge: EdgeRef };
+    { kind: "axis"; axis: OriginAxis } | { kind: "edge"; edge: EdgeRef };
   count: number;
   spacing: number; // mm
   combine: boolean;

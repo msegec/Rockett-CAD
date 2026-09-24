@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Feature, PlaneRef, TreeGroup } from "@rockett/shared";
+import { ORIGIN_AXES } from "@rockett/shared";
 import { useStore, selectionKey, type Selection } from "../store";
 import {
   viewportHandle,
@@ -21,6 +22,7 @@ import {
 import { openFeatureEditor } from "./Timeline";
 import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { RenameInput } from "./RenameInput";
+import { pickLabel } from "./form/fields";
 import {
   deleteFeatures,
   groupItems,
@@ -244,6 +246,11 @@ export const ModelTree = memo(function ModelTree() {
       label: `${plane} Plane`,
     }),
   );
+  const originAxes = ORIGIN_AXES.map((axis): Selection => ({
+    kind: "axis",
+    axis,
+  }));
+  const origins = [...originPlanes, ...originAxes];
   const planeRow = (sel: PlaneSelection) => (
     <div
       key={sel.label}
@@ -253,12 +260,26 @@ export const ModelTree = memo(function ModelTree() {
           sketchOn(sel.ref);
           return;
         }
-        pick(e, sel, originPlanes, () => toggleSelection(sel, false));
+        pick(e, sel, origins, () => toggleSelection(sel, false));
       }}
       onContextMenu={(e) => openMenu(e, planeMenu(sel.ref))}
     >
       <span className="tree-icon">▱</span>
       {sel.label}
+    </div>
+  );
+  const axisRow = (sel: Selection) => (
+    <div
+      key={selectionKey(sel)}
+      className={`tree-item ${selKeys.has(selectionKey(sel)) ? "selected" : ""}`}
+      onClick={(e) =>
+        pick(e, sel, origins, () =>
+          toggleSelection(sel, useStore.getState().mode.name === "dialog"),
+        )
+      }
+    >
+      <span className="tree-icon">↗</span>
+      {pickLabel(sel, document_, evaluation, [])}
     </div>
   );
 
@@ -521,6 +542,7 @@ export const ModelTree = memo(function ModelTree() {
             Show origin
           </div>
           {originPlanes.map((p) => planeRow(p))}
+          {originAxes.map(axisRow)}
         </>,
       )}
 

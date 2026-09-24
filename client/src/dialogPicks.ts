@@ -10,12 +10,13 @@ export interface DialogPicks {
   planes?: boolean;
   /** Sketch lines are pickable (revolve / circular-pattern axes). */
   sketchLines?: boolean;
+  axes?: boolean;
 }
 
 export const DIALOG_PICKS: Record<DialogType, DialogPicks> = {
   importStep: {},
   extrude: { profiles: true, faces: true },
-  revolve: { profiles: true, edges: true, sketchLines: true },
+  revolve: { profiles: true, edges: true, sketchLines: true, axes: true },
   sweep: { profiles: true },
   loft: { profiles: true },
   emboss: { profiles: true },
@@ -26,8 +27,13 @@ export const DIALOG_PICKS: Record<DialogType, DialogPicks> = {
   splitBody: { bodies: true, planes: true, faces: true },
   offsetFace: { faces: true },
   mirror: { bodies: true, planes: true, faces: true },
-  linearPattern: { bodies: true, edges: true },
-  circularPattern: { bodies: true, edges: true, sketchLines: true },
+  linearPattern: { bodies: true, edges: true, axes: true },
+  circularPattern: {
+    bodies: true,
+    edges: true,
+    sketchLines: true,
+    axes: true,
+  },
   constructionPlane: { planes: true, faces: true },
   referenceImage: { planes: true, faces: true },
   move: { bodies: true },
@@ -54,6 +60,8 @@ export function filterSelectionFor(
         return !!picks.planes;
       case "sketchEntity":
         return !!picks.sketchLines;
+      case "axis":
+        return !!picks.axes;
       default:
         return false;
     }

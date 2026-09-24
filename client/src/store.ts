@@ -14,6 +14,7 @@ import type {
   EvaluateResult,
   Feature,
   MeasureResult,
+  OriginAxis,
   PlaneRef,
   ProjectView,
   SketchConstraint,
@@ -49,6 +50,7 @@ export type Selection =
   | { kind: "edge"; bodyId: string; edgeName: string }
   | { kind: "vertex"; bodyId: string; vertexName: string }
   | { kind: "plane"; ref: PlaneRef; label: string }
+  | { kind: "axis"; axis: OriginAxis }
   | { kind: "profile"; sketchId: string; profileId: string }
   | { kind: "sketch"; sketchId: string }
   | {
@@ -71,6 +73,8 @@ export function selectionKey(s: Selection): string {
       return `vertex:${s.bodyId}:${s.vertexName}`;
     case "plane":
       return `plane:${JSON.stringify(s.ref)}`;
+    case "axis":
+      return `axis:${s.axis}`;
     case "profile":
       return `profile:${s.sketchId}:${s.profileId}`;
     case "sketch":

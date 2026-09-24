@@ -23,6 +23,7 @@ import {
 import { api, saveDownload } from "../api";
 import { extrudeReachesBody } from "../extrudeReach";
 import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
+import { DIALOG_PICKS } from "../dialogPicks";
 import { createLivePreview } from "../livePreview";
 import { toolTargets } from "../toolTargets";
 import { viewportHandle } from "../viewportRef";
@@ -32,6 +33,7 @@ import { RefRepair } from "./RefRepair";
 import {
   AngleField,
   AxisField,
+  axisOptions,
   CheckField,
   LengthField,
   NumField,
@@ -156,13 +158,9 @@ function DialogBody({
 
   // Picking an edge or sketch line in an axis-based dialog switches the axis
   // to it — the dropdown alone gave no hint the pick was registered.
-  const axisDialogs: DialogType[] = [
-    "revolve",
-    "linearPattern",
-    "circularPattern",
-  ];
+  const axisDialog = !!DIALOG_PICKS[dialog].axes;
   useEffect(() => {
-    if (!axisDialogs.includes(dialog)) return;
+    if (!axisDialog) return;
     if (
       (edges.length > 0 || sketchLines.length > 0) &&
       params.axisSource !== "edge"
@@ -170,6 +168,11 @@ function DialogBody({
       setParams({ axisSource: "edge" });
     }
   }, [edges.length, sketchLines.length, dialog]);
+  const originAxis = selection.findLast((s) => s.kind === "axis")?.axis;
+  useEffect(() => {
+    if (axisDialog && originAxis)
+      setParams({ axisSource: "origin", axis: originAxis });
+  }, [originAxis, dialog]);
 
   const profileRefs = (): ProfileRef[] =>
     profiles.map((x) => ({ sketchId: x.sketchId, profileId: x.profileId }));
@@ -776,12 +779,7 @@ function DialogBody({
             value={
               p("axisSource", "origin") === "edge" ? "edge" : p("axis", "X")
             }
-            options={[
-              ["X", "X axis"],
-              ["Y", "Y axis"],
-              ["Z", "Z axis"],
-              ["edge", "Selected edge"],
-            ]}
+            options={[...axisOptions, ["edge", "Selected edge"]]}
             onChange={(v) =>
               v === "edge"
                 ? setParams({ axisSource: "edge" })

@@ -1,5 +1,5 @@
 import { Type, type TProperties } from "typebox";
-import { REF_SIGNATURE_TYPES, SCHEMA_VERSION } from "../model.js";
+import { ORIGIN_AXES, REF_SIGNATURE_TYPES, SCHEMA_VERSION } from "../model.js";
 import { LINEAR_TOL } from "../tolerance.js";
 import { MB, UNIT_TO_MM, type Units } from "../units.js";
 
@@ -46,7 +46,7 @@ const planeRef = Type.Union([
   Type.Object({ kind: Type.Literal("face"), face: faceRef }),
 ]);
 
-const axis = Type.Enum(["X", "Y", "Z"]);
+const axis = Type.Enum([...ORIGIN_AXES]);
 
 const axisRef = Type.Union([
   Type.Object({ kind: Type.Literal("originAxis"), axis }),

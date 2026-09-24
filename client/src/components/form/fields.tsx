@@ -1,5 +1,6 @@
 import {
   fromMm,
+  ORIGIN_AXES,
   toMm,
   type BodyPayload,
   type CadDocument,
@@ -168,6 +169,11 @@ export function SelectField({
   );
 }
 
+export const axisOptions = ORIGIN_AXES.map((a): [string, string] => [
+  a,
+  `${a} axis`,
+]);
+
 export function AxisField({
   axisSource,
   axis,
@@ -183,12 +189,7 @@ export function AxisField({
     <SelectField
       label="Axis"
       value={axisSource === "edge" ? "edge" : (axis ?? "Z")}
-      options={[
-        ["X", "X axis"],
-        ["Y", "Y axis"],
-        ["Z", "Z axis"],
-        ["edge", "Selected line/edge"],
-      ]}
+      options={[...axisOptions, ["edge", "Selected line/edge"]]}
       onChange={(v) =>
         onChange(
           v === "edge"
@@ -258,6 +259,7 @@ export function pickLabel(
   const feature = (id: string) =>
     document && ranked(document.features, (f) => f.id).get(id)?.item;
   const featureName = (id: string) => feature(id)?.name;
+  if (pick.kind === "axis") return `${pick.axis} Axis`;
   if (pick.kind === "plane") {
     const ref = pick.ref;
     if (ref.kind === "origin") return `${ref.plane} Plane`;

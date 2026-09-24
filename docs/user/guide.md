@@ -101,6 +101,11 @@ or chamfer along a smooth contour as required by its native operation.
 
 - Replicate: mirror, rectangular pattern and circular pattern.
 - Construction: offset planes and midplanes; sketch on any planar face.
+- Origin axes: the model tree's Origin section lists X Axis, Y Axis and Z Axis
+  under the planes. In Revolve and Circular Pattern, clicking an axis row or
+  the axis line drawn at the origin sets the axis, as choosing it in the Axis
+  list does; in Rectangular Pattern it sets the direction. Hiding the origin
+  hides the axis lines too, and they cannot be picked while hidden.
 
 ### Drag handles
 

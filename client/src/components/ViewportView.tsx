@@ -19,6 +19,7 @@ import {
   newId,
   extendSketch,
   trimPiece,
+  ORIGIN_AXES,
 } from "@rockett/shared";
 import { CadViewport, uv3 } from "../three/CadViewport";
 import { ViewCube } from "../three/ViewCube";
@@ -663,14 +664,9 @@ export function ViewportView() {
         }
       }
     } else {
-      const dirs: Record<string, [number, number, number]> = {
-        X: [1, 0, 0],
-        Y: [0, 1, 0],
-        Z: [0, 0, 1],
-      };
-      const d = dirs[s.dialogParams.axis ?? "Z"] ?? dirs.Z!;
+      const index = ORIGIN_AXES.indexOf(s.dialogParams.axis);
       axisOrigin = new THREE.Vector3(0, 0, 0);
-      axisDir = new THREE.Vector3(...d);
+      axisDir = new THREE.Vector3().setComponent(index < 0 ? 2 : index, 1);
     }
     if (!axisOrigin || !axisDir || axisDir.lengthSq() < 1e-12) return null;
     return { origin: axisOrigin, dir: axisDir };
@@ -1622,6 +1618,7 @@ export function ViewportView() {
         faces: picks.faces || picks.bodies,
         bodies: picks.bodies && !picks.faces,
         originPlanes: picks.planes,
+        originAxes: picks.axes,
         constructionPlanes: picks.planes,
         sketchEntities: picks.sketchLines,
       });
@@ -1670,6 +1667,7 @@ export function ViewportView() {
     if (sel.kind === "edge" && picks.edges) return sel;
     if (sel.kind === "body" && picks.bodies) return sel;
     if (sel.kind === "plane" && picks.planes) return sel;
+    if (sel.kind === "axis" && picks.axes) return sel;
     if (sel.kind === "profile" && picks.profiles) return sel;
     if (sel.kind === "sketchEntity" && picks.sketchLines) {
       // only LINES can serve as an axis
@@ -2119,6 +2117,7 @@ export function ViewportView() {
         faces: (picks.faces || picks.bodies) && (!both || wantFace),
         bodies: picks.bodies && !picks.faces,
         originPlanes: picks.planes,
+        originAxes: picks.axes,
         constructionPlanes: picks.planes,
         sketchEntities: picks.sketchLines,
         depth: toolState.current.pickDepth,

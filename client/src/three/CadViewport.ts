@@ -8,11 +8,13 @@
  */
 
 import * as THREE from "three";
-import type {
-  BodyPayload,
-  ConstructionPlanePayload,
-  PlaneFrame,
-  Vec3,
+import {
+  ORIGIN_AXES,
+  type BodyPayload,
+  type ConstructionPlanePayload,
+  type OriginAxis,
+  type PlaneFrame,
+  type Vec3,
 } from "@rockett/shared";
 import type { Selection } from "../store";
 import type { PreviewGhost, PreviewTint } from "../livePreview";
@@ -451,6 +453,7 @@ export class CadViewport {
   // -------------------------------------------------------------------------
 
   private originPlaneMeshes: THREE.Mesh[] = [];
+  private originAxisLines = new Map<OriginAxis, THREE.Line>();
 
   private buildOriginDisplay() {
     const size = 30;
@@ -479,28 +482,23 @@ export class CadViewport {
       this.originRoot.add(mesh);
       this.originPlaneMeshes.push(mesh);
     }
-    // axes
-    const axes = [
-      { dir: new THREE.Vector3(1, 0, 0), color: themeColor("axis-x") },
-      { dir: new THREE.Vector3(0, 1, 0), color: themeColor("axis-y") },
-      { dir: new THREE.Vector3(0, 0, 1), color: themeColor("axis-z") },
-    ];
-    for (const a of axes) {
-      const geom = new THREE.BufferGeometry().setFromPoints([
-        a.dir.clone().multiplyScalar(-18),
-        a.dir.clone().multiplyScalar(18),
-      ]);
-      this.originRoot.add(
-        new THREE.Line(
-          geom,
-          new THREE.LineBasicMaterial({
-            color: a.color,
-            transparent: true,
-            opacity: PLANE_APPEARANCE.originAxisOpacity,
-          }),
-        ),
+    const colors = ["axis-x", "axis-y", "axis-z"] as const;
+    ORIGIN_AXES.forEach((axis, i) => {
+      const dir = new THREE.Vector3().setComponent(i, 1);
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          dir.clone().multiplyScalar(-18),
+          dir.clone().multiplyScalar(18),
+        ]),
+        new THREE.LineBasicMaterial({
+          color: themeColor(colors[i]!),
+          transparent: true,
+          opacity: PLANE_APPEARANCE.originAxisOpacity,
+        }),
       );
-    }
+      this.originRoot.add(line);
+      this.originAxisLines.set(axis, line);
+    });
   }
 
   setOriginVisible(v: boolean) {
@@ -723,6 +721,7 @@ export class CadViewport {
       edges?: boolean | undefined;
       vertices?: boolean | undefined;
       originPlanes?: boolean | undefined;
+      originAxes?: boolean | undefined;
       constructionPlanes?: boolean | undefined;
       profiles?: boolean | undefined;
       sketchEntities?: boolean | undefined;
@@ -826,6 +825,18 @@ export class CadViewport {
               label: `${mesh.userData.originPlane} Plane`,
             },
             distance: h.distance + pxTol, // lower priority than solid geometry
+            point: h.point,
+          });
+        }
+      }
+    }
+
+    if (opts.originAxes && this.originRoot.visible) {
+      for (const [axis, line] of this.originAxisLines) {
+        for (const h of this.raycaster.intersectObject(line, false)) {
+          results.push({
+            selection: { kind: "axis", axis },
+            distance: h.distance - pxTol * 1.2,
             point: h.point,
           });
         }
@@ -960,22 +971,21 @@ export class CadViewport {
         this.overlayRoot.add(mesh);
         this.highlightObjects.push(mesh);
       }
-    } else if (sel.kind === "edge") {
-      const b = this.bodies.get(sel.bodyId);
-      const e = b?.payload.edges.find((x) => x.name === sel.edgeName);
-      if (!e) return;
-      const pts: THREE.Vector3[] = [];
-      for (let i = 0; i < e.polyline.length; i += 3) {
-        pts.push(
-          new THREE.Vector3(
-            e.polyline[i],
-            e.polyline[i + 1],
-            e.polyline[i + 2],
-          ),
-        );
-      }
+    } else if (sel.kind === "edge" || sel.kind === "axis") {
+      const points =
+        sel.kind === "axis"
+          ? this.originAxisLines
+              .get(sel.axis)
+              ?.geometry.getAttribute("position").array
+          : this.bodies
+              .get(sel.bodyId)
+              ?.payload.edges.find((x) => x.name === sel.edgeName)?.polyline;
+      if (!points) return;
       const line = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.BufferGeometry().setAttribute(
+          "position",
+          new THREE.Float32BufferAttribute(points, 3),
+        ),
         new THREE.LineBasicMaterial({
           color,
           linewidth: HIGHLIGHT_APPEARANCE.edgeLinewidth,
