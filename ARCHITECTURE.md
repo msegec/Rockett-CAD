@@ -37,7 +37,9 @@ history tracking) with zero native build complexity in Docker. The runtime
 image is plain `node:24-trixie-slim`. The geometry code lives in
 `server/src/geometry/`, and the API reaches it only through the `KernelClient`
 in `server/src/kernel/client.ts`, so it can move to a worker thread without
-touching the routes. `InProcessKernel` is today's implementation; in-process
+touching the routes. `InProcessKernel` is today's implementation.
+`WorkerKernel` runs the same engine in one `worker_threads` worker
+(`server/src/kernel/worker.ts`) and is not wired into production yet. In-process
 evaluation is simple and fast (typical feature evaluation is a few ms; full
 first-load regeneration of a moderate model tens of ms).
 
