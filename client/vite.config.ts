@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+import { DEFAULT_PORT } from "../shared/src/routes.ts";
 
 export default defineConfig({
   plugins: [react()],
@@ -16,7 +17,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": "http://localhost:8788",
+      "/api": `http://localhost:${DEFAULT_PORT}`,
     },
   },
   build: {

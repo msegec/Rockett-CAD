@@ -10,6 +10,7 @@ import { Router, json, type RequestHandler } from "express";
 import {
   DOCUMENT_EDITS,
   emptyView,
+  MB,
   nextFeatureName,
   parse,
   projectEdge,
@@ -39,7 +40,7 @@ import { computeEdgeNames } from "../geometry/naming.js";
 import { curveInfo } from "../geometry/tessellate.js";
 import { tangentEdges } from "../geometry/tangentEdges.js";
 import { importerFor, IMPORTERS } from "../geometry/importers.js";
-import { write3mf, writeStl } from "../geometry/exporters.js";
+import { EXPORT_QUALITY, write3mf, writeStl } from "../geometry/exporters.js";
 import type { NamedBody } from "../geometry/naming.js";
 import {
   knownKeys,
@@ -56,6 +57,7 @@ import { folderRoutes } from "./folderRoutes.js";
 import {
   discarding,
   IMPORT_LIMITS,
+  JSON_BODY_LIMIT_BYTES,
   readUpload,
   receiveImage,
   receiveImport,
@@ -192,7 +194,7 @@ export function createApiRouter(
 ): Router {
   const { uploadBytes, importBytes } = { ...IMPORT_LIMITS, ...limits };
   const router = Router();
-  router.use(json({ limit: "50mb" }), check(omitHeldMeshes));
+  router.use(json({ limit: JSON_BODY_LIMIT_BYTES }), check(omitHeldMeshes));
   const on = (route: Route, ...handlers: RequestHandler[]) =>
     router[route.method.toLowerCase() as Lowercase<Method>](
       route.path,
@@ -402,7 +404,7 @@ export function createApiRouter(
       const at = Math.min(doc.timelinePosition, doc.features.length);
       doc.features.splice(at, 0, ...features);
       doc.timelinePosition = at + features.length;
-      if (Buffer.byteLength(JSON.stringify(doc), "utf8") > 40 * 1024 * 1024)
+      if (Buffer.byteLength(JSON.stringify(doc), "utf8") > 40 * MB)
         throw new ValidationError(
           `This import would exceed the 40 MB project limit. Start a separate project for this ${importer.label} file.`,
         );
@@ -645,7 +647,7 @@ export function createApiRouter(
       const {
         format,
         bodyIds: requestedIds,
-        quality = 0.05,
+        quality = EXPORT_QUALITY,
         retain,
       }: ExportRequest = req.body;
       const exporter = EXPORTERS[format];

@@ -41,6 +41,7 @@ export interface WireMutationResponse {
 export const PROJECT_FILE_FORMAT = "rockett-project";
 export const PROJECT_FILE_VERSION = 1;
 export const PROJECT_FILE_LIMIT_MB = 64;
+export const DEFAULT_PORT = 8788;
 
 export interface ProjectFile {
   format: typeof PROJECT_FILE_FORMAT;

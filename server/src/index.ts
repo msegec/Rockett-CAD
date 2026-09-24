@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import type { AddressInfo } from "node:net";
-import { SCHEMA_VERSION } from "@rockett/shared";
+import { DEFAULT_PORT, SCHEMA_VERSION } from "@rockett/shared";
 import { initKernel } from "./geometry/kernel.js";
 import { ProjectStore } from "./store/projectStore.js";
 import { validateDocument } from "./api/validate.js";
@@ -21,7 +21,7 @@ import { parseAllowedOrigins } from "./auth/origin.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-const PORT = Number(process.env.ROCKETT_PORT || 8788);
+const PORT = Number(process.env.ROCKETT_PORT || DEFAULT_PORT);
 const DATA_DIR = process.env.DATA_DIR || path.resolve(here, "../../data");
 
 let allowedOrigins: string[];

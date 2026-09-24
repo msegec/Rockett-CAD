@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { MAX_IMPORT_BYTES, MB } from "@rockett/shared";
 import { api } from "../api";
 import { useStore } from "../store";
 import { viewportHandle } from "../viewportRef";
@@ -18,9 +19,9 @@ export function StepImportButton({
     if (!file || pending || busy) return;
     setPending(true);
     try {
-      if (file.size > 10 * 1024 * 1024)
+      if (file.size > MAX_IMPORT_BYTES)
         throw new Error(
-          "Choose a STEP, IGES, BREP, STL, OBJ or 3MF file up to 10 MB.",
+          `Choose a STEP, IGES, BREP, STL, OBJ or 3MF file up to ${MAX_IMPORT_BYTES / MB} MB.`,
         );
       const s = useStore.getState();
       if (newProject) {

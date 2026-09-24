@@ -50,9 +50,9 @@ RUN groupadd -r rockett && useradd -r -g rockett rockett \
   && mkdir -p /data && chown rockett:rockett /data
 USER rockett
 VOLUME /data
-EXPOSE 8788
+EXPOSE $ROCKETT_PORT
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=10 \
-  CMD node -e "fetch('http://127.0.0.1:8788/api/health',{signal:AbortSignal.timeout(5000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:$ROCKETT_PORT/api/health',{signal:AbortSignal.timeout(5000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 CMD ["node", "server.mjs"]

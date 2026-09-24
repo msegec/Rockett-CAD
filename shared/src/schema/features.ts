@@ -1,10 +1,10 @@
 import { Type, type TProperties } from "typebox";
 import { SCHEMA_VERSION } from "../model.js";
 import { LINEAR_TOL } from "../tolerance.js";
-import { UNIT_TO_MM, type Units } from "../units.js";
+import { MB, UNIT_TO_MM, type Units } from "../units.js";
 
 export const MAX_DIM = 100_000;
-const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+export const MAX_IMPORT_BYTES = 10 * MB;
 
 const id = Type.String({ minLength: 1, maxLength: 100 });
 const bodyId = Type.String({ minLength: 1, maxLength: 200 });

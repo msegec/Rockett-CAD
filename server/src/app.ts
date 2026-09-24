@@ -1,4 +1,5 @@
 import express, { type Express, type Router } from "express";
+import { HOUR } from "@rockett/shared";
 import { readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { Server } from "node:http";
@@ -13,7 +14,6 @@ import type { FolderStore } from "./store/folderStore.js";
 import { ProjectQueue } from "./store/projectQueue.js";
 import { dropEngine } from "./geometry/engine.js";
 
-const HOUR = 60 * 60 * 1000;
 const COMPRESSIBLE = /\.(?:js|css|html)$/;
 const gzipAsync = promisify(gzip);
 const toUrl = (file: string) => `/${file.split(path.sep).join("/")}`;

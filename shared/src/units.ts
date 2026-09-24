@@ -27,3 +27,8 @@ export function formatLength(mm: number, units: Units, digits: number): string {
 export function formatAngle(deg: number, digits: number): string {
   return `${round(deg, digits)}°`;
 }
+
+export const MB = 1024 * 1024;
+export const MINUTE = 60 * 1000;
+export const HOUR = 60 * MINUTE;
+export const DAY = 24 * HOUR;

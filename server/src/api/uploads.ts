@@ -1,9 +1,13 @@
 import multer from "multer";
-import { PROJECT_FILE_LIMIT_MB, type ApiErrorBody } from "@rockett/shared";
+import {
+  MAX_IMPORT_BYTES,
+  MB,
+  PROJECT_FILE_LIMIT_MB,
+  type ApiErrorBody,
+} from "@rockett/shared";
 import { IMAGE_LIMIT_MB, StoreError } from "../store/projectStore.js";
 import type { Staged, Uploads } from "../store/blobStore.js";
 
-const MB = 1024 * 1024;
 const megabytes = (bytes: number) =>
   `${Number((bytes / MB).toPrecision(3))} MB`;
 
@@ -13,9 +17,11 @@ export interface ImportLimits {
 }
 
 export const IMPORT_LIMITS: ImportLimits = {
-  uploadBytes: 10 * MB,
-  importBytes: 10 * MB,
+  uploadBytes: MAX_IMPORT_BYTES,
+  importBytes: MAX_IMPORT_BYTES,
 };
+
+export const JSON_BODY_LIMIT_BYTES = 50 * MB;
 
 export type Upload = Staged & { originalname: string };
 

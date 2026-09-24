@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
+import { DAY } from "@rockett/shared";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const IDLE_MS = 7 * DAY_MS;
-const ABSOLUTE_MS = 30 * DAY_MS;
+const IDLE_MS = 7 * DAY;
+const ABSOLUTE_MS = 30 * DAY;
 const MAX_PER_USER = 20;
 
 interface Session {

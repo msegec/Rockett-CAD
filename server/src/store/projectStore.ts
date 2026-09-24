@@ -2,7 +2,10 @@ import path from "node:path";
 import crypto from "node:crypto";
 import {
   createEmptyDocument,
+  DAY,
   emptyView,
+  MB,
+  MINUTE,
   parse,
   projectView,
   VIEW_VERSION,
@@ -22,9 +25,6 @@ export { StoreError };
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const PNG_HEAD = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
-
-const MINUTE = 60 * 1000;
-const DAY = 24 * 60 * MINUTE;
 
 export const IMAGE_LIMIT_MB = 25;
 
@@ -53,7 +53,7 @@ const text = (v: unknown, fallback: string) =>
   typeof v === "string" ? v : fallback;
 
 function imageMime(data: Buffer, label: string): string {
-  if (data.length > IMAGE_LIMIT_MB * 1024 * 1024)
+  if (data.length > IMAGE_LIMIT_MB * MB)
     throw new StoreError(`${label}image is over ${IMAGE_LIMIT_MB} MB`);
   const type = IMAGE_TYPES.find((t) => t.test(data));
   if (!type)

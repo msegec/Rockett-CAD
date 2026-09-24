@@ -14,13 +14,15 @@ import { getKernel } from "./kernel.js";
 import { meshShape } from "./mesh.js";
 import type { NamedBody } from "./naming.js";
 
+export const EXPORT_QUALITY = 0.05;
+
 interface Mesh {
   positions: number[];
   indices: number[];
 }
 
 /** Tessellate a body at export quality. */
-export function exportMesh(body: NamedBody, quality = 0.05): Mesh {
+export function exportMesh(body: NamedBody, quality = EXPORT_QUALITY): Mesh {
   const positions: number[] = [];
   const indices: number[] = [];
   const copy = new (getKernel().BRepBuilderAPI_Copy_2)(
@@ -44,7 +46,10 @@ export function exportMesh(body: NamedBody, quality = 0.05): Mesh {
 }
 
 /** Binary STL of one or more bodies merged into a single mesh. */
-export function writeStl(bodies: NamedBody[], quality = 0.05): Buffer {
+export function writeStl(
+  bodies: NamedBody[],
+  quality = EXPORT_QUALITY,
+): Buffer {
   const meshes = bodies.map((b) => exportMesh(b, quality));
   const triCount = meshes.reduce((s, m) => s + m.indices.length / 3, 0);
   const buffer = Buffer.alloc(84 + triCount * 50);
@@ -124,7 +129,7 @@ function weld({ positions: P, indices }: Mesh): Mesh {
 /** 3MF: one <object> per body, names preserved, units = millimeter. */
 export function write3mf(
   bodies: { body: NamedBody; name: string }[],
-  quality = 0.05,
+  quality = EXPORT_QUALITY,
 ): Buffer {
   const objectsXml: string[] = [];
   const itemsXml: string[] = [];

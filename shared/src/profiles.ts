@@ -1,4 +1,5 @@
 import type { SketchEntity, SketchPoint } from "./model.js";
+import { LINEAR_TOL } from "./tolerance.js";
 
 export interface OrientedCurve {
   entityId: string;
@@ -22,7 +23,6 @@ export interface CurveHit {
   by: string[];
 }
 
-const MERGE_TOL = 1e-6;
 const SPLIT_TOL = 1e-4;
 const ARC_SEGMENTS = 24;
 const TAU = Math.PI * 2;
@@ -163,7 +163,7 @@ function lineRound(l: Line, c: Round, mode: Detection): XY[] {
   const fy = l.y1 + t0 * dy;
   const h = Math.hypot(c.cx - fx, c.cy - fy);
   const out: XY[] = [];
-  if (mode === "current" && Math.abs(h - c.r) <= MERGE_TOL) {
+  if (mode === "current" && Math.abs(h - c.r) <= LINEAR_TOL) {
     if (interior(t0)) out.push([fx, fy]);
   } else if (h < c.r) {
     const half = Math.sqrt(c.r * c.r - h * h) / Math.sqrt(len2);
@@ -182,9 +182,9 @@ function roundRound(a: Round, b: Round, mode: Detection): XY[] {
   const uy = dy / d;
   const touch = mode === "current";
   let out: XY[] = [];
-  if (touch && Math.abs(d - (a.r + b.r)) <= MERGE_TOL) {
+  if (touch && Math.abs(d - (a.r + b.r)) <= LINEAR_TOL) {
     out = [[a.cx + ux * a.r, a.cy + uy * a.r]];
-  } else if (touch && Math.abs(d - Math.abs(a.r - b.r)) <= MERGE_TOL) {
+  } else if (touch && Math.abs(d - Math.abs(a.r - b.r)) <= LINEAR_TOL) {
     const sign = a.r > b.r ? 1 : -1;
     out = [[a.cx + sign * ux * a.r, a.cy + sign * uy * a.r]];
   } else if (d < a.r + b.r && d > Math.abs(a.r - b.r)) {
@@ -327,8 +327,8 @@ function arrange(entities: SketchEntity[], mode: Detection): Arrangement {
       continue;
     }
     const [s, e] = endsOf(c);
-    const from = nodeFor(s[0], s[1], MERGE_TOL);
-    const to = nodeFor(e[0], e[1], MERGE_TOL);
+    const from = nodeFor(s[0], s[1], LINEAR_TOL);
+    const to = nodeFor(e[0], e[1], LINEAR_TOL);
     if (from === to) continue;
     curves.push(c);
     ends.push([from, to]);
