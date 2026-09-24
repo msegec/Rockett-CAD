@@ -165,6 +165,19 @@ stateless outside `/data`**. Recreating it (upgrades, host moves) loses
 nothing; this is verified by the persistence tests and was smoke-tested against
 a live container.
 
+### Naming report
+
+`node scripts/naming-report.mjs <copy>` lists which projects in a copy of
+`/data` still use naming version 1. Run it from a checkout after `npm ci`,
+since it loads the server source through `tsx`. It prints each project's id
+and `namingVersion`, and under a version 1 project one line per mapping the
+naming upgrade would stage (see [API.md](API.md), Naming upgrade): feature id
+or `-`, path, status, the old body and name, then `->` the proven target,
+`candidates` and `suggestions`. A project that fails to load prints its
+status and reason. It skips temporary projects, as the project list does. It
+never writes: it takes no backup, and its file access refuses every write. It
+exits 0 when every project is on version 2, and 1 otherwise.
+
 ## Environment
 
 | Variable                  | Default  | Purpose                                                                                                         |
