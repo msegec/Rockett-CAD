@@ -15,6 +15,7 @@ import {
   pnt,
   dir,
   progress,
+  scoped,
   shapeHash,
   type Shape,
 } from "./kernel.js";
@@ -87,20 +88,17 @@ export function arcEdge(
   const p1 = uvTo3d(frame, from[0], from[1]);
   const pm = uvTo3d(frame, c.x + r * Math.cos(amid), c.y + r * Math.sin(amid));
   const p2 = uvTo3d(frame, to[0], to[1]);
-  const arcMk = new k.GC_MakeArcOfCircle_4(
-    pnt(p1[0], p1[1], p1[2]),
-    pnt(pm[0], pm[1], pm[2]),
-    pnt(p2[0], p2[1], p2[2]),
-  );
-  const curveHandle = arcMk.Value();
-  const baseHandle = new k.Handle_Geom_Curve_2(curveHandle.get());
-  const mk = new k.BRepBuilderAPI_MakeEdge_24(baseHandle);
-  const edge = mk.Edge();
-  mk.delete();
-  baseHandle.delete();
-  curveHandle.delete();
-  arcMk.delete();
-  return edge;
+  return scoped((own) => {
+    const arcMk = own(
+      new k.GC_MakeArcOfCircle_4(
+        own(pnt(...p1)),
+        own(pnt(...pm)),
+        own(pnt(...p2)),
+      ),
+    );
+    const curve = own(k.upcastCurve(own(arcMk.Value())));
+    return own(new k.BRepBuilderAPI_MakeEdge_24(curve)).Edge();
+  });
 }
 
 /**
