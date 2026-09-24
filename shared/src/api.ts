@@ -80,7 +80,7 @@ export interface HeldMeshes {
 }
 
 export type FeatureRunStatus =
-  "ok" | "warning" | "error" | "suppressed" | "rolledBack";
+  "ok" | "warning" | "error" | "suppressed" | "rolledBack" | "cancelled";
 
 export interface RefCandidate {
   bodyId: string;

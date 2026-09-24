@@ -177,6 +177,23 @@ function cached(body: NamedBody): BodyPayload | undefined {
   return entry.payload;
 }
 
+export interface EvaluateHooks {
+  onFeatureStart?(index: number, featureId: string, featureKey: string): void;
+  onProgress?(done: number, total: number, label: string): void;
+  shouldStop?(): boolean;
+}
+
+function unreached(
+  features: CadDocument["features"],
+  from: number,
+  upTo: number,
+): FeatureStatus[] {
+  return features.slice(from).map((feature, offset) => ({
+    featureId: feature.id,
+    status: from + offset < upTo ? "cancelled" : "rolledBack",
+  }));
+}
+
 class DocumentEngine {
   private snapshots: Snapshot[] = [];
   private namingVersion?: NamingVersion;
@@ -190,9 +207,10 @@ class DocumentEngine {
     doc: CadDocument,
     position?: number,
     sources?: Sources,
+    hooks?: EvaluateHooks,
   ): EvaluateResult {
     const t0 = performance.now();
-    const { state, statuses } = this.regenerate(doc, position, sources);
+    const { state, statuses } = this.regenerate(doc, position, sources, hooks);
 
     // --- payloads ---
     const bodies: BodyPayload[] = [];
@@ -231,6 +249,7 @@ class DocumentEngine {
     doc: CadDocument,
     position: number | undefined,
     sources: Sources | undefined,
+    hooks?: EvaluateHooks,
   ) {
     if (sources) this.held = sources;
     const upTo = Math.min(
@@ -260,8 +279,10 @@ class DocumentEngine {
     let statuses: FeatureStatus[] =
       start === 0 ? [] : [...this.snapshots[start - 1]!.statuses];
 
-    for (let i = start; i < upTo; i++) {
+    let i = start;
+    for (; i < upTo && !hooks?.shouldStop?.(); i++) {
       const feature = doc.features[i]!;
+      hooks?.onFeatureStart?.(i, feature.id, keyAt(i));
       const next = cloneState(state);
       let status: FeatureStatus;
       if (feature.suppressed) {
@@ -297,14 +318,10 @@ class DocumentEngine {
         statuses,
       });
       state = next;
+      hooks?.onProgress?.(i + 1 - start, upTo - start, feature.name);
     }
 
-    for (let i = upTo; i < doc.features.length; i++) {
-      statuses = [
-        ...statuses,
-        { featureId: doc.features[i]!.id, status: "rolledBack" },
-      ];
-    }
+    statuses = [...statuses, ...unreached(doc.features, i, upTo)];
     return { state, statuses };
   }
 

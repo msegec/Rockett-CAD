@@ -17,7 +17,11 @@ import {
   type SketchEntity,
 } from "@rockett/shared";
 import { StoreError, type ProjectStore } from "../store/projectStore.js";
-import { dropEngine, engineFor } from "../geometry/engine.js";
+import {
+  dropEngine,
+  engineFor,
+  type EvaluateHooks,
+} from "../geometry/engine.js";
 import { kernelVersion } from "../geometry/kernel.js";
 import { measure } from "../geometry/measure.js";
 import { resolvePlaneFrame, type EvalState } from "../geometry/features.js";
@@ -78,6 +82,7 @@ export interface KernelClient {
     doc: CadDocument,
     position?: number,
     extra?: Sources,
+    hooks?: EvaluateHooks,
   ): Promise<EvaluateResult>;
   stateQuery<K extends keyof StateQueries>(
     doc: CadDocument,
@@ -176,12 +181,18 @@ export class InProcessKernel implements KernelClient {
     return engine.stateAt(doc, position, sources);
   }
 
-  async evaluate(doc: CadDocument, position?: number, extra?: Sources) {
+  async evaluate(
+    doc: CadDocument,
+    position?: number,
+    extra?: Sources,
+    hooks?: EvaluateHooks,
+  ) {
     const { engine, sources } = await this.sourced(doc);
     return engine.evaluate(
       doc,
       position,
       extra ? new Map([...sources, ...extra]) : sources,
+      hooks,
     );
   }
 
