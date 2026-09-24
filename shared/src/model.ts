@@ -11,7 +11,7 @@
 
 import type { Units } from "./units.js";
 
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 export type NamingVersion = 1 | 2;
 
@@ -27,12 +27,14 @@ export interface FaceRef {
   kind: "face";
   bodyId: string;
   faceName: string;
+  sig?: RefSignature;
 }
 
 export interface EdgeRef {
   kind: "edge";
   bodyId: string;
   edgeName: string;
+  sig?: RefSignature;
 }
 
 export interface VertexRef {
@@ -43,17 +45,20 @@ export interface VertexRef {
 
 export type TopoRef = FaceRef | EdgeRef | VertexRef;
 
+export const REF_SIGNATURE_TYPES = [
+  "plane",
+  "cylinder",
+  "cone",
+  "sphere",
+  "torus",
+  "bspline",
+  "line",
+  "circle",
+  "other",
+] as const;
+
 export interface RefSignature {
-  type:
-    | "plane"
-    | "cylinder"
-    | "cone"
-    | "sphere"
-    | "torus"
-    | "bspline"
-    | "line"
-    | "circle"
-    | "other";
+  type: (typeof REF_SIGNATURE_TYPES)[number];
   point: [number, number, number];
   direction: [number, number, number];
 }

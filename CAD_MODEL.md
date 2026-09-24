@@ -244,8 +244,8 @@ suffixes in deterministic centroid order.
 name: a `RefSignature` of type, point and direction. A face gives its surface
 type, its centroid and the normal at its UV midpoint, flipped with a reversed
 face. An edge gives its curve type, the point at its middle parameter and the
-unit tangent there, in the curve's own direction. Nothing stores or resolves
-them yet.
+unit tangent there, in the curve's own direction. A stored face or edge
+reference may carry one as `sig` (schema 14); evaluation never reads it yet.
 
 ### Known limitations
 
@@ -505,6 +505,20 @@ response carries. `view.json` owns visibility, so these copies are stale, and
 a feature edit would copy one back into the view. The 12 to 13 migration
 drops every `visible` from features and `bodyMeta` without moving it, backed
 up with the rest of the project before its first save.
+
+## Reference signatures (schema 14)
+
+A `FaceRef` or `EdgeRef` may carry an optional `sig`, the `RefSignature` of the
+face or edge it named when it was picked. `collectTopoRefs` in
+`shared/src/topoRefs.ts` finds every face and edge reference in a feature. When
+a feature is added or updated, the server fills each missing `sig` from the
+state before that feature. An updated reference keeps the `sig` it had when
+the patch names the same body and face or edge without one, and a `sig` sent
+with a reference is kept. A reference that does not resolve there, or whose
+signature is not finite, stays without one. References are still resolved by
+name, so a reference without `sig` evaluates as before. The 13 to 14
+migration changes nothing but the version, and the project is backed up
+before its first save.
 
 ## Tangent edge chains
 

@@ -284,6 +284,12 @@ constraint shape and requires a non-empty `name`. The declared top-level keys
 are that schema's properties. A mismatch returns the JSON Pointer inside the
 feature in `detail`, such as `/transform/scale`.
 
+A face or edge reference may carry `sig`, `{ type, point, direction }`, with
+`type` one of `plane`, `cylinder`, `cone`, `sphere`, `torus`, `bspline`,
+`line`, `circle` or `other` and both vectors three numbers. Feature add and
+update fill a missing `sig` from the model before that feature; see
+[CAD_MODEL.md](CAD_MODEL.md), Reference signatures.
+
 `PUT /projects/:id/document` also parses the document against
 `documentSchema` in the same file: `schemaVersion` equals the current version,
 `namingVersion` is 1 or 2,

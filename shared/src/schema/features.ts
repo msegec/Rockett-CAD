@@ -1,5 +1,5 @@
 import { Type, type TProperties } from "typebox";
-import { SCHEMA_VERSION } from "../model.js";
+import { REF_SIGNATURE_TYPES, SCHEMA_VERSION } from "../model.js";
 import { LINEAR_TOL } from "../tolerance.js";
 import { MB, UNIT_TO_MM, type Units } from "../units.js";
 
@@ -12,16 +12,28 @@ const topoName = Type.String({ minLength: 1, maxLength: 2000 });
 const coordinate = Type.Number({ minimum: -MAX_DIM, maximum: MAX_DIM });
 const flag = Type.Optional(Type.Boolean());
 
+const vec3 = Type.Tuple([Type.Number(), Type.Number(), Type.Number()]);
+
+const sig = Type.Optional(
+  Type.Object({
+    type: Type.Enum([...REF_SIGNATURE_TYPES]),
+    point: vec3,
+    direction: vec3,
+  }),
+);
+
 export const faceRef = Type.Object({
   kind: Type.Literal("face"),
   bodyId,
   faceName: topoName,
+  sig,
 });
 
 export const edgeRef = Type.Object({
   kind: Type.Literal("edge"),
   bodyId,
   edgeName: topoName,
+  sig,
 });
 
 const planeRef = Type.Union([

@@ -24,6 +24,7 @@ import {
   type Feature,
   type Method,
   type Route,
+  unsignedRefs,
 } from "@rockett/shared";
 import { build } from "../build.js";
 import type { ProjectStore } from "../store/projectStore.js";
@@ -37,6 +38,7 @@ import { measure } from "../geometry/measure.js";
 import { resolvePlaneFrame } from "../geometry/features.js";
 import { computeEdgeNames } from "../geometry/naming.js";
 import { curveInfo } from "../geometry/tessellate.js";
+import { signRefs } from "../geometry/signature.js";
 import { tangentEdges } from "../geometry/tangentEdges.js";
 import { importerFor, IMPORTERS } from "../geometry/importers.js";
 import { EXPORT_QUALITY, write3mf, writeStl } from "../geometry/exporters.js";
@@ -231,6 +233,16 @@ export function createApiRouter(
   async function stateAt(doc: CadDocument, position?: number) {
     const { engine, sources } = await sourced(doc);
     return engine.stateAt(doc, position, sources);
+  }
+
+  async function signed(
+    doc: CadDocument,
+    index: number,
+    feature: Feature,
+    previous?: Feature,
+  ) {
+    const missing = unsignedRefs(feature, previous);
+    if (missing.length) signRefs((await stateAt(doc, index)).bodies, missing);
   }
 
   /** Evaluate + make sure every body has display metadata. */
@@ -439,6 +451,7 @@ export function createApiRouter(
       }
       // Insert at the timeline marker (supports inserting mid-history).
       const at = Math.min(doc.timelinePosition, doc.features.length);
+      await signed(doc, at, feature);
       doc.features.splice(at, 0, feature);
       doc.timelinePosition = at + 1;
       await store.save(doc);
@@ -466,6 +479,7 @@ export function createApiRouter(
         id: doc.features[idx]!.id,
       };
       validateFeature(updated as Feature);
+      await signed(doc, idx, updated as Feature, doc.features[idx]);
       doc.features[idx] = updated as Feature;
       await store.save(doc);
       const evaluation = await evaluateAndSync(doc, position);

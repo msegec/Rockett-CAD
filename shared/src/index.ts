@@ -16,4 +16,5 @@ export * from "./importSvg.js";
 export type { SketchImport } from "./sketchBuilder.js";
 export * from "./meshFormat.js";
 export * from "./tolerance.js";
+export * from "./topoRefs.js";
 export * from "./units.js";

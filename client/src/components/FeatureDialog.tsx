@@ -49,9 +49,12 @@ function attempt(build: (() => Feature) | null): Feature | null {
   }
 }
 
+const picked = (value: unknown) =>
+  JSON.stringify(value, (key, v) => (key === "sig" ? undefined : v));
+
 function changes(stored: Feature | undefined, patch: Partial<Feature>) {
   return Object.entries(patch).some(
-    ([k, v]) => JSON.stringify((stored as any)?.[k]) !== JSON.stringify(v),
+    ([k, v]) => picked((stored as any)?.[k]) !== picked(v),
   );
 }
 
