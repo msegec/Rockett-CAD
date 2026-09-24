@@ -451,7 +451,7 @@ function DialogBody({
             label="Path sketch"
             value={p("pathSketchId", "")}
             options={[
-              ["", "— choose —"],
+              ["", "Choose"],
               ...sketches.map((s) => [s.id, s.name] as [string, string]),
             ]}
             onChange={(v) => setParams({ pathSketchId: v })}
@@ -667,7 +667,7 @@ function DialogBody({
           <SelInfo
             label="Bodies (first = target)"
             picks={bodies}
-            hint="click bodies — first is the target"
+            hint="click bodies: first is the target"
           />
           <SelectField
             label="Operation"

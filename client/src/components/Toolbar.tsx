@@ -290,7 +290,7 @@ function SketchToolbar() {
     const c = constraintFor(draft, sketchSelectionIds(selection), type);
     if (!c) {
       setError(
-        `Selection doesn't match the ${type} constraint — check the tooltip`,
+        `Selection doesn't match the ${type} constraint: check the tooltip`,
       );
       return;
     }

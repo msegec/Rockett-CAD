@@ -226,7 +226,7 @@ function resolveProfiles(
     const profile = findProfile(s, ref.profileId);
     if (!profile) {
       throw new Error(
-        `profile ${ref.profileId} no longer exists in ${ref.sketchId} — the sketch region may have changed`,
+        `profile ${ref.profileId} no longer exists in ${ref.sketchId}: the sketch region may have changed`,
       );
     }
     out.push(buildProfileFace(profile, s.entities, s.frame));
@@ -693,7 +693,7 @@ function buildPrism(
     prism.Build(progress());
     if (!prism.IsDone()) {
       prism.delete();
-      throw new Error("prism generation failed — is the profile closed?");
+      throw new Error("prism generation failed: is the profile closed?");
     }
     const shape = prism.Shape();
 
@@ -855,7 +855,7 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
       if (!revol.IsDone()) {
         revol.delete();
         throw new Error(
-          "revolve failed — the profile may cross the axis of revolution",
+          "revolve failed: the profile may cross the axis of revolution",
         );
       }
       const shape = revol.Shape();
@@ -959,7 +959,7 @@ function evalSweep(state: EvalState, f: SweepFeature): void {
     if (!pipe.IsDone()) {
       pipe.delete();
       throw new Error(
-        "sweep failed — check that the profile lies on the path start",
+        "sweep failed: check that the profile lies on the path start",
       );
     }
     const shape = pipe.Shape();
@@ -990,7 +990,7 @@ function evalLoft(state: EvalState, f: LoftFeature): void {
     thru.Build(progress());
     if (!thru.IsDone()) {
       thru.delete();
-      throw new Error("loft failed — sections may be incompatible");
+      throw new Error("loft failed: sections may be incompatible");
     }
     const shape = thru.Shape();
     const names = finalizeNames(shape, new ShapeMap(), f.id);
@@ -1198,7 +1198,7 @@ function filletBody(
       op.Build(progress());
       if (!op.IsDone()) {
         throw new Error(
-          `fillet of radius ${f.radius} failed — radius may be too large for the geometry`,
+          `fillet of radius ${f.radius} failed: radius may be too large for the geometry`,
         );
       }
       result = op.Shape();
@@ -1213,7 +1213,7 @@ function filletBody(
       }
       if (!valid) {
         throw new Error(
-          `fillet of radius ${f.radius} produced invalid geometry — try fewer edges or a different radius; the previous body has been kept`,
+          `fillet of radius ${f.radius} produced invalid geometry: try fewer edges or a different radius; the previous body has been kept`,
         );
       }
       const names = blendNames(op, body, sourceEdges, result, f.id);
@@ -1545,7 +1545,7 @@ function chamferBody(
         );
         if (!viaEnvelope) {
           throw new Error(
-            `could not build a ${f.distance} mm chamfer — check for missing connecting edges or try a smaller distance`,
+            `could not build a ${f.distance} mm chamfer: check for missing connecting edges or try a smaller distance`,
           );
         }
         registerBodySolids(state, bodyId, viaEnvelope.shape, viaEnvelope.names);
@@ -1631,7 +1631,7 @@ function evalShell(state: EvalState, f: ShellFeature): void {
     if (!op.IsDone()) {
       op.delete();
       closing.delete();
-      throw new Error("shell failed — thickness may be too large");
+      throw new Error("shell failed: thickness may be too large");
     }
     const result = op.Shape();
     const names = propagateNames(op, [body], result, f.id);

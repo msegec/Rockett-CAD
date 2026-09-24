@@ -28,7 +28,7 @@ export function ControlsHelp({ onClose }: { onClose: () => void }) {
             Shift+middle-drag orbits. Wheel or pinch zooms to the cursor.
           </p>
           <p>
-            <kbd>Shift</kbd> + <kbd>F</kbd> — fit model in view
+            <kbd>Shift</kbd> + <kbd>F</kbd>: fit model in view
           </p>
           <p>
             In the model tree, <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + click adds or
@@ -108,10 +108,10 @@ export function ControlsHelp({ onClose }: { onClose: () => void }) {
             to Cut and the preview turns red.
           </p>
           <p>
-            Sketches stay visible after use — used regions shade faintly but
-            stay selectable; the eye in the tree hides a sketch. While editing
-            an extrude or revolve, hold <kbd>Ctrl</kbd> / <kbd>⌘</kbd> to see
-            the model without it and pick regions to add or remove.
+            Sketches stay visible after use. Used regions shade faintly but stay
+            selectable; the eye in the tree hides a sketch. While editing an
+            extrude or revolve, hold <kbd>Ctrl</kbd> / <kbd>⌘</kbd> to see the
+            model without it and pick regions to add or remove.
           </p>
           <p>
             <kbd>Delete</kbd> removes selected sketch geometry.

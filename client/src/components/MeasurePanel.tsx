@@ -6,7 +6,7 @@ import { DraggablePanel } from "./DraggablePanel";
 import { DialogFooter } from "./form/DialogFooter";
 
 function fmt(v: number | undefined): string {
-  return v === undefined ? "—" : formatLength(v, "mm", 4);
+  return v === undefined ? "-" : formatLength(v, "mm", 4);
 }
 
 export function MeasurePanel() {

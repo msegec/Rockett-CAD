@@ -230,8 +230,8 @@ function OffsetBody() {
         {preview.result?.offsetChain && (
           <p className="field-hint">
             {preview.result.offsetChain.closed
-              ? "Closed outline — ready to offset."
-              : `Open chain — orange crosses mark ends ${Number(preview.result.offsetChain.endGap.toFixed(6))} mm apart. Select the missing side to make a closed outline.`}
+              ? "Closed outline, ready to offset."
+              : `Open chain: orange crosses mark ends ${Number(preview.result.offsetChain.endGap.toFixed(6))} mm apart. Select the missing side to make a closed outline.`}
           </p>
         )}
         {connector && (
