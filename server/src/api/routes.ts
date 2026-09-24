@@ -9,8 +9,6 @@
 import { Router, json, type RequestHandler } from "express";
 import {
   DOCUMENT_EDITS,
-  FEATURE_SCHEMAS,
-  MAX_TARGETS,
   MB,
   nextFeatureName,
   parse,
@@ -41,6 +39,7 @@ import { resolvePlaneFrame } from "../geometry/features.js";
 import { computeEdgeNames } from "../geometry/naming.js";
 import { curveInfo } from "../geometry/tessellate.js";
 import { signRefs } from "../geometry/signature.js";
+import { lacksTargets, pinTargets } from "../geometry/pinRefs.js";
 import { tangentEdges } from "../geometry/tangentEdges.js";
 import { importerFor, IMPORTERS } from "../geometry/importers.js";
 import { EXPORT_QUALITY, write3mf, writeStl } from "../geometry/exporters.js";
@@ -246,14 +245,11 @@ export function createApiRouter(
     return engine.stateAt(doc, position, sources);
   }
 
-  async function pinTargets(doc: CadDocument, index: number) {
+  async function pinned(doc: CadDocument, index: number) {
     const feature = doc.features[index]!;
-    const { properties } = FEATURE_SCHEMAS[feature.type];
-    if ("targets" in feature || !("targets" in properties)) return;
+    if (!lacksTargets(feature)) return;
     const evaluation = await evaluate(doc, index + 1);
-    const { targets } = evaluation.featureStatuses[index]!;
-    if (targets && targets.length <= MAX_TARGETS)
-      Object.assign(feature, { targets });
+    pinTargets(feature, evaluation.featureStatuses[index]!);
   }
 
   async function signed(
@@ -475,7 +471,7 @@ export function createApiRouter(
       await signed(doc, at, feature);
       doc.features.splice(at, 0, feature);
       doc.timelinePosition = at + 1;
-      await pinTargets(doc, at);
+      await pinned(doc, at);
       await store.save(doc);
       const evaluation = await evaluateAndSync(doc);
       send(res, doc, evaluation);
@@ -504,7 +500,7 @@ export function createApiRouter(
       validateFeature(updated as Feature);
       await signed(doc, idx, updated as Feature, doc.features[idx]);
       doc.features[idx] = updated as Feature;
-      await pinTargets(doc, idx);
+      await pinned(doc, idx);
       await store.save(doc);
       const evaluation = await evaluateAndSync(doc, position);
       send(res, doc, evaluation);

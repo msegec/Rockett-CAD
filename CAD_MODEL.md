@@ -586,6 +586,13 @@ feature; see [API.md](API.md), Validation. Loading never writes them, and a
 feature without `targets` evaluates as before. The 14 to 15 migration changes
 nothing but the version, and the project is backed up before its first save.
 
+`pinRefs` in `server/src/geometry/pinRefs.ts` gives a loaded document the pins
+a save would write, in memory: each missing `targets` from the evaluation and
+each missing `sig` from the state before its feature, by the rules above and in
+Reference signatures. It returns a copy that evaluates as the stored document
+does and never saves it, so loading a project never writes its file. Pins
+persist only when a feature add or update saves that feature.
+
 ## Tangent edge chains
 
 Fillet/Chamfer store optional tangentChain metadata (absent preserves prior
