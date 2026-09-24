@@ -10,8 +10,7 @@
 
 import { zipSync, strToU8 } from "fflate";
 import { LINEAR_TOL } from "@rockett/shared";
-import { getKernel } from "./kernel.js";
-import { meshShape } from "./mesh.js";
+import { meshCopy } from "./mesh.js";
 import type { NamedBody } from "./naming.js";
 
 export const EXPORT_QUALITY = 0.05;
@@ -25,22 +24,10 @@ interface Mesh {
 export function exportMesh(body: NamedBody, quality = EXPORT_QUALITY): Mesh {
   const positions: number[] = [];
   const indices: number[] = [];
-  const copy = new (getKernel().BRepBuilderAPI_Copy_2)(
-    body.shape,
-    false,
-    false,
-  );
-  try {
-    for (const m of meshShape(copy.Shape(), {
-      linear: quality,
-      angular: 0.3,
-    })) {
-      const offset = positions.length / 3;
-      for (const p of m.positions) positions.push(p);
-      for (const i of m.indices) indices.push(offset + i);
-    }
-  } finally {
-    copy.delete();
+  for (const m of meshCopy(body.shape, { linear: quality, angular: 0.3 })) {
+    const offset = positions.length / 3;
+    for (const p of m.positions) positions.push(p);
+    for (const i of m.indices) indices.push(offset + i);
   }
   return { positions, indices };
 }

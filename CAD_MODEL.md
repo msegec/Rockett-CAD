@@ -53,7 +53,9 @@ nodes. Each triangle becomes a planar face over shared vertices and edges, and
 solid, reversed if its volume is negative. Otherwise the sewn shell is the body
 and the feature status is `warning`, naming the open edge count. Meshes over
 200,000 triangles fail with their count. Faces stay triangles, so a mesh body
-is not parametric and has one face per triangle.
+is not parametric and has one face per triangle. Each face also carries its
+triangle as an exact triangulation, which the viewport and export read
+instead of running `BRepMesh` (see Tessellation).
 
 OCCT's STL reader takes a file as ASCII when its first 134 bytes are all
 printable, which misreads a binary cube with small coordinates. When the size
@@ -358,8 +360,10 @@ come from the kernel (`ComputeNormals`), respecting face orientation.
 Tessellations are cached per body id and shape hash, and a hit must be the
 same live shape (`IsSame`); export meshes a copy of each
 body at user-selected quality, so neither mesh reuses the other. Both go
-through `meshShape` in `server/src/geometry/mesh.ts`, the one loop that reads
-face triangulations.
+through `server/src/geometry/mesh.ts`, the one owner that reads face
+triangulations. A body whose every face carries an exact triangulation, as
+mesh imports do, skips `BRepMesh` and the copy: its triangles are read as
+they are, at any deflection.
 
 ## Measurement
 

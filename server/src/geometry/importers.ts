@@ -15,6 +15,7 @@ import {
   volumeOf,
   type Shape,
 } from "./kernel.js";
+import { setExactTriangle } from "./mesh.js";
 import { read3mf } from "./read3mf.js";
 import { sha256 } from "../store/jsonStore.js";
 
@@ -217,6 +218,7 @@ function sewTriangles({ nodes, triangles, transform: m }: MeshPart): {
         plane = new k.Handle_Geom_Surface_2(new k.Geom_Plane_3(origin, normal)),
         face = new k.TopoDS_Face();
       builder.MakeFace_2(face, plane, LINEAR_TOL);
+      setExactTriangle(builder, face, [p, q, r]);
       builder.Add(face, wire.Wire());
       sewing.Add(face);
       owned.push(wire, origin, normal, plane, face);
