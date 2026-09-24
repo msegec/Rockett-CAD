@@ -94,7 +94,8 @@ rows by kind. In Extrude, Shift-click picks a face instead of a region.
   as does join in older projects; cut and join take several. A chosen body
   stays chosen when upstream features change.
 - Sweep paths take lines and arcs drawn in any order. A branched or broken path
-  fails with "sweep path is not a connected chain".
+  fails with "sweep path is not a connected chain". Choose the path sketch
+  from the list, or click any of its curves with the Path sketch row active.
 
 ### Modify
 

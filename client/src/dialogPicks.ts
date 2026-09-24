@@ -18,6 +18,10 @@ export interface PickInput {
   planar?: true;
   straight?: true;
   optional?: true;
+  param?: {
+    read: (s: Store) => Selection[];
+    write: (next: Selection[], s: Store) => void;
+  };
 }
 
 const input = (
@@ -30,7 +34,39 @@ const profiles = input("profiles", ["profile"]);
 const profilesOrFaces = input("profiles", ["profile", "face"], {
   planar: true,
 });
-const targets = input("targets", ["body"], { optional: true });
+const targets = input("targets", ["body"], {
+  optional: true,
+  param: {
+    read: (s) =>
+      s.mode.name !== "dialog"
+        ? []
+        : chosenTargets(
+            targetOperation(s.mode.dialog, s.dialogParams),
+            s.dialogParams.targets,
+            s.document?.namingVersion,
+          ).map((bodyId) => ({ kind: "body", bodyId })),
+    write: (next, s) => {
+      const ids = next.flatMap((x) => (x.kind === "body" ? [x.bodyId] : []));
+      s.setDialogParams({ targets: ids.length > 0 ? ids : undefined });
+    },
+  },
+});
+
+export const sketchPicks = (sketchId: string | undefined): Selection[] =>
+  sketchId ? [{ kind: "sketch", sketchId }] : [];
+
+const path = input("path", ["sketchEntity", "sketch"], {
+  one: true,
+  param: {
+    read: (s) => sketchPicks(s.dialogParams.pathSketchId),
+    write: (next, s) =>
+      s.setDialogParams({
+        pathSketchId: next.flatMap((x) =>
+          "sketchId" in x ? [x.sketchId] : [],
+        )[0],
+      }),
+  },
+});
 const bodies = input("bodies", ["body"]);
 const edges = input("edges", ["edge"]);
 const faces = input("faces", ["face"]);
@@ -43,7 +79,7 @@ export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
   importStep: [],
   extrude: [profilesOrFaces, targets],
   revolve: [profilesOrFaces, axis, targets],
-  sweep: [profiles, targets],
+  sweep: [profiles, path, targets],
   loft: [profiles, targets],
   emboss: [profiles, targets],
   fillet: [edges],
@@ -61,7 +97,7 @@ export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
   export: [bodies],
 };
 
-const inSelection = (i: PickInput) => i.key !== targets.key;
+const inSelection = (i: PickInput) => !i.param;
 
 export function takes(dialog: DialogType, kind: Kind): boolean {
   return DIALOG_INPUTS[dialog].some(
@@ -80,7 +116,7 @@ function dialogInputs(s: Store): PickInput[] {
   if (s.mode.name !== "dialog") return [];
   const operation = targetOperation(s.mode.dialog, s.dialogParams);
   return DIALOG_INPUTS[s.mode.dialog].flatMap((i) => {
-    if (inSelection(i)) return [i];
+    if (i !== targets) return [i];
     if (operation === "newBody") return [];
     return several(operation, s.document?.namingVersion)
       ? [i]
@@ -103,13 +139,7 @@ export function heldBy(
 }
 
 function inputPicks(i: PickInput, s: Store): Selection[] {
-  if (inSelection(i)) return held(i, s.selection);
-  if (s.mode.name !== "dialog") return [];
-  return chosenTargets(
-    targetOperation(s.mode.dialog, s.dialogParams),
-    s.dialogParams.targets,
-    s.document?.namingVersion,
-  ).map((bodyId) => ({ kind: "body", bodyId }));
+  return i.param ? i.param.read(s) : held(i, s.selection);
 }
 
 const empty = (s: Store) => (i: PickInput) =>
@@ -211,15 +241,11 @@ function replaced(i: PickInput, had: Selection[], taken: Selection[]) {
 }
 
 function write(i: PickInput, next: Selection[], s: Store) {
-  if (inSelection(i)) {
-    s.setSelection([
-      ...s.selection.filter((x) => !i.kinds.includes(x.kind)),
-      ...next,
-    ]);
-    return;
-  }
-  const ids = next.flatMap((x) => (x.kind === "body" ? [x.bodyId] : []));
-  s.setDialogParams({ targets: ids.length > 0 ? ids : undefined });
+  if (i.param) return i.param.write(next, s);
+  s.setSelection([
+    ...s.selection.filter((x) => !i.kinds.includes(x.kind)),
+    ...next,
+  ]);
 }
 
 export function clearInput(key: string) {

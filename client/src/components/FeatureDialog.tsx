@@ -23,7 +23,7 @@ import {
 import { api, saveDownload } from "../api";
 import { extrudeReachesBody } from "../extrudeReach";
 import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
-import { clearInput, takes } from "../dialogPicks";
+import { clearInput, sketchPicks, takes } from "../dialogPicks";
 import { createLivePreview } from "../livePreview";
 import { targetOperation, toolTargets } from "../toolTargets";
 import { viewportHandle } from "../viewportRef";
@@ -459,6 +459,13 @@ function DialogBody({
               ...sketches.map((s) => [s.id, s.name] as [string, string]),
             ]}
             onChange={(v) => setParams({ pathSketchId: v })}
+          />
+          <SelInfo
+            label="Path sketch"
+            input="path"
+            picks={sketchPicks(params.pathSketchId)}
+            hint="click a curve of the path sketch"
+            onRemove={() => clearInput("path")}
           />
           {operationField(false)}
         </>
