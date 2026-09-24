@@ -103,33 +103,41 @@ docker run -d --name rockett-cad \
 ├── uploads/                # model imports while they stream in; each is removed when its request ends
 └── projects/
     └── {projectId}/
-        ├── document.json   # the parametric document (full history)
+        ├── project.json    # the manifest: its version and documents, each an id and a type
+        ├── documents/
+        │   └── {projectId}.json  # the part document (full history)
         ├── view.json       # hidden bodies and features, outside the document
         ├── temporary.json  # present only on a temporary copy of a browser project
         ├── blobs/          # reference images and STEP, IGES and BREP sources, each named by its sha256
         └── exports/        # server-retained exports (opt-in per export)
 ```
 
-A project saved by an older schema is migrated on disk by its next save.
+A project saved by an older schema, or in the layout from before the manifest
+with its document in `document.json`, is migrated on disk by its next save.
+That migration moves the document to `documents/{projectId}.json` and writes
+the manifest, which lists the part under the project id. `part` is the only document type; a manifest
+naming another type lists the project as invalid and is never rewritten.
 Before that write, the whole project directory is copied to `backups/`, named
 by the old schema and a hash of its contents, so a second migration of
 different contents never overwrites the first backup. The backup holds the
 project exactly as it was: files a migration adds, such as blobs moved out of
-`document.json` or a first `view.json`, are written after it. A project from
-before schema 9 keeps its reference images in `assets/`; the migration copies
+the document, a first `view.json`, the manifest or the moved document, are
+written after it. A project from before schema 9 keeps its reference images in `assets/`; the migration copies
 them into `blobs/`, and `assets/` is removed only after the backup reads back
 intact and the migrated document is written. While the migration runs,
 `backups/projects/{projectId}/migrating.json` records the backup and the files
 the migration adds, with their sha256. At startup, and before the next save, a
 project with that record loses each added file that still holds what the
 migration wrote, and is restored from its backup, so a retry reuses the same
-backup and a view saved in between survives. Startup
-also logs how many projects still predate the current schema. A temporary
+backup and a view saved in between survives. Startup also logs how many
+projects still predate the current schema or the manifest. A temporary
 project, the server copy of a project kept in the browser, is never backed up
 before migration and its backups directory is never created; the server
 deletes it after 24 hours without a request. Backups are never pruned. To
 restore one by hand, stop the container, run `sha256sum -c ../SHA256SUMS`
-inside its `files/` directory, and copy `files/` over the project directory.
+inside its `files/` directory, and replace the project directory with a copy
+of `files/`. Copying over it would keep a later `documents/{projectId}.json`,
+which is read in preference to a restored `document.json`.
 Any other namespace under `/data`, such as `folders/`, follows the same rule
 when its format changes: its directory is backed up to
 `backups/<namespace>/v{version}-{hash}/` and restored the same way.

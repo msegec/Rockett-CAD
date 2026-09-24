@@ -1,6 +1,8 @@
 import {
+  MANIFEST_VERSION,
   SCHEMA_VERSION,
   type CadDocument,
+  type ProjectManifest,
   type Visibility,
 } from "@rockett/shared";
 
@@ -147,4 +149,11 @@ export const documentMigrations: Migrations<CadDocument> = {
     13: (doc) => doc,
     14: (doc) => doc,
   },
+};
+
+export const manifestMigrations: Migrations<ProjectManifest> = {
+  namespace: "project",
+  current: MANIFEST_VERSION,
+  field: "version",
+  steps: {},
 };

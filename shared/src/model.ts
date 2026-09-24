@@ -536,6 +536,22 @@ export function createEmptyDocument(id: string, name: string): CadDocument {
   };
 }
 
+export const MANIFEST_VERSION = 1;
+export const DOCUMENT_TYPES = ["part"] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+
+export interface ProjectManifest {
+  version: typeof MANIFEST_VERSION;
+  documents: Array<{ id: string; type: DocumentType }>;
+}
+
+export function createManifest(partId: string): ProjectManifest {
+  return {
+    version: MANIFEST_VERSION,
+    documents: [{ id: partId, type: "part" }],
+  };
+}
+
 /** Features that can produce/modify solid bodies (used for dependency logic). */
 export function featureProducesGeometry(f: Feature): boolean {
   return (

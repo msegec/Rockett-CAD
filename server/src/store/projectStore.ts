@@ -2,7 +2,9 @@ import path from "node:path";
 import crypto from "node:crypto";
 import {
   createEmptyDocument,
+  createManifest,
   DAY,
+  DOCUMENT_TYPES,
   emptyView,
   MB,
   MINUTE,
@@ -11,18 +13,26 @@ import {
   VIEW_VERSION,
   withShown,
   type CadDocument,
+  type ProjectManifest,
   type ProjectSummary,
   type ProjectView,
 } from "@rockett/shared";
 import { build } from "../build.js";
 import { BlobStore, HASH_RE, PendingBlobs, Uploads } from "./blobStore.js";
 import { JsonStore, sha256, StoreError, type Inventory } from "./jsonStore.js";
-import { documentMigrations, TooNewError } from "./migrations.js";
+import {
+  documentMigrations,
+  manifestMigrations,
+  TooNewError,
+} from "./migrations.js";
 import type { Storage } from "./storage.js";
 
 export { StoreError };
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const LEGACY = "document.json";
+const DOCUMENTS = "documents";
+const MANIFEST = "project.json";
 const PNG_HEAD = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 
 export const IMAGE_LIMIT_MB = 25;
@@ -62,6 +72,21 @@ function imageMime(data: Buffer, label: string): string {
   return type.mime;
 }
 
+function checkManifest(id: string, manifest: ProjectManifest): void {
+  const types = new Set<unknown>(DOCUMENT_TYPES);
+  if (!Array.isArray(manifest.documents))
+    throw new Error("documents is not a list");
+  for (const document of manifest.documents) {
+    if (!types.has(document?.type))
+      throw new Error(`unknown document type ${String(document?.type)}`);
+    if (typeof document.id !== "string" || !ID_RE.test(document.id))
+      throw new Error(`invalid document id ${String(document.id)}`);
+  }
+  const [first] = manifest.documents;
+  if (first?.id !== id || first.type !== "part")
+    throw new Error(`the first document is not part ${id}`);
+}
+
 function stepBlobs(doc: CadDocument): string[] {
   return doc.features.flatMap((f) => (f.type === "importStep" ? [f.blob] : []));
 }
@@ -75,6 +100,7 @@ function imageBlobs(doc: CadDocument): string[] {
 export class ProjectStore {
   private documents: JsonStore<CadDocument, PendingBlobs>;
   private views: JsonStore<ProjectView>;
+  private manifests: JsonStore<ProjectManifest>;
   readonly uploads: Uploads;
 
   constructor(
@@ -88,7 +114,7 @@ export class ProjectStore {
       root: "projects",
       name: "project",
       key: ID_RE,
-      file: "view.json",
+      file: () => "view.json",
       migrations: {
         namespace: "view",
         current: VIEW_VERSION,
@@ -98,12 +124,21 @@ export class ProjectStore {
       unbacked: async () => true,
       validate: (view) => parse(projectView, view),
     });
+    this.manifests = new JsonStore({
+      storage,
+      root: "projects",
+      name: "project",
+      key: ID_RE,
+      file: () => MANIFEST,
+      migrations: manifestMigrations,
+    });
     this.documents = new JsonStore({
       storage,
       root: "projects",
       name: "project",
       key: ID_RE,
-      file: "document.json",
+      file: (id) => `${DOCUMENTS}/${id}.json`,
+      legacy: LEGACY,
       migrations: documentMigrations,
       unbacked: (id) => this.isTemporary(id),
       validate,
@@ -119,6 +154,8 @@ export class ProjectStore {
             out.set(
               ...this.views.encode(id, withShown(emptyView(), pending.shown)),
             );
+          if (!(await storage.list(this.documents.dir(id))).includes(MANIFEST))
+            out.set(...this.manifests.encode(id, createManifest(id)));
           return out;
         },
         retire: (id) => storage.remove(this.assetDir(id)),
@@ -150,15 +187,18 @@ export class ProjectStore {
         const raw = (await this.documents
           .stored(id)
           .catch(() => ({}))) as Partial<Record<keyof CadDocument, unknown>>;
+        const tooNew =
+          err instanceof TooNewError &&
+          err.namespace === documentMigrations.namespace;
         out.push({
           id,
           name: text(raw.name, id),
           createdAt: text(raw.createdAt, ""),
           modifiedAt: text(raw.modifiedAt, ""),
           featureCount: Array.isArray(raw.features) ? raw.features.length : 0,
-          status: err instanceof TooNewError ? "tooNew" : "invalid",
+          status: tooNew ? "tooNew" : "invalid",
           error: (err as Error).message,
-          ...(err instanceof TooNewError && { schemaVersion: err.version }),
+          ...(tooNew && { schemaVersion: err.version }),
         });
       }
     }
@@ -169,32 +209,60 @@ export class ProjectStore {
   async create(name: string): Promise<CadDocument> {
     const id = newId();
     const doc = createEmptyDocument(id, name || "Untitled");
-    await this.save(doc);
+    await this.add(doc);
     return doc;
   }
 
-  async load(id: string): Promise<CadDocument> {
-    return this.valid(id, await this.documents.read(id));
+  private async add(doc: CadDocument): Promise<void> {
+    await this.save(doc);
+    await this.storage.writeAtomic(
+      ...this.manifests.encode(doc.id, createManifest(doc.id)),
+    );
+  }
+
+  load(id: string): Promise<CadDocument> {
+    return this.loadDocument(id, id);
+  }
+
+  async loadDocument(projectId: string, documentId: string) {
+    return (await this.part(projectId, documentId)).doc;
   }
 
   async open(id: string): Promise<{ doc: CadDocument; view: ProjectView }> {
-    const { value, context } = await this.documents.migrated(id);
+    const { doc, context } = await this.part(id, id);
     return {
-      doc: this.valid(id, value),
+      doc,
       view: (await this.savedView(id)) ?? withShown(emptyView(), context.shown),
     };
   }
 
-  private valid(id: string, doc: CadDocument): CadDocument {
+  private async part(id: string, documentId: string) {
+    const { documents } = await this.manifest(id);
+    if (!documents.some((d) => d.id === documentId))
+      throw new StoreError(`document ${documentId} not found`, "not_found");
+    const { value, context } = await this.documents.migrated(id, documentId);
+    this.valid(id, () => this.validate(value));
+    return { doc: value, context };
+  }
+
+  private async manifest(id: string): Promise<ProjectManifest> {
+    const manifest = await this.manifests.read(id).catch((err) => {
+      if (!(err instanceof StoreError && err.code === "not_found")) throw err;
+      return createManifest(id);
+    });
+    this.valid(id, () => checkManifest(id, manifest));
+    return manifest;
+  }
+
+  private valid(id: string, check: () => void): void {
     try {
-      this.validate(doc);
+      check();
     } catch (err) {
       throw new StoreError(
         `project ${id} is invalid: ${(err as Error).message}`,
         "unprocessable",
       );
     }
-    return doc;
   }
 
   async save(doc: CadDocument): Promise<void> {
@@ -229,12 +297,16 @@ export class ProjectStore {
 
   private async hasView(id: string): Promise<boolean> {
     const files = await this.storage.list(this.documents.dir(id));
-    if (!files.includes("document.json"))
+    if (!files.includes(LEGACY) && !files.includes(DOCUMENTS))
       throw new StoreError(`project ${id} not found`, "not_found");
     return files.includes("view.json");
   }
 
-  async duplicate(id: string, newName?: string): Promise<CadDocument> {
+  duplicate(id: string, newName?: string): Promise<CadDocument> {
+    return this.documents.exclusive(id, () => this.copy(id, newName));
+  }
+
+  private async copy(id: string, newName?: string): Promise<CadDocument> {
     const src = await this.load(id);
     const copy: CadDocument = JSON.parse(JSON.stringify(src));
     copy.id = newId();
@@ -250,7 +322,7 @@ export class ProjectStore {
       const bytes = await this.blob(id, hash).catch(() => undefined);
       if (bytes) await this.blobs(copy.id).put(bytes);
     }
-    await this.save(copy);
+    await this.add(copy);
     return copy;
   }
 
@@ -338,7 +410,7 @@ export class ProjectStore {
         await this.blobs(id).put(data);
       }
       const imported = { ...doc, id };
-      await this.save(imported);
+      await this.add(imported);
       await this.views.write(id, view);
       return imported;
     } catch (error) {

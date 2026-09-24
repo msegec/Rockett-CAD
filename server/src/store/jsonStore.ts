@@ -32,7 +32,8 @@ export interface JsonStoreOptions<T, C extends MigrationContext> {
   root: string;
   name: string;
   key: RegExp;
-  file: string;
+  file: (item: string) => string;
+  legacy?: string;
   migrations: Migrations<T>;
   unbacked?: (key: string) => Promise<boolean>;
   validate?: (value: T) => void;
@@ -193,8 +194,10 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
     return path.posix.join(this.options.root, key);
   }
 
-  private file(key: string): string {
-    return path.posix.join(this.dir(key), this.options.file);
+  private file(key: string, item = key): string {
+    if (!this.options.key.test(item))
+      throw new StoreError(`invalid ${this.options.name} id`);
+    return path.posix.join(this.dir(key), this.options.file(item));
   }
 
   encode(key: string, value: T): [string, string] {
@@ -202,33 +205,36 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
     return [this.file(key), JSON.stringify(value, null, 1)];
   }
 
-  async stored(key: string): Promise<unknown> {
-    const file = this.file(key);
-    let raw: string;
-    try {
-      raw = (await this.options.storage.read(file)).toString("utf8");
-    } catch {
-      throw new StoreError(
-        `${this.options.name} ${key} not found`,
-        "not_found",
-      );
+  async stored(key: string, item = key): Promise<unknown> {
+    return (await this.found(key, item)).value;
+  }
+
+  private async found(
+    key: string,
+    item = key,
+  ): Promise<{ file: string; value: unknown }> {
+    const { storage, legacy, name } = this.options;
+    const files = [this.file(key, item)];
+    if (legacy && item === key)
+      files.push(path.posix.join(this.dir(key), legacy));
+    for (const file of files) {
+      const raw = await storage.read(file).catch(() => undefined);
+      if (!raw) continue;
+      try {
+        return { file, value: JSON.parse(raw.toString("utf8")) };
+      } catch {
+        throw new StoreError(`${name} ${key} is corrupted`, "internal");
+      }
     }
-    try {
-      return JSON.parse(raw);
-    } catch {
-      throw new StoreError(
-        `${this.options.name} ${key} is corrupted`,
-        "internal",
-      );
-    }
+    throw new StoreError(`${name} ${key} not found`, "not_found");
   }
 
   private context(key: string, stored: unknown): Promise<C> | C {
     return this.options.effects?.context(key, stored) ?? (NO_BLOBS as C);
   }
 
-  async migrated(key: string): Promise<{ value: T; context: C }> {
-    const stored = await this.stored(key);
+  async migrated(key: string, item = key): Promise<{ value: T; context: C }> {
+    const stored = await this.stored(key, item);
     const context = await this.context(key, stored);
     return {
       value: migrate(this.options.migrations, stored, context),
@@ -236,8 +242,8 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
     };
   }
 
-  async read(key: string): Promise<T> {
-    return (await this.migrated(key)).value;
+  async read(key: string, item = key): Promise<T> {
+    return (await this.migrated(key, item)).value;
   }
 
   exclusive<R>(key: string, operation: () => Promise<R>): Promise<R> {
@@ -273,32 +279,39 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
   private async upgrade(key: string): Promise<void> {
     const backed = !(await this.options.unbacked?.(key));
     if (backed) await this.recover(key);
-    let value: unknown;
+    let found: { file: string; value: unknown };
     try {
-      value = await this.stored(key);
+      found = await this.found(key);
     } catch (err) {
       if (err instanceof StoreError && err.code === "not_found") return;
       throw err;
     }
+    const { storage } = this.options;
+    const { file, value } = found;
+    const moved = file !== this.file(key);
     const context = await this.context(key, value);
     const next = migrate(this.options.migrations, value, context);
-    if (next === value) return;
+    if (next === value && !moved) return;
     const staged = JSON.stringify(next, null, 1);
     if (backed) this.options.validate?.(JSON.parse(staged));
-    const created =
-      (await this.options.effects?.created(key, context)) ?? new Map();
+    const created = new Map<string, string | Uint8Array>(
+      (await this.options.effects?.created(key, context)) ?? [],
+    );
+    if (moved) created.set(this.file(key), staged);
+    const place = () =>
+      moved ? storage.remove(file) : storage.writeAtomic(file, staged);
     if (!backed) {
-      await writeAll(this.options.storage, created);
-      return this.options.storage.writeAtomic(this.file(key), staged);
+      await writeAll(storage, created);
+      return place();
     }
     const from = (value as Record<string, unknown>)[
       this.options.migrations.field
     ];
-    await backupNamespace(this.options.storage, this.dir(key)).migrate(
+    await backupNamespace(storage, this.dir(key)).migrate(
       `v${String(from)}`,
       created,
       async () => {
-        await this.options.storage.writeAtomic(this.file(key), staged);
+        await place();
         await this.options.effects?.retire(key, context);
       },
     );
@@ -314,9 +327,12 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
       try {
         if (await this.writes.run(key, () => this.recover(key)))
           out.recovered.push(key);
-        const value = await this.stored(key);
+        const { file, value } = await this.found(key);
         const context = await this.context(key, value);
-        if (migrate(this.options.migrations, value, context) !== value)
+        if (
+          file !== this.file(key) ||
+          migrate(this.options.migrations, value, context) !== value
+        )
           out.outdated.push(key);
       } catch (err) {
         out.failed.push({ key, error: (err as Error).message });

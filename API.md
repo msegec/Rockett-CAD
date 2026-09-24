@@ -65,10 +65,11 @@ processes.
 
 ### Document revisions
 
-The ETag of a project names its document: `document.json` and its
-`revision`, which every save raises by one. `GET /projects/:id` and every
-document edit answer with `ETag: "<revision>"`, the same value as
-`document.revision`. `GET /projects` gives each readable project's `revision`.
+The ETag of a project names its part document,
+`documents/{projectId}.json`, and its `revision`, which every save raises by
+one. `GET /projects/:id` and every document edit answer with
+`ETag: "<revision>"`, the same value as `document.revision`. `GET /projects`
+gives each readable project's `revision`.
 
 The document edits, listed in `DOCUMENT_EDITS` in `shared/src/routes.ts`, are
 rename, `PUT /document`, import into a project, and the feature, timeline,

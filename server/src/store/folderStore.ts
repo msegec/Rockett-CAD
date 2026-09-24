@@ -24,7 +24,7 @@ export class FolderStore {
       root: "",
       name: "folders",
       key: /^folders$/,
-      file: "folders.json",
+      file: () => "folders.json",
       migrations: {
         namespace: "folders",
         current: FOLDERS_VERSION,

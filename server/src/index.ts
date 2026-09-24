@@ -50,7 +50,7 @@ async function main() {
     console.error(`[rockett] project ${key}: ${error}`);
   if (outdated.length)
     console.log(
-      `[rockett] ${outdated.length} projects predate schema ${SCHEMA_VERSION}; each is backed up and migrated on its next save`,
+      `[rockett] ${outdated.length} projects predate schema ${SCHEMA_VERSION} or the project manifest; each is backed up and migrated on its next save`,
     );
 
   // static client (production build)
