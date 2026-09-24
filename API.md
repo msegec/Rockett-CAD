@@ -88,15 +88,19 @@ document edit.
 
 ## Projects
 
-| Method & path                  | Body                   | Returns                                                                                                                                         |
-| ------------------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /health`                  | none                   | `{ ok: true, version, schemaVersion, commit, describe }` (`commit` from `ROCKETT_COMMIT`, `describe` from `ROCKETT_DESCRIBE`, each else `null`) |
-| `GET /projects`                | none                   | `ProjectSummary[]`                                                                                                                              |
-| `POST /projects`               | `{ name?, folderId? }` | `{ document }`                                                                                                                                  |
-| `GET /projects/:id`            | none                   | `{ document }`                                                                                                                                  |
-| `DELETE /projects/:id`         | none                   | `{ ok }`                                                                                                                                        |
-| `POST /projects/:id/duplicate` | `{ name? }`            | `{ document }` (assets copied)                                                                                                                  |
-| `POST /projects/:id/rename`    | `{ name }`             | `{ document }`                                                                                                                                  |
+| Method & path                  | Body                   | Returns                                                                                                                                                        |
+| ------------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`                  | none                   | `{ ok: true, version, schemaVersion, commit, describe, kernelVersion }` (`commit` from `ROCKETT_COMMIT`, `describe` from `ROCKETT_DESCRIBE`, each else `null`) |
+| `GET /projects`                | none                   | `ProjectSummary[]`                                                                                                                                             |
+| `POST /projects`               | `{ name?, folderId? }` | `{ document }`                                                                                                                                                 |
+| `GET /projects/:id`            | none                   | `{ document }`                                                                                                                                                 |
+| `DELETE /projects/:id`         | none                   | `{ ok }`                                                                                                                                                       |
+| `POST /projects/:id/duplicate` | `{ name? }`            | `{ document }` (assets copied)                                                                                                                                 |
+| `POST /projects/:id/rename`    | `{ name }`             | `{ document }`                                                                                                                                                 |
+
+`kernelVersion` is `{ occt, commit }` from the loaded kernel's
+`versionId()`: the OCCT release and the fork commit it was built from. It is
+`null` until the kernel has loaded; health never waits for it.
 
 Every stored project is listed. `status` is `ok`, `invalid` or `tooNew`, and
 the last two carry `error`. A `tooNew` project also carries the

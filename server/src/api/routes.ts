@@ -34,6 +34,7 @@ import type { FolderStore } from "../store/folderStore.js";
 import { StoreError } from "../store/projectStore.js";
 import { ProjectQueue } from "../store/projectQueue.js";
 import { engineFor, dropEngine } from "../geometry/engine.js";
+import { kernelVersion } from "../geometry/kernel.js";
 import { measure } from "../geometry/measure.js";
 import { resolvePlaneFrame } from "../geometry/features.js";
 import { computeEdgeNames } from "../geometry/naming.js";
@@ -267,6 +268,7 @@ export function createApiRouter(
       ...build(),
       schemaVersion: SCHEMA_VERSION,
       describe: process.env.ROCKETT_DESCRIBE || null,
+      kernelVersion: kernelVersion(),
     });
   });
 

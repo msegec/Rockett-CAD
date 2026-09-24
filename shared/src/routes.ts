@@ -74,6 +74,7 @@ export interface Health {
   schemaVersion: number;
   commit: string | null;
   describe: string | null;
+  kernelVersion: { occt: string; commit: string } | null;
 }
 
 export type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";

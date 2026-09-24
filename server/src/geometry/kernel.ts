@@ -5,7 +5,7 @@
  * kernel instance via `getKernel()` after `initKernel()` resolves.
  */
 
-import type { Placement } from "@rockett/shared";
+import type { Health, Placement } from "@rockett/shared";
 
 // The opencascade.js typings are enormous; we treat the instance as `any`
 // and keep all raw-kernel access inside server/src/geometry.
@@ -28,6 +28,10 @@ export async function initKernel(): Promise<OC> {
     })();
   }
   return initPromise;
+}
+
+export function kernelVersion(): Health["kernelVersion"] {
+  return oc?.versionId() ?? null;
 }
 
 export function getKernel(): OC {
