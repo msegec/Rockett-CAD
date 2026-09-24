@@ -76,7 +76,7 @@ function imageBlobs(doc: CadDocument): string[] {
 }
 
 export class ProjectStore {
-  private documents: JsonStore<CadDocument, PendingBlobs>;
+  readonly documents: JsonStore<CadDocument, PendingBlobs>;
   private views: JsonStore<ProjectView>;
   private manifests: ManifestStore;
   readonly uploads: Uploads;

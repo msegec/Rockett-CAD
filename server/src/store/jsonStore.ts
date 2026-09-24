@@ -73,6 +73,10 @@ export class NamespaceBackup {
     return name;
   }
 
+  names(): Promise<string[]> {
+    return this.storage.list(this.root);
+  }
+
   async migrate(
     version: string,
     created: Files,

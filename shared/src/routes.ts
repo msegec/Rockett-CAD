@@ -14,6 +14,9 @@ import type {
   HeldMeshes,
   MeasureRequest,
   MeasureResult,
+  NamingDecision,
+  NamingMapping,
+  NamingUpgradeProposal,
   ProjectResponse,
   ProjectSummary,
   ProjectView,
@@ -36,6 +39,11 @@ export interface MutationResponse {
 export interface WireMutationResponse {
   document: CadDocument;
   evaluation: WireEvaluateResult;
+}
+
+export interface NamingUpgradeResponse extends WireMutationResponse {
+  backup: string;
+  mappings: NamingMapping[];
 }
 
 export const PROJECT_FILE_FORMAT = "rockett-project";
@@ -124,6 +132,22 @@ const topoRef = Type.Union([
 
 const viewIds = Type.Array(Type.String({ minLength: 1, maxLength: 200 }), {
   maxItems: 10000,
+});
+
+const namingUpgradeBody = Type.Object({
+  accept: Type.Optional(
+    Type.Array(
+      Type.Object({
+        featureId: Type.Union([Type.String(), Type.Null()]),
+        path: Type.String(),
+        to: Type.Object({
+          bodyId: Type.String(),
+          name: Type.Optional(Type.String()),
+        }),
+      }),
+      { maxItems: 100_000 },
+    ),
+  ),
 });
 
 export const projectView = Type.Object(
@@ -240,6 +264,14 @@ export const ROUTES = {
     { groups: TreeGroup[] } & HeldMeshes,
     WireMutationResponse
   >()("PUT", "/projects/:id/groups", Type.Object({ groups: groupsSchema })),
+  stageNamingUpgrade: route<
+    { accept?: NamingDecision[] },
+    NamingUpgradeProposal
+  >()("POST", "/projects/:id/upgrade-naming", namingUpgradeBody),
+  commitNamingUpgrade: route<
+    { accept?: NamingDecision[] } & HeldMeshes,
+    NamingUpgradeResponse
+  >()("POST", "/projects/:id/upgrade-naming/commit", namingUpgradeBody),
   getView: route<never, ProjectView>()("GET", "/projects/:id/view"),
   putView: route<ProjectView, ProjectView>()(
     "PUT",
@@ -290,6 +322,7 @@ export const DOCUMENT_EDITS: ReadonlySet<Route> = new Set<Route>([
   ROUTES.setTimeline,
   ROUTES.updateBody,
   ROUTES.updateGroups,
+  ROUTES.commitNamingUpgrade,
 ]);
 
 export function pathFor<P extends string>(

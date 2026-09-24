@@ -79,8 +79,8 @@ one. `GET /projects/:id` and every document edit answer with
 gives each readable project's `revision`.
 
 The document edits, listed in `DOCUMENT_EDITS` in `shared/src/routes.ts`, are
-rename, `PUT /document`, import into a project, and the feature, timeline,
-body and group routes. Each needs `If-Match: "<revision>"` with the revision
+rename, `PUT /document`, import into a project, the feature, timeline,
+body and group routes, and the naming upgrade commit. Each needs `If-Match: "<revision>"` with the revision
 the caller last received. Inside the project queue the server compares it
 with the stored document:
 
@@ -245,6 +245,45 @@ Visibility lives only in the view. Documents and evaluations carry no
 `PUT /projects/:id/document` drops any `visible` it carries and leaves the
 view unchanged.
 
+### Naming upgrade
+
+| Method & path                              | Body          | Returns                                                     |
+| ------------------------------------------ | ------------- | ----------------------------------------------------------- |
+| `POST /projects/:id/upgrade-naming`        | `{ accept? }` | `NamingUpgradeProposal`: `{ backup, revision, mappings }`   |
+| `POST /projects/:id/upgrade-naming/commit` | `{ accept? }` | `{ document, evaluation, backup, mappings }`, with If-Match |
+
+These move a `namingVersion` 1 project to version 2; see
+[CAD_MODEL.md](CAD_MODEL.md), Naming upgrade. Nothing else, loading and boot
+included, changes a project's naming version. Both calls first back up the
+complete project and name the backup in `backup`, `naming1-` and 16 hex
+digits under `backups/projects/{id}/`; unchanged files reuse one backup. A
+project already on version 2 is 409 `conflict`.
+
+The stage call writes nothing else. It returns one `NamingMapping` per body
+id field, face or edge reference in each feature, and per final body:
+`{ featureId, path, from, status, to?, candidates, suggestions }`. `featureId`
+is `null` for a final body, whose `path` is `/bodyMeta/{bodyId}` with `~` and
+`/` escaped as in a JSON pointer; otherwise `path` points into the feature,
+such as `/edges/0` or `/targets/1`. `from` and `to` are `NamingTarget`s,
+`{ bodyId, name? }`, with `name` for a face or edge. `status` is `proven`,
+`candidate`, `ambiguous` or `missing`; `to` is set when the mapping is proven
+or accepted. Each candidate and suggestion is a `NamingTarget` with `basis`
+`lineage` or `signature`.
+
+`accept` is a list of `NamingDecision`s, `{ featureId, path, to }`, each
+choosing the identity for one mapping, up to 100,000. A choice must name a
+body, and for a reference a face or edge of that body, in the version 2 model
+before that feature; otherwise, or when it matches no mapping, the call is
+400 `validation` with detail `/accept/{index}`. The stage call applies
+`accept` too, so a client can show the result of its choices before it
+commits.
+
+The commit needs If-Match. It is 409 `conflict`, with nothing saved, while
+any `candidate` or `ambiguous` mapping has no `to`. Otherwise it saves the
+upgraded document as one edit, with the pinned `targets` and signatures, and
+returns it with a fresh evaluation, the backup name and the mappings it
+applied. Undo sends the previous document back through `PUT /document`.
+
 ## Inspection & output
 
 | Method & path                | Body                                                             | Returns                                                                                                                                                                   |
@@ -333,7 +372,9 @@ Every validation failure returns 400 and nothing is saved.
 `PUT /projects/:id/document` keeps the stored `namingVersion`. A document with
 a different value gets 409 `conflict` naming the field, without `revision`,
 and nothing is saved. The client sends back documents it received, so they
-carry the stored value.
+carry the stored value. A project that holds a naming upgrade backup is the
+exception: its replace may change `namingVersion`, so undo and redo of the
+upgrade work like any other edit.
 
 ## WebSockets
 

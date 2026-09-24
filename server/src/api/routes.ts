@@ -40,6 +40,11 @@ import { computeEdgeNames } from "../geometry/naming.js";
 import { curveInfo } from "../geometry/tessellate.js";
 import { signRefs } from "../geometry/signature.js";
 import { lacksTargets, pinTargets } from "../geometry/pinRefs.js";
+import {
+  commitNamingUpgrade,
+  namingUpgraded,
+  stageNamingUpgrade,
+} from "../geometry/upgradeNaming.js";
 import { tangentEdges } from "../geometry/tangentEdges.js";
 import { importerFor, IMPORTERS } from "../geometry/importers.js";
 import { EXPORT_QUALITY, write3mf, writeStl } from "../geometry/exporters.js";
@@ -387,7 +392,9 @@ export function createApiRouter(
       const incoming = splitView(sent).doc as unknown as CadDocument;
       const position = evaluationPosition(req, incoming);
       // Replacement is an edit, not creation (e.g. a delayed undo after delete).
-      keepNamingVersion(await editable(req, res), incoming);
+      const stored = await editable(req, res);
+      if (!(await namingUpgraded(store, stored.id)))
+        keepNamingVersion(stored, incoming);
       await store.save(incoming);
       const evaluation = await evaluateAndSync(incoming, position);
       send(res, incoming, evaluation);
@@ -616,6 +623,23 @@ export function createApiRouter(
       }
       const evaluation = await evaluateAndSync(doc);
       send(res, doc, evaluation);
+    }),
+  );
+
+  on(
+    ROUTES.stageNamingUpgrade,
+    wrap(async (req, res) => {
+      const doc = await store.load(req.params.id);
+      res.json(await stageNamingUpgrade(store, doc, req.body.accept));
+    }),
+  );
+
+  on(
+    ROUTES.commitNamingUpgrade,
+    wrap(async (req, res) => {
+      const doc = await editable(req, res);
+      const plan = await commitNamingUpgrade(store, doc, req.body.accept);
+      reply(res, { ...plan, evaluation: await evaluateAndSync(plan.document) });
     }),
   );
 

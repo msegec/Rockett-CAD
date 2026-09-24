@@ -563,9 +563,54 @@ name map, so edge and vertex names computed later for tessellation,
 measurement or projection follow the same rules. The 11 to 12 migration sets
 `namingVersion: 1` on every existing document, backed up with the rest of
 the project before its first save, so saved references keep resolving as
-before. New projects get 2. No route changes a stored `namingVersion`:
-`PUT /document` answers 409 to a different value. The engine drops its cached
-timeline when the version changes.
+before. New projects get 2. Only the naming upgrade below changes a stored
+`namingVersion`; `PUT /document` answers 409 to a different value unless the
+project holds a naming upgrade backup. The engine drops its cached timeline
+when the version changes.
+
+### Naming upgrade
+
+`server/src/geometry/upgradeNaming.ts` moves a version 1 document to version
+2 when the user asks, never on load or at boot. Each call first backs up the
+complete project directory through the migration backup path, as
+`backups/projects/{id}/naming1-{hash}`; the same files give the same backup.
+`planNamingUpgrade` then pins the document with `pinRefs` under version 1 and
+walks the timeline. For each feature it compares the version 1 state before
+it with the version 2 state before its translated copy, and maps each body id
+field (`targets`, `bodies`, `toolBodies`, `targetBody`, `body`) and each face
+and edge reference. After the last feature it maps the final bodies, which
+carry `bodyMeta` names and body group members to their new ids.
+
+A mapping is `proven` only by provenance: history names with every `~n` and
+`~?n` suffix removed, and never a fallback `x{n}` name, since both are
+positional.
+
+- A body is proven when the names only it bears in version 1 lie on exactly
+  one version 2 body, and that body's own names lead back only to it. A body
+  with no such names is proven only when neither state holds another body of
+  its id family (`b:x`, `b:x:2`, `b:x:2:2`).
+- A face or edge is proven when its body is proven, its name is the only one
+  with its base on the version 1 body, and exactly one name on the version 2
+  body has that base.
+
+Everything else is a `candidate`, `ambiguous` or `missing`, with candidates
+the user may accept. Body candidates are the bodies sharing its names or its
+id family, ordered by volume and then centroid distance; volume and centroid
+only order them. Reference candidates are names with the same base on the
+candidate bodies, else the stored `sig` proposes by Resolution's signature
+rule; names with that base on other bodies come back as `suggestions`. So a
+face split into mirror-image halves on one body is `ambiguous`, and a split
+body keeps its fillet on the piece it was on, whatever its version 2 id.
+
+A proven or accepted reference gets its new body and name and a `sig` taken
+from the version 2 state. The commit refuses while any `candidate` or
+`ambiguous` mapping has no accepted choice. A `missing` one without a choice
+stays as it was and reports as unresolved under version 2; if its old name
+exists on its old body id in version 2, it is a `candidate` instead, so it
+never binds by coincidence. The commit writes the upgraded document in one
+save, so an interruption leaves the old or the new document, never a
+mixture, and the backup restores the complete old project. The view's
+hidden body ids are not remapped.
 
 ## No visible flags (schema 13)
 

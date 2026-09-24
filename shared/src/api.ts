@@ -100,6 +100,37 @@ export interface UnresolvedRef extends RefProblem {
   ref: FaceRef | EdgeRef;
 }
 
+export interface NamingTarget {
+  bodyId: string;
+  name?: string;
+}
+
+export interface NamingCandidate extends NamingTarget {
+  basis: RefCandidate["basis"];
+}
+
+export interface NamingDecision {
+  featureId: string | null;
+  path: string;
+  to: NamingTarget;
+}
+
+export interface NamingMapping {
+  featureId: string | null;
+  path: string;
+  from: NamingTarget;
+  status: "proven" | RefProblem["status"];
+  to?: NamingTarget;
+  candidates: NamingCandidate[];
+  suggestions: NamingCandidate[];
+}
+
+export interface NamingUpgradeProposal {
+  backup: string;
+  revision: number;
+  mappings: NamingMapping[];
+}
+
 export interface FeatureStatus {
   featureId: string;
   status: FeatureRunStatus;

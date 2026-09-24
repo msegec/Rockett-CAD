@@ -16,6 +16,7 @@ import {
   type HeldMeshes,
   type MeasureRequest,
   type MutationResponse,
+  type NamingDecision,
   type PathParams,
   type ProjectView,
   type Route,
@@ -337,6 +338,10 @@ export const api = {
     holding(ROUTES.updateBody, { id, bodyId }, patch),
   updateGroups: (id: string, groups: TreeGroup[]) =>
     holding(ROUTES.updateGroups, { id }, { groups }),
+  stageNamingUpgrade: (id: string, accept: NamingDecision[] = []) =>
+    send(ROUTES.stageNamingUpgrade, { id }, { body: { accept } }),
+  commitNamingUpgrade: (id: string, accept: NamingDecision[] = []) =>
+    holding(ROUTES.commitNamingUpgrade, { id }, { accept }),
   getView: (id: string) => send(ROUTES.getView, { id }),
   putView: (id: string, view: ProjectView) =>
     send(ROUTES.putView, { id }, { body: view }),

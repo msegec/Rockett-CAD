@@ -192,6 +192,24 @@ export function resolveRefs(
   }
 }
 
+export function signatureCandidates(
+  bodies: ReadonlyMap<string, NamedBody>,
+  bodyIds: string[],
+  ref: Ref,
+): RefCandidate[] {
+  const { sig } = ref;
+  if (!sig) return [];
+  const topology = new Topology();
+  try {
+    return bodyIds.flatMap((id) => {
+      const body = bodies.get(id);
+      return body ? nearest(topology, body, ref.kind, sig) : [];
+    });
+  } finally {
+    topology.release();
+  }
+}
+
 export function unresolvedRefs(
   bodies: ReadonlyMap<string, NamedBody>,
   feature: Feature,
@@ -218,7 +236,7 @@ export class BlockedFeature extends Error {
   }
 }
 
-const BODY_FIELDS = [
+export const BODY_FIELDS = [
   "targets",
   "bodies",
   "toolBodies",

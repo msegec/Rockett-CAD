@@ -1,21 +1,28 @@
 import type { EdgeRef, FaceRef, Feature } from "./model.js";
 
-export function collectTopoRefs(feature: Feature): Array<FaceRef | EdgeRef> {
-  const found: Array<FaceRef | EdgeRef> = [];
-  const visit = (value: unknown): void => {
+export function topoRefPaths(
+  feature: Feature,
+): Array<[string, FaceRef | EdgeRef]> {
+  const found: Array<[string, FaceRef | EdgeRef]> = [];
+  const visit = (value: unknown, at: string): void => {
     if (typeof value !== "object" || value === null) return;
     const item = value as Record<string, unknown>;
     if (
       (item.kind === "face" && typeof item.faceName === "string") ||
       (item.kind === "edge" && typeof item.edgeName === "string")
     ) {
-      found.push(value as FaceRef | EdgeRef);
+      found.push([at, value as FaceRef | EdgeRef]);
       return;
     }
-    Object.values(item).forEach(visit);
+    for (const [key, child] of Object.entries(item))
+      visit(child, `${at}/${key}`);
   };
-  visit(feature);
+  visit(feature, "");
   return found;
+}
+
+export function collectTopoRefs(feature: Feature): Array<FaceRef | EdgeRef> {
+  return topoRefPaths(feature).map(([, ref]) => ref);
 }
 
 const refKey = (ref: FaceRef | EdgeRef) =>
