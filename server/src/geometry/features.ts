@@ -979,6 +979,7 @@ function evalLoft(state: EvalState, f: LoftFeature): void {
     throw new Error("loft requires at least two sections");
   const tool = kernelCall("loft", () => {
     const thru = new k.BRepOffsetAPI_ThruSections(true, false, LINEAR_TOL);
+    let first: { pf: ProfileFace; wire: Shape } | undefined;
     for (const ref of f.sections) {
       const sketch = state.sketches.get(ref.sketchId);
       if (!sketch) throw new Error(`sketch ${ref.sketchId} not found`);
@@ -989,6 +990,7 @@ function evalLoft(state: EvalState, f: LoftFeature): void {
       const wires = [...exploreWires(pf.face)];
       if (wires.length === 0) throw new Error("loft section has no wire");
       thru.AddWire(wires[0]);
+      first ??= { pf, wire: wires[0] };
     }
     thru.Build(progress());
     if (!thru.IsDone()) {
@@ -996,7 +998,16 @@ function evalLoft(state: EvalState, f: LoftFeature): void {
       throw new Error("loft failed: sections may be incompatible");
     }
     const shape = thru.Shape();
-    const names = finalizeNames(shape, new ShapeMap(), f.id);
+    const names =
+      namingVersion() === 1
+        ? finalizeNames(shape, new ShapeMap(), f.id)
+        : sweptNames(
+            shape,
+            f.id,
+            sideEdgeNames(f.id, first!.pf, edgesOf(first!.wire)),
+            (e) => thru.Generated(e),
+            [thru.FirstShape(), thru.LastShape()],
+          );
     thru.delete();
     return { shape, names };
   });
