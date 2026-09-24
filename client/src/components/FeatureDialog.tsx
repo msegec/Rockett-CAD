@@ -16,12 +16,12 @@ import type {
 import { newId } from "@rockett/shared";
 import {
   featurePatch,
-  previewedFeature,
   useStore,
   type DialogType,
   type Selection,
 } from "../store";
 import { api, saveDownload } from "../api";
+import { extrudeReachesBody } from "../extrudeReach";
 import { createLivePreview } from "../livePreview";
 import { viewportHandle } from "../viewportRef";
 import { DraggablePanel } from "./DraggablePanel";
@@ -46,15 +46,6 @@ function attempt(build: (() => Feature) | null): Feature | null {
   } catch {
     return null;
   }
-}
-
-function hasBodyToCut(): boolean {
-  const s = useStore.getState();
-  const own = previewedFeature(s)?.id;
-  return (s.evaluation?.bodies ?? []).some(
-    (b) =>
-      !own || (b.bodyId !== `b:${own}` && !b.bodyId.startsWith(`b:${own}:`)),
-  );
 }
 
 function useLivePreview(editId: string | undefined, draft: Feature | null) {
@@ -203,7 +194,7 @@ function DialogBody({
   const close = () => setMode({ name: "idle" });
 
   // Extrude: a negative distance, Reversed or a drag below the surface means
-  // "into the part", so Join switches to Cut when a body exists; going back
+  // "into the part", so Join turns to Cut if the tool meets a body; going back
   // undoes only that automatic switch, never an operation the user picked.
   const extrudeSign = useRef<number | null>(null);
   useEffect(() => {
@@ -219,7 +210,8 @@ function DialogBody({
     extrudeSign.current = sign;
     if (prev === null || prev === sign) return;
     const op = params.operation ?? "join";
-    if (sign < 0 && op === "join" && hasBodyToCut())
+    const start = num("startOffset", 0);
+    if (sign < 0 && op === "join" && extrudeReachesBody(start, start + d))
       setParams({ operation: "cut", autoCut: true });
     else if (sign > 0 && op === "cut" && params.autoCut)
       setParams({ operation: "join", autoCut: false });
@@ -282,7 +274,7 @@ function DialogBody({
             onChange={(v) => setParams({ distance: v })}
           />
           <div className="field-hint">
-            Negative = the other side (switches to Cut)
+            Negative = the other side (Cut when it meets a body)
           </div>
           <SelectField
             label="Direction"

@@ -1,8 +1,8 @@
 client/src/App.tsx Workspace 137
 client/src/components/ControlsHelp.tsx ControlsHelp 121
 client/src/components/DraggablePanel.tsx DraggablePanel 130
-client/src/components/FeatureDialog.tsx 1297
-client/src/components/FeatureDialog.tsx DialogBody 920
+client/src/components/FeatureDialog.tsx 1289
+client/src/components/FeatureDialog.tsx DialogBody 921
 client/src/components/FeatureDialog.tsx ReferenceImagePanel 188
 client/src/components/ModelTree.tsx 610
 client/src/components/ModelTree.tsx ModelTree 478

@@ -145,8 +145,12 @@ An extrude's `distance` is signed: a negative value builds the prism on the
 opposite side of the sketch plane (after `direction` is applied; `symmetric`
 ignores the sign). An optional `startOffset` moves the start plane along the
 profile's (or face's) own normal before the distance is applied (Fusion's
-"Start → Offset"), so a boss or cut can begin above or below the sketch. The dialog treats a typed negative value as "into the part"
-and switches Join to Cut, previewing the tool in red.
+"Start → Offset"), so a boss or cut can begin above or below the sketch.
+Reversing an extrude (a negative distance, Reversed, or the arrow dragged
+below the plane) switches Join to Cut, previewed in red, only when the
+reversed tool's bounding box overlaps a body that exists before the feature
+(`client/src/extrudeReach.ts`); the kernel's cut needs the same overlap.
+Reversing into empty space stays Join.
 
 Extrude and revolve tools built from several sketch regions pass through
 `ShapeUpgrade_UnifySameDomain` before the boolean, so adjacent regions become
