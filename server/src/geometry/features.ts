@@ -938,17 +938,41 @@ function sketchEntityToEdge(
   return null;
 }
 
+function blendPerBody(
+  state: EvalState,
+  refs: EdgeRef[],
+  blend: (body: NamedBody, refs: EdgeRef[]) => void,
+): void {
+  const groups = new Map<string, EdgeRef[]>();
+  for (const ref of refs) {
+    const group = groups.get(ref.bodyId);
+    if (group) group.push(ref);
+    else groups.set(ref.bodyId, [ref]);
+  }
+  const targets = [...groups].map(([bodyId, bodyRefs]) => {
+    const body = state.bodies.get(bodyId);
+    if (!body) throw new Error(`body ${bodyId} no longer exists`);
+    return { body, bodyRefs };
+  });
+  for (const { body, bodyRefs } of targets) {
+    try {
+      blend(body, bodyRefs);
+    } catch (error) {
+      if (targets.length === 1) throw error;
+      throw new Error(`${(error as Error).message} (body ${body.bodyId})`, {
+        cause: error,
+      });
+    }
+  }
+}
+
 function collectEdges(
   body: NamedBody,
   byName: Map<string, Shape>,
   refs: EdgeRef[],
   tangentChain: boolean | undefined,
-  label: string,
 ): { edge: Shape; name: string }[] {
   const resolve = (ref: EdgeRef) => {
-    if (ref.bodyId !== body.bodyId) {
-      throw new Error(`all ${label} edges must belong to the same body`);
-    }
     const edge = byName.get(ref.edgeName);
     if (!edge) {
       throw new Error(`referenced edge no longer exists: ${ref.edgeName}`);
@@ -1001,9 +1025,18 @@ function blendNames(
 function evalFillet(state: EvalState, f: FilletFeature): void {
   if (f.edges.length === 0) throw new Error("no edges selected");
   if (f.radius <= 0) throw new Error("fillet radius must be positive");
-  const bodyId = f.edges[0]!.bodyId;
-  const body = state.bodies.get(bodyId);
-  if (!body) throw new Error(`body ${bodyId} no longer exists`);
+  blendPerBody(state, f.edges, (body, refs) =>
+    filletBody(state, f, body, refs),
+  );
+}
+
+function filletBody(
+  state: EvalState,
+  f: FilletFeature,
+  body: NamedBody,
+  refs: EdgeRef[],
+): void {
+  const bodyId = body.bodyId;
   const k = getKernel();
   kernelCall("fillet", () => {
     const byName = computeEdgeNames(body).byName;
@@ -1013,13 +1046,7 @@ function evalFillet(state: EvalState, f: FilletFeature): void {
     );
     let result: Shape | undefined;
     try {
-      const sourceEdges = collectEdges(
-        body,
-        byName,
-        f.edges,
-        f.tangentChain,
-        "fillet",
-      );
+      const sourceEdges = collectEdges(body, byName, refs, f.tangentChain);
       for (const { edge } of sourceEdges) {
         if (!op.Contour(edge)) op.Add_2(f.radius, edge);
       }
@@ -1339,22 +1366,25 @@ function chamferByEnvelope(
 function evalChamfer(state: EvalState, f: ChamferFeature): void {
   if (f.edges.length === 0) throw new Error("no edges selected");
   if (f.distance <= 0) throw new Error("chamfer distance must be positive");
-  const bodyId = f.edges[0]!.bodyId;
-  const body = state.bodies.get(bodyId);
-  if (!body) throw new Error(`body ${bodyId} no longer exists`);
+  blendPerBody(state, f.edges, (body, refs) =>
+    chamferBody(state, f, body, refs),
+  );
+}
+
+function chamferBody(
+  state: EvalState,
+  f: ChamferFeature,
+  body: NamedBody,
+  refs: EdgeRef[],
+): void {
+  const bodyId = body.bodyId;
   const k = getKernel();
   kernelCall("chamfer", () => {
     const byName = computeEdgeNames(body).byName;
     const op = new k.BRepFilletAPI_MakeChamfer(body.shape);
     let result: Shape | undefined;
     try {
-      const sourceEdges = collectEdges(
-        body,
-        byName,
-        f.edges,
-        f.tangentChain,
-        "chamfer",
-      );
+      const sourceEdges = collectEdges(body, byName, refs, f.tangentChain);
       for (const { edge } of sourceEdges) {
         if (!op.Contour(edge)) op.Add_2(f.distance, edge);
       }

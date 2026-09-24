@@ -49,7 +49,7 @@ everything downstream against persistent topology references.
 
 - **Solid features**: extrude, revolve, sweep, loft, emboss and deboss from sketch profiles or planar faces.
 - **Modify**: fillet, chamfer, shell, combine, split, press/pull and move bodies; shell with no open face hollows the body.
-- **Tangent chains**: fillet and chamfer pick smooth connected edges in one click.
+- **Tangent chains**: fillet and chamfer pick smooth connected edges in one click, on one or several bodies.
 - **Replicate**: mirror, rectangular pattern and circular pattern.
 - **Construction**: offset planes and midplanes; sketch on any planar face.
 - **Reference images**: place PNG, JPEG or WebP images on planes and calibrate them to real size.

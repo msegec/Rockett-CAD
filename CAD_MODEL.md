@@ -178,6 +178,11 @@ outline is offset), so a through-hole survives untouched. The new faces are
 named `f:{featureId}:fe:{n}` per source edge, exactly as the kernel path names
 them.
 
+A fillet or chamfer whose edges lie on several bodies blends each body on its
+own, in the order of its first picked edge, and keeps each body's id. The tangent
+chain runs within each body, `n` counts that body's source edges, and an error
+names the body when there is more than one.
+
 Sketch-curve attribution deserves a note: wire construction can rebuild edge
 shapes (vertex merging), so after building a profile face we re-derive the
 edge→sketch-entity map _geometrically_ (each face edge's midpoint is matched
