@@ -1,4 +1,9 @@
-import { newId, type TreeGroup } from "@rockett/shared";
+import {
+  bodyMadeBy,
+  newId,
+  type EvaluateResult,
+  type TreeGroup,
+} from "@rockett/shared";
 import { api, type MutationResponse } from "./api";
 import { freeProfileIds, sketchUsage } from "./sketchUsage";
 import { selectionKey, useStore, type Selection } from "./store";
@@ -136,6 +141,19 @@ export const bodySel = (b: { bodyId: string }): Selection => ({
   kind: "body",
   bodyId: b.bodyId,
 });
+
+export function featureBodies(
+  evaluation: EvaluateResult | null,
+  featureId: string,
+): Selection[] {
+  const st = evaluation?.featureStatuses.find((x) => x.featureId === featureId);
+  if (st?.status !== "ok" && st?.status !== "warning") return [];
+  return (evaluation?.bodies ?? [])
+    .filter(
+      (b) => bodyMadeBy(featureId, b.bodyId) || st.targets?.includes(b.bodyId),
+    )
+    .map(bodySel);
+}
 
 export function sketchRegions(sketchId: string): Selection[] {
   const s = useStore.getState();

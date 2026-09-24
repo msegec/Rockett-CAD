@@ -11,7 +11,7 @@ client/src/components/ProjectItems.tsx ItemRow 92
 client/src/components/ProjectItems.tsx ProjectItems 154
 client/src/components/ProjectList.tsx ProjectList 109
 client/src/components/SketchOffsetPanel.tsx OffsetBody 247
-client/src/components/Timeline.tsx Timeline 178
+client/src/components/Timeline.tsx Timeline 177
 client/src/components/Timeline.tsx openFeatureEditor 175
 client/src/components/Toolbar.tsx SketchToolbar 98
 client/src/components/Toolbar.tsx Toolbar 92
@@ -41,7 +41,7 @@ client/src/three/toolPreview.ts updateToolPreview 158
 server/src/api/routes.ts 736
 server/src/api/routes.ts createApiRouter 532
 server/src/geometry/engine.ts evaluate 114
-server/src/geometry/features.ts 2188
+server/src/geometry/features.ts 2187
 server/src/geometry/features.ts applyToolOperation 82
 server/src/geometry/features.ts buildPrism 86
 server/src/geometry/features.ts chamferByEnvelope 272

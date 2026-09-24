@@ -5,13 +5,16 @@ import type {
   Feature,
   FeatureStatus,
 } from "@rockett/shared";
+import { pickInto } from "../dialogPicks";
 import {
   useStore,
+  selectionKey,
   sketchEditingPosition,
   type DialogType,
   type Selection,
 } from "../store";
 import { useTimelinePeek } from "../timelinePeek";
+import { featureBodies } from "../treeSelection";
 import { alignCameraToActiveSketch } from "../viewportRef";
 import { ContextMenu } from "./ContextMenu";
 import { refNotes } from "./RefRepair";
@@ -56,10 +59,51 @@ function chipTitle(
   ].join("\n");
 }
 
+function chipClass(
+  f: Feature,
+  st: FeatureStatus | undefined,
+  selected: boolean,
+) {
+  return [
+    "tl-chip",
+    st?.status === "error" ? "error" : "",
+    f.suppressed ? "suppressed" : "",
+    selected ? "selected" : "",
+    st?.status === "rolledBack" ? "rolledback" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function selectFeatureBodies(featureId: string, additive: boolean) {
+  const s = useStore.getState();
+  const bodies = featureBodies(s.evaluation, featureId);
+  if (s.mode.name === "dialog") return pickInto(bodies, additive);
+  if (s.mode.name !== "idle" || bodies.length === 0) return;
+  const had = new Set(s.selection.map(selectionKey));
+  s.setSelection(
+    additive
+      ? [...s.selection, ...bodies.filter((b) => !had.has(selectionKey(b)))]
+      : bodies,
+  );
+}
+
+function chipSelected(
+  evaluation: EvaluateResult | null,
+  featureId: string,
+  selection: Selection[],
+) {
+  if (!selection.some((x) => x.kind === "body")) return false;
+  const keys = new Set(selection.map(selectionKey));
+  const bodies = featureBodies(evaluation, featureId);
+  return bodies.length > 0 && bodies.every((b) => keys.has(selectionKey(b)));
+}
+
 export function Timeline() {
   const document_ = useStore((s) => s.document);
   const evaluation = useStore((s) => s.evaluation);
   const mode = useStore((s) => s.mode);
+  const selection = useStore((s) => s.selection);
   const busy = useStore((s) => s.busy);
   const rollTimeline = useStore((s) => s.rollTimeline);
   const [menu, setMenu] = useState<{
@@ -84,10 +128,6 @@ export function Timeline() {
   const statuses = new Map(
     (evaluation?.featureStatuses ?? []).map((s) => [s.featureId, s]),
   );
-
-  const openEditor = (f: Feature) => {
-    openFeatureEditor(f);
-  };
 
   return (
     <div className="timeline">
@@ -128,20 +168,19 @@ export function Timeline() {
         />
         {document_.features.map((f, i) => {
           const st = statuses.get(f.id);
-          const cls = [
-            "tl-chip",
-            st?.status === "error" ? "error" : "",
-            f.suppressed ? "suppressed" : "",
-            st?.status === "rolledBack" ? "rolledback" : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
           return (
             <span key={f.id} style={{ display: "contents" }}>
               <div
-                className={cls}
+                className={chipClass(
+                  f,
+                  st,
+                  chipSelected(evaluation, f.id, selection),
+                )}
                 title={chipTitle(f, st, document_, evaluation)}
-                onDoubleClick={() => openEditor(f)}
+                onClick={(e) =>
+                  selectFeatureBodies(f.id, e.ctrlKey || e.metaKey)
+                }
+                onDoubleClick={() => void openFeatureEditor(f)}
                 onMouseEnter={() => peek.enter(f.id)}
                 onMouseLeave={peek.leave}
                 onContextMenu={(e) => {
@@ -199,7 +238,10 @@ export function Timeline() {
           up
           onClose={() => setMenu(null)}
           items={[
-            { label: "Edit", action: () => openEditor(menu.feature) },
+            {
+              label: "Edit",
+              action: () => void openFeatureEditor(menu.feature),
+            },
             ...(mode.name === "idle" && quickValues(menu.feature).length > 0
               ? [{ label: "Quick edit", action: () => setQuick(menu) }]
               : []),

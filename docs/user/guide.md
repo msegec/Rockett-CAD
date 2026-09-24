@@ -153,9 +153,13 @@ them to real dimensions with two points.
 ### Feature timeline
 
 Rename, edit, suppress, delete and roll back features, or insert features
-mid-history. Right-click a chip and choose Quick edit to change its main
-value, such as an extrude distance or fillet radius, in a small box above the
-chip. The model previews as you type; Enter keeps the change as one undo step
+mid-history. Click a chip to select the bodies its feature made or changed,
+and Ctrl or Cmd+click to add them; a sketch, plane, suppressed or rolled-back
+feature selects nothing. With a feature dialog open, a chip click fills the
+active row with those bodies, as clicking each body would. Double-click a
+chip to edit its feature. Right-click a chip and choose Quick edit to change
+its main value, such as an extrude distance or fillet radius, in a small box
+above the chip. The model previews as you type; Enter keeps the change as one undo step
 and Escape or clicking away reverts it. Rest the pointer on a chip for 0.3
 seconds to see the model as it was right after that feature; moving away
 returns to the current model, and nothing is saved or added to undo. Broken

@@ -961,6 +961,11 @@ kbd {
   border-color: var(--accent);
 }
 
+.tl-chip.selected {
+  background: var(--accent-dim);
+  color: var(--on-accent);
+}
+
 .tl-chip.error {
   border-color: var(--err);
   color: var(--err);

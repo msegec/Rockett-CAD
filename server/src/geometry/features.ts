@@ -8,6 +8,7 @@ import {
   findProfile,
   solveSketch,
   projectEdge,
+  bodyMadeBy,
   ANGULAR_TOL_DEG,
   LINEAR_TOL,
   UNIT_DOT_TOL,
@@ -1919,9 +1920,7 @@ function evalMove(state: EvalState, f: MoveFeature, earlier: Feature[]): void {
   // carry the bodies' sketches along
   const movedIds = new Set(f.bodies);
   const createdBy = (g: Feature) =>
-    [...movedIds].some(
-      (id) => id === `b:${g.id}` || id.startsWith(`b:${g.id}:`),
-    );
+    [...movedIds].some((id) => bodyMadeBy(g.id, id));
   for (const [skId, sk] of state.sketches) {
     const feat = earlier.find((g) => g.id === skId && g.type === "sketch") as
       SketchFeature | undefined;

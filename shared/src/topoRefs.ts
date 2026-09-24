@@ -41,3 +41,6 @@ export function unsignedRefs(
     return !sig;
   });
 }
+
+export const bodyMadeBy = (featureId: string, bodyId: string) =>
+  bodyId === `b:${featureId}` || bodyId.startsWith(`b:${featureId}:`);
