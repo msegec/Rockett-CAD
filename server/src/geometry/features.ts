@@ -1260,25 +1260,25 @@ function filletBody(
       for (const { edge } of sourceEdges) {
         if (!op.Contour(edge)) op.Add_2(f.radius, edge);
       }
+      if (op.NbContours() === 0) {
+        throw new Error(
+          `no sharp corner to fillet on ${sourceEdges.map((s) => s.name).join(", ")}: the faces meet smoothly there`,
+        );
+      }
       op.Build(progress());
       if (!op.IsDone()) {
-        throw new Error(
-          `fillet of radius ${f.radius} failed: radius may be too large for the geometry`,
-        );
+        throw new Error(filletFailure(op, byName, refs, f.radius));
       }
       result = op.Shape();
       // IsDone only confirms that the algorithm completed. Some edge junctions
       // produce an invalid solid even when it reports success; never publish it.
-      const check = new k.BRepCheck_Analyzer(result, true, false, false);
-      let valid: boolean;
-      try {
-        valid = check.IsValid_2();
-      } finally {
-        check.delete();
-      }
-      if (!valid) {
+      const broken = invalidPart(result);
+      if (broken) {
+        const before = invalidPart(body.shape);
         throw new Error(
-          `fillet of radius ${f.radius} produced invalid geometry: try fewer edges or a different radius; the previous body has been kept`,
+          before
+            ? `fillet of radius ${f.radius} cannot be published: the body was already invalid before this fillet (the kernel check rejects a ${before}), so the fault comes from an earlier feature; the previous body has been kept`
+            : `fillet of radius ${f.radius} produced invalid geometry (the kernel check rejects a ${broken}): try fewer edges or a different radius; the previous body has been kept`,
         );
       }
       const names = blendNames(op, body, sourceEdges, result, f.id);
@@ -1289,6 +1289,53 @@ function filletBody(
       release(byName.values());
     }
   });
+}
+
+function filletFailure(
+  op: any,
+  byName: Map<string, Shape>,
+  refs: EdgeRef[],
+  radius: number,
+): string {
+  const chosen = new Set(refs.map((r) => shapeHash(byName.get(r.edgeName)!)));
+  const names = new Map(
+    [...byName].map(([name, edge]) => [shapeHash(edge), name]),
+  );
+  const added = new Set<string>();
+  for (let i = 1; i <= op.NbFaultyContours(); i++) {
+    const contour = op.FaultyContour(i);
+    for (let j = 1; j <= op.NbEdges(contour); j++) {
+      const edge = op.Edge(contour, j);
+      const hash = shapeHash(edge);
+      edge.delete();
+      if (!chosen.has(hash)) added.add(names.get(hash) ?? "an unnamed edge");
+    }
+  }
+  return added.size > 0
+    ? `fillet of radius ${radius} failed on ${[...added].join(", ")}, a tangent continuation of the selected edges: try a smaller radius or fillet this edge before its neighbours`
+    : `fillet of radius ${radius} failed: radius may be too large for the geometry`;
+}
+
+function invalidPart(shape: Shape): string | null {
+  const check = new (getKernel().BRepCheck_Analyzer)(shape, true, false, false);
+  try {
+    if (check.IsValid_2()) return null;
+    for (const [part, of] of [
+      ["face", facesOf],
+      ["edge", edgesOf],
+      ["vertex", verticesOf],
+    ] as const) {
+      const shapes = of(shape);
+      try {
+        if (shapes.some((s) => !check.IsValid_1(s))) return part;
+      } finally {
+        release(shapes);
+      }
+    }
+    return "solid";
+  } finally {
+    check.delete();
+  }
 }
 
 /**
