@@ -48,7 +48,7 @@ everything downstream against persistent topology references.
 ### Model
 
 - **Solid features**: extrude, revolve, sweep, loft, emboss and deboss from sketch profiles or planar faces.
-- **Tool targets**: join, cut and intersect act on the bodies you choose, or on Auto.
+- **Tool targets**: join, cut and intersect act on the bodies you choose, from the list or by click, or on Auto.
 - **Modify**: fillet, chamfer, shell, combine, split, press/pull and move bodies; shell with no open face hollows the body.
 - **Tangent chains**: fillet and chamfer pick smooth connected edges in one click, on one or several bodies.
 - **Replicate**: mirror, rectangular pattern and circular pattern.
@@ -78,6 +78,7 @@ everything downstream against persistent topology references.
 - **Shortcuts**: single keys start tools; ? lists every keyboard and mouse control in a resizable panel that fills the window.
 - **Undo and redo**: undo any edit, even inside a sketch, separately from the feature timeline; an unchanged OK adds nothing.
 - **Tool panels**: open with the main number selected and list each pick to remove; Enter confirms, Escape reverts.
+- **Pick fields**: each dialog pick input is a row; viewport and tree clicks fill only the active row.
 - **Groups**: gather selected bodies or sketches into named, collapsible tree folders with Ctrl+G or right-click.
 - **Tree selection**: Ctrl or Cmd+click adds bodies or sketches, Shift+click selects a range; right-click acts on all.
 - **Live preview**: feature dialogs keep the model before the feature pickable and ghost only that feature's result, green added, red removed.

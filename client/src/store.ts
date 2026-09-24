@@ -180,6 +180,7 @@ interface State {
 
   mode: Mode;
   dialogParams: Record<string, any>;
+  pickInput: string | null;
   selection: Selection[];
   hover: Selection | null;
 
@@ -213,6 +214,7 @@ interface State {
 
   setMode: (m: Mode) => void;
   setDialogParams: (p: Record<string, any>) => void;
+  setPickInput: (key: string) => void;
 
   startSketchOnPlane: (ref: PlaneRef) => Promise<void>;
   editSketch: (sketchId: string) => Promise<void>;
@@ -497,6 +499,7 @@ export const useStore = create<State>((set, get) => ({
   recovery: null,
   mode: { name: "idle" },
   dialogParams: {},
+  pickInput: null,
   selection: [],
   hover: null,
   draftSketch: null,
@@ -757,9 +760,11 @@ export const useStore = create<State>((set, get) => ({
   },
   setHover: (s) => set({ hover: s }),
 
-  setMode: (m) => set({ mode: m, dialogParams: {}, measureResult: null }),
+  setMode: (m) =>
+    set({ mode: m, dialogParams: {}, pickInput: null, measureResult: null }),
   setDialogParams: (p) =>
     set((s) => ({ dialogParams: { ...s.dialogParams, ...p } })),
+  setPickInput: (key) => set({ pickInput: key }),
 
   async startSketchOnPlane(ref) {
     const { document } = get();

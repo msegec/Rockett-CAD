@@ -137,7 +137,7 @@ export const bodySel = (b: { bodyId: string }): Selection => ({
   bodyId: b.bodyId,
 });
 
-export const selectSketchRegions = (sketchId: string) => {
+export function sketchRegions(sketchId: string): Selection[] {
   const s = useStore.getState();
   const sk = s.evaluation?.sketches.find((x) => x.featureId === sketchId);
   const profiles = sk?.profiles ?? [];
@@ -145,10 +145,8 @@ export const selectSketchRegions = (sketchId: string) => {
     ? freeProfileIds(sketchUsage(s.document), sketchId, profiles)
     : [];
   const ids = free.length > 0 ? free : profiles.map((p) => p.id);
-  const sels: Selection[] = ids.map((id) => ({
-    kind: "profile" as const,
-    sketchId,
-    profileId: id,
-  }));
-  s.setSelection(sels);
-};
+  return ids.map((id) => ({ kind: "profile", sketchId, profileId: id }));
+}
+
+export const selectSketchRegions = (sketchId: string) =>
+  useStore.getState().setSelection(sketchRegions(sketchId));

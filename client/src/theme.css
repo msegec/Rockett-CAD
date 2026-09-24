@@ -811,6 +811,16 @@ kbd {
   color: var(--accent);
 }
 
+.sel-info.selected {
+  background: var(--accent-dim);
+  border-style: solid;
+}
+
+.sel-info.selected span,
+.sel-info.selected b {
+  color: var(--on-accent);
+}
+
 .btn {
   padding: 5px 14px;
   border-radius: 4px;

@@ -14,6 +14,7 @@ import {
 } from "react";
 import type { Feature, PlaneRef, TreeGroup } from "@rockett/shared";
 import { ORIGIN_AXES } from "@rockett/shared";
+import { pickInto } from "../dialogPicks";
 import { useStore, selectionKey, type Selection } from "../store";
 import {
   viewportHandle,
@@ -207,8 +208,8 @@ export const ModelTree = memo(function ModelTree() {
         : sel;
     anchor.current = from;
     const s = useStore.getState();
-    if (!range && !additive) plain();
-    else if (!range && s.mode.name === "dialog") toggleSelection(sel, true);
+    if (s.mode.name === "dialog") pickInto([sel], range || additive);
+    else if (!range && !additive) plain();
     else s.setSelection(treeClick(s.selection, sel, order, from, range));
   };
   const chosen = (kind: Kind, id: string) => {
@@ -272,11 +273,7 @@ export const ModelTree = memo(function ModelTree() {
     <div
       key={selectionKey(sel)}
       className={`tree-item ${selKeys.has(selectionKey(sel)) ? "selected" : ""}`}
-      onClick={(e) =>
-        pick(e, sel, origins, () =>
-          toggleSelection(sel, useStore.getState().mode.name === "dialog"),
-        )
-      }
+      onClick={(e) => pick(e, sel, origins, () => toggleSelection(sel, false))}
     >
       <span className="tree-icon">↗</span>
       {pickLabel(sel, document_, evaluation, [])}

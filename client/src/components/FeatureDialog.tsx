@@ -23,9 +23,9 @@ import {
 import { api, saveDownload } from "../api";
 import { extrudeReachesBody } from "../extrudeReach";
 import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
-import { DIALOG_PICKS } from "../dialogPicks";
+import { takes } from "../dialogPicks";
 import { createLivePreview } from "../livePreview";
-import { toolTargets } from "../toolTargets";
+import { targetOperation, toolTargets } from "../toolTargets";
 import { viewportHandle } from "../viewportRef";
 import { DraggablePanel } from "./DraggablePanel";
 import { ImportPanel } from "./ImportPanel";
@@ -158,7 +158,7 @@ function DialogBody({
 
   // Picking an edge or sketch line in an axis-based dialog switches the axis
   // to it — the dropdown alone gave no hint the pick was registered.
-  const axisDialog = !!DIALOG_PICKS[dialog].axes;
+  const axisDialog = takes(dialog, "axis");
   useEffect(() => {
     if (!axisDialog) return;
     if (
@@ -229,8 +229,6 @@ function DialogBody({
       <TargetField operation={p("operation", "join")} />
     </>
   );
-  const embossOperation = () =>
-    p("embossMode", "emboss") === "emboss" ? "join" : "cut";
 
   // Extrude: a negative distance, Reversed or a drag below the surface means
   // "into the part", so Join turns to Cut if the tool meets a body; going back
@@ -272,7 +270,7 @@ function DialogBody({
         <>
           <SelInfo
             label="Profiles / faces"
-            picks={[...profiles, ...faces]}
+            input="profiles"
             hint="click sketch regions or planar faces"
           />
           <NumField
@@ -352,11 +350,12 @@ function DialogBody({
         <>
           <SelInfo
             label="Profiles"
-            picks={profiles}
+            input="profiles"
             hint="click sketch regions"
           />
           <SelInfo
             label="Axis"
+            input="axis"
             picks={[...edges, ...sketchLines]}
             hint="click a sketch line or body edge, or pick X/Y/Z"
           />
@@ -394,7 +393,7 @@ function DialogBody({
       title = "Move";
       body = (
         <>
-          <SelInfo label="Bodies" picks={bodies} hint="click bodies" />
+          <SelInfo label="Bodies" input="bodies" hint="click bodies" />
           <NumField
             label="X (mm)"
             autoFocus
@@ -435,7 +434,7 @@ function DialogBody({
         <>
           <SelInfo
             label="Profile"
-            picks={profiles}
+            input="profiles"
             hint="click a sketch region"
           />
           <SelectField
@@ -472,7 +471,7 @@ function DialogBody({
         <>
           <SelInfo
             label="Sections (in order)"
-            picks={profiles}
+            input="profiles"
             hint="click 2+ profiles"
           />
           {operationField(false)}
@@ -498,7 +497,7 @@ function DialogBody({
         <>
           <SelInfo
             label="Profiles"
-            picks={profiles}
+            input="profiles"
             hint="sketch on a face, then pick regions"
           />
           <NumField
@@ -516,7 +515,7 @@ function DialogBody({
             ]}
             onChange={(v) => setParams({ embossMode: v })}
           />
-          <TargetField operation={embossOperation()} />
+          <TargetField operation={targetOperation(dialog, params)} />
         </>
       );
       build = () => {
@@ -529,7 +528,7 @@ function DialogBody({
           profiles: profileRefs(),
           depth: main("emboss"),
           mode: p("embossMode", "emboss"),
-          ...targets(embossOperation()),
+          ...targets(targetOperation(dialog, params)),
         };
       };
       break;
@@ -538,7 +537,7 @@ function DialogBody({
       title = "Fillet";
       body = (
         <>
-          <SelInfo label="Edges" picks={edges} hint="click model edges" />
+          <SelInfo label="Edges" input="edges" hint="click model edges" />
           <label>
             <input
               type="checkbox"
@@ -576,7 +575,7 @@ function DialogBody({
       title = "Chamfer";
       body = (
         <>
-          <SelInfo label="Edges" picks={edges} hint="click model edges" />
+          <SelInfo label="Edges" input="edges" hint="click model edges" />
           <label>
             <input
               type="checkbox"
@@ -616,7 +615,7 @@ function DialogBody({
         <>
           <SelInfo
             label="Faces to remove"
-            picks={faces}
+            input="faces"
             hint="click faces to open"
           />
           <NumField
@@ -643,7 +642,7 @@ function DialogBody({
         <>
           <SelInfo
             label="Bodies (first = target)"
-            picks={bodies}
+            input="bodies"
             hint="click bodies: first is the target"
           />
           <SelectField
@@ -682,10 +681,10 @@ function DialogBody({
       title = "Split Body";
       body = (
         <>
-          <SelInfo label="Body" picks={bodies} hint="click the body to split" />
+          <SelInfo label="Body" input="body" hint="click the body to split" />
           <SelInfo
             label="Split plane"
-            picks={[...planes, ...faces]}
+            input="tool"
             hint="click an origin/construction plane or planar face"
           />
         </>
@@ -709,7 +708,7 @@ function DialogBody({
       title = "Press / Pull";
       body = (
         <>
-          <SelInfo label="Faces" picks={faces} hint="click planar faces" />
+          <SelInfo label="Faces" input="faces" hint="click planar faces" />
           <NumField
             label="Distance (mm, − = inward)"
             autoFocus
@@ -735,10 +734,10 @@ function DialogBody({
       title = "Mirror";
       body = (
         <>
-          <SelInfo label="Bodies" picks={bodies} hint="click bodies" />
+          <SelInfo label="Bodies" input="bodies" hint="click bodies" />
           <SelInfo
             label="Mirror plane"
-            picks={[...planes, ...faces]}
+            input="plane"
             hint="origin/construction plane or planar face"
           />
           <CheckField
@@ -768,9 +767,10 @@ function DialogBody({
       title = "Rectangular Pattern";
       body = (
         <>
-          <SelInfo label="Bodies" picks={bodies} hint="click bodies" />
+          <SelInfo label="Bodies" input="bodies" hint="click bodies" />
           <SelInfo
             label="Direction edge"
+            input="direction"
             picks={edges}
             hint="click a body edge, or pick X/Y/Z"
           />
@@ -829,9 +829,10 @@ function DialogBody({
       title = "Circular Pattern";
       body = (
         <>
-          <SelInfo label="Bodies" picks={bodies} hint="click bodies" />
+          <SelInfo label="Bodies" input="bodies" hint="click bodies" />
           <SelInfo
             label="Axis"
+            input="axis"
             picks={[...edges, ...sketchLines]}
             hint="click a sketch line or body edge, or pick X/Y/Z"
           />
@@ -881,7 +882,7 @@ function DialogBody({
         <>
           <SelInfo
             label="Reference plane(s)"
-            picks={[...planes, ...faces]}
+            input="plane"
             hint="origin plane / face (2 refs = midplane)"
           />
           <SelectField
@@ -1019,7 +1020,6 @@ function ReferenceImagePanel({
   const addFeature = useStore((s) => s.addFeature);
   const updateFeature = useStore((s) => s.updateFeature);
   const setError = useStore((s) => s.setError);
-  const selection = useStore((s) => s.selection);
   const [file, setFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -1138,9 +1138,7 @@ function ReferenceImagePanel({
           <>
             <SelInfo
               label="Plane"
-              picks={selection.filter(
-                (s) => s.kind === "plane" || s.kind === "face",
-              )}
+              input="plane"
               hint="click a plane/face (default XY)"
             />
             <label className="field">
@@ -1244,7 +1242,7 @@ function ExportPanel({ onClose }: { onClose: () => void }) {
       <div className="dialog-body">
         <SelInfo
           label="Bodies"
-          picks={selection.filter((s) => s.kind === "body")}
+          input="bodies"
           hint={`all visible (${shownBodies.length})`}
         />
         <label className="field">

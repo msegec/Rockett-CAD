@@ -1,9 +1,18 @@
 import type { Feature, NamingVersion } from "@rockett/shared";
 import { createLivePreview } from "./livePreview";
-import { useStore } from "./store";
+import { useStore, type DialogType } from "./store";
 
 export function several(operation: string, namingVersion?: NamingVersion) {
   return operation === "cut" || (operation === "join" && namingVersion === 2);
+}
+
+export function targetOperation(
+  dialog: DialogType,
+  params: Record<string, any>,
+): string {
+  if (dialog === "emboss")
+    return params.embossMode === "deboss" ? "cut" : "join";
+  return params.operation ?? "join";
 }
 
 export function chosenTargets(

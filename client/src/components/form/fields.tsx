@@ -15,6 +15,7 @@ import {
   useStore,
   type Selection,
 } from "../../store";
+import { activeInput, heldBy } from "../../dialogPicks";
 import { chosenTargets, several } from "../../toolTargets";
 
 export function NumField({
@@ -377,33 +378,52 @@ export function SelInfo({
   label,
   picks,
   hint,
+  input,
+  onRemove,
 }: {
   label: string;
-  picks: Selection[];
+  picks?: Selection[];
   hint: string;
+  input: string;
+  onRemove?: (keys: string[]) => void;
 }) {
   const document = useStore((s) => s.document);
   const evaluation = useStore((s) => s.evaluation);
   const mode = useStore((s) => s.mode);
+  const selection = useStore((s) => s.selection);
+  const active = useStore((s) => activeInput(s)?.key === input);
   const bodies = previewBodies({ mode, evaluation });
+  const shown =
+    picks ??
+    (mode.name === "dialog" ? heldBy(mode.dialog, input, selection) : []);
   return (
     <>
-      <div className={`sel-info ${picks.length > 0 ? "have" : ""}`}>
+      <button
+        type="button"
+        className={`sel-info ${shown.length > 0 ? "have" : ""} ${active ? "selected" : ""}`}
+        aria-pressed={active}
+        onClick={() => useStore.getState().setPickInput(input)}
+      >
         <span>{label}</span>
-        <b>{picks.length > 0 ? `${picks.length} selected` : hint}</b>
-      </div>
+        <b>{shown.length > 0 ? `${shown.length} selected` : hint}</b>
+      </button>
       <PickRows
         label={label}
-        rows={picks.map((pick) => ({
+        rows={shown.map((pick) => ({
           key: selectionKey(pick),
           name: pickLabel(pick, document, evaluation, bodies),
           pick,
         }))}
-        onRemove={(keys) => {
-          const gone = new Set(keys);
-          const s = useStore.getState();
-          s.setSelection(s.selection.filter((x) => !gone.has(selectionKey(x))));
-        }}
+        onRemove={
+          onRemove ??
+          ((keys) => {
+            const gone = new Set(keys);
+            const s = useStore.getState();
+            s.setSelection(
+              s.selection.filter((x) => !gone.has(selectionKey(x))),
+            );
+          })
+        }
       />
     </>
   );
@@ -419,8 +439,6 @@ export function TargetField({ operation }: { operation: string }) {
   const bodies = previewBodies({ mode, evaluation });
   const many = several(operation, namingVersion);
   const ids = chosenTargets(operation, value, namingVersion);
-  const name = (id: string) =>
-    ranked(bodies, (b) => b.bodyId).get(id)?.item.name ?? id;
   const set = (next: string[]) =>
     setParams({ targets: next.length > 0 ? next : undefined });
   const offered = bodies
@@ -431,10 +449,12 @@ export function TargetField({ operation }: { operation: string }) {
     : ids
         .filter((id) => !bodies.some((b) => b.bodyId === id))
         .map((id): [string, string] => [id, id]);
+  const picks = ids.map((bodyId): Selection => ({ kind: "body", bodyId }));
+  const label = many ? "Targets" : "Target";
   return (
     <>
       <SelectField
-        label={many ? "Targets" : "Target"}
+        label={label}
         value={many ? "" : (ids[0] ?? "")}
         options={[
           ["", many && ids.length > 0 ? "Add body" : "Auto"],
@@ -443,17 +463,15 @@ export function TargetField({ operation }: { operation: string }) {
         ]}
         onChange={(id) => set(many ? [...ids, id] : id === "" ? [] : [id])}
       />
-      {many && (
-        <PickRows
-          label="Targets"
-          rows={ids.map((id) => ({
-            key: id,
-            name: name(id),
-            pick: { kind: "body", bodyId: id },
-          }))}
-          onRemove={(keys) => set(ids.filter((id) => !keys.includes(id)))}
-        />
-      )}
+      <SelInfo
+        label={label}
+        input="targets"
+        picks={picks}
+        hint="Auto, or click a body"
+        onRemove={(keys) =>
+          set(ids.filter((_, i) => !keys.includes(selectionKey(picks[i]!))))
+        }
+      />
     </>
   );
 }

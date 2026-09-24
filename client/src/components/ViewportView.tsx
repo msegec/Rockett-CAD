@@ -57,7 +57,15 @@ import { viewportHandle, alignCameraToActiveSketch } from "../viewportRef";
 import * as tools from "../sketchTools";
 import { ANGLE_LOCK_KEY } from "../shortcuts";
 
-import { DIALOG_PICKS } from "../dialogPicks";
+import {
+  activeInput,
+  accepted,
+  dialogPickOptions,
+  hoverPick,
+  isPlanarFace,
+  pickInto,
+  takes,
+} from "../dialogPicks";
 import { dimensionLayout } from "../dimensionLayout";
 import { SketchOffsetIndicators } from "./SketchOffsetIndicators";
 import { ViewportContextMenu } from "./ViewportContextMenu";
@@ -366,7 +374,7 @@ export function ViewportView() {
 
     const activeSketchId = mode.name === "sketch" ? mode.sketchId : null;
     const needProfiles =
-      mode.name === "dialog" && DIALOG_PICKS[mode.dialog]?.profiles;
+      mode.name === "dialog" && takes(mode.dialog, "profile");
     // Fusion-style select-then-command: in idle, unused sketch regions shade
     // and are selectable before any tool is chosen.
     const idleProfiles = mode.name === "idle";
@@ -1524,7 +1532,7 @@ export function ViewportView() {
         constructionPlanes: true,
         faces: true,
       });
-      if (r && (r.selection.kind === "plane" || isPlanarFace(r.selection))) {
+      if (r && (r.selection.kind === "plane" || planarFace(r.selection))) {
         picked = r.selection;
       }
     } else if (s.mode.name === "sketch") {
@@ -1611,18 +1619,8 @@ export function ViewportView() {
         setSnapMarker(null);
       }
     } else if (s.mode.name === "dialog") {
-      const picks = DIALOG_PICKS[s.mode.dialog] ?? {};
-      const r = vp.pick(e.clientX, e.clientY, {
-        profiles: picks.profiles,
-        edges: picks.edges,
-        faces: picks.faces || picks.bodies,
-        bodies: picks.bodies && !picks.faces,
-        originPlanes: picks.planes,
-        originAxes: picks.axes,
-        constructionPlanes: picks.planes,
-        sketchEntities: picks.sketchLines,
-      });
-      picked = filterDialogPick(r?.selection ?? null, s.mode.dialog);
+      const r = vp.pick(e.clientX, e.clientY, dialogPickOptions(s));
+      picked = hoverPick(s, r?.selection ?? null);
     } else if (s.mode.name === "measure") {
       const r = vp.pick(e.clientX, e.clientY, {
         faces: true,
@@ -1646,39 +1644,8 @@ export function ViewportView() {
     if (prevKey !== newKey) s.setHover(picked);
   }
 
-  function isPlanarFace(sel: Selection): boolean {
-    if (sel.kind !== "face") return false;
-    const s = useStore.getState();
-    const body = s.evaluation?.bodies.find((b) => b.bodyId === sel.bodyId);
-    const face = body?.faces.find((f) => f.name === sel.faceName);
-    return face?.surface.type === "plane";
-  }
-
-  function filterDialogPick(
-    sel: Selection | null,
-    dialog: keyof typeof DIALOG_PICKS,
-  ): Selection | null {
-    if (!sel) return null;
-    const picks = DIALOG_PICKS[dialog] ?? {};
-    if (sel.kind === "face" && picks.faces) return sel;
-    if (sel.kind === "face" && picks.bodies) {
-      return { kind: "body", bodyId: sel.bodyId };
-    }
-    if (sel.kind === "edge" && picks.edges) return sel;
-    if (sel.kind === "body" && picks.bodies) return sel;
-    if (sel.kind === "plane" && picks.planes) return sel;
-    if (sel.kind === "axis" && picks.axes) return sel;
-    if (sel.kind === "profile" && picks.profiles) return sel;
-    if (sel.kind === "sketchEntity" && picks.sketchLines) {
-      // only LINES can serve as an axis
-      const doc = useStore.getState().document;
-      const sk = doc?.features.find(
-        (f) => f.id === (sel as any).sketchId && f.type === "sketch",
-      ) as any;
-      const ent = sk?.entities.find((x: any) => x.id === (sel as any).entityId);
-      return ent?.kind === "line" ? sel : null;
-    }
-    return null;
+  function planarFace(sel: Selection): boolean {
+    return isPlanarFace(sel, useStore.getState());
   }
 
   function handlePrimaryDown(e: PointerEvent) {
@@ -2086,7 +2053,7 @@ export function ViewportView() {
       if (r.selection.kind === "plane") {
         await s.startSketchOnPlane(r.selection.ref);
         alignCameraToActiveSketch();
-      } else if (r.selection.kind === "face" && isPlanarFace(r.selection)) {
+      } else if (r.selection.kind === "face" && planarFace(r.selection)) {
         await s.startSketchOnPlane({
           kind: "face",
           face: {
@@ -2106,24 +2073,12 @@ export function ViewportView() {
     }
 
     if (s.mode.name === "dialog") {
-      const picks = DIALOG_PICKS[s.mode.dialog] ?? {};
-      // When a dialog takes both profiles and faces (extrude), clicks pick
-      // profiles; Shift picks faces instead (Ctrl/⌘ is reserved for multi-select).
-      const both = !!picks.profiles && !!(picks.faces || picks.bodies);
-      const wantFace = both && e.shiftKey;
       const r = vp.pick(e.clientX, e.clientY, {
-        profiles: picks.profiles && !wantFace,
-        edges: picks.edges,
-        faces: (picks.faces || picks.bodies) && (!both || wantFace),
-        bodies: picks.bodies && !picks.faces,
-        originPlanes: picks.planes,
-        originAxes: picks.axes,
-        constructionPlanes: picks.planes,
-        sketchEntities: picks.sketchLines,
+        ...dialogPickOptions(s, e.shiftKey),
         depth: toolState.current.pickDepth,
       });
-      const sel = filterDialogPick(r?.selection ?? null, s.mode.dialog);
-      if (repick(sel)) return;
+      if (repick(r?.selection ?? null)) return;
+      const sel = accepted(activeInput(s), r?.selection ?? null, s)[0] ?? null;
       if (
         sel?.kind === "edge" &&
         ["fillet", "chamfer"].includes(s.mode.dialog) &&
@@ -2166,8 +2121,7 @@ export function ViewportView() {
         }
         return;
       }
-      const multi = e.ctrlKey || e.metaKey || e.shiftKey;
-      if (sel) s.toggleSelection(sel, sel.kind !== "profile" || multi);
+      if (sel) pickInto([sel], e.ctrlKey || e.metaKey || e.shiftKey);
       return;
     }
 
@@ -3020,7 +2974,7 @@ export function ViewportView() {
         <ViewportContextMenu
           menu={ctxMenu}
           onClose={() => setCtxMenu(null)}
-          isPlanarFace={isPlanarFace}
+          isPlanarFace={planarFace}
           alignToSketch={alignCameraToActiveSketch}
           onDimension={(entityId, pos) =>
             void openDimensionEditor(entityId, pos)

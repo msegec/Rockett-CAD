@@ -70,12 +70,26 @@ Undo/redo stays inside an existing sketch and returns to Select.
 
 ## Model
 
+### Pick fields
+
+Each input a feature dialog picks, such as Profiles, Body, Split plane or
+Target, is a row. One row is active and shows selected; click a row to make it
+active. Viewport and tree clicks fill the active row only, with what it takes:
+a face click in a body row picks that face's body, and a click on anything the
+row does not take changes nothing. The first empty row is active when the
+dialog opens, and a row that holds one item hands over to the next empty row
+once filled. Rows that need a flat face (Extrude profiles, the Split and
+Mirror planes, construction planes and reference image planes) ignore curved
+faces and do not highlight them. A selection made before opening fills the
+rows by kind. In Extrude, Shift-click picks a face instead of a region.
+
 ### Solid features
 
 - Extrude: new body, join, cut or intersect; symmetric or two-sided; from
   sketch profiles _or_ planar faces.
 - Revolve, sweep, loft, emboss and deboss.
-- Target: join, cut and intersect act on the bodies you choose. Auto picks
+- Target: join, cut and intersect act on the bodies you choose, from the
+  list or by clicking a body with the Target row active. Auto picks
   the bodies the tool meets, again after each edit. Intersect takes one body,
   as does join in older projects; cut and join take several. A chosen body
   stays chosen when upstream features change.
@@ -102,9 +116,10 @@ or chamfer along a smooth contour as required by its native operation.
 - Replicate: mirror, rectangular pattern and circular pattern.
 - Construction: offset planes and midplanes; sketch on any planar face.
 - Origin axes: the model tree's Origin section lists X Axis, Y Axis and Z Axis
-  under the planes. In Revolve and Circular Pattern, clicking an axis row or
-  the axis line drawn at the origin sets the axis, as choosing it in the Axis
-  list does; in Rectangular Pattern it sets the direction. Hiding the origin
+  under the planes. In Revolve and Circular Pattern, with the Axis row
+  active, clicking an axis row or the axis line drawn at the origin sets the
+  axis, as choosing it in the Axis list does; in Rectangular Pattern the
+  Direction edge row takes it as the direction. Hiding the origin
   hides the axis lines too, and they cannot be picked while hidden.
 
 ### Drag handles
@@ -149,7 +164,7 @@ one. Edit the feature to see them under References. Point at a proposed face
 or edge to highlight it, then click Accept to use it as one undo step. An
 ambiguous or missing reference lists its candidates, and matches on other
 bodies, each with Accept. Or click Pick, then click the face or edge in the
-viewport; in extrude, Shift-click a face.
+viewport.
 
 A project made before naming version 2 shows Naming, version 1, in each
 feature's dialog. Upgrade naming backs up the project and lists every body,
