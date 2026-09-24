@@ -1,3 +1,4 @@
+import { Fragment, type ReactNode } from "react";
 import type {
   BodyPayload,
   CadDocument,
@@ -5,13 +6,27 @@ import type {
   EvaluateResult,
   FaceRef,
   Feature,
+  RefCandidate,
   UnresolvedRef,
 } from "@rockett/shared";
-import { previewBodies, useStore, type Selection } from "../store";
+import {
+  previewBodies,
+  selectionKey,
+  useStore,
+  type Selection,
+} from "../store";
 import { dialogTargets } from "../toolTargets";
 import { pickLabel, useHoverPick } from "./form/fields";
 
 type Ref = FaceRef | EdgeRef;
+
+const pickOf = (
+  kind: Ref["kind"],
+  { bodyId, name }: Pick<RefCandidate, "bodyId" | "name">,
+): Selection =>
+  kind === "face"
+    ? { kind, bodyId, faceName: name }
+    : { kind, bodyId, edgeName: name };
 
 function proposed({
   ref,
@@ -19,10 +34,21 @@ function proposed({
   candidates,
 }: UnresolvedRef): Selection | null {
   const to = candidates[0];
-  if (status !== "candidate" || !to) return null;
-  return ref.kind === "face"
-    ? { kind: "face", bodyId: to.bodyId, faceName: to.name }
-    : { kind: "edge", bodyId: to.bodyId, edgeName: to.name };
+  return status === "candidate" && to ? pickOf(ref.kind, to) : null;
+}
+
+function choices({ ref, status, candidates, suggestions }: UnresolvedRef) {
+  if (status === "candidate") return [];
+  return [
+    ...candidates.map((c) => ({
+      pick: pickOf(ref.kind, c),
+      from: `found by ${c.basis}`,
+    })),
+    ...suggestions.map((c) => ({
+      pick: pickOf(ref.kind, c),
+      from: "on another body",
+    })),
+  ];
 }
 
 function note(
@@ -89,11 +115,65 @@ async function accept(fid: string, ref: Ref, to: Selection): Promise<void> {
   s.setMode({ name: "idle" });
 }
 
+export function repick(pick: Selection | null): boolean {
+  const s = useStore.getState();
+  const ref: Ref | undefined = s.dialogParams.repick;
+  const fid = s.mode.name === "dialog" ? s.mode.editFeatureId : undefined;
+  if (!ref || !fid) return false;
+  if (pick?.kind !== ref.kind) return true;
+  s.setDialogParams({ repick: undefined });
+  const name = pick.kind === "face" ? pick.faceName : pick.edgeName;
+  void accept(fid, ref, pickOf(ref.kind, { bodyId: pick.bodyId, name }));
+  return true;
+}
+
+function PickButton({ refFor }: { refFor: Ref }) {
+  const busy = useStore((s) => s.busy);
+  const picking: Ref | undefined = useStore((s) => s.dialogParams.repick);
+  const setParams = useStore((s) => s.setDialogParams);
+  const on = JSON.stringify(picking) === JSON.stringify(refFor);
+  return (
+    <button
+      className="btn"
+      disabled={busy}
+      aria-pressed={on}
+      onClick={() => setParams({ repick: on ? undefined : refFor })}
+    >
+      {on ? "Stop" : "Pick"}
+    </button>
+  );
+}
+
+function RepairRow({
+  text,
+  pick,
+  hover,
+  children,
+}: {
+  text: string;
+  pick: Selection | null;
+  hover: (pick: Selection | null) => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role="listitem"
+      className="measure-row"
+      onMouseEnter={() => hover(pick)}
+      onMouseLeave={() => hover(null)}
+    >
+      <span>{text}</span>
+      {children}
+    </div>
+  );
+}
+
 export function RefRepair() {
   const mode = useStore((s) => s.mode);
   const document = useStore((s) => s.document);
   const evaluation = useStore((s) => s.evaluation);
   const busy = useStore((s) => s.busy);
+  const picking: Ref | undefined = useStore((s) => s.dialogParams.repick);
   const hover = useHoverPick();
   const fid = mode.name === "dialog" ? mode.editFeatureId : undefined;
   const problems = evaluation?.featureStatuses.find(
@@ -103,35 +183,50 @@ export function RefRepair() {
   const bodies = previewBodies({ mode, evaluation });
   const label = (pick: Selection) =>
     pickLabel(pick, document, evaluation, bodies);
+  const acceptButton = (ref: Ref, to: Selection) => (
+    <button
+      className="btn"
+      disabled={busy}
+      aria-label={`Accept ${label(to)}`}
+      onClick={() => void accept(fid, ref, to)}
+    >
+      Accept
+    </button>
+  );
   return (
     <>
       <div className="sel-info">
         <span>References</span>
-        <b>{problems.length} to repair</b>
+        <b>
+          {picking
+            ? `Pick ${picking.kind === "face" ? "a face" : "an edge"} in the viewport`
+            : `${problems.length} to repair`}
+        </b>
       </div>
       <div role="list" aria-label="References">
         {problems.map((problem) => {
           const to = proposed(problem);
+          const key = JSON.stringify(problem.ref);
           return (
-            <div
-              key={JSON.stringify(problem.ref)}
-              role="listitem"
-              className="measure-row"
-              onMouseEnter={() => hover(to)}
-              onMouseLeave={() => hover(null)}
-            >
-              <span>{note(problem, label)}</span>
-              {to && (
-                <button
-                  className="btn"
-                  disabled={busy}
-                  aria-label={`Accept ${label(to)}`}
-                  onClick={() => void accept(fid, problem.ref, to)}
+            <Fragment key={key}>
+              <RepairRow text={note(problem, label)} pick={to} hover={hover}>
+                {to ? (
+                  acceptButton(problem.ref, to)
+                ) : (
+                  <PickButton refFor={problem.ref} />
+                )}
+              </RepairRow>
+              {choices(problem).map(({ pick, from }) => (
+                <RepairRow
+                  key={selectionKey(pick)}
+                  text={`${label(pick)}, ${from}`}
+                  pick={pick}
+                  hover={hover}
                 >
-                  Accept
-                </button>
-              )}
-            </div>
+                  {acceptButton(problem.ref, pick)}
+                </RepairRow>
+              ))}
+            </Fragment>
           );
         })}
       </div>

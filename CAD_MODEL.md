@@ -324,9 +324,8 @@ unchanged.
 - A reference whose face genuinely disappears (e.g. the filleted edge is
   consumed) marks the downstream feature as **error** in the timeline with an
   actionable message; the model up to that feature is preserved. Its edit
-  dialog accepts a single candidate; see
-  [FEATURE_TIMELINE.md](FEATURE_TIMELINE.md). An ambiguous or missing
-  reference is re-selected by hand.
+  dialog accepts a candidate or a suggestion, or re-picks the reference in
+  the viewport; see [FEATURE_TIMELINE.md](FEATURE_TIMELINE.md).
 
 ## Sketches
 

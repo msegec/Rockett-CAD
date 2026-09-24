@@ -81,7 +81,13 @@ the proposed face or edge and its basis, lineage or signature, and pointing at
 it highlights it. Accept writes that face or edge into the feature through the
 normal feature update, one undo step, keeping a tool feature's chosen targets;
 the server signs the new reference. Nothing uses a candidate before Accept.
-Ambiguous and missing rows are re-selected by hand.
+
+An ambiguous or missing row lists each candidate, then each `suggestions`
+entry on another body, one row each with Accept, and pointing at a row
+highlights it. Its Pick button takes the next click in the viewport instead:
+the dialog's pick filter applies, a face or edge of the reference's kind goes
+through the same Accept path, and any other click is ignored. Stop, or
+closing the dialog, ends picking. The dialog's own selection is untouched.
 
 ## Undo/redo is not the timeline
 

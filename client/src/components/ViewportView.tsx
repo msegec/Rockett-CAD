@@ -60,6 +60,7 @@ import { DIALOG_PICKS } from "../dialogPicks";
 import { dimensionLayout } from "../dimensionLayout";
 import { SketchOffsetIndicators } from "./SketchOffsetIndicators";
 import { ViewportContextMenu } from "./ViewportContextMenu";
+import { repick } from "./RefRepair";
 import { dragPreview as livePreview, previewEdit } from "../toolTargets";
 
 interface DimEditField {
@@ -2123,6 +2124,7 @@ export function ViewportView() {
         depth: toolState.current.pickDepth,
       });
       const sel = filterDialogPick(r?.selection ?? null, s.mode.dialog);
+      if (repick(sel)) return;
       if (
         sel?.kind === "edge" &&
         ["fillet", "chamfer"].includes(s.mode.dialog) &&
@@ -2165,8 +2167,6 @@ export function ViewportView() {
         }
         return;
       }
-      // profiles: plain click replaces, Ctrl/⌘/Shift adds or removes (as in
-      // idle mode); edges/faces/bodies keep accumulating without a modifier
       const multi = e.ctrlKey || e.metaKey || e.shiftKey;
       if (sel) s.toggleSelection(sel, sel.kind !== "profile" || multi);
       return;

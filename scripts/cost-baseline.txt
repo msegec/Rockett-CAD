@@ -17,9 +17,9 @@ client/src/components/Toolbar.tsx SketchToolbar 98
 client/src/components/Toolbar.tsx Toolbar 92
 client/src/components/ViewportContextMenu.tsx ViewportContextMenu 137
 client/src/components/ViewportView.tsx 3192
-client/src/components/ViewportView.tsx ViewportView 2952
+client/src/components/ViewportView.tsx ViewportView 2951
 client/src/components/ViewportView.tsx handleHover 147
-client/src/components/ViewportView.tsx handlePrimaryUp 191
+client/src/components/ViewportView.tsx handlePrimaryUp 190
 client/src/components/ViewportView.tsx handleSketchClick 245
 client/src/components/ViewportView.tsx onPointerMove 119
 client/src/components/ViewportView.tsx onPointerUp 86

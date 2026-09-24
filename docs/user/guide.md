@@ -141,7 +141,10 @@ seconds to see the model as it was right after that feature; moving away
 returns to the current model, and nothing is saved or added to undo. Broken
 references are flagged, never silently dropped: the chip's tooltip lists each
 one. Edit the feature to see them under References. Point at a proposed face
-or edge to highlight it, then click Accept to use it as one undo step.
+or edge to highlight it, then click Accept to use it as one undo step. An
+ambiguous or missing reference lists its candidates, and matches on other
+bodies, each with Accept. Or click Pick, then click the face or edge in the
+viewport; in extrude, Shift-click a face.
 [FEATURE_TIMELINE.md](../../FEATURE_TIMELINE.md) covers the semantics.
 
 ## Inspect
