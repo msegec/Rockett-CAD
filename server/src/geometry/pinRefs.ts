@@ -1,26 +1,7 @@
-import {
-  FEATURE_SCHEMAS,
-  MAX_TARGETS,
-  unsignedRefs,
-  type CadDocument,
-  type Feature,
-  type FeatureStatus,
-} from "@rockett/shared";
+import { pinTargets, unsignedRefs, type CadDocument } from "@rockett/shared";
 import type { DocumentEngine } from "./engine.js";
 import type { Sources } from "./importers.js";
 import { signRefs } from "./signature.js";
-
-export function lacksTargets(feature: Feature): boolean {
-  return (
-    !("targets" in feature) &&
-    "targets" in FEATURE_SCHEMAS[feature.type].properties
-  );
-}
-
-export function pinTargets(feature: Feature, { targets }: FeatureStatus) {
-  if (lacksTargets(feature) && targets && targets.length <= MAX_TARGETS)
-    Object.assign(feature, { targets });
-}
 
 export function pinRefs(
   doc: CadDocument,

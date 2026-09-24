@@ -1,4 +1,6 @@
+import type { FeatureStatus } from "./api.js";
 import type { EdgeRef, FaceRef, Feature } from "./model.js";
+import { FEATURE_SCHEMAS, MAX_TARGETS } from "./schema/features.js";
 
 export function topoRefPaths(
   feature: Feature,
@@ -40,6 +42,18 @@ export function unsignedRefs(
     if (sig) ref.sig = sig;
     return !sig;
   });
+}
+
+export function lacksTargets(feature: Feature): boolean {
+  return (
+    !("targets" in feature) &&
+    "targets" in FEATURE_SCHEMAS[feature.type].properties
+  );
+}
+
+export function pinTargets(feature: Feature, { targets }: FeatureStatus) {
+  if (lacksTargets(feature) && targets && targets.length <= MAX_TARGETS)
+    Object.assign(feature, { targets });
 }
 
 export const bodyMadeBy = (featureId: string, bodyId: string) =>

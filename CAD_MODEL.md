@@ -589,8 +589,10 @@ when the version changes.
 
 ### Naming upgrade
 
-`server/src/geometry/upgradeNaming.ts` moves a version 1 document to version
-2 when the user asks, never on load or at boot. Each call first backs up the
+`server/src/store/namingUpgrade.ts` moves a version 1 document to version
+2 when the user asks, never on load or at boot, with the plan from
+`planNamingUpgrade` in `server/src/geometry/upgradeNaming.ts` through the
+`KernelClient`. Each call first backs up the
 complete project directory through the migration backup path, as
 `backups/projects/{id}/naming1-{hash}`; the same files give the same backup.
 `planNamingUpgrade` then pins the document with `pinRefs` under version 1 and

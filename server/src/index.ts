@@ -16,6 +16,7 @@ import { ProjectStore } from "./store/projectStore.js";
 import { validateDocument } from "./api/validate.js";
 import { FolderStore } from "./store/folderStore.js";
 import { LocalStorage } from "./store/storage.js";
+import { InProcessKernel } from "./kernel/client.js";
 import { createApp, scheduleSweep } from "./app.js";
 import { parseAllowedOrigins } from "./auth/origin.js";
 
@@ -65,6 +66,7 @@ async function main() {
   const { app, sweep } = createApp({
     store,
     folders: new FolderStore(storage),
+    kernel: new InProcessKernel(store),
     clientDir,
     allowedOrigins,
   });

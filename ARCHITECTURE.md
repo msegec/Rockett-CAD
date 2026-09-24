@@ -34,9 +34,10 @@ B-Rep model (TopoDS solids, faces, edges, vertices)
 `opencascade.js` (OCCT 8.0.1) runs inside the Node process. This gives a full
 B-Rep kernel (booleans, fillets, shells, sweeps, topology interrogation,
 history tracking) with zero native build complexity in Docker. The runtime
-image is plain `node:24-trixie-slim`. The geometry code is isolated behind
-`server/src/geometry/` so it could later move to a worker thread or separate
-process without touching the API; for a single-user deployment, in-process
+image is plain `node:24-trixie-slim`. The geometry code lives in
+`server/src/geometry/`, and the API reaches it only through the `KernelClient`
+in `server/src/kernel/client.ts`, so it can move to a worker thread without
+touching the routes. `InProcessKernel` is today's implementation; in-process
 evaluation is simple and fast (typical feature evaluation is a few ms; full
 first-load regeneration of a moderate model tens of ms).
 

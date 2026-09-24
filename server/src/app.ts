@@ -12,7 +12,7 @@ import { requireAllowedOrigin } from "./auth/origin.js";
 import type { ProjectStore } from "./store/projectStore.js";
 import type { FolderStore } from "./store/folderStore.js";
 import { ProjectQueue } from "./store/projectQueue.js";
-import { dropEngine } from "./geometry/engine.js";
+import type { KernelClient } from "./kernel/client.js";
 
 const COMPRESSIBLE = /\.(?:js|css|html)$/;
 const gzipAsync = promisify(gzip);
@@ -75,6 +75,7 @@ function serveClient(clientDir: string): Router {
 export interface AppDeps {
   store: ProjectStore;
   folders: FolderStore;
+  kernel: KernelClient;
   clientDir?: string | undefined;
   allowedOrigins: readonly string[];
 }
@@ -82,6 +83,7 @@ export interface AppDeps {
 export function createApp({
   store,
   folders,
+  kernel,
   clientDir,
   allowedOrigins,
 }: AppDeps): { app: Express; sweep: () => Promise<void> } {
@@ -90,14 +92,14 @@ export function createApp({
   app.disable("x-powered-by");
   app.use("/api", requireAllowedOrigin(allowedOrigins));
   app.use("/api", gzipJson);
-  app.use("/api", createApiRouter(store, folders, projects));
+  app.use("/api", createApiRouter(store, folders, projects, {}, kernel));
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Not found" });
   });
   if (clientDir) app.use(serveClient(clientDir));
   const sweep = async () => {
     for (const id of await store.temporaryIds())
-      if (await projects.run(id, () => store.expire(id))) dropEngine(id);
+      if (await projects.run(id, () => store.expire(id))) kernel.drop(id);
   };
   return { app, sweep };
 }

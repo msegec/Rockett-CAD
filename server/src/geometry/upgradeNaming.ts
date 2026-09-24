@@ -10,11 +10,8 @@ import {
   type NamingDecision,
   type NamingMapping,
   type NamingTarget,
-  type NamingUpgradeProposal,
   type Vec3,
 } from "@rockett/shared";
-import { backupNamespace } from "../store/jsonStore.js";
-import { StoreError, type ProjectStore } from "../store/projectStore.js";
 import { dropEngine, engineFor } from "./engine.js";
 import type { Sources } from "./importers.js";
 import { faces, getKernel, release, scoped, type Shape } from "./kernel.js";
@@ -35,7 +32,6 @@ type Decide = (
   found: Found,
 ) => NamingTarget | undefined;
 
-const BACKUP = "naming1";
 const SUFFIX = /~\??\d+/g;
 const FALLBACK = /:x\d+$/;
 const EDGE = /^e\[(.*)\]$/;
@@ -424,58 +420,4 @@ export function planNamingUpgrade(
   } finally {
     dropEngine(scratch);
   }
-}
-
-function backupOf(store: ProjectStore, id: string) {
-  return backupNamespace(
-    store.documents.options.storage,
-    store.documents.dir(id),
-  );
-}
-
-async function staged(
-  store: ProjectStore,
-  doc: CadDocument,
-  accept: NamingDecision[] = [],
-) {
-  if (doc.namingVersion !== 1)
-    throw new StoreError(
-      `project ${doc.id} already uses naming version ${doc.namingVersion}`,
-      "conflict",
-    );
-  const backup = await backupOf(store, doc.id).backup(BACKUP);
-  const sources = await store.sources(doc, engineFor(doc.id).sources);
-  return { backup, ...planNamingUpgrade(doc, sources, accept) };
-}
-
-export async function stageNamingUpgrade(
-  store: ProjectStore,
-  doc: CadDocument,
-  accept?: NamingDecision[],
-): Promise<NamingUpgradeProposal> {
-  const { backup, mappings } = await staged(store, doc, accept);
-  return { backup, revision: doc.revision, mappings };
-}
-
-export async function acceptedNamingUpgrade(
-  store: ProjectStore,
-  doc: CadDocument,
-  accept?: NamingDecision[],
-) {
-  const plan = await staged(store, doc, accept);
-  const open = plan.mappings.filter((m) => !m.to && m.status !== "missing");
-  if (open.length)
-    throw new StoreError(
-      `${open.length} references have no proven mapping; accept one for each before the upgrade`,
-      "conflict",
-    );
-  return plan;
-}
-
-export async function namingUpgraded(
-  store: ProjectStore,
-  id: string,
-): Promise<boolean> {
-  const names = await backupOf(store, id).names();
-  return names.some((name) => name.startsWith(`${BACKUP}-`));
 }
