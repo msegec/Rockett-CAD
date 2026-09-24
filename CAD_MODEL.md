@@ -253,8 +253,9 @@ name: a `RefSignature` of type, point and direction. A face gives its surface
 type, its centroid and the normal at its UV midpoint, flipped with a reversed
 face. An edge gives its curve type, the point at its middle parameter and the
 unit tangent there, in the curve's own direction. A stored face or edge
-reference may carry one as `sig` (schema 14). Evaluation reads it only to
-propose repair candidates; see Resolution.
+reference may carry one as `sig` (schema 14). Evaluation reads it to
+propose repair candidates and, under version 2, to catch a name that now
+sits on a renumbered sibling; see Resolution.
 
 An import has no history, so under `namingVersion` 2 `geometryNames` names
 each imported face from its signature: `{surface}` is the signature type and
@@ -277,6 +278,14 @@ references against a state's bodies into `resolved`, `candidate`,
 
 - A reference whose body still bears its name is `resolved`, however far the
   face or edge moved since its `sig` was taken. A `~?n` name never resolves.
+- Under version 2 a named face or edge that no longer matches its stored
+  `sig` (same type, direction within `UNIT_DOT_TOL`, point within
+  `LINEAR_TOL`) is checked against its name family: the faces or edges on any
+  body whose names read the same with every `~n` and `~?n` suffix removed.
+  Family members that match the `sig` make it a `candidate`, or `ambiguous`
+  for several, so a renumbered split piece or duplicate is reported, not
+  followed. With no match it stays `resolved`, since only its own geometry
+  moved.
 - Otherwise lineage decides: names on the referenced body that descend from
   the reference or that it descends from, read through `~n` suffixes, `~?n`
   ties and, for edges, each adjacent face name. One is a `candidate`, several
@@ -284,8 +293,9 @@ references against a state's bodies into `resolved`, `candidate`,
 - With no lineage, the stored `sig` proposes faces or edges of the referenced
   body with the same type and a direction within `UNIT_DOT_TOL`; the nearest
   point wins, and matches equally near within `LINEAR_TOL` are `ambiguous`.
-- Other bodies are never searched by signature. Lineage names on them are
-  returned as `suggestions`, which only a user repair may accept.
+- Other bodies are searched by signature only for that name family. Lineage
+  names on them are returned as `suggestions`, which only a user repair may
+  accept.
 
 Candidates are ordered by body id and name with `compareNames`, never by
 kernel order.
@@ -321,8 +331,12 @@ unchanged.
   coordinate moves across a rounding threshold.
 - Split pieces renumber too. Under version 2, when the first of three
   identical pieces of a cut disappears, the survivors become `b:x` and
-  `b:x:2` and their `~n` suffixes shift, so a fillet saved on `b:x:2` still
-  resolves and silently moves to the piece that was `b:x:3`.
+  `b:x:2` and their `~n` suffixes shift, so a fillet saved on `b:x:2` names
+  the piece that was `b:x:3`. Its `sig` still matches the piece that is now
+  `b:x`, so it is a `candidate` for that piece (see Resolution). A reference
+  without a `sig`, or whose `sig` was taken before an upstream edit moved
+  the piece, has nothing to match and still moves silently, under version 1
+  always.
 - A feature fails without blocking the features after it when its failure
   is not a reference: a fillet whose radius is too large leaves its body as
   it was, and later features build on that body.
@@ -636,9 +650,9 @@ state before that feature. An updated reference keeps the `sig` it had when
 the patch names the same body and face or edge without one, and a `sig` sent
 with a reference is kept. A reference that does not resolve there, or whose
 signature is not finite, stays without one. A `sig` only proposes candidates
-(see Resolution), so a reference without one evaluates as before. The 13 to 14
-migration changes nothing but the version, and the project is backed up
-before its first save.
+or turns a renumbered name into one (see Resolution), so a reference without
+one evaluates as before. The 13 to 14 migration changes nothing but the
+version, and the project is backed up before its first save.
 
 ## Tool targets (schema 15)
 

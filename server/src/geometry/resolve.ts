@@ -11,7 +11,12 @@ import {
   type UnresolvedRef,
 } from "@rockett/shared";
 import { faces, release, type Shape } from "./kernel.js";
-import { compareNames, computeEdgeNames, type NamedBody } from "./naming.js";
+import {
+  compareNames,
+  computeEdgeNames,
+  namingVersion,
+  type NamedBody,
+} from "./naming.js";
 import type { EvalState, FeatureOutcome } from "./features.js";
 import { edgeSignature, faceSignature } from "./signature.js";
 
@@ -24,6 +29,8 @@ const nameOf = (ref: Ref) =>
   ref.kind === "face" ? ref.faceName : ref.edgeName;
 
 const untie = (name: string) => name.replace(/~\?\d+/g, "");
+
+const stem = (name: string) => name.replace(/~\??\d+/g, "");
 
 const within = (a: string, b: string) =>
   a === b || a.startsWith(`${b}~`) || b.startsWith(`${a}~`);
@@ -114,6 +121,11 @@ function aligned(kind: Kind, a: RefSignature, b: RefSignature): boolean {
   return (kind === "edge" ? Math.abs(dot) : dot) >= 1 - UNIT_DOT_TOL;
 }
 
+function gap(kind: Kind, found: RefSignature, sig: RefSignature): number {
+  if (found.type !== sig.type || !aligned(kind, found, sig)) return Infinity;
+  return Math.hypot(...found.point.map((x, i) => x - sig.point[i]!));
+}
+
 function nearest(
   topology: Topology,
   body: NamedBody,
@@ -121,10 +133,8 @@ function nearest(
   sig: RefSignature,
 ): RefCandidate[] {
   const matches = [...topology.of(body, kind)].flatMap(([name, shape]) => {
-    const found = topology.signature(kind, shape);
-    if (found.type !== sig.type || !aligned(kind, found, sig)) return [];
-    const gap = Math.hypot(...found.point.map((x, i) => x - sig.point[i]!));
-    return [{ name, gap }];
+    const distance = gap(kind, topology.signature(kind, shape), sig);
+    return distance === Infinity ? [] : [{ name, gap: distance }];
   });
   const best = Math.min(...matches.map((m) => m.gap));
   return matches
@@ -152,6 +162,32 @@ function suggestions(
   return found;
 }
 
+function renumbered(
+  topology: Topology,
+  bodies: ReadonlyMap<string, NamedBody>,
+  ref: Ref,
+  shape: Shape,
+): RefCandidate[] {
+  const { kind, sig } = ref;
+  if (!sig || namingVersion() === 1) return [];
+  if (gap(kind, topology.signature(kind, shape), sig) <= LINEAR_TOL) return [];
+  const family = stem(nameOf(ref));
+  const parts = new Set(faceParts(kind, family));
+  return [...bodies.values()]
+    .filter((body) =>
+      [...body.names.values()].some((face) => parts.has(stem(face))),
+    )
+    .flatMap((body) =>
+      [...topology.of(body, kind)]
+        .filter(
+          ([name, other]) =>
+            related(kind, stem(name), family) &&
+            gap(kind, topology.signature(kind, other), sig) <= LINEAR_TOL,
+        )
+        .map(([name]) => ({ bodyId: body.bodyId, name, basis: "signature" })),
+    );
+}
+
 function resolveRef(
   topology: Topology,
   bodies: ReadonlyMap<string, NamedBody>,
@@ -159,9 +195,14 @@ function resolveRef(
 ): RefResolution {
   const name = nameOf(ref);
   const body = bodies.get(ref.bodyId);
-  if (body && !name.includes("~?") && topology.of(body, ref.kind).has(name))
-    return { status: "resolved" };
-  const lineal = body ? lineage(topology, body, ref.kind, name) : [];
+  const named =
+    body && !name.includes("~?")
+      ? topology.of(body, ref.kind).get(name)
+      : undefined;
+  const moved = named ? renumbered(topology, bodies, ref, named) : [];
+  if (named && moved.length === 0) return { status: "resolved" };
+  const lineal =
+    moved.length > 0 || !body ? moved : lineage(topology, body, ref.kind, name);
   const candidates =
     lineal.length === 0 && body && ref.sig
       ? nearest(topology, body, ref.kind, ref.sig)
