@@ -228,9 +228,11 @@ export class ProjectStore {
   }
 
   async save(doc: CadDocument, write?: Write): Promise<void> {
-    const snapshot = structuredClone(doc);
-    snapshot.modifiedAt = new Date().toISOString();
-    snapshot.savedWith = build();
+    const snapshot = {
+      ...doc,
+      modifiedAt: new Date().toISOString(),
+      savedWith: build(),
+    };
     const next = (previous?: Partial<CadDocument>) => {
       snapshot.revision = (previous?.revision ?? 0) + 1;
       return snapshot;

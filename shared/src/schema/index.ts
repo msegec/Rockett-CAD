@@ -1,4 +1,5 @@
 import type { Static, TSchema } from "typebox";
+import { Compile, type Validator } from "typebox/compile";
 import { Value } from "typebox/value";
 
 export class ValidationError extends Error {
@@ -11,8 +12,16 @@ export class ValidationError extends Error {
   }
 }
 
+const compiled = new WeakMap<TSchema, Validator>();
+
+function validator(schema: TSchema): Validator {
+  let found = compiled.get(schema);
+  if (!found) compiled.set(schema, (found = Compile(schema)));
+  return found;
+}
+
 export function parse<S extends TSchema>(schema: S, value: unknown): Static<S> {
-  if (Value.Check(schema, value)) return value;
+  if (validator(schema).Check(value)) return value as Static<S>;
   const errors = Value.Errors(schema, value);
   const error =
     errors.find((e) => !e.schemaPath.includes("/anyOf/")) ?? errors[0];
