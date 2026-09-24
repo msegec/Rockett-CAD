@@ -294,6 +294,18 @@ export function SelInfo({
   const mode = useStore((s) => s.mode);
   const bodies = previewBodies({ mode, evaluation });
   const setHover = useStore((s) => s.setHover);
+  const hovered = useRef<Selection | null>(null);
+  const hover = (pick: Selection | null) => {
+    hovered.current = pick;
+    setHover(pick);
+  };
+  useEffect(
+    () => () => {
+      const s = useStore.getState();
+      if (hovered.current && s.hover === hovered.current) s.setHover(null);
+    },
+    [],
+  );
   const remove = (gone: Selection[]) => {
     const keys = new Set(gone.map(selectionKey));
     const s = useStore.getState();
@@ -315,8 +327,8 @@ export function SelInfo({
                 key={selectionKey(pick)}
                 role="listitem"
                 className="measure-row"
-                onMouseEnter={() => setHover(pick)}
-                onMouseLeave={() => setHover(null)}
+                onMouseEnter={() => hover(pick)}
+                onMouseLeave={() => hover(null)}
               >
                 <span>{name}</span>
                 <button
