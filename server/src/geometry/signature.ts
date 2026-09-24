@@ -1,6 +1,7 @@
 import type { EdgeRef, FaceRef, RefSignature } from "@rockett/shared";
 import {
   faceCentroid,
+  faces,
   getKernel,
   pnt,
   release,
@@ -8,7 +9,16 @@ import {
   vec,
   type Shape,
 } from "./kernel.js";
-import { computeEdgeNames, findFace, type NamedBody } from "./naming.js";
+import {
+  cell,
+  computeEdgeNames,
+  finalizeNames,
+  findFace,
+  type NameMap,
+  type NamedBody,
+} from "./naming.js";
+import { ShapeMap } from "./shapeMap.js";
+import { sha256 } from "../store/jsonStore.js";
 import { curveInfo, surfaceType } from "./tessellate.js";
 
 type Vec = RefSignature["direction"];
@@ -102,4 +112,21 @@ export function signRefs(
   } finally {
     for (const named of edges.values()) release(named.values());
   }
+}
+
+export function geometryNames(shape: Shape, featureId: string): NameMap {
+  const provisional = new ShapeMap<string>();
+  const shapeFaces = faces(shape);
+  try {
+    for (const face of shapeFaces) {
+      const sig = faceSignature(face);
+      const key = sha256(
+        JSON.stringify([cell(sig.point), cell(sig.direction)]),
+      ).slice(0, 16);
+      provisional.set(face, `f:${featureId}:g:${sig.type}:${key}`);
+    }
+  } finally {
+    release(shapeFaces);
+  }
+  return finalizeNames(shape, provisional, featureId);
 }

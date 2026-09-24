@@ -142,6 +142,7 @@ created and _propagated_ through later operations:
 | Fillet/chamfer face generated from an edge              | `f:{featureId}:fe:{n}`                                             |
 | Press/pull moved face, under `namingVersion` 2          | the source face's name                                             |
 | Mirrored / patterned copy                               | `m:{featureId}:{originalName}` / `p{i}:{featureId}:{originalName}` |
+| STEP, IGES or BREP import face, under `namingVersion` 2 | `f:{featureId}:g:{surface}:{key}` (see Signatures)                 |
 | Anything the history cannot attribute                   | `f:{featureId}:x{n}` (deterministic centroid order)                |
 
 Propagation uses the kernel's own history API. For every boolean, fillet,
@@ -250,6 +251,19 @@ type, its centroid and the normal at its UV midpoint, flipped with a reversed
 face. An edge gives its curve type, the point at its middle parameter and the
 unit tangent there, in the curve's own direction. A stored face or edge
 reference may carry one as `sig` (schema 14); evaluation never reads it yet.
+
+An import has no history, so under `namingVersion` 2 `geometryNames` names
+each imported face from its signature: `{surface}` is the signature type and
+`{key}` the first 16 hex digits of the sha256 of its point and direction,
+each coordinate rounded to a multiple of `LINEAR_TOL` as the `~n` sort does.
+The same file imported twice, or with another solid added, names a solid's
+faces the same. Only faces with equal keys get a suffix, and since equal keys
+mean equal rounded centroids, that suffix is always `~?n`: coincident faces
+of coincident solids stay visibly ambiguous. The names do not include the
+blob hash, which the feature already holds, and no STEP entity id feeds them:
+the kernel build binds no transfer map from shapes back to source entities.
+Under version 1 an import keeps `x{n}` names. Mesh imports keep `x{n}` names
+under both versions.
 
 ### Known limitations
 

@@ -87,6 +87,7 @@ import {
   offsetFrame,
   uvTo3d,
 } from "./frames.js";
+import { geometryNames } from "./signature.js";
 import { curveInfo } from "./tessellate.js";
 import { tangentEdges } from "./tangentEdges.js";
 import { readImport, readMesh, type Sources } from "./importers.js";
@@ -2084,7 +2085,9 @@ export function evaluateFeature(
         state,
         `b:${feature.id}`,
         shape,
-        finalizeNames(shape, new ShapeMap(), feature.id),
+        namingVersion() === 1
+          ? finalizeNames(shape, new ShapeMap(), feature.id)
+          : geometryNames(shape, feature.id),
       );
       return;
     }
