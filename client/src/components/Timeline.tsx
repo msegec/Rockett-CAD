@@ -17,7 +17,7 @@ import { useTimelinePeek } from "../timelinePeek";
 import { featureBodies } from "../treeSelection";
 import { alignCameraToActiveSketch } from "../viewportRef";
 import { ContextMenu } from "./ContextMenu";
-import { refNotes } from "./RefRepair";
+import { refNotes, useNamingUpgradePanel } from "./RefRepair";
 import { QuickEdit, quickValues } from "./QuickEdit";
 
 const TYPE_ICONS: Record<string, string> = {
@@ -121,6 +121,7 @@ export function Timeline() {
     value: string;
   } | null>(null);
   const peek = useTimelinePeek(quick !== null);
+  const upgrade = useNamingUpgradePanel();
 
   if (!document_) return null;
   const pos =
@@ -263,9 +264,11 @@ export function Timeline() {
               action: () =>
                 void useStore.getState().deleteFeature(menu.feature.id),
             },
+            ...upgrade.items(menu.x, menu.y),
           ]}
         />
       )}
+      {upgrade.panel}
       {quick && (
         <QuickEdit
           feature={quick.feature}

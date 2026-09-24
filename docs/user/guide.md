@@ -177,11 +177,13 @@ bodies, each with Accept. Or click Pick, then click the face or edge in the
 viewport.
 
 A project made before naming version 2 shows Naming, version 1, in each
-feature's dialog. Upgrade naming backs up the project and lists every body,
-face and edge reference with its new name: proven, candidate, ambiguous or
-missing. Accept one choice for each candidate and ambiguous reference, then
-Apply upgrade saves the project on version 2 as one undo step. A missing
-reference stays broken until you repair it. Undo returns to version 1.
+feature's dialog. Right-click any timeline chip and choose Upgrade naming… to
+open the same section on its own. Upgrade naming backs up the project and
+lists every body, face and edge reference with its new name: proven,
+candidate, ambiguous or missing. Accept one choice for each candidate and
+ambiguous reference, then Apply upgrade saves the project on version 2 as one
+undo step. A missing reference stays broken until you repair it. Undo returns
+to version 1.
 [FEATURE_TIMELINE.md](../../FEATURE_TIMELINE.md) covers the semantics.
 
 ## Inspect

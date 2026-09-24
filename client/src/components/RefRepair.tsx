@@ -22,6 +22,9 @@ import {
   type Selection,
 } from "../store";
 import { dialogTargets } from "../toolTargets";
+import type { MenuItem } from "./ContextMenu";
+import { DraggablePanel } from "./DraggablePanel";
+import { DialogFooter } from "./form/DialogFooter";
 import { pickLabel, useHoverPick } from "./form/fields";
 
 type Ref = FaceRef | EdgeRef;
@@ -446,4 +449,33 @@ export function RefRepair() {
       )}
     </>
   );
+}
+
+export function useNamingUpgradePanel() {
+  const document = useStore((s) => s.document);
+  const [at, setAt] = useState<{ id: string; x: number; y: number } | null>(
+    null,
+  );
+  const version1 = document?.namingVersion === 1 ? document : null;
+  const shown = at && at.id === version1?.id ? at : null;
+  if (at && !shown) setAt(null);
+  return {
+    items: (x: number, y: number): MenuItem[] =>
+      version1
+        ? [
+            {
+              label: "Upgrade naming…",
+              action: () => setAt({ id: version1.id, x, y }),
+            },
+          ]
+        : [],
+    panel: shown && version1 && (
+      <DraggablePanel title="Upgrade naming" at={shown}>
+        <div className="dialog-body">
+          <NamingUpgrade id={version1.id} revision={version1.revision} />
+        </div>
+        <DialogFooter onCancel={() => setAt(null)} />
+      </DraggablePanel>
+    ),
+  };
 }
