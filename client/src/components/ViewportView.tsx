@@ -2089,7 +2089,7 @@ export function ViewportView() {
           const response = await api.tangentEdges(
             s.projectId,
             sel,
-            s.mode.editFeatureId,
+            previewedFeature(s)?.id,
           );
           const current = useStore.getState();
           if (
