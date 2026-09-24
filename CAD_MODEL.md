@@ -323,8 +323,10 @@ unchanged.
   it was, and later features build on that body.
 - A reference whose face genuinely disappears (e.g. the filleted edge is
   consumed) marks the downstream feature as **error** in the timeline with an
-  actionable message; the model up to that feature is preserved. A repair UI
-  (re-pick reference) is on the roadmap.
+  actionable message; the model up to that feature is preserved. Its edit
+  dialog accepts a single candidate; see
+  [FEATURE_TIMELINE.md](FEATURE_TIMELINE.md). An ambiguous or missing
+  reference is re-selected by hand.
 
 ## Sketches
 

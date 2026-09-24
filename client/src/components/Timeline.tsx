@@ -1,5 +1,10 @@
 import { useState } from "react";
-import type { Feature } from "@rockett/shared";
+import type {
+  CadDocument,
+  EvaluateResult,
+  Feature,
+  FeatureStatus,
+} from "@rockett/shared";
 import {
   useStore,
   sketchEditingPosition,
@@ -9,6 +14,7 @@ import {
 import { useTimelinePeek } from "../timelinePeek";
 import { alignCameraToActiveSketch } from "../viewportRef";
 import { ContextMenu } from "./ContextMenu";
+import { refNotes } from "./RefRepair";
 import { QuickEdit, quickValues } from "./QuickEdit";
 
 const TYPE_ICONS: Record<string, string> = {
@@ -33,6 +39,22 @@ const TYPE_ICONS: Record<string, string> = {
   emboss: "℘",
   move: "✥",
 };
+
+function chipTitle(
+  f: Feature,
+  st: FeatureStatus | undefined,
+  document: CadDocument,
+  evaluation: EvaluateResult | null,
+): string {
+  const notes = st?.refs?.length
+    ? refNotes(st.refs, document, evaluation, evaluation?.bodies ?? [])
+    : [st?.error || st?.warning].filter(Boolean);
+  return [
+    `${f.name} (${f.type})`,
+    ...notes.map((n) => `⚠ ${n}`),
+    ...(f.suppressed ? ["(suppressed)"] : []),
+  ].join("\n");
+}
 
 export function Timeline() {
   const document_ = useStore((s) => s.document);
@@ -118,7 +140,7 @@ export function Timeline() {
             <span key={f.id} style={{ display: "contents" }}>
               <div
                 className={cls}
-                title={`${f.name} (${f.type})${st?.error || st?.warning ? `\n⚠ ${st.error ?? st.warning}` : ""}${f.suppressed ? "\n(suppressed)" : ""}`}
+                title={chipTitle(f, st, document_, evaluation)}
                 onDoubleClick={() => openEditor(f)}
                 onMouseEnter={() => peek.enter(f.id)}
                 onMouseLeave={peek.leave}

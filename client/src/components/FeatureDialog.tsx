@@ -27,6 +27,8 @@ import { createLivePreview } from "../livePreview";
 import { toolTargets } from "../toolTargets";
 import { viewportHandle } from "../viewportRef";
 import { DraggablePanel } from "./DraggablePanel";
+import { ImportPanel } from "./ImportPanel";
+import { RefRepair } from "./RefRepair";
 import {
   AngleField,
   AxisField,
@@ -258,29 +260,7 @@ function DialogBody({
 
   switch (dialog) {
     case "importStep": {
-      const feature = document_?.features.find((f) => f.id === editId);
-      const mesh = feature?.type === "importMesh";
-      panel = (
-        <DraggablePanel title={mesh ? "Imported mesh" : "Imported STEP"}>
-          <div className="dialog-body">
-            <p>
-              {feature?.type === "importStep" || mesh
-                ? feature.filename
-                : "STEP import"}
-            </p>
-            <p>
-              Imported solid bodies are the starting geometry. Add sketches,
-              cuts, fillets, and other features to modify them.
-            </p>
-            <p>
-              {mesh
-                ? "A mesh imports as flat triangular faces. It is not parametric."
-                : "The originating CAD program’s sketches and feature history are not included in STEP files."}
-            </p>
-          </div>
-          <DialogFooter onCancel={close} cancelLabel="Close" escapeAnywhere />
-        </DraggablePanel>
-      );
+      panel = <ImportPanel editId={editId} onClose={close} />;
       break;
     }
     case "extrude": {
@@ -1010,7 +990,10 @@ function DialogBody({
 
   return (
     <DraggablePanel title={title}>
-      <div className="dialog-body">{body}</div>
+      <div className="dialog-body">
+        <RefRepair />
+        {body}
+      </div>
       <DialogFooter
         onOk={() => void ok()}
         onCancel={close}

@@ -72,8 +72,16 @@ feature is marked in the timeline:
 The model is **never silently corrupted**: the failed feature contributes
 nothing, the pre-failure state carries forward, and the error text names the
 missing reference. Fixing the upstream edit (or editing the failed feature to
-re-select) clears the error. A guided "repair reference" flow is on the
-roadmap.
+re-select) clears the error.
+
+When the feature's status carries `refs`, the chip's tooltip lists each one
+as candidate, ambiguous or missing instead of the raw error. The edit dialog
+opens with a References section, one row per reference. A candidate row names
+the proposed face or edge and its basis, lineage or signature, and pointing at
+it highlights it. Accept writes that face or edge into the feature through the
+normal feature update, one undo step, keeping a tool feature's chosen targets;
+the server signs the new reference. Nothing uses a candidate before Accept.
+Ambiguous and missing rows are re-selected by hand.
 
 ## Undo/redo is not the timeline
 

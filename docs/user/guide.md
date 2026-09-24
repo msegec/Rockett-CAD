@@ -139,7 +139,9 @@ chip. The model previews as you type; Enter keeps the change as one undo step
 and Escape or clicking away reverts it. Rest the pointer on a chip for 0.3
 seconds to see the model as it was right after that feature; moving away
 returns to the current model, and nothing is saved or added to undo. Broken
-references are flagged, never silently dropped.
+references are flagged, never silently dropped: the chip's tooltip lists each
+one. Edit the feature to see them under References. Point at a proposed face
+or edge to highlight it, then click Accept to use it as one undo step.
 [FEATURE_TIMELINE.md](../../FEATURE_TIMELINE.md) covers the semantics.
 
 ## Inspect

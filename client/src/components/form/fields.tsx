@@ -249,7 +249,7 @@ function ranked<T extends object>(
   return made;
 }
 
-function pickLabel(
+export function pickLabel(
   pick: Selection,
   document: CadDocument | null,
   evaluation: EvaluateResult | null,
@@ -312,6 +312,22 @@ function pickLabel(
   return numbered(kind[0]!.toUpperCase() + kind.slice(1), entity.rank, sketch);
 }
 
+export function useHoverPick(): (pick: Selection | null) => void {
+  const setHover = useStore((s) => s.setHover);
+  const hovered = useRef<Selection | null>(null);
+  useEffect(
+    () => () => {
+      const s = useStore.getState();
+      if (hovered.current && s.hover === hovered.current) s.setHover(null);
+    },
+    [],
+  );
+  return (pick) => {
+    hovered.current = pick;
+    setHover(pick);
+  };
+}
+
 function PickRows({
   label,
   rows,
@@ -321,22 +337,10 @@ function PickRows({
   rows: { key: string; name: string; pick: Selection }[];
   onRemove: (keys: string[]) => void;
 }) {
-  const setHover = useStore((s) => s.setHover);
-  const hovered = useRef<Selection | null>(null);
-  const hover = (pick: Selection | null) => {
-    hovered.current = pick;
-    setHover(pick);
-  };
-  useEffect(
-    () => () => {
-      const s = useStore.getState();
-      if (hovered.current && s.hover === hovered.current) s.setHover(null);
-    },
-    [],
-  );
+  const hover = useHoverPick();
   const remove = (keys: string[]) => {
     onRemove(keys);
-    setHover(null);
+    hover(null);
   };
   if (rows.length === 0) return null;
   return (

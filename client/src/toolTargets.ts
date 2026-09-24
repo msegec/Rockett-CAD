@@ -24,12 +24,16 @@ export function toolTargets(
   return ids.length > 0 ? { targets: ids } : {};
 }
 
-export function previewEdit(fid: string, patch: object): Promise<void> {
+export function dialogTargets(): { targets?: string[] } {
   const s = useStore.getState();
   const { operation = "join", targets } = s.dialogParams;
-  return s.updateFeaturePreview(fid, {
+  return toolTargets(operation, targets, s.document?.namingVersion);
+}
+
+export function previewEdit(fid: string, patch: object): Promise<void> {
+  return useStore.getState().updateFeaturePreview(fid, {
     ...patch,
-    ...toolTargets(operation, targets, s.document?.namingVersion),
+    ...dialogTargets(),
   } as Partial<Feature>);
 }
 
