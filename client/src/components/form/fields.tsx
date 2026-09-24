@@ -1,13 +1,19 @@
 import {
   fromMm,
   toMm,
+  type BodyPayload,
   type CadDocument,
   type EvaluateResult,
   type SketchFeature,
   type Units,
 } from "@rockett/shared";
 import { useEffect, useRef, useState } from "react";
-import { selectionKey, useStore, type Selection } from "../../store";
+import {
+  previewBodies,
+  selectionKey,
+  useStore,
+  type Selection,
+} from "../../store";
 
 export function NumField({
   label,
@@ -223,6 +229,7 @@ function pickLabel(
   pick: Selection,
   document: CadDocument | null,
   evaluation: EvaluateResult | null,
+  bodies: BodyPayload[],
 ): string {
   const featureName = (id: string) =>
     document?.features.find((f) => f.id === id)?.name;
@@ -231,10 +238,10 @@ function pickLabel(
     if (ref.kind === "origin") return `${ref.plane} Plane`;
     if (ref.kind === "construction")
       return featureName(ref.featureId) ?? "Plane";
-    return pickLabel(ref.face, document, evaluation);
+    return pickLabel(ref.face, document, evaluation, bodies);
   }
   if ("bodyId" in pick) {
-    const body = evaluation?.bodies.find((b) => b.bodyId === pick.bodyId);
+    const body = bodies.find((b) => b.bodyId === pick.bodyId);
     if (pick.kind === "body") return body?.name ?? "Body";
     const [kind, list, name] =
       pick.kind === "face"
@@ -284,6 +291,8 @@ export function SelInfo({
 }) {
   const document = useStore((s) => s.document);
   const evaluation = useStore((s) => s.evaluation);
+  const mode = useStore((s) => s.mode);
+  const bodies = previewBodies({ mode, evaluation });
   const setHover = useStore((s) => s.setHover);
   const remove = (gone: Selection[]) => {
     const keys = new Set(gone.map(selectionKey));
@@ -300,7 +309,7 @@ export function SelInfo({
       {picks.length > 0 && (
         <div role="list" aria-label={label}>
           {picks.map((pick) => {
-            const name = pickLabel(pick, document, evaluation);
+            const name = pickLabel(pick, document, evaluation, bodies);
             return (
               <div
                 key={selectionKey(pick)}
