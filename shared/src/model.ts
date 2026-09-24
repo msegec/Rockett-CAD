@@ -195,8 +195,6 @@ export interface SketchFeature extends FeatureBase {
   constraints: SketchConstraint[];
   /** Editable offset operations, in creation order. */
   offsets?: SketchOffset[];
-  /** false hides the sketch in the viewport (regions not shaded or pickable). */
-  visible?: boolean;
 }
 
 export interface SketchOffset {
@@ -354,7 +352,6 @@ export interface ReferenceImageFeature extends FeatureBase {
     scale: number;
   };
   opacity: number; // 0..1
-  visible?: boolean;
   /** Natural image size in pixels (for aspect + calibration). */
   width: number;
   height: number;

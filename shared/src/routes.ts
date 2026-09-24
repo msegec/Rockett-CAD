@@ -225,16 +225,16 @@ export const ROUTES = {
       beforeFeatureId: Type.Optional(Type.String()),
     }),
   ),
-  updateBody: route<
-    { name?: string; visible?: boolean } & HeldMeshes,
-    WireMutationResponse
-  >()(
+  updateBody: route<{ name?: string } & HeldMeshes, WireMutationResponse>()(
     "PUT",
     "/projects/:id/bodies/:bodyId",
-    Type.Object({
-      name: Type.Optional(Type.String()),
-      visible: Type.Optional(Type.Boolean()),
-    }),
+    Type.Object(
+      {
+        name: Type.Optional(Type.String()),
+        held: Type.Optional(Type.Array(Type.String())),
+      },
+      { additionalProperties: false },
+    ),
   ),
   updateGroups: route<
     { groups: TreeGroup[] } & HeldMeshes,

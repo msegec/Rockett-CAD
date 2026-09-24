@@ -31,14 +31,14 @@ statuses, solved sketches with profiles, construction-plane frames). The
 server persists on every mutation (autosave).
 
 Each body carries `meshKey`, a SHA-256 of its mesh, faces, edges, vertices
-and bbox, without its name or visibility. The client keeps a body's viewport
+and bbox, without its name. The client keeps a body's viewport
 objects while its key is unchanged. A JSON response of 64 KiB or more is
 gzipped when the request accepts gzip.
 
 A mutating request with a JSON body, `POST /projects/:id/evaluate` and
 `DELETE /projects/:id/features/:fid` may carry `held`, the `meshKey`s the
 client already holds (`HeldMeshes`). A body whose key is in `held` comes back as `HeldBodyPayload`,
-`{ bodyId, name, visible, meshKey }`, with no mesh, faces, edges, vertices or
+`{ bodyId, name, meshKey }`, with no mesh, faces, edges, vertices or
 bbox; every other body comes in full (`WireEvaluateResult`). Without `held`
 every body comes in full. A `held` that is not an array of strings is 400
 `validation` with detail `/held` or `/held/N`. `client/src/api.ts` sends the
@@ -127,9 +127,10 @@ the document and decode from base64, and its bytes must hash to its key. An
 image asset also passes the image upload rules. Every referenced asset must be
 present. A file from before schema 9 may key its images by their old
 `<16hex>.<ext>` ids and may hold STEP sources inline; migration hashes both
-and rekeys them. Any `visible` flag the file carries, on a body in
-`bodyMeta` or on a sketch or reference image, moves to the new project's
-`view.json`, whatever the file's schema, so the stored document holds none.
+and rekeys them. The stored document holds no `visible` flag. Flags a file
+from schema 10 or earlier, or at the current schema, carries on a body in
+`bodyMeta` or on a sketch or reference image move to the new project's
+`view.json`; the 12 to 13 migration drops those of a schema 11 or 12 file.
 A file with a newer
 `version` or `schemaVersion` gets 400 naming both versions. Any failure
 returns 400 and creates nothing: a project half made when an asset fails is
@@ -210,7 +211,7 @@ the document, and uploads that take the document beyond 40 MB are rejected.
 | `PUT /projects/:id/features/:fid`    | `{ feature }` (partial) | Edit parameters/name/suppressed; id immutable                                |
 | `DELETE /projects/:id/features/:fid` | `{ held? }`             | Marker adjusts if needed                                                     |
 | `POST /projects/:id/timeline`        | `{ position }`          | Move the rollback marker                                                     |
-| `PUT /projects/:id/bodies/:bodyId`   | `{ name?, visible? }`   | Rename a body; `visible` writes `view.json`, as below                        |
+| `PUT /projects/:id/bodies/:bodyId`   | `{ name? }`             | Rename a body; any other field is 400                                        |
 | `PUT /projects/:id/groups`           | `{ groups }`            | Replace the model tree groups; never changes evaluation                      |
 
 ### View state
@@ -230,12 +231,10 @@ document held. A PUT on a project with no `view.json` first migrates the
 document on disk, after its backup. The migration writes the old flags only
 into a missing `view.json`, so they cannot return over a saved view.
 
-Visibility lives only in the view. Until DOC-020 the old paths still work
-through it: `visible` in a body PUT or a feature patch writes `view.json`, and
-a patch with nothing else saves no document and keeps the revision. Responses
-report `visible` from the view: on each body, and on each sketch and reference
-image in the document. `PUT /projects/:id/document` moves any `visible` it
-carries into the view.
+Visibility lives only in the view. Documents and evaluations carry no
+`visible`. A body PUT or a feature add or patch that carries `visible` is 400.
+`PUT /projects/:id/document` drops any `visible` it carries and leaves the
+view unchanged.
 
 ## Inspection & output
 
@@ -277,7 +276,7 @@ declares, and `suppressed` must be a boolean. An update patch must also be an
 object; its keys are checked against the stored feature's type. The validator
 checks profile, face, edge, plane and axis references in depth, every list
 item, and each enum and flag (`operation`, extrude `direction`, emboss `mode`,
-`combine`, `keepTools`, `visible`).
+`combine`, `keepTools`).
 
 Every feature is parsed against its type's schema in
 `shared/src/schema/features.ts`, which also checks each sketch entity and

@@ -26,7 +26,7 @@ client/src/three/toolPreview.ts 10
 client/src/viewportRef.ts 2
 client/vite.config.ts 1
 server/src/api/routes.ts 22
-server/src/geometry/engine.ts 22
+server/src/geometry/engine.ts 20
 server/src/geometry/exporters.ts 12
 server/src/geometry/features.ts 98
 server/src/geometry/frames.ts 21
@@ -39,7 +39,7 @@ server/src/geometry/tessellate.ts 10
 server/src/index.ts 8
 server/src/store/projectQueue.ts 1
 shared/src/api.ts 16
-shared/src/model.ts 84
+shared/src/model.ts 83
 shared/src/projection.ts 1
 shared/src/sketchModify.ts 10
 shared/src/sketchOffsets.ts 3

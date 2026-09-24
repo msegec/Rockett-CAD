@@ -83,11 +83,8 @@ function evaluateTracked(
   }
 }
 
-/** Cache key for a feature: its JSON minus display-only fields, so hiding a
- * sketch in the viewport doesn't re-evaluate the timeline after it. */
 export function featureKey(feature: CadDocument["features"][number]): string {
-  const { visible: _visible, ...geometric } = feature as any;
-  return JSON.stringify(geometric);
+  return JSON.stringify(feature);
 }
 
 interface Tessellation {
@@ -276,8 +273,7 @@ class DocumentEngine {
   private tessellated(body: StateBody, name: string): BodyPayload {
     const hit = cached(body);
     if (hit) return hit;
-    const payload =
-      this.moved(body) ?? tessellateBody(body, { name, visible: true });
+    const payload = this.moved(body) ?? tessellateBody(body, { name });
     store(body, payload);
     return payload;
   }

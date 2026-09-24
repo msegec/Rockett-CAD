@@ -13,7 +13,6 @@ import {
   type CadDocument,
   type ProjectSummary,
   type ProjectView,
-  type Visibility,
 } from "@rockett/shared";
 import { build } from "../build.js";
 import { BlobStore, HASH_RE, PendingBlobs, Uploads } from "./blobStore.js";
@@ -219,21 +218,6 @@ export class ProjectStore {
   async setView(id: string, view: ProjectView): Promise<void> {
     if (!(await this.hasView(id))) await this.documents.settle(id);
     await this.views.write(id, view);
-  }
-
-  async setVisible(
-    id: string,
-    view: ProjectView,
-    shown: Visibility,
-  ): Promise<ProjectView> {
-    if (
-      !Object.keys(shown.bodies).length &&
-      !Object.keys(shown.features).length
-    )
-      return view;
-    const next = withShown(view, shown);
-    await this.setView(id, next);
-    return next;
   }
 
   private savedView(id: string): Promise<ProjectView | undefined> {

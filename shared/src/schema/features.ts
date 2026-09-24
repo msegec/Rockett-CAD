@@ -158,7 +158,6 @@ const sketch = feature("sketch", {
       { maxItems: 1000 },
     ),
   ),
-  visible: flag,
 });
 
 const constructionPlane = feature("constructionPlane", {
@@ -183,7 +182,6 @@ const referenceImage = feature("referenceImage", {
     scale: Type.Number({ minimum: 1e-9, maximum: MAX_DIM }),
   }),
   opacity: Type.Number({ minimum: 0, maximum: 1 }),
-  visible: flag,
   width: Type.Number({ minimum: 1, maximum: 65536 }),
   height: Type.Number({ minimum: 1, maximum: 65536 }),
 });

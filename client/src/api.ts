@@ -245,11 +245,6 @@ async function holding<P extends string, Req>(
   };
 }
 
-function viewless<T extends Partial<Feature>>(feature: T): T {
-  const { visible: _visible, ...rest } = feature as T & { visible?: boolean };
-  return rest as T;
-}
-
 function fileForm(name: string, file: File): FormData {
   const form = new FormData();
   form.append(name, file);
@@ -325,30 +320,19 @@ export const api = {
     send(ROUTES.projectEdge, { id, fid }, { body: { edge, entityId } }),
 
   addFeature: (id: string, feature: Feature) =>
-    holding(ROUTES.addFeature, { id }, { feature: viewless(feature) }),
+    holding(ROUTES.addFeature, { id }, { feature }),
   updateFeature: (
     id: string,
     fid: string,
     feature: Partial<Feature>,
     position?: number,
-  ) =>
-    holding(
-      ROUTES.updateFeature,
-      { id, fid },
-      { feature: viewless(feature) },
-      position,
-    ),
+  ) => holding(ROUTES.updateFeature, { id, fid }, { feature }, position),
   deleteFeature: (id: string, fid: string) =>
     holding(ROUTES.deleteFeature, { id, fid }, {}),
   setTimeline: (id: string, position: number) =>
     holding(ROUTES.setTimeline, { id }, { position }),
   replaceDocument: (id: string, document: CadDocument, position?: number) =>
-    holding(
-      ROUTES.replaceDocument,
-      { id },
-      { document: { ...document, features: document.features.map(viewless) } },
-      position,
-    ),
+    holding(ROUTES.replaceDocument, { id }, { document }, position),
   updateBody: (id: string, bodyId: string, patch: { name: string }) =>
     holding(ROUTES.updateBody, { id, bodyId }, patch),
   updateGroups: (id: string, groups: TreeGroup[]) =>

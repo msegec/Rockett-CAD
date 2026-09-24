@@ -29,16 +29,15 @@ export function checkRevision(doc: CadDocument, expected: number): CadDocument {
   return doc;
 }
 
-export function keepNamingVersion<T extends { doc: CadDocument }>(
-  opened: T,
+export function keepNamingVersion(
+  stored: CadDocument,
   sent: CadDocument,
-): T {
-  if (sent.namingVersion !== opened.doc.namingVersion)
+): void {
+  if (sent.namingVersion !== stored.namingVersion)
     throw new StoreError(
-      `namingVersion stays ${opened.doc.namingVersion} for this project; a document write cannot change it.`,
+      `namingVersion stays ${stored.namingVersion} for this project; a document write cannot change it.`,
       "conflict",
     );
-  return opened;
 }
 
 export function reply(

@@ -9,7 +9,6 @@
 import { Router, json, type RequestHandler } from "express";
 import {
   DOCUMENT_EDITS,
-  emptyView,
   MB,
   nextFeatureName,
   parse,
@@ -24,7 +23,6 @@ import {
   type ExportRequest,
   type Feature,
   type Method,
-  type ProjectView,
   type Route,
 } from "@rockett/shared";
 import { build } from "../build.js";
@@ -74,11 +72,6 @@ import {
   RevisionConflict,
 } from "./revision.js";
 import { omitHeldMeshes } from "./heldMeshes.js";
-import {
-  takeVisible,
-  withVisible,
-  withVisibleBodies,
-} from "./legacyVisible.js";
 
 const STATUS: Record<ApiErrorCode, number> = {
   validation: 400,
@@ -217,21 +210,13 @@ export function createApiRouter(
     };
 
   const editable = async (req: any, res: any) => {
-    const opened = await store.open(req.params.id);
-    checkRevision(opened.doc, res.locals.revision);
-    return opened;
+    const doc = await store.load(req.params.id);
+    checkRevision(doc, res.locals.revision);
+    return doc;
   };
 
-  const send = (
-    res: any,
-    view: ProjectView,
-    doc: CadDocument,
-    evaluation?: EvaluateResult,
-  ) =>
-    reply(res, {
-      document: withVisible(doc, view),
-      ...(evaluation && { evaluation: withVisibleBodies(evaluation, view) }),
-    });
+  const send = (res: any, doc: CadDocument, evaluation?: EvaluateResult) =>
+    reply(res, { document: doc, ...(evaluation && { evaluation }) });
 
   async function sourced(doc: CadDocument) {
     const engine = engineFor(doc.id);
@@ -312,8 +297,7 @@ export function createApiRouter(
   on(
     ROUTES.getProject,
     wrap(async (req, res) => {
-      const { doc, view } = await store.open(req.params.id);
-      send(res, view, doc);
+      send(res, await store.load(req.params.id));
     }),
   );
 
@@ -341,10 +325,10 @@ export function createApiRouter(
   on(
     ROUTES.renameProject,
     wrap(async (req, res) => {
-      const { doc, view } = await editable(req, res);
+      const doc = await editable(req, res);
       doc.name = (req.body.name ?? doc.name).slice(0, 200);
       await store.save(doc);
-      send(res, view, doc);
+      send(res, doc);
     }),
   );
 
@@ -356,13 +340,8 @@ export function createApiRouter(
   on(
     ROUTES.evaluate,
     wrap(async (req, res) => {
-      const { doc, view } = await store.open(req.params.id);
-      res.json(
-        withVisibleBodies(
-          await evaluate(doc, evaluationPosition(req, doc)),
-          view,
-        ),
-      );
+      const doc = await store.load(req.params.id);
+      res.json(await evaluate(doc, evaluationPosition(req, doc)));
     }),
   );
 
@@ -376,15 +355,13 @@ export function createApiRouter(
         throw new ValidationError("document id mismatch");
       }
       validateDocument(sent);
-      const { doc, shown } = splitView(sent);
-      const incoming = doc as unknown as CadDocument;
+      const incoming = splitView(sent).doc as unknown as CadDocument;
       const position = evaluationPosition(req, incoming);
       // Replacement is an edit, not creation (e.g. a delayed undo after delete).
-      const { view } = keepNamingVersion(await editable(req, res), incoming);
+      keepNamingVersion(await editable(req, res), incoming);
       await store.save(incoming);
-      const next = await store.setVisible(incoming.id, view, shown);
       const evaluation = await evaluateAndSync(incoming, position);
-      send(res, next, incoming, evaluation);
+      send(res, incoming, evaluation);
     }),
   );
 
@@ -404,11 +381,8 @@ export function createApiRouter(
     );
     features.forEach(validateFeature);
     const created = !req.params.id;
-    const { doc, view } = created
-      ? {
-          doc: await store.create(filename.replace(/\.[^.]*$/, "")),
-          view: emptyView(),
-        }
+    const doc = created
+      ? await store.create(filename.replace(/\.[^.]*$/, ""))
       : await editable(req, res);
     try {
       const at = Math.min(doc.timelinePosition, doc.features.length);
@@ -438,7 +412,7 @@ export function createApiRouter(
           ? store.blobs(doc.id).adopt(file)
           : store.blobs(doc.id).put(bytes));
       await store.save(doc);
-      send(res, view, doc, await evaluateAndSync(doc));
+      send(res, doc, await evaluateAndSync(doc));
     } catch (error) {
       dropEngine(doc.id);
       if (created) await store.remove(doc.id);
@@ -452,7 +426,7 @@ export function createApiRouter(
   on(
     ROUTES.addFeature,
     wrap(async (req, res) => {
-      const { doc, view } = await editable(req, res);
+      const doc = await editable(req, res);
       const feature = req.body?.feature as Feature;
       record(feature, "feature");
       knownKeys(feature, feature.type);
@@ -463,22 +437,20 @@ export function createApiRouter(
       if (doc.features.some((f) => f.id === feature.id)) {
         throw new ValidationError("duplicate feature id");
       }
-      const shown = takeVisible(feature, feature.id);
       // Insert at the timeline marker (supports inserting mid-history).
       const at = Math.min(doc.timelinePosition, doc.features.length);
       doc.features.splice(at, 0, feature);
       doc.timelinePosition = at + 1;
       await store.save(doc);
-      const next = await store.setVisible(doc.id, view, shown);
       const evaluation = await evaluateAndSync(doc);
-      send(res, next, doc, evaluation);
+      send(res, doc, evaluation);
     }),
   );
 
   on(
     ROUTES.updateFeature,
     wrap(async (req, res) => {
-      const { doc, view } = await editable(req, res);
+      const doc = await editable(req, res);
       const position = evaluationPosition(req, doc);
       const idx = doc.features.findIndex((f) => f.id === req.params.fid);
       if (idx < 0) throw new StoreError("feature not found", "not_found");
@@ -494,16 +466,10 @@ export function createApiRouter(
         id: doc.features[idx]!.id,
       };
       validateFeature(updated as Feature);
-      const next = await store.setVisible(
-        doc.id,
-        view,
-        takeVisible(updated as Feature, updated.id),
-      );
       doc.features[idx] = updated as Feature;
-      if (Object.keys(patch).some((key) => key !== "visible"))
-        await store.save(doc);
+      await store.save(doc);
       const evaluation = await evaluateAndSync(doc, position);
-      send(res, next, doc, evaluation);
+      send(res, doc, evaluation);
     }),
   );
 
@@ -543,28 +509,28 @@ export function createApiRouter(
   on(
     ROUTES.deleteFeature,
     wrap(async (req, res) => {
-      const { doc, view } = await editable(req, res);
+      const doc = await editable(req, res);
       const idx = doc.features.findIndex((f) => f.id === req.params.fid);
       if (idx < 0) throw new StoreError("feature not found", "not_found");
       doc.features.splice(idx, 1);
       if (doc.timelinePosition > idx) doc.timelinePosition--;
       await store.save(doc);
       const evaluation = await evaluateAndSync(doc);
-      send(res, view, doc, evaluation);
+      send(res, doc, evaluation);
     }),
   );
 
   on(
     ROUTES.setTimeline,
     wrap(async (req, res) => {
-      const { doc, view } = await editable(req, res);
+      const doc = await editable(req, res);
       const { position } = req.body;
       if (position > doc.features.length)
         throw new ValidationError("invalid timeline position", "/position");
       doc.timelinePosition = position;
       await store.save(doc);
       const evaluation = await evaluateAndSync(doc);
-      send(res, view, doc, evaluation);
+      send(res, doc, evaluation);
     }),
   );
 
@@ -594,32 +560,28 @@ export function createApiRouter(
   on(
     ROUTES.updateGroups,
     wrap(async (req, res) => {
-      const { doc, view } = await editable(req, res);
+      const doc = await editable(req, res);
       doc.groups = req.body.groups;
       await store.save(doc);
       const evaluation = await evaluateAndSync(doc);
-      send(res, view, doc, evaluation);
+      send(res, doc, evaluation);
     }),
   );
 
   on(
     ROUTES.updateBody,
     wrap(async (req, res) => {
-      const { doc, view } = await editable(req, res);
+      const doc = await editable(req, res);
       const { bodyId } = req.params;
       const meta = doc.bodyMeta[bodyId];
       if (!meta) throw new StoreError("body not found", "not_found");
-      const { name, visible } = req.body;
-      const next = await store.setVisible(doc.id, view, {
-        bodies: visible === undefined ? {} : { [bodyId]: visible },
-        features: {},
-      });
+      const { name } = req.body;
       if (name !== undefined) {
         meta.name = name.slice(0, 120);
         await store.save(doc);
       }
       const evaluation = await evaluateAndSync(doc);
-      send(res, next, doc, evaluation);
+      send(res, doc, evaluation);
     }),
   );
 

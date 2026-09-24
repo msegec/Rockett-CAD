@@ -57,7 +57,6 @@ export interface VertexInfo {
 export interface BodyPayload {
   bodyId: string;
   name: string;
-  visible: boolean;
   meshKey: string;
   positions: number[];
   normals: number[];
@@ -68,10 +67,7 @@ export interface BodyPayload {
   bbox: { min: Vec3; max: Vec3 };
 }
 
-export type HeldBodyPayload = Pick<
-  BodyPayload,
-  "bodyId" | "name" | "visible" | "meshKey"
->;
+export type HeldBodyPayload = Pick<BodyPayload, "bodyId" | "name" | "meshKey">;
 
 export interface HeldMeshes {
   held?: string[];

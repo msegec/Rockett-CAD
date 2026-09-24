@@ -149,7 +149,6 @@ const fixtures: {
           joinTolerance: 0.01,
         },
       ],
-      visible: false,
     },
     invalid: {
       ...base,
@@ -186,7 +185,6 @@ const fixtures: {
       fileName: "a.png",
       transform: { u: 0, v: 0, rotation: 45, scale: 0.1 },
       opacity: 0.5,
-      visible: true,
       width: 640,
       height: 480,
     },
@@ -198,7 +196,6 @@ const fixtures: {
       fileName: "a.png",
       transform: { u: 0, v: 0, rotation: 0, scale: 0 },
       opacity: 0.5,
-      visible: true,
       width: 640,
       height: 480,
     },

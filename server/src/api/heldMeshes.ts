@@ -27,7 +27,6 @@ function withoutHeld(
         ? {
             bodyId: body.bodyId,
             name: body.name,
-            visible: body.visible,
             meshKey: body.meshKey,
           }
         : body,

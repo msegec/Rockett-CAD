@@ -40,7 +40,7 @@ export interface TessellationOptions {
 
 export function tessellateBody(
   body: NamedBody,
-  meta: { name: string; visible: boolean },
+  meta: { name: string },
   opts: TessellationOptions = {},
 ): BodyPayload {
   const k = getKernel();
@@ -138,7 +138,6 @@ export function tessellateBody(
   return {
     bodyId: body.bodyId,
     name: meta.name,
-    visible: meta.visible,
     meshKey: createHash("sha256").update(JSON.stringify(mesh)).digest("hex"),
     ...mesh,
   };
