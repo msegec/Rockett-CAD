@@ -137,6 +137,7 @@ created and _propagated_ through later operations:
 | ------------------------------------------------------- | ------------------------------------------------------------------ |
 | Extrude/revolve side face generated from a sketch curve | `f:{featureId}:s:{sketchEntityId}`                                 |
 | Extrude/revolve cap                                     | `f:{featureId}:cap:start` / `f:{featureId}:cap:end`                |
+| Sweep side face and cap, under `namingVersion` 2        | as extrude, from the profile curve and the pipe's ends             |
 | Fillet/chamfer face generated from an edge              | `f:{featureId}:fe:{n}`                                             |
 | Press/pull moved face, under `namingVersion` 2          | the source face's name                                             |
 | Mirrored / patterned copy                               | `m:{featureId}:{originalName}` / `p{i}:{featureId}:{originalName}` |
@@ -150,11 +151,12 @@ chamfer, shell, or offset operation we walk the input faces and ask OCCT
 - modified → each resulting face inherits the input face's name;
 - untouched → the face (same TShape) keeps its name;
 - new faces → named by their generating entity where the operation reports it
-  (e.g. `MakePrism.Generated(edge)`, `MakeFillet.Generated(edge)`). Under
-  `namingVersion` 2 a revolve then names a face its history misses, such as
-  the end annulus of a full revolve, from the profile edge whose midpoint lies
-  on it (`nameFromEdges` in `server/src/geometry/naming.ts`). Anything left
-  gets the deterministic fallback.
+  (e.g. `MakePrism.Generated(edge)`, `MakeFillet.Generated(edge)`). Revolve
+  and, under `namingVersion` 2, sweep share `sweptNames` in
+  `server/src/geometry/naming.ts`. Under version 2 it then names a face the
+  history misses, such as the end annulus of a full revolve, from the profile
+  edge whose midpoint lies on it (`nameFromEdges`). Anything left gets the
+  deterministic fallback. Under version 1 a sweep has only fallback names.
 
 A name map is a `ShapeMap` (`server/src/geometry/shapeMap.ts`): the shape hash
 only picks a bucket, and a lookup matches with OCCT's `IsSame` (same TShape

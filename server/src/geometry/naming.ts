@@ -1,24 +1,3 @@
-/**
- * Persistent topology naming.
- *
- * Every face of every body carries a persistent string name assigned when the
- * face is first created and propagated through subsequent operations using
- * the kernel's Modified/Generated/IsDeleted history. Edges and vertices are
- * named from their adjacent faces, so they inherit stability from face names.
- *
- * Naming scheme (see docs/CAD_MODEL.md):
- *   face   f:{featureId}:s:{sketchEntityId}   extrude/revolve side face
- *          f:{featureId}:cap:start|end        extrude/revolve caps
- *          f:{featureId}:fe:{n}               fillet/chamfer face from edge
- *          f:{featureId}:x{n}                 fallback (deterministic order)
- *   edge   e[{faceA}|{faceB}]                 adjacent faces, sorted
- *   vertex v[{faceA}|{faceB}|{faceC}]         adjacent faces, sorted
- *
- * When several subshapes end up with the same base name (e.g. a boolean
- * splits a face in two) they are disambiguated with a deterministic ~n
- * suffix ordered by centroid.
- */
-
 import { LINEAR_TOL, type NamingVersion, type Vec3 } from "@rockett/shared";
 import {
   edgeCentroid,
@@ -49,6 +28,10 @@ export function withNamingVersion<T>(version: NamingVersion, run: () => T): T {
   } finally {
     active = outer;
   }
+}
+
+export function namingVersion(): NamingVersion {
+  return active;
 }
 
 export interface NamedBody {
@@ -197,6 +180,33 @@ export function nameFromEdges(
       if (first) provisional.set(face, first);
     }
   });
+}
+
+export function sweptNames(
+  shape: Shape,
+  featureId: string,
+  edgeNames: Array<[Shape, string]>,
+  generated: (edge: Shape) => unknown,
+  caps: Shape[],
+): NameMap {
+  const k = getKernel();
+  const provisional = new ShapeMap<string>();
+  for (const [edge, name] of edgeNames) {
+    const made = listToArray(generated(edge));
+    for (const g of made)
+      if (g.ShapeType() === k.TopAbs_ShapeEnum.TopAbs_FACE)
+        provisional.set(g, name);
+    release(made);
+  }
+  caps.forEach((cap, i) => {
+    const capFaces = faces(cap);
+    for (const face of capFaces)
+      provisional.set(face, `f:${featureId}:cap:${i === 0 ? "start" : "end"}`);
+    release(capFaces);
+  });
+  nameFromEdges(shape, provisional, edgeNames);
+  release([...caps, ...edgeNames.map(([edge]) => edge)]);
+  return finalizeNames(shape, provisional, featureId);
 }
 
 /** Assign fallback names + disambiguate duplicates. Returns final NameMap. */

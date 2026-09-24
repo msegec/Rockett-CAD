@@ -71,8 +71,9 @@ import {
   finalizeNames,
   findFace,
   historyNames,
-  nameFromEdges,
+  namingVersion,
   propagateNames,
+  sweptNames,
   transformNames,
   type BodyPiece,
   type NameMap,
@@ -824,6 +825,19 @@ function evalExtrude(state: EvalState, f: ExtrudeFeature): void {
   }
 }
 
+function sideEdgeNames(
+  featureId: string,
+  pf: ProfileFace,
+  edges = edgesOf(pf.face),
+): Array<[Shape, string]> {
+  return edges.flatMap((e): Array<[Shape, string]> => {
+    const entityId = pf.edgeEntity.get(shapeHash(e));
+    if (entityId) return [[e, `f:${featureId}:s:${entityId}`]];
+    e.delete();
+    return [];
+  });
+}
+
 function evalRevolve(state: EvalState, f: RevolveFeature): void {
   const { faces: profileFaces } = resolveProfiles(state, f.profiles);
   const axis = resolveAxis(state, f.axis);
@@ -859,33 +873,13 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
         );
       }
       const shape = revol.Shape();
-      const provisional = new ShapeMap<string>();
-      const profileEdges: Array<[Shape, string]> = [];
-      const faceEdges = edgesOf(pf.face);
-      for (const e of faceEdges) {
-        const entityId = pf.edgeEntity.get(shapeHash(e));
-        if (!entityId) continue;
-        const name = `f:${f.id}:s:${entityId}`;
-        profileEdges.push([e, name]);
-        const gen = listToArray(revol.Generated(e));
-        for (const g of gen) {
-          if (g.ShapeType() === k.TopAbs_ShapeEnum.TopAbs_FACE) {
-            provisional.set(g, name);
-          }
-        }
-        release(gen);
-      }
-      if (!full) {
-        for (const cap of facesOf(revol.FirstShape_1())) {
-          provisional.set(cap, `f:${f.id}:cap:start`);
-        }
-        for (const cap of facesOf(revol.LastShape_1())) {
-          provisional.set(cap, `f:${f.id}:cap:end`);
-        }
-      }
-      nameFromEdges(shape, provisional, profileEdges);
-      release(faceEdges);
-      const names = finalizeNames(shape, provisional, f.id);
+      const names = sweptNames(
+        shape,
+        f.id,
+        sideEdgeNames(f.id, pf),
+        (e) => revol.Generated(e),
+        full ? [] : [revol.FirstShape_1(), revol.LastShape_1()],
+      );
       revol.delete();
       ax1.delete();
       return { shape, names };
@@ -963,7 +957,16 @@ function evalSweep(state: EvalState, f: SweepFeature): void {
       );
     }
     const shape = pipe.Shape();
-    const names = finalizeNames(shape, new ShapeMap(), f.id);
+    const names =
+      namingVersion() === 1
+        ? finalizeNames(shape, new ShapeMap(), f.id)
+        : sweptNames(
+            shape,
+            f.id,
+            sideEdgeNames(f.id, profileFaces[0]!),
+            (e) => pipe.Generated_1(e),
+            [pipe.FirstShape(), pipe.LastShape()],
+          );
     pipe.delete();
     return { shape, names };
   });
