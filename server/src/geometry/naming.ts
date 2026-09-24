@@ -387,7 +387,6 @@ export function computeEdgeNames(body: NamedBody): EdgeNames {
   interface Entry {
     edge: Shape;
     base: string;
-    centroid: [number, number, number];
   }
   const entries: Entry[] = [];
   const n = map.Extent();
@@ -404,13 +403,7 @@ export function computeEdgeNames(body: NamedBody): EdgeNames {
       faceNames.length >= 2
         ? `e[${faceNames.join("|")}]`
         : `e[${faceNames[0] ?? "?"}|seam]`;
-    let centroid: [number, number, number];
-    try {
-      centroid = edgeCentroid(edge);
-    } catch {
-      centroid = [0, 0, 0];
-    }
-    entries.push({ edge, base, centroid });
+    entries.push({ edge, base });
   }
   map.delete();
 
@@ -424,7 +417,13 @@ export function computeEdgeNames(body: NamedBody): EdgeNames {
   const byName = new Map<string, Shape>();
   for (const [e, name] of suffixDuplicates(
     groups,
-    (entry) => entry.centroid,
+    (entry) => {
+      try {
+        return edgeCentroid(entry.edge);
+      } catch {
+        return [0, 0, 0];
+      }
+    },
     body.names.version,
   )) {
     byName.set(name, e.edge);
