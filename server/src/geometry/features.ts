@@ -256,7 +256,15 @@ function registerBodySolids(
   shape: Shape,
   names: NameMap,
 ): void {
-  const sols = solids(shape);
+  registerSolids(state, bodyId, solids(shape), names);
+}
+
+function registerSolids(
+  state: EvalState,
+  bodyId: string,
+  sols: Shape[],
+  names: NameMap,
+): void {
   if (sols.length === 0) {
     state.bodies.delete(bodyId);
     return;
@@ -358,6 +366,70 @@ function unifyJoin(tool: ToolResult, featureId: string): ToolResult {
   return tool.names.version === 2 ? unifyTool(tool, featureId) : tool;
 }
 
+function fuseNamed(
+  a: ToolResult,
+  b: ToolResult,
+  featureId: string,
+  failure: string,
+): ToolResult {
+  const k = getKernel();
+  const op = new k.BRepAlgoAPI_Fuse_3(a.shape, b.shape, progress());
+  op.Build(progress());
+  if (!op.IsDone()) {
+    op.delete();
+    throw new Error(failure);
+  }
+  const shape = op.Shape();
+  const names = propagateNames(op, [a, b], shape, featureId);
+  op.delete();
+  return { shape, names };
+}
+
+function joinEvery(
+  state: EvalState,
+  featureId: string,
+  tool: ToolResult,
+): void {
+  const bodies = [...state.bodies.values()]
+    .filter((b) => bboxOverlap(b.shape, tool.shape))
+    .sort((a, b) => (a.bodyId < b.bodyId ? -1 : 1));
+  let groups: { bodies: StateBody[]; pieces: ToolResult[] }[] = [];
+  const loose: Shape[] = [];
+  for (const shape of solids(tool.shape)) {
+    const hits = bodies.filter((b) => bboxOverlap(b.shape, shape));
+    if (hits.length === 0) {
+      loose.push(shape);
+      continue;
+    }
+    const bridged = groups.filter((g) =>
+      g.bodies.some((b) => hits.includes(b)),
+    );
+    groups = [
+      ...groups.filter((g) => !bridged.includes(g)),
+      {
+        bodies: bodies.filter(
+          (b) => hits.includes(b) || bridged.some((g) => g.bodies.includes(b)),
+        ),
+        pieces: [...bridged.flatMap((g) => g.pieces), { ...tool, shape }],
+      },
+    ];
+  }
+  if (loose.length > 0)
+    registerSolids(state, `b:${featureId}`, loose, tool.names);
+  for (const {
+    bodies: [first, ...rest],
+    pieces,
+  } of groups) {
+    const fused = [...pieces, ...rest].reduce<ToolResult>(
+      (acc, next) => fuseNamed(acc, next, featureId, "boolean join failed"),
+      first!,
+    );
+    for (const b of rest) state.bodies.delete(b.bodyId);
+    const joined = unifyTool(fused, featureId);
+    registerBodySolids(state, first!.bodyId, joined.shape, joined.names);
+  }
+}
+
 function applyToolOperation(
   state: EvalState,
   featureId: string,
@@ -370,6 +442,11 @@ function applyToolOperation(
     return;
   }
 
+  if (operation === "join" && tool.names.version === 2) {
+    joinEvery(state, featureId, tool);
+    return;
+  }
+
   if (operation === "join") {
     // Fuse into the first overlapping body; otherwise create a new body.
     const target = [...state.bodies.values()].find((b) =>
@@ -379,23 +456,10 @@ function applyToolOperation(
       registerBodySolids(state, `b:${featureId}`, tool.shape, tool.names);
       return;
     }
-    const op = new k.BRepAlgoAPI_Fuse_3(target.shape, tool.shape, progress());
-    op.Build(progress());
-    if (!op.IsDone()) {
-      op.delete();
-      throw new Error("boolean join failed");
-    }
-    const result = op.Shape();
-    const names = propagateNames(
-      op,
-      [target, { shape: tool.shape, names: tool.names }],
-      result,
-      featureId,
-    );
-    op.delete();
+    const fused = fuseNamed(target, tool, featureId, "boolean join failed");
     // Clean the final union too: unifying only the incoming tool leaves
     // coplanar splits where a later extrusion meets the existing body.
-    const joined = unifyTool({ shape: result, names }, featureId);
+    const joined = unifyTool(fused, featureId);
     registerBodySolids(state, target.bodyId, joined.shape, joined.names);
     return;
   }
@@ -657,30 +721,8 @@ function evalExtrude(state: EvalState, f: ExtrudeFeature): void {
 
   // merge multiple profile prisms into one tool
   let tool = tools[0]!;
-  const k = getKernel();
   for (let i = 1; i < tools.length; i++) {
-    const op = new k.BRepAlgoAPI_Fuse_3(
-      tool.shape,
-      tools[i]!.shape,
-      progress(),
-    );
-    op.Build(progress());
-    if (!op.IsDone()) {
-      op.delete();
-      throw new Error("failed to merge profile solids");
-    }
-    const merged = op.Shape();
-    const names = propagateNames(
-      op,
-      [
-        { shape: tool.shape, names: tool.names },
-        { shape: tools[i]!.shape, names: tools[i]!.names },
-      ],
-      merged,
-      f.id,
-    );
-    op.delete();
-    tool = { shape: merged, names };
+    tool = fuseNamed(tool, tools[i]!, f.id, "failed to merge profile solids");
   }
 
   applyToolOperation(state, f.id, unifyTool(tool, f.id), f.operation);
@@ -1662,7 +1704,6 @@ function mirrorTrsfFor(frame: PlaneFrame): any {
 
 function evalMirror(state: EvalState, f: MirrorFeature): void {
   const frame = resolvePlaneFrame(state, f.plane);
-  const k = getKernel();
   kernelCall("mirror", () => {
     const trsf = mirrorTrsfFor(frame);
     for (const bodyId of f.bodies) {
@@ -1673,21 +1714,13 @@ function evalMirror(state: EvalState, f: MirrorFeature): void {
       const mirroredNames = transformNames(tr, body, `m:${f.id}`);
       tr.delete();
       if (f.combine) {
-        const op = new k.BRepAlgoAPI_Fuse_3(body.shape, mirrored, progress());
-        op.Build(progress());
-        if (!op.IsDone()) {
-          op.delete();
-          throw new Error("mirror join failed");
-        }
-        const result = op.Shape();
-        const names = propagateNames(
-          op,
-          [body, { shape: mirrored, names: mirroredNames }],
-          result,
+        const fused = fuseNamed(
+          body,
+          { shape: mirrored, names: mirroredNames },
           f.id,
+          "mirror join failed",
         );
-        op.delete();
-        const joined = unifyJoin({ shape: result, names }, f.id);
+        const joined = unifyJoin(fused, f.id);
         registerBodySolids(state, bodyId, joined.shape, joined.names);
       } else {
         const newId = `b:${f.id}:${bodyId}`;
@@ -1759,7 +1792,6 @@ function evalMove(state: EvalState, f: MoveFeature, earlier: Feature[]): void {
 
 function evalLinearPattern(state: EvalState, f: LinearPatternFeature): void {
   if (f.count < 2) throw new Error("pattern count must be ≥ 2");
-  const k = getKernel();
   let direction: Vec3;
   if (f.direction.kind === "axis") {
     const dirs: Record<"X" | "Y" | "Z", Vec3> = {
@@ -1787,25 +1819,15 @@ function evalLinearPattern(state: EvalState, f: LinearPatternFeature): void {
         tr.delete();
         trsf.delete();
         if (f.combine) {
-          const op = new k.BRepAlgoAPI_Fuse_3(
-            combined.shape,
-            instance,
-            progress(),
-          );
-          op.Build(progress());
-          if (!op.IsDone()) {
-            op.delete();
-            throw new Error("pattern join failed");
-          }
-          const result = op.Shape();
-          const names = propagateNames(
-            op,
-            [combined, { shape: instance, names: instNames }],
-            result,
-            f.id,
-          );
-          op.delete();
-          combined = { bodyId, shape: result, names };
+          combined = {
+            bodyId,
+            ...fuseNamed(
+              combined,
+              { shape: instance, names: instNames },
+              f.id,
+              "pattern join failed",
+            ),
+          };
         } else {
           const newId = `b:${f.id}:${bodyId}:${i}`;
           registerBodySolids(
@@ -1833,7 +1855,6 @@ function evalCircularPattern(
 ): void {
   if (f.count < 2) throw new Error("pattern count must be ≥ 2");
   const axis = resolveAxis(state, f.axis);
-  const k = getKernel();
   const total = ((f.totalAngle || 360) * Math.PI) / 180;
   const fullCircle = Math.abs((f.totalAngle || 360) - 360) < ANGULAR_TOL_DEG;
   const step = fullCircle ? total / f.count : total / (f.count - 1);
@@ -1852,25 +1873,15 @@ function evalCircularPattern(
         tr.delete();
         trsf.delete();
         if (f.combine) {
-          const op = new k.BRepAlgoAPI_Fuse_3(
-            combined.shape,
-            instance,
-            progress(),
-          );
-          op.Build(progress());
-          if (!op.IsDone()) {
-            op.delete();
-            throw new Error("pattern join failed");
-          }
-          const result = op.Shape();
-          const names = propagateNames(
-            op,
-            [combined, { shape: instance, names: instNames }],
-            result,
-            f.id,
-          );
-          op.delete();
-          combined = { bodyId, shape: result, names };
+          combined = {
+            bodyId,
+            ...fuseNamed(
+              combined,
+              { shape: instance, names: instNames },
+              f.id,
+              "pattern join failed",
+            ),
+          };
         } else {
           const newId = `b:${f.id}:${bodyId}:${i}`;
           registerBodySolids(

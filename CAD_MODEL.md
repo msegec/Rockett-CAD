@@ -84,6 +84,12 @@ Bodies get stable ids derived from the feature that created them:
   single solid (with no existing body to join, the merged solid becomes the new
   body).
 - Boolean join/cut keep the _target_ body's id.
+- Under `namingVersion` 1 a join fuses its whole tool into the first body its
+  bounding box overlaps, so tool solids over other bodies become `b:{body}:n`.
+  Under version 2 each tool solid fuses into every body it overlaps, and each
+  result is unified. Bodies one tool solid bridges become one body under the
+  first id in sort order. Tool solids that overlap no body become
+  `b:{featureId}`, `b:{featureId}:2`, … by volume.
 - An operation that leaves multiple solids appends ordinal suffixes ordered
   by volume (`b:x`, `b:x:2`, …); `splitBody` orders along the split-plane
   normal (`b:x`, `b:x:s2`).
