@@ -150,8 +150,11 @@ chamfer, shell, or offset operation we walk the input faces and ask OCCT
 - modified → each resulting face inherits the input face's name;
 - untouched → the face (same TShape) keeps its name;
 - new faces → named by their generating entity where the operation reports it
-  (e.g. `MakePrism.Generated(edge)`, `MakeFillet.Generated(edge)`), otherwise
-  the deterministic fallback.
+  (e.g. `MakePrism.Generated(edge)`, `MakeFillet.Generated(edge)`). Under
+  `namingVersion` 2 a revolve then names a face its history misses, such as
+  the end annulus of a full revolve, from the profile edge whose midpoint lies
+  on it (`nameFromEdges` in `server/src/geometry/naming.ts`). Anything left
+  gets the deterministic fallback.
 
 A name map is a `ShapeMap` (`server/src/geometry/shapeMap.ts`): the shape hash
 only picks a bucket, and a lookup matches with OCCT's `IsSame` (same TShape

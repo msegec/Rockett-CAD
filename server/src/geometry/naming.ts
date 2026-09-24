@@ -26,7 +26,9 @@ import {
   faces,
   getKernel,
   listToArray,
+  progress,
   release,
+  scoped,
   type Shape,
 } from "./kernel.js";
 import { ShapeMap } from "./shapeMap.js";
@@ -153,6 +155,48 @@ export function assignBodyIds<T extends BodyPiece>(
       i === 0 ? parentId : `${parentId}:${i + 1}`,
       piece,
     ]);
+}
+
+export function nameFromEdges(
+  shape: Shape,
+  provisional: ShapeMap<string>,
+  edgeNames: Array<[Shape, string]>,
+): void {
+  if (active === 1) return;
+  const k = getKernel();
+  scoped((own) => {
+    const midpoints = edgeNames.map(([edge, name]) => {
+      const curve = own(new k.BRepAdaptor_Curve_2(edge));
+      const at = own(
+        curve.Value((curve.FirstParameter() + curve.LastParameter()) / 2),
+      );
+      return {
+        vertex: own(own(new k.BRepBuilderAPI_MakeVertex(at)).Vertex()),
+        name,
+      };
+    });
+    const lies = (vertex: Shape, face: Shape) => {
+      const dist = own(
+        new k.BRepExtrema_DistShapeShape_2(
+          vertex,
+          face,
+          k.Extrema_ExtFlag.Extrema_ExtFlag_MIN,
+          k.Extrema_ExtAlgo.Extrema_ExtAlgo_Grad,
+          own(progress()),
+        ),
+      );
+      if (!dist.IsDone()) throw new Error("edge naming distance check failed");
+      return dist.Value() <= LINEAR_TOL;
+    };
+    for (const face of faces(shape).map(own)) {
+      if (provisional.get(face)) continue;
+      const [first] = midpoints
+        .filter((m) => lies(m.vertex, face))
+        .map((m) => m.name)
+        .sort(compareNames);
+      if (first) provisional.set(face, first);
+    }
+  });
 }
 
 /** Assign fallback names + disambiguate duplicates. Returns final NameMap. */

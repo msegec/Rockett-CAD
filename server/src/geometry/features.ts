@@ -71,6 +71,7 @@ import {
   finalizeNames,
   findFace,
   historyNames,
+  nameFromEdges,
   propagateNames,
   transformNames,
   type BodyPiece,
@@ -827,13 +828,16 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
       }
       const shape = revol.Shape();
       const provisional = new ShapeMap<string>();
+      const profileEdges: Array<[Shape, string]> = [];
       for (const e of edgesOf(pf.face)) {
         const entityId = pf.edgeEntity.get(shapeHash(e));
         if (!entityId) continue;
+        const name = `f:${f.id}:s:${entityId}`;
+        profileEdges.push([e, name]);
         const gen = listToArray(revol.Generated(e));
         for (const g of gen) {
           if (g.ShapeType() === k.TopAbs_ShapeEnum.TopAbs_FACE) {
-            provisional.set(g, `f:${f.id}:s:${entityId}`);
+            provisional.set(g, name);
           }
         }
         release(gen);
@@ -846,6 +850,7 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
           provisional.set(cap, `f:${f.id}:cap:end`);
         }
       }
+      nameFromEdges(shape, provisional, profileEdges);
       const names = finalizeNames(shape, provisional, f.id);
       revol.delete();
       ax1.delete();
