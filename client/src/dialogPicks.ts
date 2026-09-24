@@ -27,6 +27,9 @@ const input = (
 ): PickInput => ({ key, kinds, ...rules });
 
 const profiles = input("profiles", ["profile"]);
+const profilesOrFaces = input("profiles", ["profile", "face"], {
+  planar: true,
+});
 const targets = input("targets", ["body"], { optional: true });
 const bodies = input("bodies", ["body"]);
 const edges = input("edges", ["edge"]);
@@ -38,8 +41,8 @@ const planar = (key: string, one: boolean) =>
 
 export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
   importStep: [],
-  extrude: [input("profiles", ["profile", "face"], { planar: true }), targets],
-  revolve: [profiles, axis, targets],
+  extrude: [profilesOrFaces, targets],
+  revolve: [profilesOrFaces, axis, targets],
   sweep: [profiles, targets],
   loft: [profiles, targets],
   emboss: [profiles, targets],

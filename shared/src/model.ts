@@ -11,7 +11,7 @@
 
 import type { Units } from "./units.js";
 
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 export type NamingVersion = 1 | 2;
 
@@ -254,6 +254,7 @@ export interface ExtrudeFeature extends ToolFeatureBase {
 export interface RevolveFeature extends ToolFeatureBase {
   type: "revolve";
   profiles: ProfileRef[];
+  faces?: FaceRef[];
   axis: AxisRef;
   angle: number; // degrees; 360 = full
   operation: BooleanOperation;

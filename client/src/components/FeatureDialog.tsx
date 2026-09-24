@@ -188,6 +188,20 @@ function DialogBody({
       bodyId: x.bodyId,
       faceName: x.faceName,
     }));
+  const storedFeature = () =>
+    document_?.features.find((f) => f.id === editId) ?? {};
+  const profileSources = () => {
+    need(
+      profiles.length + faces.length > 0,
+      "Select at least one profile or planar face",
+    );
+    return {
+      profiles: profileRefs(),
+      ...((faces.length > 0 || "faces" in storedFeature()) && {
+        faces: faceRefs(),
+      }),
+    };
+  };
   const planeRef = (): PlaneRef | null => {
     if (planes.length > 0) return planes[0]!.ref;
     if (faces.length > 0) return { kind: "face", face: faceRefs()[0]! };
@@ -320,12 +334,9 @@ function DialogBody({
         </>
       );
       build = () => {
-        need(
-          profiles.length + faces.length > 0,
-          "Select at least one profile or planar face",
-        );
+        const sources = profileSources();
         need(num("distance", 10) !== 0, "Extrude distance must be non-zero");
-        const stored = document_?.features.find((f) => f.id === editId) ?? {};
+        const stored = storedFeature();
         const direction = p("direction", "normal");
         const startOffset = num("startOffset", 0);
         return {
@@ -333,10 +344,7 @@ function DialogBody({
           type: "extrude",
           name: p("name", ""),
           suppressed: false,
-          profiles: profileRefs(),
-          ...((faces.length > 0 || "faces" in stored) && {
-            faces: faceRefs(),
-          }),
+          ...sources,
           distance: num("distance", 10),
           ...((direction === "twoSided" || "distance2" in stored) && {
             distance2: num("distance2", 5),
@@ -356,9 +364,9 @@ function DialogBody({
       body = (
         <>
           <SelInfo
-            label="Profiles"
+            label="Profiles / faces"
             input="profiles"
-            hint="click sketch regions"
+            hint="click sketch regions or Shift-click planar faces"
           />
           <SelInfo
             label="Axis"
@@ -381,13 +389,12 @@ function DialogBody({
         </>
       );
       build = () => {
-        need(profiles.length > 0, "Select at least one profile");
         return {
           id: editId ?? newId("revolve"),
           type: "revolve",
           name: p("name", ""),
           suppressed: false,
-          profiles: profileRefs(),
+          ...profileSources(),
           axis: axisRef(),
           angle: num("angle", 360),
           operation: p("operation", "join"),

@@ -671,6 +671,16 @@ does and never saves it, so loading a project never writes its file. Pins
 persist only when a feature add or update saves that feature, or when the
 naming upgrade commits the pinned document; see Naming upgrade.
 
+## Revolve faces (schema 16)
+
+Revolve may carry `faces`, planar body faces used as profiles as Extrude uses
+its `faces`: sketch regions drawn strictly inside a face are cut out of it, and
+each face revolves about the axis beside any `profiles`. `profiles` may then be
+empty; together they hold 1 to 64 sources. A face that is gone or not planar
+fails the feature with an error naming it. A revolve without `faces` evaluates
+as before. The 15 to 16 migration changes nothing but the version, and the
+project is backed up before its first save.
+
 ## Tangent edge chains
 
 Fillet/Chamfer store optional tangentChain metadata (absent preserves prior

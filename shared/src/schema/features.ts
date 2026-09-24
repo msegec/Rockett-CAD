@@ -1,4 +1,4 @@
-import { Type, type TProperties } from "typebox";
+import { Type, type TProperties, type TSchema } from "typebox";
 import { ORIGIN_AXES, REF_SIGNATURE_TYPES, SCHEMA_VERSION } from "../model.js";
 import { LINEAR_TOL } from "../tolerance.js";
 import { MB, UNIT_TO_MM, type Units } from "../units.js";
@@ -224,10 +224,22 @@ const emboss = feature("emboss", {
   targets,
 });
 
-const extrude = Type.Refine(
+const profileFaces = Type.Optional(Type.Array(faceRef, { maxItems: 64 }));
+
+const profilesOrFaces = <T extends TSchema>(schema: T) =>
+  Type.Refine(
+    schema,
+    (f: { profiles: unknown[]; faces?: unknown[] }) => {
+      const sources = f.profiles.length + (f.faces?.length ?? 0);
+      return sources >= 1 && sources <= 64;
+    },
+    () => "needs 1 to 64 profiles or faces",
+  );
+
+const extrude = profilesOrFaces(
   feature("extrude", {
     profiles: profiles(0),
-    faces: Type.Optional(Type.Array(faceRef, { maxItems: 64 })),
+    faces: profileFaces,
     distance: Type.Refine(
       coordinate,
       (distance) => Math.abs(distance) >= LINEAR_TOL,
@@ -239,20 +251,18 @@ const extrude = Type.Refine(
     operation,
     targets,
   }),
-  (f) => {
-    const sources = f.profiles.length + (f.faces?.length ?? 0);
-    return sources >= 1 && sources <= 64;
-  },
-  () => "needs 1 to 64 profiles or faces",
 );
 
-const revolve = feature("revolve", {
-  profiles: profiles(1),
-  axis: axisRef,
-  angle: degrees,
-  operation,
-  targets,
-});
+const revolve = profilesOrFaces(
+  feature("revolve", {
+    profiles: profiles(0),
+    faces: profileFaces,
+    axis: axisRef,
+    angle: degrees,
+    operation,
+    targets,
+  }),
+);
 
 const sweep = feature("sweep", {
   profiles: profiles(1),

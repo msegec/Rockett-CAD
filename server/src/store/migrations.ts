@@ -148,6 +148,7 @@ export const documentMigrations: Migrations<CadDocument> = {
     12: (doc) => splitView(doc).doc,
     13: (doc) => doc,
     14: (doc) => doc,
+    15: (doc) => doc,
   },
 };
 

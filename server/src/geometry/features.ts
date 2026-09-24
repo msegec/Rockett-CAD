@@ -19,6 +19,7 @@ import {
   type EdgeRef,
   type EmbossFeature,
   type ExtrudeFeature,
+  type FaceRef,
   type Feature,
   type FeatureStatus,
   type FilletFeature,
@@ -772,6 +773,23 @@ function buildPrism(
   });
 }
 
+function faceProfile(
+  state: EvalState,
+  ref: FaceRef,
+): { pf: ProfileFace; n: Vec3 } {
+  const body = state.bodies.get(ref.bodyId);
+  if (!body) throw new Error(`body ${ref.bodyId} no longer exists`);
+  const face = findFace(body, ref.faceName);
+  if (!face) throw new Error(`face ${ref.faceName} no longer exists`);
+  const plane = planarFacePlane(face);
+  if (!plane) throw new Error(`face ${ref.faceName} is not planar`);
+  const cut = subtractSketchRegionsFromFace(face, state.sketches.values());
+  return {
+    pf: { face: cut.face, edgeEntity: cut.edgeEntity, profileId: ref.faceName },
+    n: plane.normal,
+  };
+}
+
 function evalExtrude(state: EvalState, f: ExtrudeFeature) {
   const dist = Math.abs(f.distance);
   if (dist <= 0) throw new Error("extrude distance must be non-zero");
@@ -790,29 +808,8 @@ function evalExtrude(state: EvalState, f: ExtrudeFeature) {
     }
   }
 
-  // Planar body faces used directly as profiles (face extrude).
-  for (const ref of faceRefs) {
-    const body = state.bodies.get(ref.bodyId);
-    if (!body) throw new Error(`body ${ref.bodyId} no longer exists`);
-    const face = findFace(body, ref.faceName);
-    if (!face) throw new Error(`face ${ref.faceName} no longer exists`);
-    const plane = planarFacePlane(face);
-    if (!plane) throw new Error(`face ${ref.faceName} is not planar`);
-    const n = plane.normal;
-    // Sketch regions drawn on this face split it (Fusion-style). Regions
-    // also selected as profiles in this feature get their own prism and
-    // fuse back in below.
-    const cut = subtractSketchRegionsFromFace(face, state.sketches.values());
-    sources.push({
-      pf: {
-        face: cut.face,
-        edgeEntity: cut.edgeEntity,
-        profileId: ref.faceName,
-      },
-      n,
-      copy: true,
-    });
-  }
+  for (const ref of faceRefs)
+    sources.push({ ...faceProfile(state, ref), copy: true });
 
   // A negative distance flips the side (typing -5 in the dialog extrudes
   // 5 mm the other way — the usual way to start a cut into a body).
@@ -878,8 +875,21 @@ function sideEdgeNames(
   });
 }
 
+function revolveSources(state: EvalState, f: RevolveFeature) {
+  const faceRefs = f.faces ?? [];
+  const profiles =
+    f.profiles.length > 0 || faceRefs.length === 0
+      ? resolveProfiles(state, f.profiles).faces
+      : [];
+  return [
+    ...profiles.map((pf) => ({ pf, copy: false })),
+    ...faceRefs.map((ref) => ({ pf: faceProfile(state, ref).pf, copy: true })),
+  ];
+}
+
 function evalRevolve(state: EvalState, f: RevolveFeature) {
-  const { faces: profileFaces } = resolveProfiles(state, f.profiles);
+  const sources = revolveSources(state, f);
+  const profileFaces = sources.map((s) => s.pf);
   const axis = resolveAxis(state, f.axis);
   const k = getKernel();
   const angleRad = (Math.min(Math.abs(f.angle), 360) * Math.PI) / 180;
@@ -887,7 +897,7 @@ function evalRevolve(state: EvalState, f: RevolveFeature) {
   const sign = f.angle >= 0 ? 1 : -1;
 
   const tools: ToolResult[] = [];
-  for (const pf of profileFaces) {
+  for (const { pf, copy } of sources) {
     const tool = kernelCall("revolve", () => {
       const ax1 = scoped(
         (own) =>
@@ -903,8 +913,8 @@ function evalRevolve(state: EvalState, f: RevolveFeature) {
           ),
       );
       const revol = full
-        ? new k.BRepPrimAPI_MakeRevol_2(pf.face, ax1, false)
-        : new k.BRepPrimAPI_MakeRevol_1(pf.face, ax1, angleRad, false);
+        ? new k.BRepPrimAPI_MakeRevol_2(pf.face, ax1, copy)
+        : new k.BRepPrimAPI_MakeRevol_1(pf.face, ax1, angleRad, copy);
       revol.Build(progress());
       if (!revol.IsDone()) {
         revol.delete();
