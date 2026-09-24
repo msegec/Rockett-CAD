@@ -108,9 +108,9 @@ export function featureKey(feature: object): string {
 
 function featureKeys(
   feature: CadDocument["features"][number],
+  key: string,
   { targets }: FeatureStatus,
 ): string[] {
-  const key = featureKey(feature);
   return targets && !("targets" in feature)
     ? [key, featureKey({ ...feature, targets })]
     : [key];
@@ -198,6 +198,8 @@ class DocumentEngine {
       doc.features.length,
     );
 
+    const keys: string[] = [];
+    const keyAt = (i: number) => (keys[i] ??= featureKey(doc.features[i]!));
     // Drop snapshots from the first stale feature on. Valid snapshots past
     // upTo stay, so a rewind or stateAt query doesn't discard later work.
     let valid = 0;
@@ -205,9 +207,7 @@ class DocumentEngine {
       this.namingVersion === doc.namingVersion &&
       valid < this.snapshots.length &&
       valid < doc.features.length &&
-      this.snapshots[valid]!.featureKeys.includes(
-        featureKey(doc.features[valid]!),
-      )
+      this.snapshots[valid]!.featureKeys.includes(keyAt(valid))
     ) {
       valid++;
     }
@@ -253,7 +253,7 @@ class DocumentEngine {
       }
       statuses = [...statuses, status];
       this.snapshots.push({
-        featureKeys: featureKeys(feature, status),
+        featureKeys: featureKeys(feature, keyAt(i), status),
         state: next,
         statuses,
       });
