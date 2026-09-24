@@ -336,6 +336,7 @@ export class ProjectStore {
   async importProject(
     doc: CadDocument,
     assets: ReadonlyMap<string, Buffer>,
+    view: ProjectView,
     temporary = false,
   ): Promise<CadDocument> {
     const id = newId();
@@ -353,6 +354,7 @@ export class ProjectStore {
       }
       const imported = { ...doc, id };
       await this.save(imported);
+      await this.views.write(id, view);
       return imported;
     } catch (error) {
       await this.remove(id);

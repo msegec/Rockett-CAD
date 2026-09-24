@@ -120,7 +120,10 @@ the document and decode from base64, and its bytes must hash to its key. An
 image asset also passes the image upload rules. Every referenced asset must be
 present. A file from before schema 9 may key its images by their old
 `<16hex>.<ext>` ids and may hold STEP sources inline; migration hashes both
-and rekeys them. A file with a newer
+and rekeys them. Any `visible` flag the file carries, on a body in
+`bodyMeta` or on a sketch or reference image, moves to the new project's
+`view.json`, whatever the file's schema, so the stored document holds none.
+A file with a newer
 `version` or `schemaVersion` gets 400 naming both versions. Any failure
 returns 400 and creates nothing: a project half made when an asset fails is
 removed.

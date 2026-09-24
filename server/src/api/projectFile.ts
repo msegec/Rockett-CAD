@@ -1,4 +1,5 @@
 import {
+  emptyView,
   folderId as folderIdSchema,
   parse,
   PROJECT_FILE_FORMAT,
@@ -7,12 +8,14 @@ import {
   referencedAssets,
   SCHEMA_VERSION,
   ValidationError,
+  withShown,
+  type CadDocument,
   type ProjectFile,
 } from "@rockett/shared";
 import type { Request, Response } from "express";
 import type { FolderStore } from "../store/folderStore.js";
 import type { ProjectStore } from "../store/projectStore.js";
-import { documentMigrations, migrate } from "../store/migrations.js";
+import { documentMigrations, migrate, splitView } from "../store/migrations.js";
 import { HASH_RE, PendingBlobs } from "../store/blobStore.js";
 import { validateDocument } from "./validate.js";
 
@@ -101,8 +104,12 @@ export const uploadProjectFile =
           .map(([name, base64]) => [name, decodeAsset(name, base64)]),
       ),
     );
-    const document = migrate(documentMigrations, file.document, pending);
+    const { doc, shown } = splitView({
+      ...migrate(documentMigrations, file.document, pending),
+    });
+    const document = doc as unknown as CadDocument;
     validateDocument(document);
+    const view = withShown(withShown(emptyView(), pending.shown), shown);
     const referenced = referencedAssets(document);
     for (const name of Object.keys(file.assets))
       if (!referenced.has(name) && !pending.used.has(name))
@@ -115,7 +122,8 @@ export const uploadProjectFile =
         pending.blobs.get(name) ?? decodeAsset(name, file.assets[name]),
       ]),
     );
-    const imported = () => store.importProject(document, assets, temporary);
+    const imported = () =>
+      store.importProject(document, assets, view, temporary);
     res.json({
       document:
         folderId === undefined
