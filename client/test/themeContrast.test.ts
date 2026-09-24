@@ -3,7 +3,14 @@ import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 import { contrastRatio } from "../src/theme/contrast";
 import { THEME_TOKENS, type ThemeColor } from "../src/theme/tokens";
-import { PREVIEW_APPEARANCE } from "../src/tunables";
+import {
+  BODY_APPEARANCE,
+  GIZMO_APPEARANCE,
+  HIGHLIGHT_APPEARANCE,
+  PLANE_APPEARANCE,
+  PREVIEW_APPEARANCE,
+  SKETCH_APPEARANCE,
+} from "../src/tunables";
 
 it("matches known WCAG ratios", () => {
   expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 2);
@@ -70,6 +77,8 @@ const marks: ThemeColor[] = [
   "move-axis-hover",
   "viewcube-edge",
   "viewcube-border",
+  "dim-leader",
+  "offset-end",
 ];
 
 type Pair = [ThemeColor, ThemeColor, number];
@@ -93,6 +102,53 @@ it("derives the preview tints from body at the tint strength", () => {
   expect(PREVIEW_APPEARANCE.tintStrength).toBe(0.4);
   expect(THEME_TOKENS["preview-add"]).toBe("#8cbf9e");
   expect(THEME_TOKENS["preview-cut"]).toBe("#d4a4a7");
+});
+
+it("keeps the viewport drawing colours", () => {
+  expect(THEME_TOKENS["dim-leader"]).toBe("#9aa2ab");
+  expect(THEME_TOKENS["offset-end"]).toBe("#ff9933");
+  expect(THEME_TOKENS.offset).toBe("#ffcc66");
+  expect(THEME_TOKENS.hover).toBe("#ffd166");
+  expect(THEME_TOKENS["gizmo-handle"]).toBe(THEME_TOKENS.hover);
+});
+
+it("keeps the viewport drawing values", () => {
+  expect(BODY_APPEARANCE).toEqual({
+    metalness: 0.15,
+    roughness: 0.55,
+    vertexSizePx: 4,
+  });
+  expect(HIGHLIGHT_APPEARANCE).toEqual({
+    faceOpacity: { select: 0.5, hover: 0.3 },
+    edgeLinewidth: 2,
+    vertexSizePx: 10,
+    originPlaneOpacity: 0.25,
+  });
+  expect(PLANE_APPEARANCE).toEqual({
+    originFillOpacity: 0.07,
+    originBorderOpacity: 0.35,
+    originAxisOpacity: 0.6,
+    constructionFillOpacity: 0.09,
+    constructionBorderOpacity: 0.55,
+  });
+  expect(SKETCH_APPEARANCE).toEqual({
+    profileSelectOpacity: 0.55,
+    profileHoverOpacity: 0.4,
+    profileUsedOpacity: 0.06,
+    profileOpacity: 0.18,
+    activeLineOpacity: 1,
+    dimmedLineOpacity: 0.5,
+    inactiveLineOpacity: 0.8,
+    constructionDashMm: 2,
+    constructionGapMm: 1.5,
+    pointSizePx: 6,
+    pointHighlightSizePx: 9,
+    previewLineOpacity: 0.9,
+    dimLeaderOpacity: 0.4,
+    dimLeaderDashPx: 5,
+    dimLeaderGapPx: 4,
+  });
+  expect(GIZMO_APPEARANCE).toEqual({ shaftOpacity: 0.95, ringOpacity: 0.9 });
 });
 
 it.each(pairs)("%s on %s meets %d:1", (fg, bg, target) => {

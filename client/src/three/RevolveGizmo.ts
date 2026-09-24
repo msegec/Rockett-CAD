@@ -9,6 +9,7 @@
 import * as THREE from "three";
 import { Manipulator, type ManipulatorHost } from "./Manipulator";
 import { themeColor } from "../theme/tokens";
+import { GIZMO_APPEARANCE } from "../tunables";
 
 export class RevolveGizmo extends Manipulator {
   private ring: THREE.Mesh;
@@ -43,7 +44,7 @@ export class RevolveGizmo extends Manipulator {
         color: themeColor("gizmo"),
         depthTest: false,
         transparent: true,
-        opacity: 0.9,
+        opacity: GIZMO_APPEARANCE.ringOpacity,
       }),
     );
     // torus lies around local Z — align local Z with the axis

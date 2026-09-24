@@ -7,6 +7,7 @@ import * as THREE from "three";
 import type { PlaneFrame } from "@rockett/shared";
 import { CadViewport, uv3 } from "./CadViewport";
 import { themeColor } from "../theme/tokens";
+import { SKETCH_APPEARANCE } from "../tunables";
 import { clearGroup } from "./dispose";
 import type { SketchTool } from "../store";
 import type { UV } from "../sketchTools";
@@ -35,7 +36,7 @@ function ghostLine(pts: THREE.Vector3[]): THREE.Line {
     new THREE.LineBasicMaterial({
       color: themeColor("hover"),
       transparent: true,
-      opacity: 0.9,
+      opacity: SKETCH_APPEARANCE.previewLineOpacity,
       depthTest: false,
     }),
   );

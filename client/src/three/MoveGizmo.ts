@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { Manipulator, snapStep, type ManipulatorHost } from "./Manipulator";
 import { themeColor } from "../theme/tokens";
-import { PREVIEW_APPEARANCE } from "../tunables";
+import { GIZMO_APPEARANCE, PREVIEW_APPEARANCE } from "../tunables";
 
 const AXIS_COLORS = ["move-axis-x", "move-axis-y", "move-axis-z"] as const;
 const AXES: THREE.Vector3[] = [
@@ -55,7 +55,7 @@ export class MoveGizmo extends Manipulator {
         color,
         depthTest: false,
         transparent: true,
-        opacity: 0.95,
+        opacity: GIZMO_APPEARANCE.shaftOpacity,
       });
       const shaft = new THREE.Mesh(
         new THREE.CylinderGeometry(1, 1, 1, 12),

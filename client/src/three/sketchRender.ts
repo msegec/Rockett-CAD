@@ -8,6 +8,7 @@ import type { PlaneFrame, Profile, SketchEntity } from "@rockett/shared";
 import { detectProfiles, sampleArc } from "@rockett/shared";
 import { CadViewport, uv3 } from "./CadViewport";
 import { themeColor } from "../theme/tokens";
+import { SKETCH_APPEARANCE } from "../tunables";
 import { disposeGroup } from "./dispose";
 import type { Selection } from "../store";
 import { selectionKey } from "../store";
@@ -133,7 +134,13 @@ function buildSketch(
             isSel ? "selection" : isHover ? "hover" : "profile-fill",
           ),
           transparent: true,
-          opacity: isSel ? 0.55 : isHover ? 0.4 : used ? 0.06 : 0.18,
+          opacity: isSel
+            ? SKETCH_APPEARANCE.profileSelectOpacity
+            : isHover
+              ? SKETCH_APPEARANCE.profileHoverOpacity
+              : used
+                ? SKETCH_APPEARANCE.profileUsedOpacity
+                : SKETCH_APPEARANCE.profileOpacity,
           side: THREE.DoubleSide,
           depthWrite: false,
           polygonOffset: true,
@@ -204,14 +211,18 @@ function buildSketch(
       e.construction
         ? new THREE.LineDashedMaterial({
             color,
-            dashSize: 2,
-            gapSize: 1.5,
+            dashSize: SKETCH_APPEARANCE.constructionDashMm,
+            gapSize: SKETCH_APPEARANCE.constructionGapMm,
             depthTest: false,
           })
         : new THREE.LineBasicMaterial({
             color,
             transparent: !sk.active,
-            opacity: sk.active ? 1 : sk.dim ? 0.5 : 0.8,
+            opacity: sk.active
+              ? SKETCH_APPEARANCE.activeLineOpacity
+              : sk.dim
+                ? SKETCH_APPEARANCE.dimmedLineOpacity
+                : SKETCH_APPEARANCE.inactiveLineOpacity,
             depthTest: false,
           }),
     );
@@ -238,7 +249,10 @@ function buildSketch(
           color: themeColor(
             isSel ? "selection" : isHover ? "hover" : "sketch-point",
           ),
-          size: isSel || isHover ? 9 : 6,
+          size:
+            isSel || isHover
+              ? SKETCH_APPEARANCE.pointHighlightSizePx
+              : SKETCH_APPEARANCE.pointSizePx,
           sizeAttenuation: false,
           depthTest: false,
         }),

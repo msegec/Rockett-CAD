@@ -9,7 +9,7 @@ import type { PlaneFrame, Profile } from "@rockett/shared";
 import { disposeObject } from "./dispose";
 import { Manipulator, snapStep, type ManipulatorHost } from "./Manipulator";
 import { themeColor } from "../theme/tokens";
-import { PREVIEW_APPEARANCE } from "../tunables";
+import { GIZMO_APPEARANCE, PREVIEW_APPEARANCE } from "../tunables";
 
 export interface GizmoSource {
   /** Base plane frame; the arrow points along frame.normal. */
@@ -78,7 +78,7 @@ export class ExtrudeGizmo extends Manipulator {
       color: themeColor("gizmo"),
       depthTest: false,
       transparent: true,
-      opacity: 0.95,
+      opacity: GIZMO_APPEARANCE.shaftOpacity,
     });
     this.shaft = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 12), mat);
     this.cone = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 16), mat.clone());

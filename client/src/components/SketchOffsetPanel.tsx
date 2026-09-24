@@ -10,6 +10,8 @@ import { useStore } from "../store";
 import { viewportHandle } from "../viewportRef";
 import { uv3 } from "../three/CadViewport";
 import { disposeGroup } from "../three/dispose";
+import { themeColor } from "../theme/tokens";
+import { SKETCH_APPEARANCE } from "../tunables";
 import { DraggablePanel } from "./DraggablePanel";
 import { DialogFooter } from "./form/DialogFooter";
 import { LengthField } from "./form/fields";
@@ -114,10 +116,10 @@ function OffsetBody() {
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(positions),
         new THREE.LineBasicMaterial({
-          color: 0xffcc66,
+          color: themeColor("offset"),
           depthTest: false,
           transparent: true,
-          opacity: 0.9,
+          opacity: SKETCH_APPEARANCE.previewLineOpacity,
         }),
       );
       line.renderOrder = 9;
@@ -136,7 +138,10 @@ function OffsetBody() {
       }
       const markers = new THREE.LineSegments(
         new THREE.BufferGeometry().setFromPoints(positions),
-        new THREE.LineBasicMaterial({ color: 0xff9933, depthTest: false }),
+        new THREE.LineBasicMaterial({
+          color: themeColor("offset-end"),
+          depthTest: false,
+        }),
       );
       markers.renderOrder = 10;
       group.add(markers);

@@ -28,6 +28,8 @@ import { syncReferenceImages } from "../three/referenceImages";
 import { renderSketches, type SketchRenderInput } from "../three/sketchRender";
 import { ExtrudeGizmo, type GizmoSource } from "../three/ExtrudeGizmo";
 import { MoveGizmo } from "../three/MoveGizmo";
+import { themeColor } from "../theme/tokens";
+import { SKETCH_APPEARANCE } from "../tunables";
 import { buildRevolveGhost } from "../three/revolveGhost";
 import { RevolveGizmo } from "../three/RevolveGizmo";
 import { GizmoSlot } from "../three/gizmoSlot";
@@ -228,11 +230,11 @@ export function ViewportView() {
       const line = new THREE.Line(
         geom,
         new THREE.LineDashedMaterial({
-          color: 0x9aa2ab,
-          dashSize: wpp * 5,
-          gapSize: wpp * 4,
+          color: themeColor("dim-leader"),
+          dashSize: wpp * SKETCH_APPEARANCE.dimLeaderDashPx,
+          gapSize: wpp * SKETCH_APPEARANCE.dimLeaderGapPx,
           transparent: true,
-          opacity: 0.4,
+          opacity: SKETCH_APPEARANCE.dimLeaderOpacity,
           depthTest: false,
         }),
       );

@@ -21,7 +21,13 @@ import { clearGroup, disposeGroup, disposeObject } from "./dispose";
 import { themeColor } from "../theme/tokens";
 import { cameraTween, orbitAbout, type CameraPose } from "./camera";
 import { frameScheduler } from "./frameScheduler";
-import { PREVIEW_APPEARANCE, TIMING_MS } from "../tunables";
+import {
+  BODY_APPEARANCE,
+  HIGHLIGHT_APPEARANCE,
+  PLANE_APPEARANCE,
+  PREVIEW_APPEARANCE,
+  TIMING_MS,
+} from "../tunables";
 
 export interface PickResult {
   selection: Selection;
@@ -445,7 +451,7 @@ export class CadViewport {
       const mat = new THREE.MeshBasicMaterial({
         color: themeColor("origin-plane"),
         transparent: true,
-        opacity: 0.07,
+        opacity: PLANE_APPEARANCE.originFillOpacity,
         side: THREE.DoubleSide,
         depthWrite: false,
       });
@@ -458,7 +464,7 @@ export class CadViewport {
         new THREE.LineBasicMaterial({
           color: themeColor("origin-plane-border"),
           transparent: true,
-          opacity: 0.35,
+          opacity: PLANE_APPEARANCE.originBorderOpacity,
         }),
       );
       mesh.add(border);
@@ -482,7 +488,7 @@ export class CadViewport {
           new THREE.LineBasicMaterial({
             color: a.color,
             transparent: true,
-            opacity: 0.6,
+            opacity: PLANE_APPEARANCE.originAxisOpacity,
           }),
         ),
       );
@@ -541,8 +547,8 @@ export class CadViewport {
     geom.setIndex(p.indices);
     const mat = new THREE.MeshStandardMaterial({
       color: themeColor("body"),
-      metalness: 0.15,
-      roughness: 0.55,
+      metalness: BODY_APPEARANCE.metalness,
+      roughness: BODY_APPEARANCE.roughness,
       polygonOffset: true,
       polygonOffsetFactor: 1,
       polygonOffsetUnits: 1,
@@ -595,7 +601,7 @@ export class CadViewport {
       vertGeom,
       new THREE.PointsMaterial({
         color: themeColor("edge"),
-        size: 4,
+        size: BODY_APPEARANCE.vertexSizePx,
         sizeAttenuation: false,
       }),
     );
@@ -665,8 +671,8 @@ export class CadViewport {
         geom,
         new THREE.MeshStandardMaterial({
           color: themeColor(tint),
-          metalness: 0.15,
-          roughness: 0.55,
+          metalness: BODY_APPEARANCE.metalness,
+          roughness: BODY_APPEARANCE.roughness,
           transparent: true,
           opacity: PREVIEW_APPEARANCE.ghostOpacity,
           depthTest: false,
@@ -923,7 +929,7 @@ export class CadViewport {
           new THREE.MeshBasicMaterial({
             color,
             transparent: true,
-            opacity: kind === "select" ? 0.5 : 0.3,
+            opacity: HIGHLIGHT_APPEARANCE.faceOpacity[kind],
             depthTest: true,
             polygonOffset: true,
             polygonOffsetFactor: -2,
@@ -950,7 +956,11 @@ export class CadViewport {
       }
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(pts),
-        new THREE.LineBasicMaterial({ color, linewidth: 2, depthTest: false }),
+        new THREE.LineBasicMaterial({
+          color,
+          linewidth: HIGHLIGHT_APPEARANCE.edgeLinewidth,
+          depthTest: false,
+        }),
       );
       line.renderOrder = 10;
       this.overlayRoot.add(line);
@@ -966,7 +976,7 @@ export class CadViewport {
         ]),
         new THREE.PointsMaterial({
           color,
-          size: 10,
+          size: HIGHLIGHT_APPEARANCE.vertexSizePx,
           sizeAttenuation: false,
           depthTest: false,
         }),
@@ -984,7 +994,7 @@ export class CadViewport {
           new THREE.MeshBasicMaterial({
             color,
             transparent: true,
-            opacity: 0.25,
+            opacity: HIGHLIGHT_APPEARANCE.originPlaneOpacity,
             side: THREE.DoubleSide,
             depthWrite: false,
           }),
@@ -1022,7 +1032,7 @@ export class CadViewport {
       const mat = new THREE.MeshBasicMaterial({
         color: themeColor("plane"),
         transparent: true,
-        opacity: 0.09,
+        opacity: PLANE_APPEARANCE.constructionFillOpacity,
         side: THREE.DoubleSide,
         depthWrite: false,
       });
@@ -1035,7 +1045,7 @@ export class CadViewport {
         new THREE.LineBasicMaterial({
           color: themeColor("plane"),
           transparent: true,
-          opacity: 0.55,
+          opacity: PLANE_APPEARANCE.constructionBorderOpacity,
         }),
       );
       mesh.add(border);
