@@ -1,5 +1,6 @@
 import type { CadViewport } from "./three/CadViewport";
 import { useStore } from "./store";
+import { TIMING_MS } from "./tunables";
 
 /** Shared handle so toolbar/dialogs can drive the viewport (views, raycasts). */
 export const viewportHandle: { current: CadViewport | null } = {
@@ -18,5 +19,5 @@ export function alignCameraToActiveSketch(): void {
     if (!sk || !vp) return;
     const n = sk.frame.normal;
     vp.setView([n[0], n[1], n[2]], sk.frame.yAxis);
-  }, 60);
+  }, TIMING_MS.sketchAlignDelay);
 }

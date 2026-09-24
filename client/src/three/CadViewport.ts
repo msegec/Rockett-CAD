@@ -21,8 +21,7 @@ import { clearGroup, disposeGroup, disposeObject } from "./dispose";
 import { themeColor } from "../theme/tokens";
 import { cameraTween, orbitAbout, type CameraPose } from "./camera";
 import { frameScheduler } from "./frameScheduler";
-
-const VIEW_TURN_MS = 300;
+import { PREVIEW_APPEARANCE, TIMING_MS } from "../tunables";
 
 export interface PickResult {
   selection: Selection;
@@ -412,7 +411,7 @@ export class CadViewport {
 
   private stepAnimation(now: number) {
     if (!this.animating) return;
-    const t = (now - this.animating.start) / VIEW_TURN_MS;
+    const t = (now - this.animating.start) / TIMING_MS.viewTurn;
     this.applyPose(this.animating.poseAt(t));
     if (t >= 1) this.animating = null;
   }
@@ -669,7 +668,7 @@ export class CadViewport {
           metalness: 0.15,
           roughness: 0.55,
           transparent: true,
-          opacity: 0.45,
+          opacity: PREVIEW_APPEARANCE.ghostOpacity,
           depthTest: false,
           depthWrite: false,
         }),

@@ -1,3 +1,17 @@
+import { PREVIEW_APPEARANCE } from "../tunables";
+import { rgb } from "./contrast";
+
+function blend(from: string, to: string, strength: number): string {
+  const target = rgb(to);
+  return `#${rgb(from)
+    .map((byte, i) =>
+      Math.round(byte + (target[i]! - byte) * strength)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
 const bg0 = "#1e2124";
 const bg1 = "#26292d";
 const border = "#868686";
@@ -10,6 +24,7 @@ const originPlane = "#999faf";
 const blue = "#66b3ff";
 const red = "#ff8080";
 const green = "#4cc36a";
+const body = "#b7bcc1";
 
 export const THEME_TOKENS = {
   bg0,
@@ -40,9 +55,9 @@ export const THEME_TOKENS = {
   "shadow-menu": "rgba(0, 0, 0, 0.5)",
   "shadow-panel": "rgba(0, 0, 0, 0.4)",
   "viewport-bg": "#2a2d30",
-  body: "#b7bcc1",
-  "preview-add": "#8cbf9e",
-  "preview-cut": "#d4a4a7",
+  body,
+  "preview-add": blend(body, green, PREVIEW_APPEARANCE.tintStrength),
+  "preview-cut": blend(body, red, PREVIEW_APPEARANCE.tintStrength),
   edge: "#30343a",
   selection: blue,
   hover,

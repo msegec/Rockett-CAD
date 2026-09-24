@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { expect, it } from "vitest";
 import { contrastRatio } from "../src/theme/contrast";
 import { THEME_TOKENS, type ThemeColor } from "../src/theme/tokens";
+import { PREVIEW_APPEARANCE } from "../src/tunables";
 
 it("matches known WCAG ratios", () => {
   expect(contrastRatio("#000000", "#ffffff")).toBeCloseTo(21, 2);
@@ -87,6 +88,12 @@ const pairs: Pair[] = [
   ["edge", "preview-cut", 3],
   ...marks.map((fg): Pair => [fg, "viewport-bg", 3]),
 ];
+
+it("derives the preview tints from body at the tint strength", () => {
+  expect(PREVIEW_APPEARANCE.tintStrength).toBe(0.4);
+  expect(THEME_TOKENS["preview-add"]).toBe("#8cbf9e");
+  expect(THEME_TOKENS["preview-cut"]).toBe("#d4a4a7");
+});
 
 it.each(pairs)("%s on %s meets %d:1", (fg, bg, target) => {
   expect(

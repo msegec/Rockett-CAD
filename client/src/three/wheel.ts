@@ -1,3 +1,5 @@
+import { TIMING_MS } from "../tunables";
+
 export interface WheelInput {
   deltaX: number;
   deltaY: number;
@@ -14,7 +16,6 @@ const LINE_PX = NOTCH_PX / 3;
 const PAGE_PX = 800;
 const PINCH_GAIN = 0.01;
 const MAX_EVENT_FACTOR = 1.25;
-const GESTURE_IDLE_MS = 150;
 const TRACKPAD_MAX_PX = 40;
 const MAC_MOUSE_PX = 4.000244140625;
 
@@ -63,7 +64,7 @@ export function wheelGesture() {
   let last = -Infinity;
   return {
     classify(e: WheelInput): WheelKind {
-      const fresh = e.timeStamp - last > GESTURE_IDLE_MS;
+      const fresh = e.timeStamp - last > TIMING_MS.wheelGestureIdle;
       last = e.timeStamp;
       if (e.ctrlKey) kind = "pinch";
       else if (fresh || kind === "pinch")
@@ -71,7 +72,7 @@ export function wheelGesture() {
       return kind;
     },
     pinching(now: number) {
-      return kind === "pinch" && now - last <= GESTURE_IDLE_MS;
+      return kind === "pinch" && now - last <= TIMING_MS.wheelGestureIdle;
     },
   };
 }

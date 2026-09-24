@@ -5,6 +5,7 @@ import {
   PREVIEW_DWELL_MS,
   previewTints,
 } from "../src/livePreview";
+import { TIMING_MS } from "../src/tunables";
 import { manyBodyPayloads } from "./helpers/perfFixtures";
 
 function setup() {
@@ -16,7 +17,7 @@ function setup() {
         settle = resolve;
       }),
   );
-  const live = createLivePreview({ intervalMs: 250, send, now: () => clock });
+  const live = createLivePreview({ send, now: () => clock });
   return {
     live,
     send,
@@ -40,6 +41,18 @@ it("sends once for ten calls inside the interval", async () => {
   }
   expect(send).toHaveBeenCalledTimes(1);
   expect(send).toHaveBeenCalledWith("f", { distance: 0 });
+});
+
+it("sends again only after the drag throttle", async () => {
+  const { live, send, at, settle } = setup();
+  live.during("f", { distance: 1 } as any);
+  await settle();
+  at(TIMING_MS.dragThrottle);
+  live.during("f", { distance: 2 } as any);
+  at(TIMING_MS.dragThrottle + 1);
+  live.during("f", { distance: 3 } as any);
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(send).toHaveBeenLastCalledWith("f", { distance: 3 });
 });
 
 it("drops a call while a send is in flight", async () => {

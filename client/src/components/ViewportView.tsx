@@ -72,7 +72,6 @@ interface DimLabel {
 const NUDGE_EVENTS = ["pointerdown", "pointerup", "wheel"];
 
 const livePreview = createLivePreview({
-  intervalMs: 250,
   send: (featureId, patch) =>
     useStore.getState().updateFeaturePreview(featureId, patch),
   now: () => performance.now(),

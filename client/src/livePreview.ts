@@ -1,18 +1,17 @@
 import type { BodyPayload, FaceInfo, Feature } from "@rockett/shared";
 import type { ThemeColor } from "./theme/tokens";
+import { TIMING_MS } from "./tunables";
 
 type Send = (featureId: string, patch: Partial<Feature>) => Promise<void>;
 
-export const PREVIEW_DWELL_MS = 300;
+export const PREVIEW_DWELL_MS = TIMING_MS.previewDwell;
 
 export function createLivePreview({
   send,
-  intervalMs = 250,
   dwellMs = PREVIEW_DWELL_MS,
   now = () => performance.now(),
 }: {
   send: Send;
-  intervalMs?: number;
   dwellMs?: number;
   now?: () => number;
 }) {
@@ -26,7 +25,7 @@ export function createLivePreview({
   return {
     during(featureId: string, patch: Partial<Feature>) {
       const t = now();
-      if (inFlight || t - last <= intervalMs) return;
+      if (inFlight || t - last <= TIMING_MS.dragThrottle) return;
       last = t;
       inFlight = true;
       void send(featureId, patch).finally(() => {

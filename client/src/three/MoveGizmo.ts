@@ -9,6 +9,7 @@
 import * as THREE from "three";
 import { Manipulator, snapStep, type ManipulatorHost } from "./Manipulator";
 import { themeColor } from "../theme/tokens";
+import { PREVIEW_APPEARANCE } from "../tunables";
 
 const AXIS_COLORS = ["move-axis-x", "move-axis-y", "move-axis-z"] as const;
 const AXES: THREE.Vector3[] = [
@@ -82,7 +83,7 @@ export class MoveGizmo extends Manipulator {
         new THREE.MeshBasicMaterial({
           color: themeColor("gizmo"),
           transparent: true,
-          opacity: 0.22,
+          opacity: PREVIEW_APPEARANCE.gizmoAddOpacity,
           depthWrite: false,
           side: THREE.DoubleSide,
         }),
