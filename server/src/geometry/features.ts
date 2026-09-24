@@ -354,6 +354,10 @@ function unifyTool(tool: ToolResult, featureId: string): ToolResult {
   }
 }
 
+function unifyJoin(tool: ToolResult, featureId: string): ToolResult {
+  return tool.names.version === 2 ? unifyTool(tool, featureId) : tool;
+}
+
 function applyToolOperation(
   state: EvalState,
   featureId: string,
@@ -1448,7 +1452,8 @@ function evalCombine(state: EvalState, f: CombineFeature): void {
       op.delete();
       current = { bodyId: target.bodyId, shape: result, names };
     }
-    registerBodySolids(state, target.bodyId, current.shape, current.names);
+    const joined = f.operation === "join" ? unifyJoin(current, f.id) : current;
+    registerBodySolids(state, target.bodyId, joined.shape, joined.names);
     if (!f.keepTools) {
       for (const tool of tools) state.bodies.delete(tool.bodyId);
     }
@@ -1565,7 +1570,8 @@ function evalOffsetFace(state: EvalState, f: OffsetFaceFeature): void {
       op.delete();
       current = { bodyId, shape: result, names };
     }
-    registerBodySolids(state, bodyId, current.shape, current.names);
+    const joined = f.distance > 0 ? unifyJoin(current, f.id) : current;
+    registerBodySolids(state, bodyId, joined.shape, joined.names);
   });
 }
 
@@ -1681,7 +1687,8 @@ function evalMirror(state: EvalState, f: MirrorFeature): void {
           f.id,
         );
         op.delete();
-        registerBodySolids(state, bodyId, result, names);
+        const joined = unifyJoin({ shape: result, names }, f.id);
+        registerBodySolids(state, bodyId, joined.shape, joined.names);
       } else {
         const newId = `b:${f.id}:${bodyId}`;
         const finalNames = finalizeNames(mirrored, mirroredNames, f.id);
@@ -1813,7 +1820,8 @@ function evalLinearPattern(state: EvalState, f: LinearPatternFeature): void {
         }
       }
       if (f.combine) {
-        registerBodySolids(state, bodyId, combined.shape, combined.names);
+        const joined = unifyJoin(combined, f.id);
+        registerBodySolids(state, bodyId, joined.shape, joined.names);
       }
     }
   });
@@ -1874,7 +1882,8 @@ function evalCircularPattern(
         }
       }
       if (f.combine) {
-        registerBodySolids(state, bodyId, combined.shape, combined.names);
+        const joined = unifyJoin(combined, f.id);
+        registerBodySolids(state, bodyId, joined.shape, joined.names);
       }
     }
   });

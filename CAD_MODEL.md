@@ -167,13 +167,16 @@ Extrude and revolve tools built from several sketch regions pass through
 one face instead of showing the sketch's internal boundaries as edges. Names
 follow the unify history: a face merged from several inputs takes their shared
 base name (the `~n` suffix dropped), or the first distinct base name in sorted
-order when they differ. This runs on the tool only. A later join whose cap is
-coplanar with an existing face keeps that edge, so downstream references to
-existing faces never move. Two cylinder faces merge only when their surfaces
-share the same X and Y axes. OCCT 7.6 never returned from merging a fillet's
-cylinder with a coaxial prism cylinder whose angle starts a quarter turn away,
-so cylinders whose axes differ keep the edge between them (BUG-041). The guard
-stays on OCCT 8.0.1, where this case has not been retried.
+order when they differ. An extrude, revolve, sweep or loft join also unifies
+the fused result. Under `namingVersion` 1 the other joins keep their seams:
+Combine join, Mirror and both patterns with combine, and an outward press/pull,
+so saved references to a merged half still resolve. Under version 2 those
+joins unify their result as well. Two cylinder faces merge only when their
+surfaces share the same X and Y axes. OCCT 7.6 never returned from merging a
+fillet's cylinder with a coaxial prism cylinder whose angle starts a quarter
+turn away, so cylinders whose axes differ keep the edge between them
+(BUG-041). The guard stays on OCCT 8.0.1, where this case has not been
+retried.
 
 Chamfers go through the kernel's `BRepFilletAPI_MakeChamfer` first. That
 algorithm cannot remove a face the chamfer consumes entirely (two 3.5 mm
