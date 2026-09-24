@@ -12,6 +12,7 @@ import type {
   BodyPayload,
   EdgeInfo,
   FaceInfo,
+  RefSignature,
   VertexInfo,
   Vec3,
 } from "@rockett/shared";
@@ -224,13 +225,28 @@ function viewportDeflection({ min, max }: ReturnType<typeof bboxOf>): number {
   return Math.min(0.5, Math.max(0.005, 0.0005 * diagonal));
 }
 
+const SURFACE_TYPES = [
+  ["GeomAbs_Plane", "plane"],
+  ["GeomAbs_Cylinder", "cylinder"],
+  ["GeomAbs_Cone", "cone"],
+  ["GeomAbs_Sphere", "sphere"],
+  ["GeomAbs_Torus", "torus"],
+  ["GeomAbs_BSplineSurface", "bspline"],
+] as const;
+
+export function surfaceType(surf: any): RefSignature["type"] {
+  const types = getKernel().GeomAbs_SurfaceType;
+  const type = surf.GetType();
+  return SURFACE_TYPES.find(([name]) => types[name] === type)?.[1] ?? "other";
+}
+
 function surfaceInfo(face: Shape): FaceInfo["surface"] {
   const k = getKernel();
   try {
     return scoped((own): FaceInfo["surface"] => {
       const surf = own(new k.BRepAdaptor_Surface_2(face, false));
-      const type = surf.GetType();
-      if (type === k.GeomAbs_SurfaceType.GeomAbs_Plane) {
+      const type = surfaceType(surf);
+      if (type === "plane") {
         const pln = own(surf.Plane());
         const locP = own(pln.Location());
         const d = own(own(pln.Axis()).Direction());
@@ -243,7 +259,7 @@ function surfaceInfo(face: Shape): FaceInfo["surface"] {
           normal: [sgn * d.X(), sgn * d.Y(), sgn * d.Z()] as Vec3,
         };
       }
-      if (type === k.GeomAbs_SurfaceType.GeomAbs_Cylinder) {
+      if (type === "cylinder") {
         const cyl = own(surf.Cylinder());
         const locP = own(cyl.Location());
         const d = own(own(cyl.Axis()).Direction());

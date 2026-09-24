@@ -221,6 +221,15 @@ Multiple edges sharing the same face pair (e.g. the two circles bounding a
 cylindrical hole wall meet the same faces in some topologies) get `~n`
 suffixes in deterministic centroid order.
 
+### Signatures
+
+`server/src/geometry/signature.ts` describes a face or edge by geometry, not
+name: a `RefSignature` of type, point and direction. A face gives its surface
+type, its centroid and the normal at its UV midpoint, flipped with a reversed
+face. An edge gives its curve type, the point at its middle parameter and the
+unit tangent there, in the curve's own direction. Nothing stores or resolves
+them yet.
+
 ### Known limitations
 
 - Centroid-ordered `~n` disambiguation can swap if an upstream edit moves

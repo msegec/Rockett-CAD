@@ -43,6 +43,21 @@ export interface VertexRef {
 
 export type TopoRef = FaceRef | EdgeRef | VertexRef;
 
+export interface RefSignature {
+  type:
+    | "plane"
+    | "cylinder"
+    | "cone"
+    | "sphere"
+    | "torus"
+    | "bspline"
+    | "line"
+    | "circle"
+    | "other";
+  point: [number, number, number];
+  direction: [number, number, number];
+}
+
 export type OriginPlaneName = "XY" | "XZ" | "YZ";
 
 /** Where a sketch / construction plane / mirror plane lives. */
