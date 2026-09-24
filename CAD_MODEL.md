@@ -265,6 +265,28 @@ the kernel build binds no transfer map from shapes back to source entities.
 Under version 1 an import keeps `x{n}` names. Mesh imports keep `x{n}` names
 under both versions.
 
+### Resolution
+
+`resolveRefs` in `server/src/geometry/resolve.ts` sorts face and edge
+references against a state's bodies into `resolved`, `candidate`,
+`ambiguous` or `missing`. Evaluation does not call it yet, so saved references
+still resolve by name alone.
+
+- A reference whose body still bears its name is `resolved`, however far the
+  face or edge moved since its `sig` was taken. A `~?n` name never resolves.
+- Otherwise lineage decides: names on the referenced body that descend from
+  the reference or that it descends from, read through `~n` suffixes, `~?n`
+  ties and, for edges, each adjacent face name. One is a `candidate`, several
+  are `ambiguous`, so a split face or a tied name is reported, not chosen.
+- With no lineage, the stored `sig` proposes faces or edges of the referenced
+  body with the same type and a direction within `UNIT_DOT_TOL`; the nearest
+  point wins, and matches equally near within `LINEAR_TOL` are `ambiguous`.
+- Other bodies are never searched by signature. Lineage names on them are
+  returned as `suggestions`, which only a user repair may accept.
+
+Candidates are ordered by body id and name with `compareNames`, never by
+kernel order.
+
 ### Known limitations
 
 - Centroid-ordered `~n` disambiguation can swap if an upstream edit moves
