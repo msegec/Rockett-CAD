@@ -21,6 +21,7 @@ export const projects = [
     name: "dom",
     environment: "happy-dom",
     include: [
+      "client/test/*.test.tsx",
       "client/test/dom/**/*.test.{ts,tsx}",
       "modules/*/test/dom/**/*.test.{ts,tsx}",
     ],

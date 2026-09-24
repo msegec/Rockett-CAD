@@ -646,13 +646,9 @@ export const useStore = create<State>((set, get) => ({
       set({ previewBaseline: JSON.parse(JSON.stringify(document)) });
     }
     preview.seq++;
-    preview.pending =
-      preview.pending?.fid === fid
-        ? {
-            fid,
-            patch: { ...preview.pending.patch, ...patch } as Partial<Feature>,
-          }
-        : { fid, patch };
+    const { targets: _replaced, ...queued }: Record<string, unknown> =
+      preview.pending?.fid === fid ? preview.pending.patch : {};
+    preview.pending = { fid, patch: { ...queued, ...patch } };
     preview.inFlight ??= sendPreviews();
     return preview.inFlight;
   },

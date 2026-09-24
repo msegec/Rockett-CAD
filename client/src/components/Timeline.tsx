@@ -273,7 +273,7 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
     }
   };
 
-  const params: Record<string, any> = { name: f.name };
+  const params: Record<string, any> = { name: f.name, targets: anyF.targets };
   switch (f.type) {
     case "extrude":
       Object.assign(params, {

@@ -9,6 +9,7 @@ import type { Feature } from "@rockett/shared";
 import { createLivePreview } from "../livePreview";
 import { panelPlacement } from "../panelPlacement";
 import { useStore } from "../store";
+import { storedTargets } from "../toolTargets";
 import { LengthField, NumField } from "./form/fields";
 
 interface QuickValue {
@@ -166,7 +167,7 @@ export function QuickEdit({
   anchor: { left: number; top: number };
   onClose: () => void;
 }) {
-  const [patch, setPatch] = useState<Partial<Feature>>({});
+  const [patch, setPatch] = useState(() => storedTargets(feature));
   const ref = useRef<HTMLDivElement>(null);
   const at = useAbove(ref, anchor);
   const committed = useRef(false);

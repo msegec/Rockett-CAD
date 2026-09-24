@@ -14,6 +14,7 @@ import {
   useStore,
   type Selection,
 } from "../../store";
+import { chosenTargets, several } from "../../toolTargets";
 
 export function NumField({
   label,
@@ -311,19 +312,15 @@ function pickLabel(
   return numbered(kind[0]!.toUpperCase() + kind.slice(1), entity.rank, sketch);
 }
 
-export function SelInfo({
+function PickRows({
   label,
-  picks,
-  hint,
+  rows,
+  onRemove,
 }: {
   label: string;
-  picks: Selection[];
-  hint: string;
+  rows: { key: string; name: string; pick: Selection }[];
+  onRemove: (keys: string[]) => void;
 }) {
-  const document = useStore((s) => s.document);
-  const evaluation = useStore((s) => s.evaluation);
-  const mode = useStore((s) => s.mode);
-  const bodies = previewBodies({ mode, evaluation });
   const setHover = useStore((s) => s.setHover);
   const hovered = useRef<Selection | null>(null);
   const hover = (pick: Selection | null) => {
@@ -337,46 +334,119 @@ export function SelInfo({
     },
     [],
   );
-  const remove = (gone: Selection[]) => {
-    const keys = new Set(gone.map(selectionKey));
-    const s = useStore.getState();
-    s.setSelection(s.selection.filter((x) => !keys.has(selectionKey(x))));
+  const remove = (keys: string[]) => {
+    onRemove(keys);
     setHover(null);
   };
+  if (rows.length === 0) return null;
+  return (
+    <div role="list" aria-label={label}>
+      {rows.map(({ key, name, pick }) => (
+        <div
+          key={key}
+          role="listitem"
+          className="measure-row"
+          onMouseEnter={() => hover(pick)}
+          onMouseLeave={() => hover(null)}
+        >
+          <span>{name}</span>
+          <button
+            className="icon-btn danger"
+            title="Remove"
+            aria-label={`Remove ${name}`}
+            onClick={() => remove([key])}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button className="btn" onClick={() => remove(rows.map((r) => r.key))}>
+        Clear
+      </button>
+    </div>
+  );
+}
+
+export function SelInfo({
+  label,
+  picks,
+  hint,
+}: {
+  label: string;
+  picks: Selection[];
+  hint: string;
+}) {
+  const document = useStore((s) => s.document);
+  const evaluation = useStore((s) => s.evaluation);
+  const mode = useStore((s) => s.mode);
+  const bodies = previewBodies({ mode, evaluation });
   return (
     <>
       <div className={`sel-info ${picks.length > 0 ? "have" : ""}`}>
         <span>{label}</span>
         <b>{picks.length > 0 ? `${picks.length} selected` : hint}</b>
       </div>
-      {picks.length > 0 && (
-        <div role="list" aria-label={label}>
-          {picks.map((pick) => {
-            const name = pickLabel(pick, document, evaluation, bodies);
-            return (
-              <div
-                key={selectionKey(pick)}
-                role="listitem"
-                className="measure-row"
-                onMouseEnter={() => hover(pick)}
-                onMouseLeave={() => hover(null)}
-              >
-                <span>{name}</span>
-                <button
-                  className="icon-btn danger"
-                  title="Remove"
-                  aria-label={`Remove ${name}`}
-                  onClick={() => remove([pick])}
-                >
-                  ✕
-                </button>
-              </div>
-            );
-          })}
-          <button className="btn" onClick={() => remove(picks)}>
-            Clear
-          </button>
-        </div>
+      <PickRows
+        label={label}
+        rows={picks.map((pick) => ({
+          key: selectionKey(pick),
+          name: pickLabel(pick, document, evaluation, bodies),
+          pick,
+        }))}
+        onRemove={(keys) => {
+          const gone = new Set(keys);
+          const s = useStore.getState();
+          s.setSelection(s.selection.filter((x) => !gone.has(selectionKey(x))));
+        }}
+      />
+    </>
+  );
+}
+
+export function TargetField({ operation }: { operation: string }) {
+  const value: string[] | undefined = useStore((s) => s.dialogParams.targets);
+  const setParams = useStore((s) => s.setDialogParams);
+  const namingVersion = useStore((s) => s.document?.namingVersion);
+  const evaluation = useStore((s) => s.evaluation);
+  const mode = useStore((s) => s.mode);
+  if (operation === "newBody") return null;
+  const bodies = previewBodies({ mode, evaluation });
+  const many = several(operation, namingVersion);
+  const ids = chosenTargets(operation, value, namingVersion);
+  const name = (id: string) =>
+    ranked(bodies, (b) => b.bodyId).get(id)?.item.name ?? id;
+  const set = (next: string[]) =>
+    setParams({ targets: next.length > 0 ? next : undefined });
+  const offered = bodies
+    .filter((b) => !many || !ids.includes(b.bodyId))
+    .map((b): [string, string] => [b.bodyId, b.name]);
+  const missing = many
+    ? []
+    : ids
+        .filter((id) => !bodies.some((b) => b.bodyId === id))
+        .map((id): [string, string] => [id, id]);
+  return (
+    <>
+      <SelectField
+        label={many ? "Targets" : "Target"}
+        value={many ? "" : (ids[0] ?? "")}
+        options={[
+          ["", many && ids.length > 0 ? "Add body" : "Auto"],
+          ...missing,
+          ...offered,
+        ]}
+        onChange={(id) => set(many ? [...ids, id] : id === "" ? [] : [id])}
+      />
+      {many && (
+        <PickRows
+          label="Targets"
+          rows={ids.map((id) => ({
+            key: id,
+            name: name(id),
+            pick: { kind: "body", bodyId: id },
+          }))}
+          onRemove={(keys) => set(ids.filter((id) => !keys.includes(id)))}
+        />
       )}
     </>
   );

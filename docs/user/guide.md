@@ -75,6 +75,10 @@ Undo/redo stays inside an existing sketch and returns to Select.
 - Extrude: new body, join, cut or intersect; symmetric or two-sided; from
   sketch profiles _or_ planar faces.
 - Revolve, sweep, loft, emboss and deboss.
+- Target: join, cut and intersect act on the bodies you choose. Auto picks
+  the bodies the tool meets, again after each edit. Intersect takes one body,
+  as does join in older projects; cut and join take several. A chosen body
+  stays chosen when upstream features change.
 - Sweep paths take lines and arcs drawn in any order. A branched or broken path
   fails with "sweep path is not a connected chain".
 

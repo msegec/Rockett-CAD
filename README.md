@@ -48,6 +48,7 @@ everything downstream against persistent topology references.
 ### Model
 
 - **Solid features**: extrude, revolve, sweep, loft, emboss and deboss from sketch profiles or planar faces.
+- **Tool targets**: join, cut and intersect act on the bodies you choose, or on Auto.
 - **Modify**: fillet, chamfer, shell, combine, split, press/pull and move bodies; shell with no open face hollows the body.
 - **Tangent chains**: fillet and chamfer pick smooth connected edges in one click, on one or several bodies.
 - **Replicate**: mirror, rectangular pattern and circular pattern.

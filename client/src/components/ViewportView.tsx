@@ -60,7 +60,7 @@ import { DIALOG_PICKS } from "../dialogPicks";
 import { dimensionLayout } from "../dimensionLayout";
 import { SketchOffsetIndicators } from "./SketchOffsetIndicators";
 import { ViewportContextMenu } from "./ViewportContextMenu";
-import { createLivePreview } from "../livePreview";
+import { dragPreview as livePreview, previewEdit } from "../toolTargets";
 
 interface DimEditField {
   constraintId: string;
@@ -79,12 +79,6 @@ interface DimLabel {
 }
 
 const NUDGE_EVENTS = ["pointerdown", "pointerup", "wheel"];
-
-const livePreview = createLivePreview({
-  send: (featureId, patch) =>
-    useStore.getState().updateFeaturePreview(featureId, patch),
-  now: () => performance.now(),
-});
 
 export function ViewportView() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -2705,10 +2699,7 @@ export function ViewportView() {
     if (refs.profiles.length + (refs.faces?.length ?? 0) === 0) return;
     const current = document_?.features.find((f) => f.id === editId);
     if (!current?.suppressed) return;
-    void useStore.getState().updateFeaturePreview(editId, {
-      ...refs,
-      suppressed: false,
-    } as any);
+    void previewEdit(editId, { ...refs, suppressed: false });
   }, [selection, editingProfiles]);
 
   // Hold Ctrl/⌘ while editing to see the model WITHOUT this feature — its
@@ -2736,10 +2727,7 @@ export function ViewportView() {
       const refs = selectionRefs(s.mode.dialog, s.selection);
       // nothing selected: stays hidden until a region is picked
       if (refs.profiles.length + (refs.faces?.length ?? 0) === 0) return;
-      void s.updateFeaturePreview(s.mode.editFeatureId, {
-        ...refs,
-        suppressed: false,
-      } as any);
+      void previewEdit(s.mode.editFeatureId, { ...refs, suppressed: false });
     };
     const onBlur = () => release();
     window.addEventListener("keydown", onDown);

@@ -24,6 +24,7 @@ import { api, saveDownload } from "../api";
 import { extrudeReachesBody } from "../extrudeReach";
 import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
 import { createLivePreview } from "../livePreview";
+import { toolTargets } from "../toolTargets";
 import { viewportHandle } from "../viewportRef";
 import { DraggablePanel } from "./DraggablePanel";
 import {
@@ -34,6 +35,7 @@ import {
   NumField,
   SelInfo,
   SelectField,
+  TargetField,
 } from "./form/fields";
 import { DialogFooter } from "./form/DialogFooter";
 
@@ -53,8 +55,9 @@ const picked = (value: unknown) =>
   JSON.stringify(value, (key, v) => (key === "sig" ? undefined : v));
 
 function changes(stored: Feature | undefined, patch: Partial<Feature>) {
-  return Object.entries(patch).some(
-    ([k, v]) => picked((stored as any)?.[k]) !== picked(v),
+  const was: Record<string, unknown> = { targets: [], ...stored };
+  return Object.entries({ targets: [], ...patch }).some(
+    ([k, v]) => picked(was[k]) !== picked(v),
   );
 }
 
@@ -201,6 +204,29 @@ function DialogBody({
 
   const close = () => setMode({ name: "idle" });
 
+  const targets = (operation: string) =>
+    toolTargets(operation, params.targets, document_?.namingVersion);
+  const operationField = (intersect: boolean, extra: object = {}) => (
+    <>
+      <SelectField
+        label="Operation"
+        value={p("operation", "join")}
+        options={[
+          ["newBody", "New body"],
+          ["join", "Join"],
+          ["cut", "Cut"],
+          ...(intersect
+            ? [["intersect", "Intersect"] as [string, string]]
+            : []),
+        ]}
+        onChange={(v) => setParams({ operation: v, ...extra })}
+      />
+      <TargetField operation={p("operation", "join")} />
+    </>
+  );
+  const embossOperation = () =>
+    p("embossMode", "emboss") === "emboss" ? "join" : "cut";
+
   // Extrude: a negative distance, Reversed or a drag below the surface means
   // "into the part", so Join turns to Cut if the tool meets a body; going back
   // undoes only that automatic switch, never an operation the user picked.
@@ -302,17 +328,7 @@ function DialogBody({
               onChange={(v) => setParams({ distance2: v })}
             />
           )}
-          <SelectField
-            label="Operation"
-            value={p("operation", "join")}
-            options={[
-              ["newBody", "New body"],
-              ["join", "Join"],
-              ["cut", "Cut"],
-              ["intersect", "Intersect"],
-            ]}
-            onChange={(v) => setParams({ operation: v, autoCut: false })}
-          />
+          {operationField(true, { autoCut: false })}
         </>
       );
       build = () => {
@@ -342,6 +358,7 @@ function DialogBody({
           }),
           direction,
           operation: p("operation", "join"),
+          ...targets(p("operation", "join")),
         };
       };
       break;
@@ -371,17 +388,7 @@ function DialogBody({
             value={p("angle", 360)}
             onChange={(v) => setParams({ angle: v })}
           />
-          <SelectField
-            label="Operation"
-            value={p("operation", "join")}
-            options={[
-              ["newBody", "New body"],
-              ["join", "Join"],
-              ["cut", "Cut"],
-              ["intersect", "Intersect"],
-            ]}
-            onChange={(v) => setParams({ operation: v })}
-          />
+          {operationField(true)}
         </>
       );
       build = () => {
@@ -395,6 +402,7 @@ function DialogBody({
           axis: axisRef(),
           angle: num("angle", 360),
           operation: p("operation", "join"),
+          ...targets(p("operation", "join")),
         };
       };
       break;
@@ -456,16 +464,7 @@ function DialogBody({
             ]}
             onChange={(v) => setParams({ pathSketchId: v })}
           />
-          <SelectField
-            label="Operation"
-            value={p("operation", "join")}
-            options={[
-              ["newBody", "New body"],
-              ["join", "Join"],
-              ["cut", "Cut"],
-            ]}
-            onChange={(v) => setParams({ operation: v })}
-          />
+          {operationField(false)}
         </>
       );
       build = () => {
@@ -479,6 +478,7 @@ function DialogBody({
           profiles: profileRefs(),
           pathSketchId: p("pathSketchId", ""),
           operation: p("operation", "join"),
+          ...targets(p("operation", "join")),
         };
       };
       break;
@@ -492,16 +492,7 @@ function DialogBody({
             picks={profiles}
             hint="click 2+ profiles"
           />
-          <SelectField
-            label="Operation"
-            value={p("operation", "join")}
-            options={[
-              ["newBody", "New body"],
-              ["join", "Join"],
-              ["cut", "Cut"],
-            ]}
-            onChange={(v) => setParams({ operation: v })}
-          />
+          {operationField(false)}
         </>
       );
       build = () => {
@@ -513,6 +504,7 @@ function DialogBody({
           suppressed: false,
           sections: profileRefs(),
           operation: p("operation", "join"),
+          ...targets(p("operation", "join")),
         };
       };
       break;
@@ -541,6 +533,7 @@ function DialogBody({
             ]}
             onChange={(v) => setParams({ embossMode: v })}
           />
+          <TargetField operation={embossOperation()} />
         </>
       );
       build = () => {
@@ -553,6 +546,7 @@ function DialogBody({
           profiles: profileRefs(),
           depth: main("emboss"),
           mode: p("embossMode", "emboss"),
+          ...targets(embossOperation()),
         };
       };
       break;

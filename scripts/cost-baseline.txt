@@ -1,8 +1,8 @@
 client/src/App.tsx Workspace 137
 client/src/components/ControlsHelp.tsx ControlsHelp 121
 client/src/components/DraggablePanel.tsx DraggablePanel 130
-client/src/components/FeatureDialog.tsx 1306
-client/src/components/FeatureDialog.tsx DialogBody 932
+client/src/components/FeatureDialog.tsx 1300
+client/src/components/FeatureDialog.tsx DialogBody 923
 client/src/components/FeatureDialog.tsx ReferenceImagePanel 188
 client/src/components/ModelTree.tsx 610
 client/src/components/ModelTree.tsx ModelTree 478
@@ -16,8 +16,8 @@ client/src/components/Timeline.tsx openFeatureEditor 175
 client/src/components/Toolbar.tsx SketchToolbar 98
 client/src/components/Toolbar.tsx Toolbar 92
 client/src/components/ViewportContextMenu.tsx ViewportContextMenu 137
-client/src/components/ViewportView.tsx 3204
-client/src/components/ViewportView.tsx ViewportView 2958
+client/src/components/ViewportView.tsx 3192
+client/src/components/ViewportView.tsx ViewportView 2952
 client/src/components/ViewportView.tsx handleHover 147
 client/src/components/ViewportView.tsx handlePrimaryUp 191
 client/src/components/ViewportView.tsx handleSketchClick 245
@@ -27,9 +27,9 @@ client/src/components/ViewportView.tsx pointerToSketchUV 221
 client/src/components/ViewportView.tsx useEffect() 108
 client/src/components/ViewportView.tsx useEffect()#2 296
 client/src/sketchTools.ts 827
-client/src/store.ts 1273
+client/src/store.ts 1269
 client/src/store.ts deleteSketchEntities 94
-client/src/store.ts useStore 790
+client/src/store.ts useStore 786
 client/src/three/CadViewport.ts 1076
 client/src/three/CadViewport.ts addHighlight 108
 client/src/three/CadViewport.ts buildBody 87
