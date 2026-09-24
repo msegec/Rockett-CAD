@@ -102,6 +102,59 @@ export function suffixDuplicates<T>(
   return named;
 }
 
+export function compareNames(a: string, b: string): number {
+  const x = a.match(/\d+|\D+/g) ?? [];
+  const y = b.match(/\d+|\D+/g) ?? [];
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const [p, q] = [x[i]!, y[i]!];
+    if (p === q) continue;
+    const numeric = /^\d/.test(p) && /^\d/.test(q);
+    return (numeric && Number(p) - Number(q)) || (p < q ? -1 : 1);
+  }
+  return x.length - y.length;
+}
+
+export interface BodyPiece {
+  shape: Shape;
+  names: NameMap;
+  region?: string;
+}
+
+export function assignBodyIds<T extends BodyPiece>(
+  parentId: string,
+  pieces: T[],
+): Array<[string, T]> {
+  if (pieces.length === 1) return [[parentId, pieces[0]!]];
+  const owned = pieces.map((piece) => {
+    const pieceFaces = faces(piece.shape);
+    const names = new Set(pieceFaces.map((f) => piece.names.get(f)));
+    release(pieceFaces);
+    names.delete(undefined);
+    if (piece.region) names.add(`r:${piece.region}`);
+    return [...names] as string[];
+  });
+  const bearers = new Map<string, number>();
+  for (const name of owned.flat())
+    bearers.set(name, (bearers.get(name) ?? 0) + 1);
+  return pieces
+    .map((piece, i) => {
+      const own = owned[i]!.filter((n) => bearers.get(n) === 1);
+      if (own.length === 0)
+        throw new Error(
+          `body identity conflict: a piece of ${parentId} has no name of its own`,
+        );
+      return {
+        piece,
+        key: own.reduce((a, b) => (compareNames(a, b) <= 0 ? a : b)),
+      };
+    })
+    .sort((a, b) => compareNames(a.key, b.key))
+    .map(({ piece }, i) => [
+      i === 0 ? parentId : `${parentId}:${i + 1}`,
+      piece,
+    ]);
+}
+
 /** Assign fallback names + disambiguate duplicates. Returns final NameMap. */
 export function finalizeNames(
   shape: Shape,

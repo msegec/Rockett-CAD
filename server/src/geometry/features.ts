@@ -65,12 +65,14 @@ import {
   type Shape,
 } from "./kernel.js";
 import {
+  assignBodyIds,
   computeEdgeNames,
   finalizeNames,
   findFace,
   historyNames,
   propagateNames,
   transformNames,
+  type BodyPiece,
   type NameMap,
   type NamedBody,
 } from "./naming.js";
@@ -246,10 +248,6 @@ function bboxOverlap(a: Shape, b: Shape): boolean {
   return true;
 }
 
-/**
- * Register the solids of `shape` under `bodyId`. If the shape contains
- * multiple solids they become bodyId, bodyId:2, ... ordered by volume.
- */
 function registerBodySolids(
   state: EvalState,
   bodyId: string,
@@ -273,6 +271,14 @@ function registerSolids(
     state.bodies.set(bodyId, { bodyId, shape: sols[0], names });
     return;
   }
+  if (names.version === 2) {
+    registerPieces(
+      state,
+      bodyId,
+      sols.map((shape) => ({ shape, names })),
+    );
+    return;
+  }
   const sorted = sols
     .map((s) => ({ s, v: volumeOf(s) }))
     .sort((a, b) => b.v - a.v);
@@ -280,6 +286,46 @@ function registerSolids(
     const id = i === 0 ? bodyId : `${bodyId}:${i + 1}`;
     state.bodies.set(id, { bodyId: id, shape: item.s, names });
   });
+}
+
+function registerPieces(
+  state: EvalState,
+  bodyId: string,
+  pieces: BodyPiece[],
+): void {
+  for (const [id, { shape, names }] of assignBodyIds(bodyId, pieces))
+    state.bodies.set(id, { bodyId: id, shape, names });
+}
+
+function registerNewBodies(
+  state: EvalState,
+  featureId: string,
+  tools: ToolResult[],
+  regions: ProfileFace[],
+): void {
+  const unified = tools.map((t) => unifyTool(t, featureId));
+  if (unified[0]?.names.version === 2) {
+    registerPieces(
+      state,
+      `b:${featureId}`,
+      unified.flatMap((u, i) =>
+        solids(u.shape).map((shape) => ({
+          shape,
+          names: u.names,
+          region: regions[i]!.profileId,
+        })),
+      ),
+    );
+    return;
+  }
+  unified.forEach((u, i) =>
+    registerBodySolids(
+      state,
+      i === 0 ? `b:${featureId}` : `b:${featureId}:${i + 1}`,
+      u.shape,
+      u.names,
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -705,17 +751,13 @@ function evalExtrude(state: EvalState, f: ExtrudeFeature): void {
     }
   }
 
-  // "New body": every region is its own body — Join is what merges them.
   if (f.operation === "newBody") {
-    tools.forEach((t, i) => {
-      const u = unifyTool(t, f.id);
-      registerBodySolids(
-        state,
-        i === 0 ? `b:${f.id}` : `b:${f.id}:${i + 1}`,
-        u.shape,
-        u.names,
-      );
-    });
+    registerNewBodies(
+      state,
+      f.id,
+      tools,
+      sources.map((s) => s.pf),
+    );
     return;
   }
 
@@ -786,17 +828,8 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
     tools.push(tool);
   }
 
-  // "New body": every region is its own body — Join is what merges them.
   if (f.operation === "newBody") {
-    tools.forEach((t, i) => {
-      const u = unifyTool(t, f.id);
-      registerBodySolids(
-        state,
-        i === 0 ? `b:${f.id}` : `b:${f.id}:${i + 1}`,
-        u.shape,
-        u.names,
-      );
-    });
+    registerNewBodies(state, f.id, tools, profileFaces);
     return;
   }
 

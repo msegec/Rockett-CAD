@@ -81,8 +81,9 @@ document containing it, so nothing is lost.
 Bodies get stable ids derived from the feature that created them:
 
 - `b:{featureId}`: a `newBody` extrude/revolve/sweep/loft. A `newBody`
-  extrude/revolve of several sketch regions makes one body per region, in
-  selection order (`b:x`, `b:x:2`, …); `join` is what merges regions into a
+  extrude/revolve of several sketch regions makes one body per region
+  (`b:x`, `b:x:2`, …), in selection order under `namingVersion` 1 and in
+  face name order under version 2; `join` is what merges regions into a
   single solid (with no existing body to join, the merged solid becomes the new
   body).
 - Boolean join/cut keep the _target_ body's id.
@@ -91,10 +92,16 @@ Bodies get stable ids derived from the feature that created them:
   Under version 2 each tool solid fuses into every body it overlaps, and each
   result is unified. Bodies one tool solid bridges become one body under the
   first id in sort order. Tool solids that overlap no body become
-  `b:{featureId}`, `b:{featureId}:2`, … by volume.
-- An operation that leaves multiple solids appends ordinal suffixes ordered
-  by volume (`b:x`, `b:x:2`, …); `splitBody` orders along the split-plane
-  normal (`b:x`, `b:x:s2`).
+  `b:{featureId}`, `b:{featureId}:2`, … in face name order.
+- An operation that leaves multiple solids appends ordinal suffixes
+  (`b:x`, `b:x:2`, …). Under version 1 they follow volume. Under version 2
+  `assignBodyIds` sorts the pieces by their smallest face name that no other
+  piece bears, comparing digit runs as numbers, so a pattern's original keeps
+  `b:x` and `~2` sorts before `~10`. A new body built from a sketch region
+  also bears `r:{profileId}`, so halves of a split circle, whose faces share
+  every name, still differ. A piece with no name of its own is an identity
+  conflict and fails the feature. `splitBody` orders along the
+  split-plane normal (`b:x`, `b:x:s2`).
 
 A body's display name lives in `document.bodyMeta[bodyId]` and is assigned
 server-side the first time a body id appears (`Body1`, `Body2`, …). Which

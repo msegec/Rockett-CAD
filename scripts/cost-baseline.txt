@@ -41,12 +41,12 @@ client/src/three/toolPreview.ts updateToolPreview 158
 server/src/api/routes.ts 719
 server/src/api/routes.ts createApiRouter 529
 server/src/geometry/engine.ts evaluate 112
-server/src/geometry/features.ts 2025
+server/src/geometry/features.ts 2058
 server/src/geometry/features.ts applyToolOperation 81
 server/src/geometry/features.ts buildPrism 81
 server/src/geometry/features.ts chamferByEnvelope 272
-server/src/geometry/features.ts evalExtrude 88
-server/src/geometry/features.ts evalRevolve 95
+server/src/geometry/features.ts evalExtrude 84
+server/src/geometry/features.ts evalRevolve 86
 server/src/geometry/sketchGeom.ts buildWire 81
 server/src/geometry/sketchGeom.ts subtractSketchRegionsFromFace 133
 server/src/geometry/tangentEdges.ts tangentEdges 110
