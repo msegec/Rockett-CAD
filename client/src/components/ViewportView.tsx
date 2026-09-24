@@ -621,7 +621,7 @@ export function ViewportView() {
   // build / rebuild the MOVE gizmo (three axis arrows) for the move dialog
   useEffect(() => {
     moveSlot.rebuild(buildMoveGizmo);
-  }, [mode, selection, evaluation]);
+  }, [mode, selection, evaluation, baseLoads]);
 
   function buildMoveGizmo(): MoveGizmo | null {
     const vp = viewportRef.current;
@@ -632,17 +632,13 @@ export function ViewportView() {
       .filter((x) => x.kind === "body")
       .map((x: any) => x.bodyId);
     if (bodyIds.length === 0) return null;
-    const bodies = (s.evaluation?.bodies ?? []).filter((b) =>
-      bodyIds.includes(b.bodyId),
-    );
+    const bodies = previewBodies(s).filter((b) => bodyIds.includes(b.bodyId));
     if (bodies.length === 0) return null;
     const t: [number, number, number] = [
       Number(s.dialogParams.tx) || 0,
       Number(s.dialogParams.ty) || 0,
       Number(s.dialogParams.tz) || 0,
     ];
-    // bodies already sit at +t when editing (feature applied) — the gizmo
-    // base is the pre-move position
     const shown = previewedFeature(s);
     const center = new THREE.Vector3();
     for (const b of bodies) {
@@ -655,8 +651,6 @@ export function ViewportView() {
       );
     }
     center.divideScalar(bodies.length);
-    if (shown?.type === "move")
-      center.sub(new THREE.Vector3(...shown.translation));
     // ghost meshes only for NEW moves; edits live-update the real geometry
     const ghosts = shown
       ? []
