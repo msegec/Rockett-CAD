@@ -66,6 +66,7 @@ import {
 } from "./kernel.js";
 import {
   assignBodyIds,
+  compareNames,
   computeEdgeNames,
   finalizeNames,
   findFace,
@@ -431,6 +432,23 @@ function fuseNamed(
   return { shape, names };
 }
 
+function touches(a: Shape, b: Shape): boolean {
+  if (!bboxOverlap(a, b)) return false;
+  const k = getKernel();
+  const dist = new k.BRepExtrema_DistShapeShape_2(
+    a,
+    b,
+    k.Extrema_ExtFlag.Extrema_ExtFlag_MIN,
+    k.Extrema_ExtAlgo.Extrema_ExtAlgo_Grad,
+    progress(),
+  );
+  const done = dist.IsDone();
+  const value = done ? dist.Value() : 0;
+  dist.delete();
+  if (!done) throw new Error("join contact check failed");
+  return value <= LINEAR_TOL;
+}
+
 function joinEvery(
   state: EvalState,
   featureId: string,
@@ -438,11 +456,11 @@ function joinEvery(
 ): void {
   const bodies = [...state.bodies.values()]
     .filter((b) => bboxOverlap(b.shape, tool.shape))
-    .sort((a, b) => (a.bodyId < b.bodyId ? -1 : 1));
+    .sort((a, b) => compareNames(a.bodyId, b.bodyId));
   let groups: { bodies: StateBody[]; pieces: ToolResult[] }[] = [];
   const loose: Shape[] = [];
   for (const shape of solids(tool.shape)) {
-    const hits = bodies.filter((b) => bboxOverlap(b.shape, shape));
+    const hits = bodies.filter((b) => touches(b.shape, shape));
     if (hits.length === 0) {
       loose.push(shape);
       continue;

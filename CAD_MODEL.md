@@ -89,10 +89,12 @@ Bodies get stable ids derived from the feature that created them:
 - Boolean join/cut keep the _target_ body's id.
 - Under `namingVersion` 1 a join fuses its whole tool into the first body its
   bounding box overlaps, so tool solids over other bodies become `b:{body}:n`.
-  Under version 2 each tool solid fuses into every body it overlaps, and each
+  Under version 2 each tool solid fuses into every body it touches or
+  overlaps, found by bounding box and then by kernel distance, and each
   result is unified. Bodies one tool solid bridges become one body under the
-  first id in sort order. Tool solids that overlap no body become
-  `b:{featureId}`, `b:{featureId}:2`, … in face name order.
+  first id, digit runs compared as numbers, so `b:x:2` wins over `b:x:10`.
+  Tool solids that touch no body become `b:{featureId}`,
+  `b:{featureId}:2`, … in face name order.
 - An operation that leaves multiple solids appends ordinal suffixes
   (`b:x`, `b:x:2`, …). Under version 1 they follow volume. Under version 2
   `assignBodyIds` sorts the pieces by their smallest face name that no other
