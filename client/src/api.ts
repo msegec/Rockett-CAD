@@ -218,17 +218,27 @@ function refill(
   };
 }
 
+async function sendHeld<P extends string, Req, Res>(
+  route: Route<P, Req & HeldMeshes, Res>,
+  params: PathParams<P>,
+  body: Req,
+  position: number | undefined,
+): Promise<[Res, ReadonlyMap<string, BodyPayload>]> {
+  const held = meshes;
+  const response = await send(route, params, {
+    body: { ...body, held: [...held.keys()] },
+    position,
+  });
+  return [response, held];
+}
+
 async function holding<P extends string, Req>(
   route: Route<P, Req & HeldMeshes, WireMutationResponse>,
   params: PathParams<P>,
   body: Req,
   position?: number,
 ): Promise<MutationResponse> {
-  const held = meshes;
-  const response = await send(route, params, {
-    body: { ...body, held: [...held.keys()] },
-    position,
-  });
+  const [response, held] = await sendHeld(route, params, body, position);
   return {
     document: response.document,
     evaluation: keep(refill(response.evaluation, held)),
@@ -301,10 +311,11 @@ export const api = {
     send(ROUTES.updateFolder, { id }, { body: { parentId } }),
   deleteFolder: (id: string) => send(ROUTES.deleteFolder, { id }),
 
-  evaluate: (id: string, position?: number) =>
-    send(ROUTES.evaluate, { id }, { position }).then((evaluation) =>
-      position === undefined ? keep(evaluation) : evaluation,
-    ),
+  evaluate: async (id: string, position?: number) => {
+    const [wire, held] = await sendHeld(ROUTES.evaluate, { id }, {}, position);
+    const evaluation = refill(wire, held);
+    return position === undefined ? keep(evaluation) : evaluation;
+  },
   tangentEdges: (id: string, edge: EdgeRef, beforeFeatureId?: string) =>
     send(ROUTES.tangentEdges, { id }, { body: { edge, beforeFeatureId } }),
   projectEdge: (id: string, fid: string, edge: EdgeRef, entityId: string) =>

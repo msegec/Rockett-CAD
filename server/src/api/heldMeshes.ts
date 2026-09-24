@@ -39,10 +39,12 @@ export function omitHeldMeshes(req: Request, res: Response): void {
   const held = heldKeys(req.body);
   if (!held) return;
   const json = res.json.bind(res);
-  res.json = (body?: { evaluation?: EvaluateResult }) =>
+  res.json = (body?: EvaluateResult | { evaluation?: EvaluateResult }) =>
     json(
-      body?.evaluation
-        ? { ...body, evaluation: withoutHeld(body.evaluation, held) }
-        : body,
+      body && "bodies" in body
+        ? withoutHeld(body, held)
+        : body?.evaluation
+          ? { ...body, evaluation: withoutHeld(body.evaluation, held) }
+          : body,
     );
 }

@@ -173,7 +173,10 @@ export const ROUTES = {
     placeProjectBody,
   ),
   downloadProjectFile: route<never, Blob>()("GET", "/projects/:id/file"),
-  evaluate: route<never, EvaluateResult>()("GET", "/projects/:id/evaluate"),
+  evaluate: route<HeldMeshes, WireEvaluateResult>()(
+    "POST",
+    "/projects/:id/evaluate",
+  ),
   replaceDocument: route<
     { document: CadDocument } & HeldMeshes,
     WireMutationResponse

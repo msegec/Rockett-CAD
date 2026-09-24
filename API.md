@@ -35,23 +35,25 @@ and bbox, without its name or visibility. The client keeps a body's viewport
 objects while its key is unchanged. A JSON response of 64 KiB or more is
 gzipped when the request accepts gzip.
 
-A mutating request with a JSON body may carry `held`, the `meshKey`s the
-client already holds (`HeldMeshes`). A body whose key is in `held` comes back
-as `HeldBodyPayload`, `{ bodyId, name, visible, meshKey }`, with no mesh,
-faces, edges, vertices or bbox; every other body comes in full
-(`WireEvaluateResult`). Without `held` every body comes in full. A `held`
-that is not an array of strings is 400 `validation` with detail `/held` or
-`/held/N`. `client/src/api.ts` sends the keys of the last mutation response
-or whole-timeline evaluation it received and refills each omitted body from
-the payloads it held when it sent that request, so its callers get full
-`BodyPayload`s.
+A mutating request with a JSON body, and `POST /projects/:id/evaluate`, may
+carry `held`, the `meshKey`s the client already holds (`HeldMeshes`). A body
+whose key is in `held` comes back as `HeldBodyPayload`,
+`{ bodyId, name, visible, meshKey }`, with no mesh, faces, edges, vertices or
+bbox; every other body comes in full (`WireEvaluateResult`). Without `held`
+every body comes in full. A `held` that is not an array of strings is 400
+`validation` with detail `/held` or `/held/N`. `client/src/api.ts` sends the
+keys of the last mutation response or whole-timeline evaluation it received,
+including when it evaluates at an earlier position, and refills each omitted
+body from the payloads it held when it sent that request, so its callers get
+full `BodyPayload`s. Evaluate is `POST` because 1,000 keys of 64 hex
+characters, about 65 KB, exceed Node's 16 KB request header limit in a URL.
 
-`GET /projects/:id/evaluate`, `PUT /projects/:id/features/:fid`, and
+`POST /projects/:id/evaluate`, `PUT /projects/:id/features/:fid`, and
 `PUT /projects/:id/document` accept an optional `?position=N` for the returned
 evaluation. This temporarily evaluates the first N features without moving the
 document's saved timeline marker, for sketch editing and undo/redo in a sketch.
 
-`GET /projects/:id/evaluate` never writes the project. A body without saved
+`POST /projects/:id/evaluate` never writes the project. A body without saved
 display metadata gets the default (its name is the body id) in the response
 only; mutating routes save new body metadata.
 
@@ -197,7 +199,7 @@ the document, and uploads that take the document beyond 40 MB are rejected.
 
 | Method & path                        | Body                    | Notes                                                                        |
 | ------------------------------------ | ----------------------- | ---------------------------------------------------------------------------- |
-| `GET /projects/:id/evaluate`         | none                    | Evaluate to the timeline marker; returns `EvaluateResult`                    |
+| `POST /projects/:id/evaluate`        | `{ held? }`             | Evaluate to the timeline marker; returns `WireEvaluateResult`                |
 | `PUT /projects/:id/document`         | `{ document }`          | Full replace (undo/redo restore); validated; 404 if project no longer exists |
 | `POST /projects/:id/features`        | `{ feature }`           | Insert **at the timeline marker**; empty `name` → server assigns `Extrude2`… |
 | `PUT /projects/:id/features/:fid`    | `{ feature }` (partial) | Edit parameters/name/suppressed; id immutable                                |
