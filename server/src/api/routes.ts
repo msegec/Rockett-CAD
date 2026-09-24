@@ -1,11 +1,3 @@
-/**
- * REST API.
- *
- * The server owns the document: clients send feature-level operations, the
- * server validates, persists (autosave on every mutation) and returns the
- * updated document plus a fresh incremental evaluation.
- */
-
 import { Router, json, type RequestHandler } from "express";
 import {
   DOCUMENT_EDITS,
@@ -15,6 +7,7 @@ import {
   projectEdge,
   ROUTES,
   SCHEMA_VERSION,
+  TX_HEADER,
   ValidationError,
   type ApiErrorBody,
   type ApiErrorCode,
@@ -32,6 +25,7 @@ import { splitView } from "../store/migrations.js";
 import type { FolderStore } from "../store/folderStore.js";
 import { StoreError } from "../store/projectStore.js";
 import { ProjectQueue } from "../store/projectQueue.js";
+import { HistoryStore } from "../store/historyStore.js";
 import { engineFor, dropEngine } from "../geometry/engine.js";
 import { kernelVersion } from "../geometry/kernel.js";
 import { measure } from "../geometry/measure.js";
@@ -41,7 +35,7 @@ import { curveInfo } from "../geometry/tessellate.js";
 import { signRefs } from "../geometry/signature.js";
 import { lacksTargets, pinTargets } from "../geometry/pinRefs.js";
 import {
-  commitNamingUpgrade,
+  acceptedNamingUpgrade,
   namingUpgraded,
   stageNamingUpgrade,
 } from "../geometry/upgradeNaming.js";
@@ -78,6 +72,7 @@ import {
   keepNamingVersion,
   reply,
   RevisionConflict,
+  transactionId,
 } from "./revision.js";
 import { omitHeldMeshes } from "./heldMeshes.js";
 
@@ -154,6 +149,15 @@ const EXPORTERS: Record<
   },
 };
 
+interface Mutation {
+  label: string;
+  document?: CadDocument;
+  position?: number | undefined;
+  [extra: string]: unknown;
+}
+
+type Edit = (doc: CadDocument, req: any) => Promise<Mutation>;
+
 const KEEPS_TARGETS = new Set(["name", "suppressed"]);
 
 function retargets(patch: object): boolean {
@@ -206,6 +210,7 @@ export function createApiRouter(
 ): Router {
   const { uploadBytes, importBytes } = { ...IMPORT_LIMITS, ...limits };
   const router = Router();
+  const history = new HistoryStore(store.documents.options.storage, store);
   router.use(json({ limit: JSON_BODY_LIMIT_BYTES }), check(omitHeldMeshes));
   const on = (route: Route, ...handlers: RequestHandler[]) =>
     router[route.method.toLowerCase() as Lowercase<Method>](
@@ -267,7 +272,6 @@ export function createApiRouter(
     if (missing.length) signRefs((await stateAt(doc, index)).bodies, missing);
   }
 
-  /** Evaluate + make sure every body has display metadata. */
   async function evaluateAndSync(doc: CadDocument, position?: number) {
     const evaluation = await evaluate(doc, position);
     let metaChanged = pruneGroups(doc, evaluation, position);
@@ -279,15 +283,30 @@ export function createApiRouter(
         metaChanged = true;
       }
     }
-    if (metaChanged) {
+    if (metaChanged)
       evaluation.bodies = evaluation.bodies.map((body) => ({
         ...body,
         name: doc.bodyMeta[body.bodyId]!.name,
       }));
-      await store.save(doc);
-    }
     return evaluation;
   }
+
+  const mutateProject = (edit: Edit) =>
+    wrap(
+      discarding(store.uploads, async (req, res) => {
+        const tx = transactionId(req.get(TX_HEADER));
+        const loaded = await editable(req, res);
+        const {
+          label,
+          position,
+          document = loaded,
+          ...extra
+        } = await edit(loaded, req);
+        const evaluation = await evaluateAndSync(document, position);
+        await history.save(document, label, tx);
+        reply(res, { ...extra, document, evaluation });
+      }),
+    );
 
   on(ROUTES.health, (_req, res) => {
     res.json({
@@ -298,8 +317,6 @@ export function createApiRouter(
       kernelVersion: kernelVersion(),
     });
   });
-
-  // ----- projects -----
 
   on(
     ROUTES.listProjects,
@@ -369,8 +386,6 @@ export function createApiRouter(
   for (const [route, handler] of folderRoutes(folders, store))
     on(route, wrap(handler));
 
-  // ----- evaluation -----
-
   on(
     ROUTES.evaluate,
     wrap(async (req, res) => {
@@ -379,31 +394,24 @@ export function createApiRouter(
     }),
   );
 
-  // ----- document-level replace (undo/redo restore) -----
-
   on(
     ROUTES.replaceDocument,
-    wrap(async (req, res) => {
+    mutateProject(async (stored, req) => {
       const sent = req.body?.document;
-      if (!sent || sent.id !== req.params.id) {
+      if (!sent || sent.id !== req.params.id)
         throw new ValidationError("document id mismatch");
-      }
       validateDocument(sent);
-      const incoming = splitView(sent).doc as unknown as CadDocument;
-      const position = evaluationPosition(req, incoming);
-      // Replacement is an edit, not creation (e.g. a delayed undo after delete).
-      const stored = await editable(req, res);
+      const document = splitView(sent).doc as unknown as CadDocument;
+      const position = evaluationPosition(req, document);
       if (!(await namingUpgraded(store, stored.id)))
-        keepNamingVersion(stored, incoming);
-      await store.save(incoming);
-      const evaluation = await evaluateAndSync(incoming, position);
-      send(res, incoming, evaluation);
+        keepNamingVersion(stored, document);
+      return { label: "Replace document", document, position };
     }),
   );
 
-  // ----- features -----
   const receiveStep = receiveImport(store.uploads, uploadBytes);
-  const importUpload = async (req: any, res: any) => {
+  type Received = Awaited<ReturnType<typeof received>>;
+  async function received(req: any) {
     const file: Upload | undefined = req.file,
       importer = file && importerFor(file.originalname);
     if (!file || !importer)
@@ -416,10 +424,10 @@ export function createApiRouter(
       filename,
     );
     features.forEach(validateFeature);
-    const created = !req.params.id;
-    const doc = created
-      ? await store.create(filename.replace(/\.[^.]*$/, ""))
-      : await editable(req, res);
+    return { file, importer, filename, features, sources };
+  }
+  async function insert(doc: CadDocument, upload: Received) {
+    const { file, importer, features, sources } = upload;
     try {
       const at = Math.min(doc.timelinePosition, doc.features.length);
       doc.features.splice(at, 0, ...features);
@@ -447,70 +455,76 @@ export function createApiRouter(
         await (hash === file.hash
           ? store.blobs(doc.id).adopt(file)
           : store.blobs(doc.id).put(bytes));
-      await store.save(doc);
-      send(res, doc, await evaluateAndSync(doc));
+      return { label: `Import ${upload.filename}` };
     } catch (error) {
       dropEngine(doc.id);
-      if (created) await store.remove(doc.id);
       throw error;
     }
-  };
-  const importStep = wrap(discarding(store.uploads, importUpload));
-  on(ROUTES.importStep, receiveStep, importStep);
-  on(ROUTES.importStepInto, receiveStep, importStep);
+  }
+  on(
+    ROUTES.importStep,
+    receiveStep,
+    wrap(
+      discarding(store.uploads, async (req, res) => {
+        const upload = await received(req);
+        const doc = await store.create(upload.filename.replace(/\.[^.]*$/, ""));
+        try {
+          await insert(doc, upload);
+          const evaluation = await evaluateAndSync(doc);
+          await store.save(doc);
+          send(res, doc, evaluation);
+        } catch (error) {
+          dropEngine(doc.id);
+          await store.remove(doc.id);
+          throw error;
+        }
+      }),
+    ),
+  );
+  on(
+    ROUTES.importStepInto,
+    receiveStep,
+    mutateProject(async (doc, req) => insert(doc, await received(req))),
+  );
 
   on(
     ROUTES.addFeature,
-    wrap(async (req, res) => {
-      const doc = await editable(req, res);
+    mutateProject(async (doc, req) => {
       const feature = req.body?.feature as Feature;
       record(feature, "feature");
       knownKeys(feature, feature.type);
-      if (!feature.name) {
-        feature.name = nextFeatureName(doc, feature.type);
-      }
+      feature.name ||= nextFeatureName(doc, feature.type);
       validateFeature(feature);
-      if (doc.features.some((f) => f.id === feature.id)) {
+      if (doc.features.some((f) => f.id === feature.id))
         throw new ValidationError("duplicate feature id");
-      }
-      // Insert at the timeline marker (supports inserting mid-history).
       const at = Math.min(doc.timelinePosition, doc.features.length);
       await signed(doc, at, feature);
       doc.features.splice(at, 0, feature);
       doc.timelinePosition = at + 1;
       await pinned(doc, at);
-      await store.save(doc);
-      const evaluation = await evaluateAndSync(doc);
-      send(res, doc, evaluation);
+      return { label: `Add ${feature.name}` };
     }),
   );
 
   on(
     ROUTES.updateFeature,
-    wrap(async (req, res) => {
-      const doc = await editable(req, res);
+    mutateProject(async (doc, req) => {
       const position = evaluationPosition(req, doc);
       const idx = doc.features.findIndex((f) => f.id === req.params.fid);
-      if (idx < 0) throw new StoreError("feature not found", "not_found");
+      const current = doc.features[idx];
+      if (!current) throw new StoreError("feature not found", "not_found");
       const patch = req.body?.feature as Partial<Feature>;
       record(patch, "feature");
-      if (patch.type !== undefined && patch.type !== doc.features[idx]!.type) {
+      if (patch.type !== undefined && patch.type !== current.type)
         throw new ValidationError("feature type cannot change");
-      }
-      knownKeys(patch, doc.features[idx]!.type);
-      const updated = {
-        ...doc.features[idx],
-        ...patch,
-        id: doc.features[idx]!.id,
-      };
+      knownKeys(patch, current.type);
+      const updated = { ...current, ...patch, id: current.id } as Feature;
       if (retargets(patch)) Reflect.deleteProperty(updated, "targets");
-      validateFeature(updated as Feature);
-      await signed(doc, idx, updated as Feature, doc.features[idx]);
-      doc.features[idx] = updated as Feature;
+      validateFeature(updated);
+      await signed(doc, idx, updated, current);
+      doc.features[idx] = updated;
       await pinned(doc, idx);
-      await store.save(doc);
-      const evaluation = await evaluateAndSync(doc, position);
-      send(res, doc, evaluation);
+      return { label: `Edit ${updated.name}`, position };
     }),
   );
 
@@ -549,33 +563,26 @@ export function createApiRouter(
 
   on(
     ROUTES.deleteFeature,
-    wrap(async (req, res) => {
-      const doc = await editable(req, res);
+    mutateProject(async (doc, req) => {
       const idx = doc.features.findIndex((f) => f.id === req.params.fid);
       if (idx < 0) throw new StoreError("feature not found", "not_found");
-      doc.features.splice(idx, 1);
+      const [deleted] = doc.features.splice(idx, 1);
       if (doc.timelinePosition > idx) doc.timelinePosition--;
-      await store.save(doc);
-      const evaluation = await evaluateAndSync(doc);
-      send(res, doc, evaluation);
+      return { label: `Delete ${deleted!.name}` };
     }),
   );
 
   on(
     ROUTES.setTimeline,
-    wrap(async (req, res) => {
-      const doc = await editable(req, res);
+    mutateProject(async (doc, req) => {
       const { position } = req.body;
       if (position > doc.features.length)
         throw new ValidationError("invalid timeline position", "/position");
       doc.timelinePosition = position;
-      await store.save(doc);
-      const evaluation = await evaluateAndSync(doc);
-      send(res, doc, evaluation);
+      return { label: "Roll timeline" };
     }),
   );
 
-  // ----- bodies -----
   on(
     ROUTES.tangentEdges,
     wrap(async (req, res) => {
@@ -600,29 +607,20 @@ export function createApiRouter(
 
   on(
     ROUTES.updateGroups,
-    wrap(async (req, res) => {
-      const doc = await editable(req, res);
+    mutateProject(async (doc, req) => {
       doc.groups = req.body.groups;
-      await store.save(doc);
-      const evaluation = await evaluateAndSync(doc);
-      send(res, doc, evaluation);
+      return { label: "Edit groups" };
     }),
   );
 
   on(
     ROUTES.updateBody,
-    wrap(async (req, res) => {
-      const doc = await editable(req, res);
-      const { bodyId } = req.params;
-      const meta = doc.bodyMeta[bodyId];
+    mutateProject(async (doc, req) => {
+      const meta = doc.bodyMeta[req.params.bodyId];
       if (!meta) throw new StoreError("body not found", "not_found");
-      const { name } = req.body;
-      if (name !== undefined) {
-        meta.name = name.slice(0, 120);
-        await store.save(doc);
-      }
-      const evaluation = await evaluateAndSync(doc);
-      send(res, doc, evaluation);
+      const label = `Rename ${meta.name}`;
+      if (req.body.name !== undefined) meta.name = req.body.name.slice(0, 120);
+      return { label };
     }),
   );
 
@@ -636,11 +634,10 @@ export function createApiRouter(
 
   on(
     ROUTES.commitNamingUpgrade,
-    wrap(async (req, res) => {
-      const doc = await editable(req, res);
-      const plan = await commitNamingUpgrade(store, doc, req.body.accept);
-      reply(res, { ...plan, evaluation: await evaluateAndSync(plan.document) });
-    }),
+    mutateProject(async (doc, req) => ({
+      label: "Upgrade naming",
+      ...(await acceptedNamingUpgrade(store, doc, req.body.accept)),
+    })),
   );
 
   on(
@@ -658,8 +655,6 @@ export function createApiRouter(
     }),
   );
 
-  // ----- measure -----
-
   on(
     ROUTES.measure,
     wrap(async (req, res) => {
@@ -668,8 +663,6 @@ export function createApiRouter(
       res.json(measure(state, req.body));
     }),
   );
-
-  // ----- export -----
 
   on(
     ROUTES.exportModel,
@@ -719,8 +712,6 @@ export function createApiRouter(
       res.send(data);
     }),
   );
-
-  // ----- assets (reference images) -----
 
   on(
     ROUTES.uploadImage,

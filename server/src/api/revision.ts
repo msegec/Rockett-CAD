@@ -1,4 +1,9 @@
-import type { CadDocument, EvaluateResult } from "@rockett/shared";
+import {
+  TX_HEADER,
+  TX_ID,
+  type CadDocument,
+  type EvaluateResult,
+} from "@rockett/shared";
 import { StoreError } from "../store/projectStore.js";
 
 export class RevisionConflict extends StoreError {
@@ -22,6 +27,13 @@ export function ifMatchRevision(header: string | undefined): number {
       'If-Match must be one quoted document revision, such as "3".',
     );
   return Number(match[1]);
+}
+
+export function transactionId(header: string | undefined): string | undefined {
+  if (header === undefined || TX_ID.test(header)) return header;
+  throw new StoreError(
+    `${TX_HEADER} must be 1 to 64 letters, digits, underscores or dashes.`,
+  );
 }
 
 export function checkRevision(doc: CadDocument, expected: number): CadDocument {

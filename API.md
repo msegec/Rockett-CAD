@@ -95,6 +95,23 @@ not edit the document and take no `If-Match`. `client/src/api.ts` remembers
 the highest revision it has received per project and sends it on every
 document edit.
 
+### History
+
+Every document edit except the project rename saves the document and one
+undo history entry in the same write. Labels read `Add Extrude2`,
+`Edit Fillet1`, `Delete Sketch3`, `Roll timeline`, `Rename Body1`,
+`Edit groups`, `Import part.step`, `Replace document` and `Upgrade naming`.
+The server evaluates before it saves, so names given to new bodies land in
+the same entry and revision, and a failed edit writes and records nothing.
+The project rename and `PUT /view` record nothing.
+
+A document edit may send `X-Rockett-Tx: <id>`, 1 to 64 letters, digits,
+underscores or dashes; any other value is 400 `validation` with nothing
+written. Without it the request is its own entry. When the id matches the
+latest entry's, the edit replaces that entry's snapshot and keeps its label,
+so undo returns to the state before the transaction's first edit. Any other
+entry in between starts a new one.
+
 ## Projects
 
 | Method & path                  | Body                   | Returns                                                                                                                                                        |

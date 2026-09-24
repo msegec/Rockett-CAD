@@ -110,7 +110,7 @@ docker run -d --name rockett-cad \
         ├── view.json       # hidden bodies and features, outside the document
         ├── temporary.json  # present only on a temporary copy of a browser project
         ├── blobs/          # reference images and STEP, IGES and BREP sources, each named by its sha256
-        ├── history/        # undo history: log.json, cursor.json and snapshots/ (gzip documents named by sha256)
+        ├── history/        # undo history: log.json and snapshots/ (gzip documents named by sha256)
         └── exports/        # server-retained exports (opt-in per export)
 ```
 
@@ -137,11 +137,11 @@ project, the server copy of a project kept in the browser, is never backed up
 before migration; the server deletes it after 24 hours without a request.
 Backups are never pruned.
 
-A history write replaces the document, `history/log.json` and
-`history/cursor.json` and adds a snapshot. It first copies the files it
-replaces to `tx-{hash}/` and lists that copy and the files it adds in
-`migrating.json`, so startup, or the next write, restores the previous
-generation after a failure, as for a migration. The copy and a backups
+A history write replaces the document and `history/log.json` and adds a
+snapshot. It first copies the files it replaces to `tx-{hash}/` and lists
+that copy and the files it adds in `migrating.json`, then writes the new files
+together, so startup, or the next write, restores the previous generation
+after a failure, as for a migration. The copy and a backups
 directory holding nothing else are removed once the write ends. The log keeps
 the 50 most recent entries, the state before the oldest of them and every
 checkpoint; a snapshot none of them names is deleted on the next history

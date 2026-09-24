@@ -4,11 +4,10 @@ import zlib from "node:zlib";
 import {
   HISTORY_LIMIT,
   HISTORY_VERSION,
-  historyCursor,
+  LABEL_LIMIT,
   historyLog,
   parse,
   type CadDocument,
-  type HistoryCursor,
   type HistoryLog,
 } from "@rockett/shared";
 import { BlobStore } from "./blobStore.js";
@@ -22,44 +21,30 @@ const gunzip = promisify(zlib.gunzip);
 
 type Staged = Map<string, string | Uint8Array>;
 
-export type History = HistoryLog & { position: number };
-
-function historyFile<T extends { version: number }>(
-  storage: Storage,
-  name: string,
-  validate: (value: T) => void,
-) {
-  return new JsonStore<T>({
-    storage,
-    root: "projects",
-    name: `project history ${name}`,
-    key: ID_RE,
-    file: () => `history/${name}.json`,
-    migrations: {
-      namespace: `history ${name}`,
-      current: HISTORY_VERSION,
-      field: "version",
-      steps: {},
-    },
-    validate,
-  });
-}
-
 export class HistoryStore {
   private readonly logs: JsonStore<HistoryLog>;
-  private readonly cursors: JsonStore<HistoryCursor>;
 
   constructor(
     private readonly storage: Storage,
     private readonly store: ProjectStore,
   ) {
-    this.logs = historyFile(storage, "log", (v) => parse(historyLog, v));
-    this.cursors = historyFile(storage, "cursor", (v) =>
-      parse(historyCursor, v),
-    );
+    this.logs = new JsonStore<HistoryLog>({
+      storage,
+      root: "projects",
+      name: "project history log",
+      key: ID_RE,
+      file: () => "history/log.json",
+      migrations: {
+        namespace: "history log",
+        current: HISTORY_VERSION,
+        field: "version",
+        steps: {},
+      },
+      validate: (log) => parse(historyLog, log),
+    });
   }
 
-  save(doc: CadDocument, label: string): Promise<void> {
+  save(doc: CadDocument, label: string, tx?: string): Promise<void> {
     return this.store.save(doc, (file, text) =>
       this.commit(doc.id, async (history) => {
         const files: Staged = new Map([[file, text]]);
@@ -67,21 +52,26 @@ export class HistoryStore {
           history?.base ??
           (await this.stage(doc.id, files, await this.storage.read(file)));
         const entries = history?.entries.slice(0, history.position) ?? [];
-        entries.push(this.mark(label, await this.stage(doc.id, files, text)));
+        const joined =
+          tx !== undefined && entries.at(-1)?.tx === tx
+            ? entries.pop()
+            : undefined;
+        entries.push({
+          ...this.mark(
+            joined?.label ?? label,
+            await this.stage(doc.id, files, text),
+          ),
+          ...(tx !== undefined && { tx }),
+        });
         const dropped = entries.splice(0, entries.length - HISTORY_LIMIT);
         const log: HistoryLog = {
           version: HISTORY_VERSION,
           base: dropped.at(-1)?.snapshot ?? base,
           entries,
+          position: entries.length,
           checkpoints: history?.checkpoints ?? [],
         };
         files.set(...this.logs.encode(doc.id, log));
-        files.set(
-          ...this.cursors.encode(doc.id, {
-            version: HISTORY_VERSION,
-            position: entries.length,
-          }),
-        );
         return files;
       }),
     );
@@ -95,9 +85,7 @@ export class HistoryStore {
         const { base, entries, checkpoints, position } = history;
         const snapshot = entries[position - 1]?.snapshot ?? base;
         const log: HistoryLog = {
-          version: HISTORY_VERSION,
-          base,
-          entries,
+          ...history,
           checkpoints: [...checkpoints, this.mark(label, snapshot)],
         };
         return new Map([this.logs.encode(id, log)]);
@@ -105,7 +93,7 @@ export class HistoryStore {
     );
   }
 
-  async read(id: string): Promise<History | undefined> {
+  async read(id: string): Promise<HistoryLog | undefined> {
     let stored: unknown;
     try {
       stored = await this.logs.read(id);
@@ -116,10 +104,9 @@ export class HistoryStore {
     }
     try {
       const log = parse(historyLog, stored);
-      const { position } = parse(historyCursor, await this.cursors.read(id));
-      if (position > log.entries.length)
-        throw new Error("the cursor is past the log");
-      return { ...log, position };
+      if (log.position > log.entries.length)
+        throw new Error("the position is past the log");
+      return log;
     } catch (err) {
       throw new StoreError(
         `project ${id} history is damaged: ${(err as Error).message}`,
@@ -135,7 +122,7 @@ export class HistoryStore {
 
   private commit(
     id: string,
-    build: (history?: History) => Promise<Staged>,
+    build: (history?: HistoryLog) => Promise<Staged>,
   ): Promise<void> {
     return backupNamespace(this.storage, this.logs.dir(id)).commit(async () => {
       const history = await this.read(id);
@@ -145,7 +132,11 @@ export class HistoryStore {
   }
 
   private mark(label: string, snapshot: string) {
-    return { label, at: new Date().toISOString(), snapshot };
+    return {
+      label: label.slice(0, LABEL_LIMIT),
+      at: new Date().toISOString(),
+      snapshot,
+    };
   }
 
   private snapshots(id: string): BlobStore {
@@ -168,7 +159,7 @@ export class HistoryStore {
     return hash;
   }
 
-  private async prune(id: string, history: History): Promise<void> {
+  private async prune(id: string, history: HistoryLog): Promise<void> {
     const marks = [...history.entries, ...history.checkpoints];
     const kept = new Set([history.base, ...marks.map((m) => m.snapshot)]);
     const dir = this.snapshotDir(id);

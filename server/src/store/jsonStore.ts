@@ -77,7 +77,47 @@ export class NamespaceBackup {
     return this.storage.list(this.root);
   }
 
-  async migrate(
+  migrate(
+    version: string,
+    created: Files,
+    apply: () => Promise<void>,
+    names?: string[],
+  ): Promise<void> {
+    return this.journal(
+      version,
+      created,
+      async () => {
+        await writeAll(this.storage, created);
+        await apply();
+      },
+      names,
+    );
+  }
+
+  async commit(build: () => Promise<Files>): Promise<void> {
+    await this.settle();
+    const files = await build();
+    const created = new Map<string, string | Uint8Array>();
+    const replaced: string[] = [];
+    for (const [file, data] of files) {
+      const live = await this.storage.list(path.posix.dirname(file));
+      if (live.includes(path.posix.basename(file)))
+        replaced.push(path.posix.relative(this.dir, file));
+      else created.set(file, data);
+    }
+    try {
+      await this.journal(
+        TRANSACTION,
+        created,
+        () => writeAll(this.storage, files),
+        replaced,
+      );
+    } finally {
+      await this.settle();
+    }
+  }
+
+  private async journal(
     version: string,
     created: Files,
     apply: () => Promise<void>,
@@ -91,43 +131,21 @@ export class NamespaceBackup {
         created: [...created].map(([file, data]) => [file, sha256(data)]),
       }),
     );
-    await writeAll(this.storage, created);
     await apply();
     await this.storage.remove(this.record);
-  }
-
-  async commit(build: () => Promise<Files>): Promise<void> {
-    await this.settle();
-    const files = await build();
-    const created = new Map<string, string | Uint8Array>();
-    const replaced = new Map<string, string | Uint8Array>();
-    for (const [file, data] of files) {
-      const live = await this.storage.list(path.posix.dirname(file));
-      (live.includes(path.posix.basename(file)) ? replaced : created).set(
-        file,
-        data,
-      );
-    }
-    try {
-      await this.migrate(
-        TRANSACTION,
-        created,
-        () => writeAll(this.storage, replaced),
-        [...replaced.keys()].map((file) => path.posix.relative(this.dir, file)),
-      );
-    } finally {
-      await this.settle();
-    }
   }
 
   private async settle(): Promise<void> {
     await this.recover();
     const names = await this.storage.list(this.root);
     const journal = names.filter((n) => n.startsWith(`${TRANSACTION}-`));
-    for (const name of journal)
-      await this.storage.remove(path.posix.join(this.root, name));
     if (names.length && journal.length === names.length)
-      await this.storage.remove(this.root);
+      return this.storage.remove(this.root);
+    await settled(
+      journal.map((name) =>
+        this.storage.remove(path.posix.join(this.root, name)),
+      ),
+    );
   }
 
   async recover(): Promise<boolean> {
@@ -203,19 +221,30 @@ export class NamespaceBackup {
     if (existing?.toString("utf8") === manifest) return backup;
     if (existing)
       throw new StoreError(`${dir} backup ${backup} differs`, "internal");
-    for (const name of names) {
+    const copy = async (name: string) => {
       const data = await storage.read(path.posix.join(dir, name));
       if (sha256(data) !== sums.get(name))
         throw new StoreError(`${dir} changed during backup`, "internal");
       await storage.writeAtomic(path.posix.join(target, "files", name), data);
-    }
+    };
+    if (only) await settled(names.map(copy));
+    else for (const name of names) await copy(name);
     await storage.writeAtomic(path.posix.join(target, "SHA256SUMS"), manifest);
     return backup;
   }
 }
 
-async function writeAll(storage: Storage, files: Files): Promise<void> {
-  for (const [file, data] of files) await storage.writeAtomic(file, data);
+async function settled(work: Array<Promise<void>>): Promise<void> {
+  const failed = (await Promise.allSettled(work)).find(
+    (result): result is PromiseRejectedResult => result.status === "rejected",
+  );
+  if (failed) throw failed.reason;
+}
+
+function writeAll(storage: Storage, files: Files): Promise<void> {
+  return settled(
+    [...files].map(([file, data]) => storage.writeAtomic(file, data)),
+  );
 }
 
 export function backupNamespace(

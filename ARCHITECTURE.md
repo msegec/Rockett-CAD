@@ -49,7 +49,10 @@ from the CAD timeline (see FEATURE_TIMELINE.md). What is hidden is view state,
 not document: the client keeps it in a `view` slice and saves it with
 `PUT /view`, outside undo and evaluation. Every document edit names the
 revision it last read, and a stale one gets 409 with nothing written (see
-API.md, Document revisions).
+API.md, Document revisions). Every document edit except a project rename runs
+through `mutateProject` in `server/src/api/routes.ts`: it checks the revision,
+applies the edit, evaluates, names new bodies, then saves the document with
+one labelled history entry in a single write (see API.md, History).
 
 **Storage.** `server/src/store/` owns persistence. `Storage` reads, writes
 atomically, moves, lists and removes paths under the data root, and
@@ -60,11 +63,11 @@ file's whole directory; a temporary project gets no backup. `BlobStore` keeps
 a project's source files and images by sha256. `ProjectStore` assembles a
 project from its `project.json` manifest (`ManifestStore`), its part
 document, `view.json` and blobs. `HistoryStore` keeps a project's undo
-history in `history/`: a log of at most 50 labelled entries plus
-checkpoints, a cursor, and gzip snapshots of the document named by the sha256
-of their stored bytes. A history save writes the document, its snapshot, the
-log and the cursor as one transaction: the migration recovery record lists
-it, and a failure or restart rolls it back. No route records history yet.
+history in `history/`: a log of at most 50 labelled entries, the current
+position and checkpoints, and gzip snapshots of the document named by the
+sha256 of their stored bytes. A history save writes the document, its
+snapshot and the log as one transaction: the migration recovery record lists
+it, and a failure or restart rolls it back.
 DOCKER.md shows the layout on disk and the backup and restore rules.
 
 **Shared parametric code.** The constraint solver and profile detection are

@@ -457,7 +457,7 @@ export async function stageNamingUpgrade(
   return { backup, revision: doc.revision, mappings };
 }
 
-export async function commitNamingUpgrade(
+export async function acceptedNamingUpgrade(
   store: ProjectStore,
   doc: CadDocument,
   accept?: NamingDecision[],
@@ -469,7 +469,6 @@ export async function commitNamingUpgrade(
       `${open.length} references have no proven mapping; accept one for each before the upgrade`,
       "conflict",
     );
-  await store.save(plan.document);
   return plan;
 }
 
