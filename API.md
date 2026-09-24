@@ -291,6 +291,16 @@ A face or edge reference may carry `sig`, `{ type, point, direction }`, with
 update fill a missing `sig` from the model before that feature; see
 [CAD_MODEL.md](CAD_MODEL.md), Reference signatures.
 
+Extrude, revolve, sweep, loft and emboss accept `targets`, up to 10,000
+unique body ids. The evaluation reports the ids a feature used in
+`featureStatuses[].targets`. Feature add writes them into a feature sent
+without `targets`. Feature update keeps stored `targets` when the patch sends
+its own or changes only `name` or `suppressed`. Any other patch without
+`targets` drops them and writes the ones the edited feature now uses, so a
+dialog edit, its previews and a cancel store what they show. A feature that
+fails or is suppressed, or whose ids pass the limit, is saved without
+`targets`. See [CAD_MODEL.md](CAD_MODEL.md), Tool targets.
+
 `PUT /projects/:id/document` also parses the document against
 `documentSchema` in the same file: `schemaVersion` equals the current version,
 `namingVersion` is 1 or 2,

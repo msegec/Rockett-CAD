@@ -11,7 +11,7 @@
 
 import type { Units } from "./units.js";
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export type NamingVersion = 1 | 2;
 
@@ -193,6 +193,10 @@ interface FeatureBase {
   suppressed: boolean;
 }
 
+interface ToolFeatureBase extends FeatureBase {
+  targets?: string[];
+}
+
 export interface SketchFeature extends FeatureBase {
   type: "sketch";
   plane: PlaneRef;
@@ -217,7 +221,7 @@ export interface ProfileRef {
   profileId: string;
 }
 
-export interface ExtrudeFeature extends FeatureBase {
+export interface ExtrudeFeature extends ToolFeatureBase {
   type: "extrude";
   profiles: ProfileRef[];
   /**
@@ -244,7 +248,7 @@ export interface ExtrudeFeature extends FeatureBase {
   operation: BooleanOperation;
 }
 
-export interface RevolveFeature extends FeatureBase {
+export interface RevolveFeature extends ToolFeatureBase {
   type: "revolve";
   profiles: ProfileRef[];
   axis: AxisRef;
@@ -252,7 +256,7 @@ export interface RevolveFeature extends FeatureBase {
   operation: BooleanOperation;
 }
 
-export interface SweepFeature extends FeatureBase {
+export interface SweepFeature extends ToolFeatureBase {
   type: "sweep";
   profiles: ProfileRef[];
   /** Path: open chain of sketch entities in the given sketch. */
@@ -260,7 +264,7 @@ export interface SweepFeature extends FeatureBase {
   operation: BooleanOperation;
 }
 
-export interface LoftFeature extends FeatureBase {
+export interface LoftFeature extends ToolFeatureBase {
   type: "loft";
   sections: ProfileRef[];
   operation: BooleanOperation;
@@ -369,7 +373,7 @@ export interface MoveFeature extends FeatureBase {
   translation: [number, number, number];
 }
 
-export interface EmbossFeature extends FeatureBase {
+export interface EmbossFeature extends ToolFeatureBase {
   type: "emboss";
   profiles: ProfileRef[];
   depth: number; // positive = emboss (raise), handled with `mode`

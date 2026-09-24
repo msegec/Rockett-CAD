@@ -26,9 +26,9 @@ client/src/three/toolPreview.ts 10
 client/src/viewportRef.ts 2
 client/vite.config.ts 1
 server/src/api/routes.ts 22
-server/src/geometry/engine.ts 20
+server/src/geometry/engine.ts 19
 server/src/geometry/exporters.ts 12
-server/src/geometry/features.ts 98
+server/src/geometry/features.ts 93
 server/src/geometry/frames.ts 21
 server/src/geometry/kernel.ts 19
 server/src/geometry/measure.ts 4

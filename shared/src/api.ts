@@ -81,6 +81,7 @@ export interface FeatureStatus {
   status: FeatureRunStatus;
   error?: string;
   warning?: string;
+  targets?: string[];
 }
 
 export interface SketchPayload {

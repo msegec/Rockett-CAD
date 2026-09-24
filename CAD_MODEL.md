@@ -96,7 +96,8 @@ Bodies get stable ids derived from the feature that created them:
   solid bridges become one body under the first id, digit runs compared as
   numbers, so `b:x:2` wins over `b:x:10`.
   Tool solids that touch no body become `b:{featureId}`,
-  `b:{featureId}:2`, … in face name order.
+  `b:{featureId}:2`, … in face name order. Stored `targets` choose the
+  bodies instead; see Tool targets.
 - An operation that leaves multiple solids appends ordinal suffixes
   (`b:x`, `b:x:2`, …). Under version 1 they follow volume. Under version 2
   `assignBodyIds` sorts the pieces by their smallest face name that no other
@@ -357,7 +358,9 @@ meets the others by line fraction or arc and circle angle.
    (bodies + solved sketches + construction frames). Each evaluator sees only
    the features before it, so a later feature cannot change an earlier result
    behind its cache key.
-2. After each feature a **snapshot** is stored, keyed by the feature's JSON.
+2. After each feature a **snapshot** is stored, keyed by the feature's JSON,
+   and also by that JSON with the reported `targets` for a feature evaluated
+   without them (see Tool targets).
 3. On the next evaluation the longest prefix whose feature JSON is unchanged
    is reused; evaluation restarts from the first changed feature, so editing
    feature _k_ re-evaluates only _k..end_ ("retain valid cached state,
@@ -559,6 +562,29 @@ signature is not finite, stays without one. References are still resolved by
 name, so a reference without `sig` evaluates as before. The 13 to 14
 migration changes nothing but the version, and the project is backed up
 before its first save.
+
+## Tool targets (schema 15)
+
+Extrude, revolve, sweep, loft and emboss may carry `targets`, the ids of the
+bodies their join, cut or intersect acts on. Join under `namingVersion` 1 and
+intersect use `targets[0]`. Join under version 2 fuses into every body in
+`targets`, grouped as in Body identity, and a tool solid that meets no target
+becomes a new body. Cut cuts exactly `targets`. A target that no longer exists
+or that the tool does not overlap fails the feature with an error naming it:
+by bounding box for cut, intersect and join under version 1, and by the
+version 2 contact rule for join under version 2. Empty `targets` make the tool
+a new body, as every operation does when no body exists. `newBody` ignores
+`targets`.
+
+Without `targets` the old rules pick them: join under version 1 and intersect
+take the first body in `state.bodies` order whose bounding box overlaps the
+tool, join under version 2 takes every body the tool touches, and cut takes
+every body whose bounding box overlaps the tool. `FeatureStatus.targets`
+reports the ids used, sorted as bridged bodies are under version 2. Stored,
+they give the same result. Feature add and update write them into the stored
+feature; see [API.md](API.md), Validation. Loading never writes them, and a
+feature without `targets` evaluates as before. The 14 to 15 migration changes
+nothing but the version, and the project is backed up before its first save.
 
 ## Tangent edge chains
 

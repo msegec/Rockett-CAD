@@ -19,6 +19,7 @@ import {
   type EmbossFeature,
   type ExtrudeFeature,
   type Feature,
+  type FeatureStatus,
   type FilletFeature,
   type LinearPatternFeature,
   type LoftFeature,
@@ -473,14 +474,37 @@ function touches(a: Shape, b: Shape): boolean {
   });
 }
 
+export type FeatureOutcome = Pick<FeatureStatus, "warning" | "targets">;
+
+function targetBody(
+  state: EvalState,
+  operation: string,
+  id: string,
+  tool: Shape,
+): StateBody {
+  const body = state.bodies.get(id);
+  if (!body) throw new Error(`${operation} target ${id} no longer exists`);
+  if (!bboxOverlap(body.shape, tool)) throw missedTarget(operation, id);
+  return body;
+}
+
+function missedTarget(operation: string, id: string): Error {
+  return new Error(`${operation} target ${id} does not overlap the tool`);
+}
+
 function joinEvery(
   state: EvalState,
   featureId: string,
   tool: ToolResult,
-): void {
-  const bodies = [...state.bodies.values()]
-    .filter((b) => bboxOverlap(b.shape, tool.shape))
-    .sort((a, b) => compareNames(a.bodyId, b.bodyId));
+  targets?: string[],
+): string[] {
+  const bodies = (
+    targets
+      ? targets.map((id) => targetBody(state, "join", id, tool.shape))
+      : [...state.bodies.values()].filter((b) =>
+          bboxOverlap(b.shape, tool.shape),
+        )
+  ).sort((a, b) => compareNames(a.bodyId, b.bodyId));
   let groups: { bodies: StateBody[]; pieces: ToolResult[] }[] = [];
   const loose: Shape[] = [];
   for (const shape of solids(tool.shape)) {
@@ -502,6 +526,12 @@ function joinEvery(
       },
     ];
   }
+  const used = groups.flatMap((g) => g.bodies.map((b) => b.bodyId));
+  const missed = targets?.find((id) => !used.includes(id));
+  if (missed) {
+    release([...loose, ...groups.flatMap((g) => g.pieces.map((p) => p.shape))]);
+    throw missedTarget("join", missed);
+  }
   if (loose.length > 0)
     registerSolids(state, `b:${featureId}`, loose, tool.names);
   for (const {
@@ -516,6 +546,7 @@ function joinEvery(
     const joined = unifyTool(fused, featureId);
     registerBodySolids(state, first!.bodyId, joined.shape, joined.names);
   }
+  return used.sort(compareNames);
 }
 
 function applyToolOperation(
@@ -523,41 +554,30 @@ function applyToolOperation(
   featureId: string,
   tool: ToolResult,
   operation: "newBody" | "join" | "cut" | "intersect",
-): void {
+  targets?: string[],
+): FeatureOutcome | void {
   const k = getKernel();
-  if (operation === "newBody" || state.bodies.size === 0) {
+  if (operation === "newBody") {
     registerBodySolids(state, `b:${featureId}`, tool.shape, tool.names);
     return;
   }
-
-  if (operation === "join" && tool.names.version === 2) {
-    joinEvery(state, featureId, tool);
-    return;
+  if (targets?.length === 0 || (!targets && state.bodies.size === 0)) {
+    registerBodySolids(state, `b:${featureId}`, tool.shape, tool.names);
+    return { targets: [] };
   }
 
-  if (operation === "join") {
-    // Fuse into the first overlapping body; otherwise create a new body.
-    const target = [...state.bodies.values()].find((b) =>
-      bboxOverlap(b.shape, tool.shape),
-    );
-    if (!target) {
-      registerBodySolids(state, `b:${featureId}`, tool.shape, tool.names);
-      return;
-    }
-    const fused = fuseNamed(target, tool, featureId, "boolean join failed");
-    // Clean the final union too: unifying only the incoming tool leaves
-    // coplanar splits where a later extrusion meets the existing body.
-    const joined = unifyTool(fused, featureId);
-    registerBodySolids(state, target.bodyId, joined.shape, joined.names);
-    return;
-  }
+  if (operation === "join" && tool.names.version === 2)
+    return { targets: joinEvery(state, featureId, tool, targets) };
 
   if (operation === "cut") {
-    // Cut affects every overlapping body.
-    let any = false;
-    for (const body of Array.from(state.bodies.values())) {
-      if (!bboxOverlap(body.shape, tool.shape)) continue;
-      any = true;
+    const bodies = targets
+      ? targets.map((id) => targetBody(state, "cut", id, tool.shape))
+      : [...state.bodies.values()].filter((b) =>
+          bboxOverlap(b.shape, tool.shape),
+        );
+    if (bodies.length === 0)
+      throw new Error("cut tool does not intersect any body");
+    for (const body of bodies) {
       const op = new k.BRepAlgoAPI_Cut_3(body.shape, tool.shape, progress());
       op.Build(progress());
       if (!op.IsDone()) {
@@ -575,14 +595,24 @@ function applyToolOperation(
       registerBodySolids(state, body.bodyId, result, names);
       result.delete();
     }
-    if (!any) throw new Error("cut tool does not intersect any body");
-    return;
+    return { targets: bodies.map((b) => b.bodyId) };
   }
 
-  // intersect
-  const target = [...state.bodies.values()].find((b) =>
-    bboxOverlap(b.shape, tool.shape),
-  );
+  const target = targets
+    ? targetBody(state, operation, targets[0]!, tool.shape)
+    : [...state.bodies.values()].find((b) => bboxOverlap(b.shape, tool.shape));
+
+  if (operation === "join") {
+    if (!target) {
+      registerBodySolids(state, `b:${featureId}`, tool.shape, tool.names);
+      return { targets: [] };
+    }
+    const fused = fuseNamed(target, tool, featureId, "boolean join failed");
+    const joined = unifyTool(fused, featureId);
+    registerBodySolids(state, target.bodyId, joined.shape, joined.names);
+    return { targets: [target.bodyId] };
+  }
+
   if (!target) throw new Error("intersect tool does not overlap any body");
   const op = new k.BRepAlgoAPI_Common_3(target.shape, tool.shape, progress());
   op.Build(progress());
@@ -599,6 +629,7 @@ function applyToolOperation(
   );
   op.delete();
   registerBodySolids(state, target.bodyId, result, names);
+  return { targets: [target.bodyId] };
 }
 
 // ---------------------------------------------------------------------------
@@ -733,7 +764,7 @@ function buildPrism(
   });
 }
 
-function evalExtrude(state: EvalState, f: ExtrudeFeature): void {
+function evalExtrude(state: EvalState, f: ExtrudeFeature) {
   const dist = Math.abs(f.distance);
   if (dist <= 0) throw new Error("extrude distance must be non-zero");
   const faceRefs = f.faces ?? [];
@@ -820,7 +851,7 @@ function evalExtrude(state: EvalState, f: ExtrudeFeature): void {
   const unified = unifyTool(tool, f.id);
   made.add(unified.shape);
   try {
-    applyToolOperation(state, f.id, unified, f.operation);
+    return applyToolOperation(state, f.id, unified, f.operation, f.targets);
   } finally {
     release(made);
   }
@@ -839,7 +870,7 @@ function sideEdgeNames(
   });
 }
 
-function evalRevolve(state: EvalState, f: RevolveFeature): void {
+function evalRevolve(state: EvalState, f: RevolveFeature) {
   const { faces: profileFaces } = resolveProfiles(state, f.profiles);
   const axis = resolveAxis(state, f.axis);
   const k = getKernel();
@@ -915,10 +946,11 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
     op.delete();
     tool = { shape: merged, names };
   }
-  applyToolOperation(state, f.id, unifyTool(tool, f.id), f.operation);
+  const unified = unifyTool(tool, f.id);
+  return applyToolOperation(state, f.id, unified, f.operation, f.targets);
 }
 
-function evalSweep(state: EvalState, f: SweepFeature): void {
+function evalSweep(state: EvalState, f: SweepFeature) {
   const { faces: profileFaces } = resolveProfiles(state, f.profiles);
   const pathSketch = state.sketches.get(f.pathSketchId);
   if (!pathSketch) throw new Error(`path sketch ${f.pathSketchId} not found`);
@@ -971,10 +1003,10 @@ function evalSweep(state: EvalState, f: SweepFeature): void {
     pipe.delete();
     return { shape, names };
   });
-  applyToolOperation(state, f.id, tool, f.operation);
+  return applyToolOperation(state, f.id, tool, f.operation, f.targets);
 }
 
-function evalLoft(state: EvalState, f: LoftFeature): void {
+function evalLoft(state: EvalState, f: LoftFeature) {
   const k = getKernel();
   if (f.sections.length < 2)
     throw new Error("loft requires at least two sections");
@@ -1012,7 +1044,7 @@ function evalLoft(state: EvalState, f: LoftFeature): void {
     thru.delete();
     return { shape, names };
   });
-  applyToolOperation(state, f.id, tool, f.operation);
+  return applyToolOperation(state, f.id, tool, f.operation, f.targets);
 }
 
 function* exploreWires(shape: Shape): Generator<Shape> {
@@ -2052,7 +2084,7 @@ function evalConstructionPlane(
   state.planes.set(f.id, { frame, size });
 }
 
-function evalEmboss(state: EvalState, f: EmbossFeature): void {
+function evalEmboss(state: EvalState, f: EmbossFeature) {
   // Emboss = extrude the sketch profiles by `depth` and join (emboss) or
   // cut (deboss) into the underlying body.
   const pseudo: ExtrudeFeature = {
@@ -2064,8 +2096,9 @@ function evalEmboss(state: EvalState, f: EmbossFeature): void {
     distance: Math.abs(f.depth),
     direction: f.mode === "emboss" ? "normal" : "reverse",
     operation: f.mode === "emboss" ? "join" : "cut",
+    ...(f.targets && { targets: f.targets }),
   };
-  evalExtrude(state, pseudo);
+  return evalExtrude(state, pseudo);
 }
 
 // ---------------------------------------------------------------------------
@@ -2077,7 +2110,7 @@ export function evaluateFeature(
   feature: Feature,
   earlier: Feature[],
   sources: Sources = new Map(),
-): string | void {
+): FeatureOutcome | void {
   switch (feature.type) {
     case "importStep": {
       const shape = readImport(feature, sources);
@@ -2095,9 +2128,9 @@ export function evaluateFeature(
       const { shape, warning } = readMesh(feature),
         bodyId = `b:${feature.id}`,
         names = finalizeNames(shape, new ShapeMap(), feature.id);
-      if (warning) state.bodies.set(bodyId, { bodyId, shape, names });
-      else registerBodySolids(state, bodyId, shape, names);
-      return warning;
+      if (!warning) return registerBodySolids(state, bodyId, shape, names);
+      state.bodies.set(bodyId, { bodyId, shape, names });
+      return { warning };
     }
     case "sketch":
       return evalSketch(state, feature);

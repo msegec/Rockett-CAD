@@ -38,10 +38,10 @@ client/src/three/ViewCube.ts constructor 95
 client/src/three/revolveGhost.ts buildRevolveGhost 99
 client/src/three/sketchRender.ts buildSketch 177
 client/src/three/toolPreview.ts updateToolPreview 158
-server/src/api/routes.ts 695
-server/src/api/routes.ts createApiRouter 510
-server/src/geometry/engine.ts evaluate 112
-server/src/geometry/features.ts 2148
+server/src/api/routes.ts 719
+server/src/api/routes.ts createApiRouter 523
+server/src/geometry/engine.ts evaluate 116
+server/src/geometry/features.ts 2181
 server/src/geometry/features.ts applyToolOperation 82
 server/src/geometry/features.ts buildPrism 86
 server/src/geometry/features.ts chamferByEnvelope 272
@@ -50,7 +50,7 @@ server/src/geometry/sketchGeom.ts buildWire 84
 server/src/geometry/sketchGeom.ts subtractSketchRegionsFromFace 133
 server/src/geometry/tangentEdges.ts tangentEdges 110
 server/src/geometry/tessellate.ts tessellateBody 104
-shared/src/model.ts 542
+shared/src/model.ts 546
 shared/src/profiles.ts 589
 shared/src/sketchModify.ts 741
 shared/src/sketchModify.ts joinOffsetEndpoints 110

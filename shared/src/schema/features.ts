@@ -5,6 +5,7 @@ import { MB, UNIT_TO_MM, type Units } from "../units.js";
 
 export const MAX_DIM = 100_000;
 export const MAX_IMPORT_BYTES = 10 * MB;
+export const MAX_TARGETS = 10_000;
 
 const id = Type.String({ minLength: 1, maxLength: 100 });
 const bodyId = Type.String({ minLength: 1, maxLength: 200 });
@@ -62,6 +63,9 @@ const operation = Type.Enum(["newBody", "join", "cut", "intersect"]);
 const positive = Type.Number({ minimum: LINEAR_TOL, maximum: MAX_DIM });
 const degrees = Type.Number({ minimum: -360, maximum: 360 });
 const bodies = Type.Array(bodyId, { minItems: 1, maxItems: 64 });
+const targets = Type.Optional(
+  Type.Array(bodyId, { maxItems: MAX_TARGETS, uniqueItems: true }),
+);
 const edges = Type.Array(edgeRef, { minItems: 1, maxItems: 256 });
 const profiles = (minItems: number) =>
   Type.Array(profileRef, { minItems, maxItems: 64 });
@@ -217,6 +221,7 @@ const emboss = feature("emboss", {
   profiles: profiles(1),
   depth: positive,
   mode: Type.Enum(["emboss", "deboss"]),
+  targets,
 });
 
 const extrude = Type.Refine(
@@ -232,6 +237,7 @@ const extrude = Type.Refine(
     startOffset: Type.Optional(coordinate),
     direction: Type.Enum(["normal", "reverse", "symmetric", "twoSided"]),
     operation,
+    targets,
   }),
   (f) => {
     const sources = f.profiles.length + (f.faces?.length ?? 0);
@@ -245,15 +251,17 @@ const revolve = feature("revolve", {
   axis: axisRef,
   angle: degrees,
   operation,
+  targets,
 });
 
 const sweep = feature("sweep", {
   profiles: profiles(1),
   pathSketchId: id,
   operation,
+  targets,
 });
 
-const loft = feature("loft", { sections: profiles(2), operation });
+const loft = feature("loft", { sections: profiles(2), operation, targets });
 
 const fillet = feature("fillet", {
   tangentChain: flag,

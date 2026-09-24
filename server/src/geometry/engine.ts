@@ -26,6 +26,7 @@ import {
   emptyState,
   evaluateFeature,
   type EvalState,
+  type FeatureOutcome,
   type StateBody,
 } from "./features.js";
 import type { Sources } from "./importers.js";
@@ -35,8 +36,7 @@ import { shapeHash, type Shape } from "./kernel.js";
 import { ShapeMap, trackShapeMaps } from "./shapeMap.js";
 
 interface Snapshot {
-  /** JSON of the feature this snapshot is the result of (cache key). */
-  featureKey: string;
+  featureKeys: string[];
   state: EvalState;
   statuses: FeatureStatus[];
 }
@@ -67,7 +67,7 @@ function evaluateTracked(
   earlier: CadDocument["features"],
   sources: Sources,
   namingVersion: NamingVersion,
-): string | void {
+): FeatureOutcome | void {
   const made: ShapeMap<unknown>[] = [];
   try {
     return trackShapeMaps(made, () =>
@@ -83,8 +83,18 @@ function evaluateTracked(
   }
 }
 
-export function featureKey(feature: CadDocument["features"][number]): string {
+export function featureKey(feature: object): string {
   return JSON.stringify(feature);
+}
+
+function featureKeys(
+  feature: CadDocument["features"][number],
+  { targets }: FeatureStatus,
+): string[] {
+  const key = featureKey(feature);
+  return targets && !("targets" in feature)
+    ? [key, featureKey({ ...feature, targets })]
+    : [key];
 }
 
 interface Tessellation {
@@ -176,7 +186,9 @@ class DocumentEngine {
       this.namingVersion === doc.namingVersion &&
       valid < this.snapshots.length &&
       valid < doc.features.length &&
-      this.snapshots[valid]!.featureKey === featureKey(doc.features[valid]!)
+      this.snapshots[valid]!.featureKeys.includes(
+        featureKey(doc.features[valid]!),
+      )
     ) {
       valid++;
     }
@@ -197,16 +209,18 @@ class DocumentEngine {
         status = { featureId: feature.id, status: "suppressed" };
       } else {
         try {
-          const warning = evaluateTracked(
+          const outcome = evaluateTracked(
             next,
             feature,
             doc.features.slice(0, i),
             this.held,
             doc.namingVersion,
           );
-          status = warning
-            ? { featureId: feature.id, status: "warning", warning }
-            : { featureId: feature.id, status: "ok" };
+          status = {
+            featureId: feature.id,
+            status: outcome?.warning ? "warning" : "ok",
+            ...outcome,
+          };
         } catch (err: any) {
           status = {
             featureId: feature.id,
@@ -222,7 +236,7 @@ class DocumentEngine {
       }
       statuses = [...statuses, status];
       this.snapshots.push({
-        featureKey: featureKey(feature),
+        featureKeys: featureKeys(feature, status),
         state: next,
         statuses,
       });

@@ -9,6 +9,8 @@
 import { Router, json, type RequestHandler } from "express";
 import {
   DOCUMENT_EDITS,
+  FEATURE_SCHEMAS,
+  MAX_TARGETS,
   MB,
   nextFeatureName,
   parse,
@@ -148,6 +150,15 @@ const EXPORTERS: Record<
   },
 };
 
+const KEEPS_TARGETS = new Set(["name", "suppressed"]);
+
+function retargets(patch: object): boolean {
+  return (
+    !("targets" in patch) &&
+    Object.keys(patch).some((key) => !KEEPS_TARGETS.has(key))
+  );
+}
+
 function evaluationPosition(req: any, doc: CadDocument): number | undefined {
   if (req.query.position === undefined) return undefined;
   const position = Number(req.query.position);
@@ -233,6 +244,16 @@ export function createApiRouter(
   async function stateAt(doc: CadDocument, position?: number) {
     const { engine, sources } = await sourced(doc);
     return engine.stateAt(doc, position, sources);
+  }
+
+  async function pinTargets(doc: CadDocument, index: number) {
+    const feature = doc.features[index]!;
+    const { properties } = FEATURE_SCHEMAS[feature.type];
+    if ("targets" in feature || !("targets" in properties)) return;
+    const evaluation = await evaluate(doc, index + 1);
+    const { targets } = evaluation.featureStatuses[index]!;
+    if (targets && targets.length <= MAX_TARGETS)
+      Object.assign(feature, { targets });
   }
 
   async function signed(
@@ -454,6 +475,7 @@ export function createApiRouter(
       await signed(doc, at, feature);
       doc.features.splice(at, 0, feature);
       doc.timelinePosition = at + 1;
+      await pinTargets(doc, at);
       await store.save(doc);
       const evaluation = await evaluateAndSync(doc);
       send(res, doc, evaluation);
@@ -478,9 +500,11 @@ export function createApiRouter(
         ...patch,
         id: doc.features[idx]!.id,
       };
+      if (retargets(patch)) Reflect.deleteProperty(updated, "targets");
       validateFeature(updated as Feature);
       await signed(doc, idx, updated as Feature, doc.features[idx]);
       doc.features[idx] = updated as Feature;
+      await pinTargets(doc, idx);
       await store.save(doc);
       const evaluation = await evaluateAndSync(doc, position);
       send(res, doc, evaluation);
