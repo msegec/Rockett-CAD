@@ -87,7 +87,7 @@ export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
   shell: [faces],
   combine: [bodies],
   splitBody: [input("body", ["body"], { one: true }), planar("tool", true)],
-  offsetFace: [faces],
+  offsetFace: [input("faces", ["face"], { planar: true })],
   mirror: [bodies, planar("plane", true)],
   linearPattern: [bodies, input("direction", ["edge", "axis"], line)],
   circularPattern: [bodies, axis],
@@ -109,7 +109,10 @@ export function filterSelectionFor(
   dialog: DialogType,
   selection: Selection[],
 ): Selection[] {
-  return selection.filter((s) => takes(dialog, s.kind));
+  const s = useStore.getState();
+  return selection.filter((sel) =>
+    DIALOG_INPUTS[dialog].some((i) => inSelection(i) && fits(i, sel, s)),
+  );
 }
 
 function dialogInputs(s: Store): PickInput[] {
@@ -161,6 +164,11 @@ export function isPlanarFace(sel: Selection, s: Store): boolean {
   return face?.surface.type === "plane";
 }
 
+function fits(i: PickInput, sel: Selection, s: Store): boolean {
+  if (!i.kinds.includes(sel.kind)) return false;
+  return !(i.planar && sel.kind === "face" && !isPlanarFace(sel, s));
+}
+
 function isStraight(sel: Selection, s: Store): boolean {
   if (sel.kind === "edge") {
     const body = previewBodies(s).find((b) => b.bodyId === sel.bodyId);
@@ -209,8 +217,7 @@ export function accepted(
     return [{ kind: "body", bodyId: sel.bodyId }];
   if (sel.kind === "sketch" && has("profile"))
     return sketchRegions(sel.sketchId);
-  if (!has(sel.kind)) return [];
-  if (i.planar && sel.kind === "face" && !isPlanarFace(sel, s)) return [];
+  if (!fits(i, sel, s)) return [];
   if (i.straight && !isStraight(sel, s)) return [];
   return [sel];
 }
