@@ -111,11 +111,16 @@ export class ProjectStore {
       effects: {
         context: async (id, stored) =>
           new PendingBlobs(await this.legacyAssets(id, stored)),
-        commit: async (id, pending) => {
-          for (const bytes of pending.blobs.values())
-            await this.blobs(id).put(bytes);
+        created: async (id, pending) => {
+          const blobs = this.blobs(id);
+          const out = new Map<string, string | Uint8Array>();
+          for (const [hash, bytes] of pending.blobs)
+            if (!(await blobs.has(hash))) out.set(blobs.file(hash), bytes);
           if (!(await this.savedView(id)))
-            await this.views.write(id, withShown(emptyView(), pending.shown));
+            out.set(
+              ...this.views.encode(id, withShown(emptyView(), pending.shown)),
+            );
+          return out;
         },
         retire: (id) => storage.remove(this.assetDir(id)),
       },

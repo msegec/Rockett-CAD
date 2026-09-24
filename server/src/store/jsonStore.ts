@@ -19,9 +19,11 @@ export class StoreError extends Error {
   }
 }
 
+export type Files = ReadonlyMap<string, string | Uint8Array>;
+
 export interface MigrationEffects<C extends MigrationContext> {
   context(key: string, stored: unknown): Promise<C>;
-  commit(key: string, context: C): Promise<void>;
+  created(key: string, context: C): Promise<Files>;
   retire(key: string, context: C): Promise<void>;
 }
 
@@ -67,9 +69,20 @@ export class NamespaceBackup {
     return name;
   }
 
-  async migrate(version: string, apply: () => Promise<void>): Promise<void> {
+  async migrate(
+    version: string,
+    created: Files,
+    apply: () => Promise<void>,
+  ): Promise<void> {
     const backup = await this.backup(version);
-    await this.storage.writeAtomic(this.record, JSON.stringify({ backup }));
+    await this.storage.writeAtomic(
+      this.record,
+      JSON.stringify({
+        backup,
+        created: [...created].map(([file, data]) => [file, sha256(data)]),
+      }),
+    );
+    await writeAll(this.storage, created);
     await apply();
     await this.storage.remove(this.record);
   }
@@ -77,7 +90,14 @@ export class NamespaceBackup {
   async recover(): Promise<boolean> {
     const raw = await this.storage.read(this.record).catch(() => undefined);
     if (!raw) return false;
-    const { backup } = JSON.parse(raw.toString("utf8")) as { backup: string };
+    const { backup, created = [] } = JSON.parse(raw.toString("utf8")) as {
+      backup: string;
+      created?: Array<[string, string]>;
+    };
+    for (const [file, sum] of created) {
+      const data = await this.storage.read(file).catch(() => undefined);
+      if (data && sha256(data) === sum) await this.storage.remove(file);
+    }
     await this.restore(backup);
     await this.storage.remove(this.record);
     return true;
@@ -151,6 +171,10 @@ export class NamespaceBackup {
   }
 }
 
+async function writeAll(storage: Storage, files: Files): Promise<void> {
+  for (const [file, data] of files) await storage.writeAtomic(file, data);
+}
+
 export function backupNamespace(
   storage: Storage,
   namespace: string,
@@ -171,6 +195,11 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
 
   private file(key: string): string {
     return path.posix.join(this.dir(key), this.options.file);
+  }
+
+  encode(key: string, value: T): [string, string] {
+    this.options.validate?.(value);
+    return [this.file(key), JSON.stringify(value, null, 1)];
   }
 
   async stored(key: string): Promise<unknown> {
@@ -221,13 +250,9 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
 
   update(key: string, change: (previous: T | undefined) => T): Promise<void> {
     return this.writes.run(key, async () => {
-      const value = change(await this.previous(key));
-      this.options.validate?.(value);
+      const [file, text] = this.encode(key, change(await this.previous(key)));
       await this.upgrade(key);
-      await this.options.storage.writeAtomic(
-        this.file(key),
-        JSON.stringify(value, null, 1),
-      );
+      await this.options.storage.writeAtomic(file, text);
     });
   }
 
@@ -260,14 +285,18 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
     if (next === value) return;
     const staged = JSON.stringify(next, null, 1);
     if (backed) this.options.validate?.(JSON.parse(staged));
-    await this.options.effects?.commit(key, context);
-    if (!backed)
+    const created =
+      (await this.options.effects?.created(key, context)) ?? new Map();
+    if (!backed) {
+      await writeAll(this.options.storage, created);
       return this.options.storage.writeAtomic(this.file(key), staged);
+    }
     const from = (value as Record<string, unknown>)[
       this.options.migrations.field
     ];
     await backupNamespace(this.options.storage, this.dir(key)).migrate(
       `v${String(from)}`,
+      created,
       async () => {
         await this.options.storage.writeAtomic(this.file(key), staged);
         await this.options.effects?.retire(key, context);

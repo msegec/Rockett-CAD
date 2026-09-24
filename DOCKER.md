@@ -113,15 +113,17 @@ docker run -d --name rockett-cad \
 A project saved by an older schema is migrated on disk by its next save.
 Before that write, the whole project directory is copied to `backups/`, named
 by the old schema and a hash of its contents, so a second migration of
-different contents never overwrites the first backup. A migration that moves
-data out of `document.json` into `blobs/` writes those blobs before the backup,
-so the backup also holds them; the old document never reads them, and a retry
-finds the same files and reuses the same backup. A project from before schema
-9 keeps its reference images in `assets/`; the migration copies them into
-`blobs/`, and `assets/` is removed only after the backup reads back intact
-and the migrated document is written. While the migration runs,
-`backups/projects/{projectId}/migrating.json` records it; at startup, and before
-the next save, a project with that record is restored from its backup. Startup
+different contents never overwrites the first backup. The backup holds the
+project exactly as it was: files a migration adds, such as blobs moved out of
+`document.json` or a first `view.json`, are written after it. A project from
+before schema 9 keeps its reference images in `assets/`; the migration copies
+them into `blobs/`, and `assets/` is removed only after the backup reads back
+intact and the migrated document is written. While the migration runs,
+`backups/projects/{projectId}/migrating.json` records the backup and the files
+the migration adds, with their sha256. At startup, and before the next save, a
+project with that record loses each added file that still holds what the
+migration wrote, and is restored from its backup, so a retry reuses the same
+backup and a view saved in between survives. Startup
 also logs how many projects still predate the current schema. A temporary
 project, the server copy of a project kept in the browser, is never backed up
 before migration and its backups directory is never created; the server

@@ -76,7 +76,7 @@ export class BlobStore {
     private readonly dir: string,
   ) {}
 
-  private file(hash: string): string {
+  file(hash: string): string {
     if (!HASH_RE.test(hash)) throw new StoreError("invalid blob hash");
     return path.posix.join(this.dir, hash);
   }
