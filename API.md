@@ -30,6 +30,13 @@ plus a fresh incremental evaluation (bodies with tagged tessellation, feature
 statuses, solved sketches with profiles, construction-plane frames). The
 server persists on every mutation (autosave).
 
+A failed feature's status may carry `refs`, one entry per face or edge
+reference that did not resolve: `{ ref, status, candidates, suggestions }`,
+with `status` `candidate`, `ambiguous` or `missing` and each candidate
+`{ bodyId, name, basis }`, `basis` being `lineage` or `signature`. Evaluation
+never writes a candidate into the document; see
+[CAD_MODEL.md](CAD_MODEL.md), Resolution.
+
 Each body carries `meshKey`, a SHA-256 of its mesh, faces, edges, vertices
 and bbox, without its name. The client keeps a body's viewport
 objects while its key is unchanged. A JSON response of 64 KiB or more is
@@ -246,7 +253,10 @@ view unchanged.
 | `POST /projects/:id/export`  | `{ format: "stl"\|"3mf", bodyIds: string[], quality?, retain? }` | Binary file (`Content-Disposition` attachment). Empty `bodyIds` = every body the view does not hide. `retain: true` also stores a copy under the project's `exports/` dir |
 
 Export returns 400 when an id in `bodyIds` is not a body of the evaluated
-model; the error names the offending ids. `format` is required, and `stl` is
+model, and 422 `unprocessable` when a body it would write is blocked by a
+reference that did not resolve (`namingVersion` 2 only); each error names
+the offending ids. Measure returns 400 when a face or edge reference does not
+resolve, naming the reference and its status. `format` is required, and `stl` is
 always binary. `quality` is the tessellation tolerance in mm: a number,
 default 0.05, clamped to 0.001 to 1.
 

@@ -2,10 +2,16 @@
  * Measurement: distances/angles between persistent topology references.
  */
 
-import type { MeasureRequest, MeasureResult, Vec3 } from "@rockett/shared";
+import {
+  ValidationError,
+  type MeasureRequest,
+  type MeasureResult,
+  type Vec3,
+} from "@rockett/shared";
 import { areaOf, getKernel, lengthOf, progress, type Shape } from "./kernel.js";
 import { computeEdgeNames, computeVertexNames, findFace } from "./naming.js";
 import type { EvalState } from "./features.js";
+import { describeRef, resolveRefs } from "./resolve.js";
 
 interface Resolved {
   kind: string;
@@ -91,9 +97,19 @@ function edgeDirection(shape: Shape): Vec3 | null {
   return [v[0] / n, v[1] / n, v[2] / n];
 }
 
+function refuseUnresolved(state: EvalState, refs: MeasureRequest["refs"]) {
+  const topo = refs.filter((ref) => ref.kind !== "vertex");
+  resolveRefs(state.bodies, topo).forEach((resolution, i) => {
+    if (resolution.status !== "resolved")
+      throw new ValidationError(describeRef({ ref: topo[i]!, ...resolution }));
+  });
+}
+
 export function measure(state: EvalState, req: MeasureRequest): MeasureResult {
   const k = getKernel();
-  const resolved = req.refs.slice(0, 2).map((r) => resolveRef(state, r));
+  const refs = req.refs.slice(0, 2);
+  refuseUnresolved(state, refs);
+  const resolved = refs.map((r) => resolveRef(state, r));
   const result: MeasureResult = { items: resolved.map((r) => r.info) };
 
   if (resolved.length === 2) {

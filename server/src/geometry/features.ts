@@ -117,6 +117,7 @@ export interface EvalState {
   bodies: Map<string, StateBody>;
   sketches: Map<string, EvaluatedSketch>;
   planes: Map<string, { frame: PlaneFrame; size: number }>;
+  blocked: ReadonlySet<string>;
 }
 
 export function cloneState(state: EvalState): EvalState {
@@ -124,11 +125,17 @@ export function cloneState(state: EvalState): EvalState {
     bodies: new Map(state.bodies),
     sketches: new Map(state.sketches),
     planes: new Map(state.planes),
+    blocked: state.blocked,
   };
 }
 
 export function emptyState(): EvalState {
-  return { bodies: new Map(), sketches: new Map(), planes: new Map() };
+  return {
+    bodies: new Map(),
+    sketches: new Map(),
+    planes: new Map(),
+    blocked: new Set(),
+  };
 }
 
 export class FeatureError extends Error {

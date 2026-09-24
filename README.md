@@ -54,7 +54,7 @@ everything downstream against persistent topology references.
 - **Construction**: offset planes and midplanes; sketch on any planar face.
 - **Drag handles**: every feature with a main value, from extrude distance to pattern spacing, has an arrow or arc to drag.
 - **Reference images**: place PNG, JPEG or WebP images on planes and calibrate them to real size.
-- **Feature timeline**: rename, edit, quick edit, hover preview, suppress, delete, roll back and insert features; broken references are flagged, never dropped.
+- **Feature timeline**: rename, edit, quick edit, hover preview, suppress, delete, roll back, insert features; broken references are flagged, never guessed or dropped.
 
 ### Inspect
 

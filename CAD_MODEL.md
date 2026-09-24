@@ -253,7 +253,8 @@ name: a `RefSignature` of type, point and direction. A face gives its surface
 type, its centroid and the normal at its UV midpoint, flipped with a reversed
 face. An edge gives its curve type, the point at its middle parameter and the
 unit tangent there, in the curve's own direction. A stored face or edge
-reference may carry one as `sig` (schema 14); evaluation never reads it yet.
+reference may carry one as `sig` (schema 14). Evaluation reads it only to
+propose repair candidates; see Resolution.
 
 An import has no history, so under `namingVersion` 2 `geometryNames` names
 each imported face from its signature: `{surface}` is the signature type and
@@ -272,8 +273,7 @@ under both versions.
 
 `resolveRefs` in `server/src/geometry/resolve.ts` sorts face and edge
 references against a state's bodies into `resolved`, `candidate`,
-`ambiguous` or `missing`. Evaluation does not call it yet, so saved references
-still resolve by name alone.
+`ambiguous` or `missing`.
 
 - A reference whose body still bears its name is `resolved`, however far the
   face or edge moved since its `sig` was taken. A `~?n` name never resolves.
@@ -290,6 +290,27 @@ still resolve by name alone.
 Candidates are ordered by body id and name with `compareNames`, never by
 kernel order.
 
+Under `namingVersion` 2 every feature passes through the resolver before it
+evaluates, against the state before it. A feature with a face or edge
+reference that is not `resolved` does not evaluate: it fails, and its
+`FeatureStatus.refs` lists each such reference with its status, candidates
+and suggestions. A candidate is shown for repair and never used; only a
+feature update that names it, the repair mutation, changes the stored
+reference. The bodies the feature names, through its references, `targets`,
+`bodies`, `toolBodies`, `targetBody` or `body`, become blocked. A later
+feature that names a blocked body is blocked too and fails without
+evaluating, so its bodies join the set. Other bodies build as usual. Export
+refuses a blocked body; see [API.md](API.md), Inspection & output. Measurement
+refuses a face or edge reference that is not `resolved`, under either
+version.
+
+Under version 1 evaluation is unchanged. No version 1 name carries `~?`, so
+a reference resolves exactly when its body still bears its name, as the
+evaluators already require. A feature that fails still reports its
+unresolved references in `FeatureStatus.refs`, but nothing is blocked, the
+features after it evaluate against the state before it, and export is
+unchanged.
+
 ### Known limitations
 
 - Centroid-ordered `~n` disambiguation can swap if an upstream edit moves
@@ -297,8 +318,9 @@ kernel order.
   subshape. This is rare in practice and fails loudly (wrong-edge fillet or a
   reported error), never silently. Version 2 rounding still swaps two
   duplicates when a coordinate moves across a rounding threshold.
-- A reference to a `~?n` name still resolves, to whichever candidate the
-  kernel listed at that position.
+- A feature fails without blocking the features after it when its failure
+  is not a reference: a fillet whose radius is too large leaves its body as
+  it was, and later features build on that body.
 - A reference whose face genuinely disappears (e.g. the filleted edge is
   consumed) marks the downstream feature as **error** in the timeline with an
   actionable message; the model up to that feature is preserved. A repair UI
@@ -371,7 +393,9 @@ meets the others by line fraction or arc and circle angle.
    reported as `rolledBack`.
 5. A failing feature records `error` with the kernel's message; evaluation
    continues from the pre-failure state so independent downstream features
-   still build. Nothing is silently discarded.
+   still build. Nothing is silently discarded. Under `namingVersion` 2 a
+   feature whose references do not resolve also blocks the features that
+   name its bodies; see Resolution.
 
 Suppressed features skip evaluation but still occupy a snapshot slot, so
 toggling suppression invalidates exactly the right suffix.
@@ -560,8 +584,8 @@ a feature is added or updated, the server fills each missing `sig` from the
 state before that feature. An updated reference keeps the `sig` it had when
 the patch names the same body and face or edge without one, and a `sig` sent
 with a reference is kept. A reference that does not resolve there, or whose
-signature is not finite, stays without one. References are still resolved by
-name, so a reference without `sig` evaluates as before. The 13 to 14
+signature is not finite, stays without one. A `sig` only proposes candidates
+(see Resolution), so a reference without one evaluates as before. The 13 to 14
 migration changes nothing but the version, and the project is backed up
 before its first save.
 

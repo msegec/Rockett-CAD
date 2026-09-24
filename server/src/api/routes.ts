@@ -671,6 +671,12 @@ export function createApiRouter(
       if (chosen.length === 0) {
         throw new ValidationError("no bodies to export");
       }
+      const blocked = chosen.filter((b) => state.blocked.has(b.bodyId));
+      if (blocked.length)
+        throw new StoreError(
+          `export bodies depend on unresolved references: ${blocked.map((b) => b.bodyId).join(", ")}`,
+          "unprocessable",
+        );
       const safeName = safeFileName(doc.name) || "model";
       const data = exporter.write(
         chosen,

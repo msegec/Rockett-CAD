@@ -34,6 +34,7 @@ import { movePayload, tessellateBody } from "./tessellate.js";
 import { withNamingVersion, type NamedBody } from "./naming.js";
 import { shapeHash, type Shape } from "./kernel.js";
 import { ShapeMap, trackShapeMaps } from "./shapeMap.js";
+import { BlockedFeature, evaluateResolved, unresolvedRefs } from "./resolve.js";
 
 interface Snapshot {
   featureKeys: string[];
@@ -69,10 +70,11 @@ function evaluateTracked(
   namingVersion: NamingVersion,
 ): FeatureOutcome | void {
   const made: ShapeMap<unknown>[] = [];
+  const run = () => evaluateFeature(next, feature, earlier, sources);
   try {
     return trackShapeMaps(made, () =>
       withNamingVersion(namingVersion, () =>
-        evaluateFeature(next, feature, earlier, sources),
+        namingVersion === 1 ? run() : evaluateResolved(next, feature, run),
       ),
     );
   } finally {
@@ -81,6 +83,23 @@ function evaluateTracked(
     );
     for (const map of made) if (!held.has(map)) map.release();
   }
+}
+
+function failedStatus(
+  err: any,
+  state: EvalState,
+  feature: CadDocument["features"][number],
+): FeatureStatus {
+  const refs =
+    err instanceof BlockedFeature
+      ? err.refs
+      : unresolvedRefs(state.bodies, feature);
+  return {
+    featureId: feature.id,
+    status: "error",
+    error: err?.message ?? String(err),
+    ...(refs.length > 0 && { refs }),
+  };
 }
 
 export function featureKey(feature: object): string {
@@ -222,16 +241,14 @@ class DocumentEngine {
             ...outcome,
           };
         } catch (err: any) {
-          status = {
-            featureId: feature.id,
-            status: "error",
-            error: err?.message ?? String(err),
-          };
+          status = failedStatus(err, state, feature);
           // keep pre-failure state
           releaseSnapshots([{ state: next }], this.snapshots);
           next.bodies = new Map(state.bodies);
           next.sketches = new Map(state.sketches);
           next.planes = new Map(state.planes);
+          if (err instanceof BlockedFeature)
+            next.blocked = new Set([...state.blocked, ...err.bodies]);
         }
       }
       statuses = [...statuses, status];

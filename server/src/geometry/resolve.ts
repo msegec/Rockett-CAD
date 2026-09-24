@@ -1,30 +1,22 @@
 import {
+  collectTopoRefs,
   LINEAR_TOL,
   UNIT_DOT_TOL,
   type EdgeRef,
   type FaceRef,
+  type Feature,
+  type RefCandidate,
+  type RefResolution,
   type RefSignature,
+  type UnresolvedRef,
 } from "@rockett/shared";
 import { faces, release, type Shape } from "./kernel.js";
 import { compareNames, computeEdgeNames, type NamedBody } from "./naming.js";
+import type { EvalState, FeatureOutcome } from "./features.js";
 import { edgeSignature, faceSignature } from "./signature.js";
 
 type Ref = FaceRef | EdgeRef;
 type Kind = Ref["kind"];
-
-export interface RefCandidate {
-  bodyId: string;
-  name: string;
-  basis: "lineage" | "signature";
-}
-
-export type RefResolution =
-  | { status: "resolved" }
-  | {
-      status: "candidate" | "ambiguous" | "missing";
-      candidates: RefCandidate[];
-      suggestions: RefCandidate[];
-    };
 
 const EDGE = /^e\[(.*)\]((?:~\d+)*)$/;
 
@@ -198,4 +190,82 @@ export function resolveRefs(
   } finally {
     topology.release();
   }
+}
+
+export function unresolvedRefs(
+  bodies: ReadonlyMap<string, NamedBody>,
+  feature: Feature,
+): UnresolvedRef[] {
+  const refs = collectTopoRefs(feature);
+  if (refs.length === 0) return [];
+  return resolveRefs(bodies, refs).flatMap((resolution, i) =>
+    resolution.status === "resolved" ? [] : [{ ref: refs[i]!, ...resolution }],
+  );
+}
+
+export const describeRef = ({ ref, status }: UnresolvedRef) =>
+  status === "missing"
+    ? `${ref.kind} ${nameOf(ref)} no longer exists on ${ref.bodyId}`
+    : `${ref.kind} ${nameOf(ref)} on ${ref.bodyId} is ${status}`;
+
+export class BlockedFeature extends Error {
+  constructor(
+    message: string,
+    readonly bodies: string[],
+    readonly refs: UnresolvedRef[] = [],
+  ) {
+    super(message);
+  }
+}
+
+const BODY_FIELDS = [
+  "targets",
+  "bodies",
+  "toolBodies",
+  "targetBody",
+  "body",
+] as const;
+
+function inputBodies(feature: Feature): string[] {
+  const fields = feature as Partial<
+    Record<(typeof BODY_FIELDS)[number], string | string[]>
+  >;
+  return [
+    ...new Set([
+      ...collectTopoRefs(feature).map((ref) => ref.bodyId),
+      ...BODY_FIELDS.flatMap((key) => fields[key] ?? []),
+    ]),
+  ];
+}
+
+function refuseBlocked(blocked: ReadonlySet<string>, inputs: string[]): void {
+  const held = inputs.filter((id) => blocked.has(id));
+  if (held.length > 0)
+    throw new BlockedFeature(
+      `blocked by unresolved references on ${held.join(", ")}`,
+      inputs,
+    );
+}
+
+function requireResolved(
+  bodies: ReadonlyMap<string, NamedBody>,
+  blocked: ReadonlySet<string>,
+  feature: Feature,
+): void {
+  const inputs = inputBodies(feature);
+  refuseBlocked(blocked, inputs);
+  const refs = unresolvedRefs(bodies, feature);
+  if (refs.length > 0)
+    throw new BlockedFeature(refs.map(describeRef).join("; "), inputs, refs);
+}
+
+export function evaluateResolved(
+  state: EvalState,
+  feature: Feature,
+  run: () => FeatureOutcome | void,
+): FeatureOutcome | void {
+  requireResolved(state.bodies, state.blocked, feature);
+  const outcome = run();
+  refuseBlocked(state.blocked, outcome?.targets ?? []);
+  return outcome;
 }

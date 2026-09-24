@@ -2,7 +2,13 @@
  * API DTOs shared between server and client.
  */
 
-import type { CadDocument, SketchSolveStatus, SketchEntity } from "./model.js";
+import type {
+  CadDocument,
+  EdgeRef,
+  FaceRef,
+  SketchSolveStatus,
+  SketchEntity,
+} from "./model.js";
 import type { Profile } from "./profiles.js";
 
 export type Vec3 = [number, number, number];
@@ -76,12 +82,31 @@ export interface HeldMeshes {
 export type FeatureRunStatus =
   "ok" | "warning" | "error" | "suppressed" | "rolledBack";
 
+export interface RefCandidate {
+  bodyId: string;
+  name: string;
+  basis: "lineage" | "signature";
+}
+
+export interface RefProblem {
+  status: "candidate" | "ambiguous" | "missing";
+  candidates: RefCandidate[];
+  suggestions: RefCandidate[];
+}
+
+export type RefResolution = { status: "resolved" } | RefProblem;
+
+export interface UnresolvedRef extends RefProblem {
+  ref: FaceRef | EdgeRef;
+}
+
 export interface FeatureStatus {
   featureId: string;
   status: FeatureRunStatus;
   error?: string;
   warning?: string;
   targets?: string[];
+  refs?: UnresolvedRef[];
 }
 
 export interface SketchPayload {
