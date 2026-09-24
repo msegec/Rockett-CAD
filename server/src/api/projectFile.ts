@@ -9,7 +9,6 @@ import {
   SCHEMA_VERSION,
   ValidationError,
   withShown,
-  type CadDocument,
   type ProjectFile,
 } from "@rockett/shared";
 import type { Request, Response } from "express";
@@ -104,12 +103,10 @@ export const uploadProjectFile =
           .map(([name, base64]) => [name, decodeAsset(name, base64)]),
       ),
     );
-    const { doc, shown } = splitView({
-      ...migrate(documentMigrations, file.document, pending),
-    });
-    const document = doc as unknown as CadDocument;
+    const { doc, shown } = splitView(file.document);
+    const document = migrate(documentMigrations, doc, pending);
     validateDocument(document);
-    const view = withShown(withShown(emptyView(), pending.shown), shown);
+    const view = withShown(emptyView(), shown);
     const referenced = referencedAssets(document);
     for (const name of Object.keys(file.assets))
       if (!referenced.has(name) && !pending.used.has(name))

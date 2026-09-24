@@ -127,10 +127,11 @@ the document and decode from base64, and its bytes must hash to its key. An
 image asset also passes the image upload rules. Every referenced asset must be
 present. A file from before schema 9 may key its images by their old
 `<16hex>.<ext>` ids and may hold STEP sources inline; migration hashes both
-and rekeys them. The stored document holds no `visible` flag. Flags a file
-from schema 10 or earlier, or at the current schema, carries on a body in
-`bodyMeta` or on a sketch or reference image move to the new project's
-`view.json`; the 12 to 13 migration drops those of a schema 11 or 12 file.
+and rekeys them. Before migrating, any `visible` flag the file carries on a
+body in `bodyMeta` or on a sketch or reference image moves to the new
+project's `view.json`, whatever the file's schema, so the stored document
+holds none. A browser project opens through this route, so its record keeps
+its hidden bodies and sketches too.
 A file with a newer
 `version` or `schemaVersion` gets 400 naming both versions. Any failure
 returns 400 and creates nothing: a project half made when an asset fails is
