@@ -40,6 +40,7 @@ const refuse = (operation) => async (target) => {
 const readOnly = {
   readFile: fs.promises.readFile,
   readdir: fs.promises.readdir,
+  stat: fs.promises.stat,
   mkdir: refuse("mkdir"),
   open: refuse("open"),
   rename: refuse("rename"),

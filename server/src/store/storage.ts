@@ -6,6 +6,7 @@ export type Data = string | Uint8Array | AsyncIterable<Uint8Array>;
 
 export interface Storage {
   read(file: string): Promise<Buffer>;
+  stamp(file: string): Promise<string | undefined>;
   writeAtomic(file: string, data: Data): Promise<void>;
   move(from: string, to: string): Promise<void>;
   list(dir: string): Promise<string[]>;
@@ -15,7 +16,7 @@ export interface Storage {
 
 export type Fs = Pick<
   typeof promises,
-  "mkdir" | "open" | "readFile" | "readdir" | "rename" | "rm"
+  "mkdir" | "open" | "readFile" | "readdir" | "rename" | "rm" | "stat"
 >;
 
 export function storagePath(target: string, allowRoot = false): string {
@@ -42,6 +43,16 @@ export class LocalStorage implements Storage {
 
   async read(file: string): Promise<Buffer> {
     return this.fs.readFile(this.resolve(file));
+  }
+
+  async stamp(file: string): Promise<string | undefined> {
+    try {
+      const s = await this.fs.stat(this.resolve(file), { bigint: true });
+      return `${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}`;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw err;
+    }
   }
 
   async writeAtomic(file: string, data: Data): Promise<void> {

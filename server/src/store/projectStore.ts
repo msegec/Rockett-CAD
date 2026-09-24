@@ -113,6 +113,7 @@ export class ProjectStore {
       migrations: documentMigrations,
       unbacked: (id) => this.isTemporary(id),
       validate,
+      remember: (doc) => ({ revision: doc.revision }),
       effects: {
         context: async (id, stored) =>
           new PendingBlobs(await this.legacyAssets(id, stored)),
@@ -230,7 +231,7 @@ export class ProjectStore {
     const snapshot = structuredClone(doc);
     snapshot.modifiedAt = new Date().toISOString();
     snapshot.savedWith = build();
-    const next = (previous?: CadDocument) => {
+    const next = (previous?: Partial<CadDocument>) => {
       snapshot.revision = (previous?.revision ?? 0) + 1;
       return snapshot;
     };

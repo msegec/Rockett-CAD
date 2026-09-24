@@ -54,12 +54,16 @@ through `mutateProject` in `server/src/api/routes.ts`: it checks the revision,
 applies the edit, evaluates, names new bodies, then saves the document with
 one labelled history entry in a single write (see API.md, History).
 
-**Storage.** `server/src/store/` owns persistence. `Storage` reads, writes
-atomically, moves, lists and removes paths under the data root, and
-`LocalStorage` is its one implementation. `JsonStore` keeps one namespace of
-JSON files, queues writes per key and migrates each file on read through its
-`Migrations` table. Before a migrated file is first written, it backs up the
-file's whole directory; a temporary project gets no backup. `BlobStore` keeps
+**Storage.** `server/src/store/` owns persistence. `Storage` reads, stamps,
+writes atomically, moves, lists and removes paths under the data root, and
+`LocalStorage` is its one implementation. A stamp is a file's inode, size and
+change times. `JsonStore` keeps one namespace of JSON files, queues writes per
+key and migrates each file on read through its `Migrations` table. Before a
+migrated file is first written, it backs up the file's whole directory; a
+temporary project gets no backup. It remembers the stamp of each file it last
+read or wrote at the current version and place, and for a document its
+revision, so saving an unchanged file reads nothing; any other change to the
+file moves its stamp and the next save reads it again. `BlobStore` keeps
 a project's source files and images by sha256. `ProjectStore` assembles a
 project from its `project.json` manifest (`ManifestStore`), its part
 document, `view.json` and blobs. `HistoryStore` keeps a project's undo

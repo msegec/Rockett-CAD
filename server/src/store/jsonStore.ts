@@ -41,6 +41,7 @@ export interface JsonStoreOptions<T, C extends MigrationContext> {
   unbacked?: (key: string) => Promise<boolean>;
   validate?: (value: T) => void;
   effects?: MigrationEffects<C>;
+  remember?: (value: T) => Partial<T>;
 }
 
 export interface Inventory {
@@ -256,6 +257,7 @@ export function backupNamespace(
 
 export class JsonStore<T, C extends MigrationContext = MigrationContext> {
   private writes = new ProjectQueue();
+  private known = new Map<string, { stamp: string; value: Partial<T> }>();
 
   constructor(readonly options: JsonStoreOptions<T, C>) {}
 
@@ -305,12 +307,17 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
   }
 
   async migrated(key: string, item = key): Promise<{ value: T; context: C }> {
-    const stored = await this.stored(key, item);
+    const stamp = item === key ? await this.stamp(key) : undefined;
+    const { file, value: stored } = await this.found(key, item);
     const context = await this.context(key, stored);
-    return {
-      value: migrate(this.options.migrations, stored, context),
-      context,
-    };
+    const value = migrate(this.options.migrations, stored, context);
+    if (item === key)
+      this.remember(
+        key,
+        value === stored && file === this.file(key) ? stamp : undefined,
+        value,
+      );
+    return { value, context };
   }
 
   async read(key: string, item = key): Promise<T> {
@@ -322,19 +329,56 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
   }
 
   write(key: string, value: T): Promise<void> {
-    return this.update(key, () => value);
+    return this.writes.run(key, () => this.put(key, value));
   }
 
   update(
     key: string,
-    change: (previous: T | undefined) => T,
-    write: Write = (file, text) => this.options.storage.writeAtomic(file, text),
+    change: (previous: Partial<T> | undefined) => T,
+    write?: Write,
   ): Promise<void> {
     return this.writes.run(key, async () => {
-      const [file, text] = this.encode(key, change(await this.previous(key)));
-      await this.upgrade(key);
-      await write(file, text);
+      await this.put(key, change(await this.recall(key)), write);
     });
+  }
+
+  private async recall(key: string): Promise<Partial<T> | undefined> {
+    const known = await this.current(key);
+    if (known) return known;
+    const previous = await this.previous(key);
+    return previous && this.remembered(previous);
+  }
+
+  private remembered(value: T): Partial<T> {
+    return this.options.remember?.(value) ?? {};
+  }
+
+  private async put(
+    key: string,
+    value: T,
+    write: Write = (file, text) => this.options.storage.writeAtomic(file, text),
+  ): Promise<void> {
+    const [file, text] = this.encode(key, value);
+    await this.upgrade(key);
+    this.known.delete(key);
+    await write(file, text);
+    this.remember(key, await this.stamp(key), value);
+  }
+
+  private stamp(key: string): Promise<string | undefined> {
+    return this.options.storage.stamp(this.file(key));
+  }
+
+  private remember(key: string, stamp: string | undefined, value: T): void {
+    if (stamp === undefined) this.known.delete(key);
+    else this.known.set(key, { stamp, value: this.remembered(value) });
+  }
+
+  private async current(key: string): Promise<Partial<T> | undefined> {
+    const known = this.known.get(key);
+    if (known && known.stamp === (await this.stamp(key))) return known.value;
+    this.known.delete(key);
+    return undefined;
   }
 
   settle(key: string): Promise<void> {
@@ -354,6 +398,7 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
   private async upgrade(key: string): Promise<void> {
     const backed = !(await this.options.unbacked?.(key));
     if (backed) await this.recover(key);
+    if (await this.current(key)) return;
     let found: { file: string; value: unknown };
     try {
       found = await this.found(key);
@@ -417,6 +462,7 @@ export class JsonStore<T, C extends MigrationContext = MigrationContext> {
   }
 
   async remove(key: string): Promise<void> {
+    this.known.delete(key);
     await this.options.storage.remove(this.dir(key));
   }
 
