@@ -1,4 +1,4 @@
-import { getKernel, faces as facesOf, release, type Shape } from "./kernel.js";
+import { getKernel, faces as facesOf, scoped, type Shape } from "./kernel.js";
 
 export interface FaceMesh {
   face: Shape;
@@ -69,15 +69,20 @@ export function meshShape(
 
 export function meshCopy(
   shape: Shape,
-  deflection: { linear: number; angular: number },
-): FaceMesh[] {
-  const faces = facesOf(shape);
-  if (faces.every(isExact)) return read(faces);
-  release(faces);
-  const copy = new (getKernel().BRepBuilderAPI_Copy_2)(shape, false, false);
-  try {
-    return meshShape(copy.Shape(), deflection);
-  } finally {
-    copy.delete();
-  }
+  { linear, angular }: { linear: number; angular: number },
+): Omit<FaceMesh, "face">[] {
+  const k = getKernel();
+  return scoped((own) => {
+    let faces = facesOf(shape).map(own);
+    if (!faces.every(isExact)) {
+      const copy = own(
+        own(new k.BRepBuilderAPI_Copy_2(shape, false, false)).Shape(),
+      );
+      own(
+        new k.BRepMesh_IncrementalMesh_2(copy, linear, false, angular, false),
+      );
+      faces = facesOf(copy).map(own);
+    }
+    return faces.flatMap((face) => k.meshFace(face) ?? []);
+  });
 }
