@@ -30,7 +30,7 @@ client/src/sketchTools.ts 827
 client/src/store.ts 1244
 client/src/store.ts deleteSketchEntities 94
 client/src/store.ts useStore 788
-client/src/three/CadViewport.ts 1056
+client/src/three/CadViewport.ts 1073
 client/src/three/CadViewport.ts addHighlight 108
 client/src/three/CadViewport.ts buildBody 87
 client/src/three/CadViewport.ts pick 188

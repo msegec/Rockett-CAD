@@ -113,6 +113,10 @@ export class CadViewport {
   private bodies = new Map<string, BodyObjects>();
   private bodyRoot = new THREE.Group();
   private ghostRoot = new THREE.Group();
+  private ghosts = new Map<
+    string,
+    THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
+  >();
   private sketchRoot = new THREE.Group();
   private planeRoot = new THREE.Group();
   private overlayRoot = new THREE.Group();
@@ -184,6 +188,7 @@ export class CadViewport {
     window.removeEventListener("scroll", this.forgetRect, true);
     clearGroup(this.scene);
     this.bodies.clear();
+    this.ghosts.clear();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
@@ -651,39 +656,51 @@ export class CadViewport {
   }
 
   setPreviewGhosts(ghosts: readonly PreviewGhost[]) {
-    clearGroup(this.ghostRoot);
+    const keys = new Set(ghosts.map((g) => g.body.meshKey));
+    for (const [key, mesh] of this.ghosts) {
+      if (keys.has(key)) continue;
+      this.ghostRoot.remove(mesh);
+      disposeObject(mesh);
+      this.ghosts.delete(key);
+    }
     for (const { body, tint, ranges } of ghosts) {
-      const geom = new THREE.BufferGeometry();
-      geom.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(body.positions, 3),
-      );
-      geom.setAttribute(
-        "normal",
-        new THREE.Float32BufferAttribute(body.normals, 3),
-      );
-      geom.setIndex(
+      const mesh = this.ghosts.get(body.meshKey) ?? this.addGhost(body);
+      mesh.geometry.setIndex(
         ranges.flatMap(({ start, count }) =>
           body.indices.slice(start, start + count),
         ),
       );
-      const mesh = new THREE.Mesh(
-        geom,
-        new THREE.MeshStandardMaterial({
-          color: themeColor(tint),
-          metalness: BODY_APPEARANCE.metalness,
-          roughness: BODY_APPEARANCE.roughness,
-          transparent: true,
-          opacity: PREVIEW_APPEARANCE.ghostOpacity,
-          depthTest: false,
-          depthWrite: false,
-        }),
-      );
-      mesh.renderOrder = 3;
+      mesh.material.color.set(themeColor(tint));
       mesh.userData.ghostOf = body.bodyId;
-      this.ghostRoot.add(mesh);
     }
     this.requestRender();
+  }
+
+  private addGhost(body: BodyPayload) {
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute(body.positions, 3),
+    );
+    geom.setAttribute(
+      "normal",
+      new THREE.Float32BufferAttribute(body.normals, 3),
+    );
+    const mesh = new THREE.Mesh(
+      geom,
+      new THREE.MeshStandardMaterial({
+        metalness: BODY_APPEARANCE.metalness,
+        roughness: BODY_APPEARANCE.roughness,
+        transparent: true,
+        opacity: PREVIEW_APPEARANCE.ghostOpacity,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
+    mesh.renderOrder = 3;
+    this.ghostRoot.add(mesh);
+    this.ghosts.set(body.meshKey, mesh);
+    return mesh;
   }
 
   bodyPayloads(): BodyPayload[] {
