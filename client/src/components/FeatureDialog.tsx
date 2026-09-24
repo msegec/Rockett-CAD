@@ -48,6 +48,12 @@ function attempt(build: (() => Feature) | null): Feature | null {
   }
 }
 
+function changes(stored: Feature | undefined, patch: Partial<Feature>) {
+  return Object.entries(patch).some(
+    ([k, v]) => JSON.stringify((stored as any)?.[k]) !== JSON.stringify(v),
+  );
+}
+
 function useLivePreview(editId: string | undefined, draft: Feature | null) {
   const key = draft && JSON.stringify(featurePatch(draft));
   const sent = useRef(editId ? key : null);
@@ -58,12 +64,8 @@ function useLivePreview(editId: string | undefined, draft: Feature | null) {
         sent.current = JSON.stringify(patch);
         const s = useStore.getState();
         if (!editId) return s.previewNewFeature(feature as Feature);
-        const stored: any = s.document?.features.find((f) => f.id === editId);
-        if (
-          Object.entries(patch).some(
-            ([k, v]) => JSON.stringify(stored?.[k]) !== JSON.stringify(v),
-          )
-        )
+        const stored = s.document?.features.find((f) => f.id === editId);
+        if (changes(stored, patch))
           return s.updateFeaturePreview(editId, patch);
       },
     }),
@@ -985,6 +987,11 @@ function DialogBody({
       return;
     }
     live.cancel();
+    const { previewBaseline, document: current } = useStore.getState();
+    const before = (previewBaseline ?? current)?.features.find(
+      (f) => f.id === editId,
+    );
+    if (editId && !changes(before, featurePatch(feature))) return close();
     setPending(true);
     try {
       if (editId) await updateFeature(editId, featurePatch(feature));
