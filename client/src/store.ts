@@ -274,6 +274,7 @@ const preview: {
     after?: BodyPayload[] | undefined;
   } | null;
   error: string | null;
+  restore: Feature | null;
 } = {
   seq: 0,
   pending: null,
@@ -281,7 +282,33 @@ const preview: {
   provisional: null,
   base: null,
   error: null,
+  restore: null,
 };
+
+function savedPreview(
+  baseline: CadDocument | null,
+  mine: CadDocument,
+  latest: CadDocument,
+): Feature | undefined {
+  const same = (a: unknown, b: unknown) =>
+    JSON.stringify(a) === JSON.stringify(b);
+  const byId = (d: CadDocument, id: string) =>
+    d.features.find((f) => f.id === id);
+  return baseline?.features.find(
+    (f) =>
+      !same(f, byId(mine, f.id)) && same(byId(mine, f.id), byId(latest, f.id)),
+  );
+}
+
+function revert(
+  id: string,
+  baseline: CadDocument | null,
+): Promise<MutationResponse | null> {
+  const restore = preview.restore;
+  preview.restore = null;
+  if (restore) return api.updateFeature(id, restore.id, featurePatch(restore));
+  return baseline ? api.replaceDocument(id, baseline) : Promise.resolve(null);
+}
 
 export function previewedFeature(s: {
   mode: Mode;
@@ -551,6 +578,7 @@ export const useStore = create<State>((set, get) => ({
       try {
         const m = await fn();
         preview.base = null;
+        preview.restore = null;
         set((s) => ({
           document: m.document,
           evaluation: m.evaluation,
@@ -568,7 +596,7 @@ export const useStore = create<State>((set, get) => ({
   },
 
   async recover(choice) {
-    const { document, recovery } = get();
+    const { document, recovery, previewBaseline } = get();
     if (!document || !recovery) return;
     endPreviews();
     preview.provisional = null;
@@ -577,6 +605,8 @@ export const useStore = create<State>((set, get) => ({
     const reloaded = await inTurn(async () => {
       try {
         const latest = (await api.getProject(document.id)).document;
+        preview.restore ??=
+          savedPreview(previewBaseline, document, latest) ?? null;
         const mode = get().mode;
         const evaluation = await api.evaluate(
           document.id,
@@ -633,23 +663,21 @@ export const useStore = create<State>((set, get) => ({
   },
 
   async cancelPreview() {
-    const { previewBaseline } = get();
+    const { previewBaseline, document, recovery } = get();
     const settling = endPreviews();
     preview.provisional = null;
     preview.base = null;
-    if (!previewBaseline) return;
-    if (get().recovery) return set({ previewBaseline: null });
-    const current = () => get().projectId === previewBaseline.id;
+    if (recovery) preview.restore = null;
+    if (!document || (!previewBaseline && !preview.restore)) return;
+    if (recovery) return set({ previewBaseline: null });
+    const current = () => get().projectId === document.id;
     set({ busy: true });
     try {
       await settling;
-      const m = await inTurn(() =>
-        api.replaceDocument(previewBaseline.id, previewBaseline),
-      );
+      const m = await inTurn(() => revert(document.id, previewBaseline));
       if (current())
         set({
-          document: m.document,
-          evaluation: m.evaluation,
+          ...(m && { document: m.document, evaluation: m.evaluation }),
           previewBaseline: null,
           busy: false,
         });
