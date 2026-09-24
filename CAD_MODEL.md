@@ -8,11 +8,12 @@ exports geometry. This is the most load-bearing document in the repo.
 The authoritative model is OpenCascade B-Rep: each **body** is a
 `TopoDS_Solid` (occasionally several solids when an operation splits a body).
 The document (`shared/src/model.ts`) stores the _recipe_: sketches with
-constraints, features with parameters and references, and embedded source
-data for imported geometry.
+constraints, features with parameters and references, and imported
+geometry: an STL, OBJ or 3MF file inline, and a STEP, IGES or BREP file by
+the sha256 of its blob.
 Geometry exists only inside the evaluation state and its caches, and is
 rebuilt from the recipe on demand. Saved projects are JSON, and the modelling
-history survives close/reopen; embedded imports increase document size.
+history survives close/reopen; embedded mesh imports increase document size.
 
 ### STEP, IGES and BREP imports
 
@@ -25,8 +26,9 @@ for the feature is its small JSON, not the file. The 7 to 8 migration hashes
 each inline `data`, and the next save writes the blob before the document
 that drops `data`; until then a read serves the bytes from the stored
 document. OCCT reads this source during regeneration,
-normalizes lengths to millimetres, and registers each solid as a body. The
-source travels with document snapshots and duplicates. Imports can be
+normalizes lengths to millimetres, and registers each solid as a body. A
+document snapshot carries the hash, and the blob stays in the project, so undo
+restores the import; duplicates and project files copy the bytes. Imports can be
 suppressed, deleted, or rolled back, and downstream features reference their
 named faces and edges. Assembly hierarchy, appearance, and source design
 history are not retained. Surface-only files are rejected; solid bodies are

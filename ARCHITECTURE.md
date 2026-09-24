@@ -47,7 +47,19 @@ plus a freshly evaluated model. Undo/redo is a client-side stack of document
 snapshots restored through a full-document endpoint, deliberately distinct
 from the CAD timeline (see FEATURE_TIMELINE.md). What is hidden is view state,
 not document: the client keeps it in a `view` slice and saves it with
-`PUT /view`, outside undo and evaluation.
+`PUT /view`, outside undo and evaluation. Every document edit names the
+revision it last read, and a stale one gets 409 with nothing written (see
+API.md, Document revisions).
+
+**Storage.** `server/src/store/` owns persistence. `Storage` reads, writes
+atomically, moves, lists and removes paths under the data root, and
+`LocalStorage` is its one implementation. `JsonStore` keeps one namespace of
+JSON files, queues writes per key and migrates each file on read through its
+`Migrations` table. Before a migrated file is first written, it backs up the
+file's whole directory; a temporary project gets no backup. `BlobStore` keeps
+a project's source files and images by sha256. `ProjectStore` assembles a
+project from its `project.json` manifest, its part document, `view.json` and
+blobs. DOCKER.md shows the layout on disk and the backup and restore rules.
 
 **Shared parametric code.** The constraint solver and profile detection are
 plain TypeScript used by _both_ sides: the browser solves interactively while

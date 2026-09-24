@@ -97,7 +97,7 @@ document edit.
 | `POST /projects`               | `{ name?, folderId? }` | `{ document }`                                                                                                                                                 |
 | `GET /projects/:id`            | none                   | `{ document }`                                                                                                                                                 |
 | `DELETE /projects/:id`         | none                   | `{ ok }`                                                                                                                                                       |
-| `POST /projects/:id/duplicate` | `{ name? }`            | `{ document }` (assets copied)                                                                                                                                 |
+| `POST /projects/:id/duplicate` | `{ name? }`            | `{ document }` (blobs copied)                                                                                                                                  |
 | `POST /projects/:id/rename`    | `{ name }`             | `{ document }`                                                                                                                                                 |
 
 `kernelVersion` is `{ occt, commit }` from the loaded kernel's
@@ -316,7 +316,7 @@ value is `{ version, data }` with `version` a non-negative integer and `data`
 any JSON value,
 `createdAt` and `modifiedAt` are non-empty strings and `timelinePosition` is an
 integer no greater than the feature count. Loading a saved project migrates
-it without validating.
+it and then applies the same checks; a failure is 422 `unprocessable`.
 
 Every validation failure returns 400 and nothing is saved.
 
