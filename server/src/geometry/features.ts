@@ -1272,15 +1272,13 @@ function filletBody(
       result = op.Shape();
       // IsDone only confirms that the algorithm completed. Some edge junctions
       // produce an invalid solid even when it reports success; never publish it.
-      const broken = invalidPart(result);
-      if (broken) {
-        const before = invalidPart(body.shape);
-        throw new Error(
-          before
-            ? `fillet of radius ${f.radius} cannot be published: the body was already invalid before this fillet (the kernel check rejects a ${before}), so the fault comes from an earlier feature; the previous body has been kept`
-            : `fillet of radius ${f.radius} produced invalid geometry (the kernel check rejects a ${broken}): try fewer edges or a different radius; the previous body has been kept`,
-        );
-      }
+      rejectInvalid(
+        result,
+        body.shape,
+        "fillet",
+        `radius ${f.radius}`,
+        "try fewer edges or a different radius",
+      );
       const names = blendNames(op, body, sourceEdges, result, f.id);
       registerBodySolids(state, bodyId, result, names);
     } finally {
@@ -1314,6 +1312,23 @@ function filletFailure(
   return added.size > 0
     ? `fillet of radius ${radius} failed on ${[...added].join(", ")}, a tangent continuation of the selected edges: try a smaller radius or fillet this edge before its neighbours`
     : `fillet of radius ${radius} failed: radius may be too large for the geometry`;
+}
+
+function rejectInvalid(
+  result: Shape,
+  before: Shape,
+  kind: string,
+  size: string,
+  advice: string,
+): void {
+  const broken = invalidPart(result);
+  if (!broken) return;
+  const earlier = invalidPart(before);
+  throw new Error(
+    earlier
+      ? `${kind} of ${size} cannot be published: the body was already invalid before this ${kind} (the kernel check rejects a ${earlier}), so the fault comes from an earlier feature; the previous body has been kept`
+      : `${kind} of ${size} left an invalid shape (the kernel check rejects a ${broken}): ${advice}; the previous body has been kept`,
+  );
 }
 
 function invalidPart(shape: Shape): string | null {
@@ -1749,10 +1764,22 @@ function evalShell(state: EvalState, f: ShellFeature): void {
     const names = propagateNames(op, [body], result, f.id);
     op.delete();
     closing.delete();
-    if (f.openFaces.length > 0) {
-      registerBodySolids(state, bodyId, result, names);
-      return;
-    }
+    const publish = (shape: Shape, shapeNames: NameMap) => {
+      try {
+        rejectInvalid(
+          shape,
+          body.shape,
+          "shell",
+          `${f.thickness} mm`,
+          "try a different wall thickness",
+        );
+      } catch (err) {
+        shape.delete();
+        throw err;
+      }
+      registerBodySolids(state, bodyId, shape, shapeNames);
+    };
+    if (f.openFaces.length > 0) return publish(result, names);
     const cut = new k.BRepAlgoAPI_Cut_3(body.shape, result, progress());
     cut.Build(progress());
     if (!cut.IsDone()) {
@@ -1767,7 +1794,7 @@ function evalShell(state: EvalState, f: ShellFeature): void {
       f.id,
     );
     cut.delete();
-    registerBodySolids(state, bodyId, hollow, hollowNames);
+    publish(hollow, hollowNames);
   });
 }
 

@@ -231,6 +231,14 @@ own, in the order of its first picked edge, and keeps each body's id. The tangen
 chain runs within each body, `n` counts that body's source edges, and an error
 names the body when there is more than one.
 
+Fillet and Shell run the kernel validity check, `BRepCheck_Analyzer`, on their
+result, since the kernel can report success and still leave an invalid shape.
+A 0.8 mm shell of a 5 or 10 degree wedge with 1 mm top fillets leaves an
+invalid face near the rim. An invalid result is a feature error that names the
+kind of part the check rejects and keeps the previous body. When the body was
+already invalid before the feature, the error says the fault comes from an
+earlier feature.
+
 Sketch-curve attribution deserves a note: wire construction can rebuild edge
 shapes (vertex merging), so after building a profile face we re-derive the
 edge→sketch-entity map _geometrically_ (each face edge's midpoint is matched
