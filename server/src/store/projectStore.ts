@@ -377,11 +377,16 @@ export class ProjectStore {
     }
   }
 
-  async sources(doc: CadDocument): Promise<Map<string, Buffer>> {
-    const out = new Map<string, Buffer>();
+  async sources(
+    doc: CadDocument,
+    held: ReadonlyMap<string, Uint8Array> = new Map(),
+  ): Promise<Map<string, Uint8Array>> {
+    const out = new Map<string, Uint8Array>();
     for (const hash of stepBlobs(doc)) {
       if (out.has(hash)) continue;
-      const bytes = await this.blob(doc.id, hash).catch(() => undefined);
+      const bytes =
+        held.get(hash) ??
+        (await this.blob(doc.id, hash).catch(() => undefined));
       if (bytes) out.set(hash, bytes);
     }
     return out;

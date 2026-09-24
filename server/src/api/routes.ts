@@ -233,12 +233,19 @@ export function createApiRouter(
       ...(evaluation && { evaluation: withVisibleBodies(evaluation, view) }),
     });
 
+  async function sourced(doc: CadDocument) {
+    const engine = engineFor(doc.id);
+    return { engine, sources: await store.sources(doc, engine.sources) };
+  }
+
   async function evaluate(doc: CadDocument, position?: number) {
-    return engineFor(doc.id).evaluate(doc, position, await store.sources(doc));
+    const { engine, sources } = await sourced(doc);
+    return engine.evaluate(doc, position, sources);
   }
 
   async function stateAt(doc: CadDocument, position?: number) {
-    return engineFor(doc.id).stateAt(doc, position, await store.sources(doc));
+    const { engine, sources } = await sourced(doc);
+    return engine.stateAt(doc, position, sources);
   }
 
   /** Evaluate + make sure every body has display metadata. */
@@ -411,10 +418,11 @@ export function createApiRouter(
         throw new ValidationError(
           `This import would exceed the 40 MB project limit. Start a separate project for this ${importer.label} file.`,
         );
-      const evaluation = engineFor(doc.id).evaluate(
+      const held = await sourced(doc);
+      const evaluation = held.engine.evaluate(
         doc,
         undefined,
-        new Map([...(await store.sources(doc)), ...sources]),
+        new Map([...held.sources, ...sources]),
       );
       for (const feature of features) {
         const status = evaluation.featureStatuses.find(

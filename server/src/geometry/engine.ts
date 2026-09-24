@@ -154,13 +154,19 @@ function cached(body: NamedBody): BodyPayload | undefined {
 class DocumentEngine {
   private snapshots: Snapshot[] = [];
   private namingVersion?: NamingVersion;
+  private held: Sources = new Map();
+
+  get sources(): Sources {
+    return this.held;
+  }
 
   evaluate(
     doc: CadDocument,
     position?: number,
-    sources: Sources = new Map(),
+    sources?: Sources,
   ): EvaluateResult {
     const t0 = performance.now();
+    if (sources) this.held = sources;
     const upTo = Math.min(
       position ?? doc.timelinePosition,
       doc.features.length,
@@ -198,7 +204,7 @@ class DocumentEngine {
             next,
             feature,
             doc.features.slice(0, i),
-            sources,
+            this.held,
             doc.namingVersion,
           );
           status = warning
@@ -282,11 +288,7 @@ class DocumentEngine {
   }
 
   /** Access the evaluated state at the current cache tip (for measure/export). */
-  stateAt(
-    doc: CadDocument,
-    position?: number,
-    sources: Sources = new Map(),
-  ): EvalState {
+  stateAt(doc: CadDocument, position?: number, sources?: Sources): EvalState {
     this.evaluate(doc, position, sources);
     const upTo = Math.min(
       position ?? doc.timelinePosition,
@@ -299,6 +301,7 @@ class DocumentEngine {
   invalidate(): void {
     releaseSnapshots(this.snapshots, []);
     this.snapshots = [];
+    this.held = new Map();
   }
 }
 
