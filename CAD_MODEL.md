@@ -92,7 +92,8 @@ A body's display name lives in `document.bodyMeta[bodyId]` and is assigned
 server-side the first time a body id appears (`Body1`, `Body2`, …). Which
 bodies, sketches and reference images are hidden lives outside the document,
 in `view.json` (see [API.md](API.md), View state). The 10 to 11 migration
-moves every `visible` flag there and drops the unused `camera`.
+moves every `visible` flag there, unless the project already has a
+`view.json`, and drops the unused `camera`.
 
 `document.groups` holds model tree folders: `{ id, name, kind, members }`,
 where `kind` is `body` or `sketch` and `members` are body ids or sketch feature

@@ -114,10 +114,8 @@ export class ProjectStore {
         commit: async (id, pending) => {
           for (const bytes of pending.blobs.values())
             await this.blobs(id).put(bytes);
-          await this.views.write(
-            id,
-            withShown(await this.storedView(id), pending.shown),
-          );
+          if (!(await this.savedView(id)))
+            await this.views.write(id, withShown(emptyView(), pending.shown));
         },
         retire: (id) => storage.remove(this.assetDir(id)),
       },
@@ -179,7 +177,7 @@ export class ProjectStore {
     const { value, context } = await this.documents.migrated(id);
     return {
       doc: this.valid(id, value),
-      view: withShown(await this.storedView(id), context.shown),
+      view: (await this.savedView(id)) ?? withShown(emptyView(), context.shown),
     };
   }
 
@@ -209,12 +207,12 @@ export class ProjectStore {
   }
 
   async view(id: string): Promise<ProjectView> {
+    if (await this.hasView(id)) return this.views.read(id);
     return (await this.open(id)).view;
   }
 
   async setView(id: string, view: ProjectView): Promise<void> {
-    await this.exists(id);
-    await this.documents.settle(id);
+    if (!(await this.hasView(id))) await this.documents.settle(id);
     await this.views.write(id, view);
   }
 
@@ -233,20 +231,18 @@ export class ProjectStore {
     return next;
   }
 
-  private storedView(id: string): Promise<ProjectView> {
+  private savedView(id: string): Promise<ProjectView | undefined> {
     return this.views.read(id).catch((err) => {
       if (!(err instanceof StoreError && err.code === "not_found")) throw err;
-      return emptyView();
+      return undefined;
     });
   }
 
-  private async exists(id: string): Promise<void> {
-    if (
-      !(await this.storage.list(this.documents.dir(id))).includes(
-        "document.json",
-      )
-    )
+  private async hasView(id: string): Promise<boolean> {
+    const files = await this.storage.list(this.documents.dir(id));
+    if (!files.includes("document.json"))
       throw new StoreError(`project ${id} not found`, "not_found");
+    return files.includes("view.json");
   }
 
   async duplicate(id: string, newName?: string): Promise<CadDocument> {

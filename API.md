@@ -216,10 +216,12 @@ with a body of the same shape and echoes it back. The body is validated, with
 unknown fields rejected, and a bad one is 400 with nothing written. The PUT
 never edits the document, never evaluates and never raises the revision, so
 it takes no `If-Match`; the last write wins. A missing project is 404. The
-view stays with the project and is shared by everyone who opens it. A GET on
-a project saved before schema 11 reports the visibility its document held. A
-PUT first migrates that document on disk, after its backup, so the old flags
-cannot return over the new view.
+view stays with the project and is shared by everyone who opens it. Once
+`view.json` exists, the GET and PUT touch only that file and never read the
+document. A GET on a project saved before schema 11 reports the visibility its
+document held. A PUT on a project with no `view.json` first migrates the
+document on disk, after its backup. The migration writes the old flags only
+into a missing `view.json`, so they cannot return over a saved view.
 
 Visibility lives only in the view. Until DOC-020 the old paths still work
 through it: `visible` in a body PUT or a feature patch writes `view.json`, and
