@@ -187,11 +187,16 @@ opposite side of the sketch plane (after `direction` is applied; `symmetric`
 ignores the sign). An optional `startOffset` moves the start plane along the
 profile's (or face's) own normal before the distance is applied (Fusion's
 "Start → Offset"), so a boss or cut can begin above or below the sketch.
-Reversing an extrude (a negative distance, Reversed, or the arrow dragged
-below the plane) switches Join to Cut, previewed in red, only when the
-reversed tool's bounding box overlaps a body that exists before the feature
-(`client/src/extrudeReach.ts`); the kernel's cut needs the same overlap.
-Reversing into empty space stays Join.
+A new extrude picks its operation from the bounding box of its tool against
+the bodies that exist before the feature (`extrudeOperation` in
+`client/src/extrudeReach.ts`): Cut, previewed in red, when the tool goes into
+the part (a negative distance, Reversed, or the arrow dragged below the
+plane) and overlaps a body; Join when it touches or overlaps a body; New body
+when it meets none. The choice follows the selection, distance, direction and
+start offset until the user picks an operation, which then stays. Editing an
+extrude keeps its stored operation. The kernel makes a Join that meets no
+body a new body `b:<featureId>`, so the geometry matches New body, but the
+stored Join fuses once an earlier edit puts a body in its path.
 
 Extrude and revolve tools built from several sketch regions pass through
 `ShapeUpgrade_UnifySameDomain` before the boolean, so adjacent regions become

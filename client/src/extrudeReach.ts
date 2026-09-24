@@ -70,28 +70,41 @@ function swept({ points, normal }: Base, from: number, to: number): Bounds {
   return { min, max };
 }
 
-function overlaps(a: Bounds, b: Bounds): boolean {
+function overlaps(a: Bounds, b: Bounds, margin: number): boolean {
   for (let i = 0; i < 3; i++)
-    if (
-      a.max[i]! <= b.min[i]! + LINEAR_TOL ||
-      b.max[i]! <= a.min[i]! + LINEAR_TOL
-    )
+    if (a.max[i]! <= b.min[i]! + margin || b.max[i]! <= a.min[i]! + margin)
       return false;
   return true;
 }
 
-export function extrudeReachesBody(from: number, to: number): boolean {
+export function extrudeOperation(
+  direction: string,
+  distance: number,
+  start: number,
+  distance2: number,
+): "newBody" | "join" | "cut" {
+  const d = direction === "reverse" ? -distance : distance;
+  const back = Math.sign(d) * Math.abs(distance2);
+  const [from, to] =
+    direction === "symmetric"
+      ? [start - Math.abs(d) / 2, start + Math.abs(d) / 2]
+      : direction === "twoSided"
+        ? [start - back, start + d]
+        : [start, start + d];
+  const into = d < 0 && (direction === "normal" || direction === "reverse");
   const s = useStore.getState();
   const bodies = previewBodies(s);
-  return s.selection.some((sel) => {
+  const tools = s.selection.flatMap((sel) => {
     const base =
       sel.kind === "profile"
         ? profileBase(sel, s.evaluation?.sketches ?? [])
         : sel.kind === "face"
           ? faceBase(sel, bodies)
           : null;
-    if (!base) return false;
-    const tool = swept(base, from, to);
-    return bodies.some((b) => overlaps(tool, b.bbox));
+    return base ? [swept(base, from, to)] : [];
   });
+  const meets = (margin: number) =>
+    tools.some((t) => bodies.some((b) => overlaps(t, b.bbox, margin)));
+  if (into && meets(LINEAR_TOL)) return "cut";
+  return meets(-LINEAR_TOL) ? "join" : "newBody";
 }

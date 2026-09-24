@@ -21,7 +21,7 @@ import {
   type Selection,
 } from "../store";
 import { api, saveDownload } from "../api";
-import { extrudeReachesBody } from "../extrudeReach";
+import { extrudeOperation } from "../extrudeReach";
 import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
 import { clearInput, sketchPicks, takes } from "../dialogPicks";
 import { createLivePreview } from "../livePreview";
@@ -251,29 +251,18 @@ function DialogBody({
     </>
   );
 
-  // Extrude: a negative distance, Reversed or a drag below the surface means
-  // "into the part", so Join turns to Cut if the tool meets a body; going back
-  // undoes only that automatic switch, never an operation the user picked.
-  const extrudeSign = useRef<number | null>(null);
   useEffect(() => {
-    if (dialog !== "extrude") return;
-    const direction = params.direction ?? "normal";
-    if (direction !== "normal" && direction !== "reverse") return;
-    // unset = the dialog's default of 10, so the very first negative counts
-    const d =
-      Number(params.distance ?? 10) * (direction === "reverse" ? -1 : 1);
-    if (!Number.isFinite(d) || d === 0) return;
-    const sign = d < 0 ? -1 : 1;
-    const prev = extrudeSign.current;
-    extrudeSign.current = sign;
-    if (prev === null || prev === sign) return;
-    const op = params.operation ?? "join";
-    const start = num("startOffset", 0);
-    if (sign < 0 && op === "join" && extrudeReachesBody(start, start + d))
-      setParams({ operation: "cut", autoCut: true });
-    else if (sign > 0 && op === "cut" && params.autoCut)
-      setParams({ operation: "join", autoCut: false });
-  }, [params.distance, params.direction, dialog]);
+    if (dialog !== "extrude" || num("distance", 10) === 0) return;
+    if (params.operation !== undefined && !params.autoOperation) return;
+    const operation = extrudeOperation(
+      p("direction", "normal"),
+      num("distance", 10),
+      num("startOffset", 0),
+      num("distance2", 5),
+    );
+    if (operation !== params.operation)
+      setParams({ operation, autoOperation: true });
+  }, [dialog, selection, params]);
 
   let title = "";
   let body: ReactElement | null = null;
@@ -330,7 +319,7 @@ function DialogBody({
               onChange={(v) => setParams({ distance2: v })}
             />
           )}
-          {operationField(true, { autoCut: false })}
+          {operationField(true, { autoOperation: false })}
         </>
       );
       build = () => {
