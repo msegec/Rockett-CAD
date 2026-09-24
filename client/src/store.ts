@@ -563,6 +563,8 @@ export const useStore = create<State>((set, get) => ({
           evaluation,
           previewBaseline: null,
           recovery: null,
+          undoStack: [],
+          redoStack: [],
           busy: false,
           ...historyEditingState(mode, { document: latest, evaluation }),
         });
