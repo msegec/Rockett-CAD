@@ -21,6 +21,7 @@ import type {
   SketchEntity,
   SketchFeature,
   SketchImport,
+  TopoRef,
   Visibility,
 } from "@rockett/shared";
 import {
@@ -85,6 +86,9 @@ export function selectionKey(s: Selection): string {
       return `sp:${s.sketchId}:${s.entityId}`;
   }
 }
+
+const measurable = (s: Selection): s is TopoRef =>
+  s.kind === "face" || s.kind === "edge" || s.kind === "vertex";
 
 export type SketchTool =
   | "select"
@@ -761,7 +765,14 @@ export const useStore = create<State>((set, get) => ({
   setHover: (s) => set({ hover: s }),
 
   setMode: (m) =>
-    set({ mode: m, dialogParams: {}, pickInput: null, measureResult: null }),
+    set((s) => ({
+      mode: m,
+      dialogParams: {},
+      pickInput: null,
+      measureResult: null,
+      selection:
+        m.name === "measure" ? s.selection.filter(measurable) : s.selection,
+    })),
   setDialogParams: (p) =>
     set((s) => ({ dialogParams: { ...s.dialogParams, ...p } })),
   setPickInput: (key) => set({ pickInput: key }),
@@ -1259,11 +1270,7 @@ export const useStore = create<State>((set, get) => ({
   async runMeasure() {
     const { selection, document } = get();
     if (!document) return;
-    const refs = selection
-      .filter(
-        (s) => s.kind === "face" || s.kind === "edge" || s.kind === "vertex",
-      )
-      .slice(0, 2) as any[];
+    const refs = selection.filter(measurable).slice(0, 2);
     if (refs.length === 0) {
       set({ measureResult: null });
       return;
