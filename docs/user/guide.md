@@ -121,6 +121,11 @@ or chamfer along a smooth contour as required by its native operation.
   axis, as choosing it in the Axis list does; in Rectangular Pattern the
   Direction edge row takes it as the direction. Hiding the origin
   hides the axis lines too, and they cannot be picked while hidden.
+- Axis and direction rows hold one straight line. A new pick replaces the
+  old one, a circular edge or arc is refused, and choosing another entry in
+  the list drops the earlier pick. With Selected line/edge and nothing picked,
+  the row reads Pick an axis (Pick a direction in Rectangular Pattern) and OK
+  stays disabled.
 
 ### Drag handles
 

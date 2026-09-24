@@ -16,6 +16,7 @@ export interface PickInput {
   kinds: readonly Kind[];
   one?: true;
   planar?: true;
+  straight?: true;
   optional?: true;
 }
 
@@ -30,7 +31,8 @@ const targets = input("targets", ["body"], { optional: true });
 const bodies = input("bodies", ["body"]);
 const edges = input("edges", ["edge"]);
 const faces = input("faces", ["face"]);
-const axis = input("axis", ["edge", "sketchEntity", "axis"]);
+const line = { one: true, straight: true } as const;
+const axis = input("axis", ["edge", "sketchEntity", "axis"], line);
 const planar = (key: string, one: boolean) =>
   input(key, ["plane", "face"], { planar: true, ...(one && { one: true }) });
 
@@ -48,7 +50,7 @@ export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
   splitBody: [input("body", ["body"], { one: true }), planar("tool", true)],
   offsetFace: [faces],
   mirror: [bodies, planar("plane", true)],
-  linearPattern: [bodies, input("direction", ["edge", "axis"])],
+  linearPattern: [bodies, input("direction", ["edge", "axis"], line)],
   circularPattern: [bodies, axis],
   constructionPlane: [planar("plane", false)],
   referenceImage: [planar("plane", true)],
@@ -126,8 +128,14 @@ export function isPlanarFace(sel: Selection, s: Store): boolean {
   return face?.surface.type === "plane";
 }
 
-function isLine(sel: Selection, s: Store): boolean {
-  if (sel.kind !== "sketchEntity") return false;
+function isStraight(sel: Selection, s: Store): boolean {
+  if (sel.kind === "edge") {
+    const body = previewBodies(s).find((b) => b.bodyId === sel.bodyId);
+    return (
+      body?.edges.find((e) => e.name === sel.edgeName)?.curve.type === "line"
+    );
+  }
+  if (sel.kind !== "sketchEntity") return true;
   const sketch = s.document?.features.find((f) => f.id === sel.sketchId);
   return (
     sketch?.type === "sketch" &&
@@ -170,7 +178,7 @@ export function accepted(
     return sketchRegions(sel.sketchId);
   if (!has(sel.kind)) return [];
   if (i.planar && sel.kind === "face" && !isPlanarFace(sel, s)) return [];
-  if (sel.kind === "sketchEntity" && !isLine(sel, s)) return [];
+  if (i.straight && !isStraight(sel, s)) return [];
   return [sel];
 }
 
@@ -209,6 +217,12 @@ function write(i: PickInput, next: Selection[], s: Store) {
   }
   const ids = next.flatMap((x) => (x.kind === "body" ? [x.bodyId] : []));
   s.setDialogParams({ targets: ids.length > 0 ? ids : undefined });
+}
+
+export function clearInput(key: string) {
+  const s = useStore.getState();
+  const i = dialogInputs(s).find((x) => x.key === key);
+  if (i) write(i, [], s);
 }
 
 function following(key: string, s: Store): PickInput | undefined {

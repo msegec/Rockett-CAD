@@ -212,7 +212,8 @@ function bodyCenter(input: HandleInput): THREE.Vector3 | null {
 function patternDirection(input: HandleInput): THREE.Vector3 | null {
   const { params, selection, bodies } = input;
   const edge = selection.find((s) => s.kind === "edge");
-  if ((params.axisSource ?? "origin") === "edge" && edge?.kind === "edge") {
+  if ((params.axisSource ?? "origin") === "edge") {
+    if (edge?.kind !== "edge") return null;
     const pl = bodies
       .find((b) => b.bodyId === edge.bodyId)
       ?.edges.find((e) => e.name === edge.edgeName)?.polyline;

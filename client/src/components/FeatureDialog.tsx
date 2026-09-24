@@ -23,7 +23,7 @@ import {
 import { api, saveDownload } from "../api";
 import { extrudeReachesBody } from "../extrudeReach";
 import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
-import { takes } from "../dialogPicks";
+import { clearInput, takes } from "../dialogPicks";
 import { createLivePreview } from "../livePreview";
 import { targetOperation, toolTargets } from "../toolTargets";
 import { viewportHandle } from "../viewportRef";
@@ -193,18 +193,25 @@ function DialogBody({
     if (faces.length > 0) return { kind: "face", face: faceRefs()[0]! };
     return null;
   };
+  const axisMissing =
+    axisDialog &&
+    p("axisSource", "origin") === "edge" &&
+    edges.length + sketchLines.length === 0;
+  const axisHint = axisMissing
+    ? "Pick an axis"
+    : "click a sketch line or body edge, or pick X/Y/Z";
+  const chooseAxis = (key: string, patch: Record<string, unknown>) => {
+    setParams(patch);
+    clearInput(key);
+  };
   const axisRef = (): AxisRef => {
-    if (p("axisSource", "origin") === "edge") {
-      if (sketchLines.length > 0) {
-        return {
-          kind: "sketchLine",
-          sketchId: sketchLines[0]!.sketchId,
-          entityId: sketchLines[0]!.entityId,
-        };
-      }
-      if (edges.length > 0) return { kind: "edge", edge: edgeRefs()[0]! };
-    }
-    return { kind: "originAxis", axis: p("axis", "Z") };
+    if (p("axisSource", "origin") !== "edge")
+      return { kind: "originAxis", axis: p("axis", "Z") };
+    need(!axisMissing, "Pick an axis");
+    const line = sketchLines[0];
+    return line
+      ? { kind: "sketchLine", sketchId: line.sketchId, entityId: line.entityId }
+      : { kind: "edge", edge: edgeRefs()[0]! };
   };
 
   const close = () => setMode({ name: "idle" });
@@ -357,12 +364,12 @@ function DialogBody({
             label="Axis"
             input="axis"
             picks={[...edges, ...sketchLines]}
-            hint="click a sketch line or body edge, or pick X/Y/Z"
+            hint={axisHint}
           />
           <AxisField
             axisSource={params.axisSource}
             axis={params.axis}
-            onChange={setParams}
+            onChange={(patch) => chooseAxis("axis", patch)}
           />
           <NumField
             label="Angle (°)"
@@ -772,7 +779,11 @@ function DialogBody({
             label="Direction edge"
             input="direction"
             picks={edges}
-            hint="click a body edge, or pick X/Y/Z"
+            hint={
+              axisMissing
+                ? "Pick a direction"
+                : "click a body edge, or pick X/Y/Z"
+            }
           />
           <SelectField
             label="Direction"
@@ -781,9 +792,12 @@ function DialogBody({
             }
             options={[...axisOptions, ["edge", "Selected edge"]]}
             onChange={(v) =>
-              v === "edge"
-                ? setParams({ axisSource: "edge" })
-                : setParams({ axisSource: "origin", axis: v })
+              chooseAxis(
+                "direction",
+                v === "edge"
+                  ? { axisSource: "edge" }
+                  : { axisSource: "origin", axis: v },
+              )
             }
           />
           <NumField
@@ -807,8 +821,9 @@ function DialogBody({
       );
       build = () => {
         need(bodies.length > 0, "Select bodies to pattern");
+        need(!axisMissing, "Pick a direction");
         const direction =
-          p("axisSource", "origin") === "edge" && edges.length > 0
+          p("axisSource", "origin") === "edge"
             ? ({ kind: "edge", edge: edgeRefs()[0]! } as const)
             : ({ kind: "axis", axis: p("axis", "X") } as const);
         return {
@@ -834,12 +849,12 @@ function DialogBody({
             label="Axis"
             input="axis"
             picks={[...edges, ...sketchLines]}
-            hint="click a sketch line or body edge, or pick X/Y/Z"
+            hint={axisHint}
           />
           <AxisField
             axisSource={params.axisSource}
             axis={params.axis}
-            onChange={setParams}
+            onChange={(patch) => chooseAxis("axis", patch)}
           />
           <NumField
             label="Quantity"
@@ -997,6 +1012,7 @@ function DialogBody({
         onOk={() => void ok()}
         onCancel={close}
         pending={pending}
+        okDisabled={axisMissing}
         escapeAnywhere
       />
     </DraggablePanel>
