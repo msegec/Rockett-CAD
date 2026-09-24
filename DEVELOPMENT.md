@@ -66,8 +66,10 @@ boxes, face counts). Never rely on visual confirmation alone.
 
 - All raw kernel access stays inside `server/src/geometry/`. The OCCT API is
   typed loosely (`OC = any`); check binding signatures against
-  `node_modules/opencascade.js/dist/opencascade.full.d.ts`. Emscripten
-  overloads carry `_1`, `_2`, … suffixes.
+  `node_modules/opencascade.js/dist/opencascade.rockett.d.ts`, and the fork's
+  helpers such as `shapeHash` and `getExceptionMessage` against
+  `dist/rockett-helpers.d.ts`. Emscripten overloads carry `_1`, `_2`, …
+  suffixes. Int64 values are BigInt; `Standard_Size` is a number.
 - Every feature evaluator must: validate inputs, use `kernelCall()` so kernel
   aborts become readable errors, and propagate persistent names
   (`naming.ts`) for every face of every produced shape.

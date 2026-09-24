@@ -14,7 +14,7 @@ Parametric document / model representation (shared TypeScript schema)
    ↓
 Geometry service (Node.js, regeneration engine + caches)
    ↓
-CAD kernel (OpenCascade 7.6 compiled to WebAssembly)
+CAD kernel (OpenCascade 8.0.1 compiled to WebAssembly)
    ↓
 B-Rep model (TopoDS solids, faces, edges, vertices)
 ```
@@ -31,7 +31,7 @@ B-Rep model (TopoDS solids, faces, edges, vertices)
 ## Key decisions
 
 **Kernel: OpenCascade via WASM, hosted server-side.**
-`opencascade.js` (OCCT 7.6) runs inside the Node process. This gives a full
+`opencascade.js` (OCCT 8.0.1) runs inside the Node process. This gives a full
 B-Rep kernel (booleans, fillets, shells, sweeps, topology interrogation,
 history tracking) with zero native build complexity in Docker. The runtime
 image is plain `node:24-trixie-slim`. The geometry code is isolated behind

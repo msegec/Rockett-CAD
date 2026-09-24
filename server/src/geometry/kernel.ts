@@ -44,7 +44,7 @@ const HASH_BOUND = 1_000_000_007;
 
 /** Stable-ish identity hash for a TopoDS_Shape (TShape pointer + location). */
 export function shapeHash(shape: Shape): number {
-  return shape.HashCode(HASH_BOUND);
+  return getKernel().shapeHash(shape, HASH_BOUND);
 }
 
 export function* explore(
@@ -63,7 +63,7 @@ export function* explore(
   const map = new k.TopTools_IndexedMapOfShape_1();
   try {
     k.TopExp.MapShapes_1(shape, enumMap[type], map);
-    for (let i = 1; i <= map.Extent(); i++) yield map.FindKey(i);
+    for (let i = 1; i <= map.Extent(); i++) yield map.FindKey_2(i);
   } finally {
     map.delete();
   }
@@ -139,7 +139,7 @@ export function pnt(x: number, y: number, z: number): any {
 
 export function dir(x: number, y: number, z: number): any {
   const k = getKernel();
-  return new k.gp_Dir_4(x, y, z);
+  return new k.gp_Dir_5(x, y, z);
 }
 
 export function vec(x: number, y: number, z: number): any {
@@ -157,6 +157,10 @@ export function placementToTrsf(placement: Placement): any {
   rotation.delete();
   translation.delete();
   return trsf;
+}
+
+export function transformOp(shape: Shape, trsf: any): any {
+  return new (getKernel().BRepBuilderAPI_Transform_2)(shape, trsf, true, false);
 }
 
 export function progress(): any {
@@ -269,19 +273,11 @@ export function kernelCall<T>(label: string, fn: () => T): T {
   try {
     return fn();
   } catch (err: any) {
-    if (typeof err === "number") {
-      // Emscripten C++ exception pointer — try to extract a message.
-      let msg = `OCCT exception #${err}`;
-      try {
-        const k = getKernel();
-        if (k.OCJS?.getStandard_FailureData) {
-          const failure = k.OCJS.getStandard_FailureData(err);
-          if (failure?.GetMessageString) msg = failure.GetMessageString();
-        }
-      } catch {
-        // keep generic message
-      }
-      throw new Error(`${label}: ${msg}`);
+    if (err instanceof WebAssembly.Exception) {
+      const k = getKernel();
+      const [, message] = k.getExceptionMessage(err);
+      k.decrementExceptionRefcount(err);
+      throw new Error(`${label}: ${message}`);
     }
     throw new Error(`${label}: ${err?.message ?? String(err)}`);
   }

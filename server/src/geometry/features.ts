@@ -58,6 +58,7 @@ import {
   scoped,
   shapeHash,
   solids,
+  transformOp,
   vec,
   vertices as verticesOf,
   volumeOf,
@@ -309,11 +310,11 @@ function reparametrisedCylinderEdges(shape: Shape): Shape[] {
   );
   const keep: Shape[] = [];
   for (let i = 1; i <= map.Extent(); i++) {
-    const adjacent = listToArray(map.FindFromIndex(i));
+    const adjacent = listToArray(map.FindFromIndex_2(i));
     const [a, b] = adjacent.map(cylinderAxes);
     release(adjacent);
     if (a && b && a.some((d, j) => V.dot(d, b[j]!) < 1 - UNIT_DOT_TOL))
-      keep.push(map.FindKey(i));
+      keep.push(map.FindKey_2(i));
   }
   map.delete();
   return keep;
@@ -509,7 +510,7 @@ function buildPrism(
           direction[2] * baseOffset,
         ),
       );
-      const tr = new k.BRepBuilderAPI_Transform_2(face, trsf, true);
+      const tr = transformOp(face, trsf);
       const moved = tr.Shape();
       // remap edge->entity through the transform
       const newMap = new Map<number, string>();
@@ -1031,7 +1032,7 @@ function evalFillet(state: EvalState, f: FilletFeature): void {
       result = op.Shape();
       // IsDone only confirms that the algorithm completed. Some edge junctions
       // produce an invalid solid even when it reports success; never publish it.
-      const check = new k.BRepCheck_Analyzer(result, true, false);
+      const check = new k.BRepCheck_Analyzer(result, true, false, false);
       let valid: boolean;
       try {
         valid = check.IsValid_2();
@@ -1139,7 +1140,7 @@ function chamferByEnvelope(
   const inward = (shape: Shape, n: Vec3, t: number): Shape => {
     const tr = new k.gp_Trsf_1();
     tr.SetTranslation_1(vec(-n[0] * t, -n[1] * t, -n[2] * t));
-    const op = new k.BRepBuilderAPI_Transform_2(shape, tr, true);
+    const op = transformOp(shape, tr);
     const s = op.Shape();
     op.delete();
     tr.delete();
@@ -1631,7 +1632,7 @@ function evalMirror(state: EvalState, f: MirrorFeature): void {
     for (const bodyId of f.bodies) {
       const body = state.bodies.get(bodyId);
       if (!body) throw new Error(`body ${bodyId} not found`);
-      const tr = new k.BRepBuilderAPI_Transform_2(body.shape, trsf, true);
+      const tr = transformOp(body.shape, trsf);
       const mirrored = tr.Shape();
       const mirroredNames = transformNames(tr, body, `m:${f.id}`);
       tr.delete();
@@ -1670,13 +1671,12 @@ function evalMove(state: EvalState, f: MoveFeature, earlier: Feature[]): void {
   if (f.bodies.length === 0)
     throw new Error("select at least one body to move");
   const placement = Placement.fromTranslation(f.translation);
-  const k = getKernel();
   kernelCall("move", () => {
     for (const bodyId of f.bodies) {
       const body = state.bodies.get(bodyId);
       if (!body) throw new Error(`body ${bodyId} not found`);
       const trsf = placementToTrsf(placement);
-      const tr = new k.BRepBuilderAPI_Transform_2(body.shape, trsf, true);
+      const tr = transformOp(body.shape, trsf);
       const moved = tr.Shape();
       // empty prefix: keep the original persistent names
       const names = transformNames(tr, body, "");
@@ -1744,7 +1744,7 @@ function evalLinearPattern(state: EvalState, f: LinearPatternFeature): void {
         const offset = V.scale(V.scale(direction, f.spacing), i);
         const prefix = `p${i}:${f.id}`;
         const trsf = placementToTrsf(Placement.fromTranslation(offset));
-        const tr = new k.BRepBuilderAPI_Transform_2(body.shape, trsf, true);
+        const tr = transformOp(body.shape, trsf);
         const instance = tr.Shape();
         const instNames = transformNames(tr, body, prefix);
         tr.delete();
@@ -1808,7 +1808,7 @@ function evalCircularPattern(
         const trsf = placementToTrsf(
           Placement.fromAxisAngle(axis.direction, step * i, axis.origin),
         );
-        const tr = new k.BRepBuilderAPI_Transform_2(body.shape, trsf, true);
+        const tr = transformOp(body.shape, trsf);
         const instance = tr.Shape();
         const instNames = transformNames(tr, body, `p${i}:${f.id}`);
         tr.delete();

@@ -244,10 +244,10 @@ export function computeEdgeNames(body: NamedBody): EdgeNames {
   const entries: Entry[] = [];
   const n = map.Extent();
   for (let i = 1; i <= n; i++) {
-    const key = map.FindKey(i);
+    const key = map.FindKey_2(i);
     const edge = k.TopoDS.Edge_1(key);
     key.delete();
-    const faceList = listToArray(map.FindFromIndex(i));
+    const faceList = listToArray(map.FindFromIndex_2(i));
     const faceNames = [
       ...new Set(faceList.map((f: Shape) => body.names.get(f) ?? "?")),
     ].sort();
@@ -297,10 +297,10 @@ export function computeVertexNames(body: NamedBody): VertexNames {
   const entries: Entry[] = [];
   const n = map.Extent();
   for (let i = 1; i <= n; i++) {
-    const key = map.FindKey(i);
+    const key = map.FindKey_2(i);
     const vertex = k.TopoDS.Vertex_1(key);
     key.delete();
-    const faceList = listToArray(map.FindFromIndex(i));
+    const faceList = listToArray(map.FindFromIndex_2(i));
     const faceNames = [
       ...new Set(faceList.map((f: Shape) => body.names.get(f) ?? "?")),
     ].sort();

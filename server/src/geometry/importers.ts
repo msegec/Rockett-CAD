@@ -225,7 +225,7 @@ function sewTriangles({ nodes, triangles, transform: m }: MeshPart): {
         continue;
       const wire = new k.BRepBuilderAPI_MakeWire_4(...sides),
         origin = new k.gp_Pnt_3(p[0], p[1], p[2]),
-        normal = new k.gp_Dir_4(n[0], n[1], n[2]),
+        normal = new k.gp_Dir_5(n[0], n[1], n[2]),
         plane = new k.Handle_Geom_Surface_2(new k.Geom_Plane_3(origin, normal)),
         face = new k.TopoDS_Face();
       builder.MakeFace_2(face, plane, LINEAR_TOL);

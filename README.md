@@ -29,7 +29,7 @@ WebAssembly), not a mesh editor. Every operation is an editable parametric
 feature in a chronological timeline; editing an earlier feature rebuilds
 everything downstream against persistent topology references.
 
-![stack](https://img.shields.io/badge/kernel-OpenCascade%207.6-blue)
+![stack](https://img.shields.io/badge/kernel-OpenCascade%208.0.1-blue)
 
 ## Features
 
@@ -148,8 +148,9 @@ The last two need masterrulez cloned to `~/masterrulez`. See
 
 ## License note
 
-Rockett CAD bundles [opencascade.js](https://github.com/donalffons/opencascade.js)
-(LGPL-2.1-only), the WASM build of Open CASCADE Technology.
+Rockett CAD bundles opencascade.js from the fork at
+[msegec/opencascade.js](https://github.com/msegec/opencascade.js)
+(LGPL-2.1-only), the WASM build of Open CASCADE Technology 8.0.1.
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists every third-party
 package in the image and the client bundle, with its version, licence and the
 obligations to meet before distribution.

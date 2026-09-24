@@ -156,9 +156,10 @@ base name (the `~n` suffix dropped), or the first distinct base name in sorted
 order when they differ. This runs on the tool only. A later join whose cap is
 coplanar with an existing face keeps that edge, so downstream references to
 existing faces never move. Two cylinder faces merge only when their surfaces
-share the same X and Y axes. OCCT 7.6 never returns from merging a fillet's
+share the same X and Y axes. OCCT 7.6 never returned from merging a fillet's
 cylinder with a coaxial prism cylinder whose angle starts a quarter turn away,
-so cylinders whose axes differ keep the edge between them (BUG-041).
+so cylinders whose axes differ keep the edge between them (BUG-041). The guard
+stays on OCCT 8.0.1, where this case has not been retried.
 
 Chamfers go through the kernel's `BRepFilletAPI_MakeChamfer` first. That
 algorithm cannot remove a face the chamfer consumes entirely (two 3.5 mm
