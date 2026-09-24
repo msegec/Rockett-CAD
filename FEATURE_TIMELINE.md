@@ -65,14 +65,16 @@ one progress range `progress()` returns, which lives as long as the kernel
 and which no caller deletes.
 
 If an upstream change removes geometry a downstream feature references, that
-feature is marked in the timeline:
+feature fails and is marked in the timeline. Its error names the reference:
+a fillet reports `referenced edge no longer exists: e[f:…|f:…]`, or under
+`namingVersion` 2 `edge e[f:…|f:…] no longer exists on b:…`.
 
-> ⚠ Fillet1: referenced edge no longer exists: e[f:…|f:…]
-
-The model is **never silently corrupted**: the failed feature contributes
-nothing, the pre-failure state carries forward, and the error text names the
-missing reference. Fixing the upstream edit (or editing the failed feature to
-re-select) clears the error.
+The failed feature contributes nothing and the pre-failure state carries
+forward. Under `namingVersion` 2 a feature whose references do not resolve
+also blocks the later features that use its bodies; see CAD_MODEL.md,
+Resolution. Fixing the upstream edit (or editing the failed feature to
+re-select) clears the error. A reference can still resolve on the wrong face,
+edge or split piece without an error; see CAD_MODEL.md, Known limitations.
 
 When the feature's status carries `refs`, the chip's tooltip lists each one
 as candidate, ambiguous or missing instead of the raw error. The edit dialog
@@ -88,6 +90,16 @@ highlights it. Its Pick button takes the next click in the viewport instead:
 the dialog's pick filter applies, a face or edge of the reference's kind goes
 through the same Accept path, and any other click is ignored. Stop, or
 closing the dialog, ends picking. The dialog's own selection is untouched.
+
+On a `namingVersion` 1 project the edit dialog also shows a Naming section.
+Upgrade naming stages the upgrade (see API.md, Naming upgrade) and lists every
+mapping with its status, a count per status and the backup name. A candidate
+or ambiguous mapping takes a choice through the same rows and Accept, and each
+choice stages the report again. These rows offer no Pick and no highlight,
+since the viewport shows version 1 geometry. Apply upgrade stays disabled
+until every candidate and ambiguous mapping has a choice, then commits as one
+undo step, and undo returns the project to version 1. The dialog closes after
+the commit. A report staged on an older revision is hidden.
 
 ## Undo/redo is not the timeline
 

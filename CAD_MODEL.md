@@ -299,10 +299,11 @@ feature update that names it, the repair mutation, changes the stored
 reference. The bodies the feature names, through its references, `targets`,
 `bodies`, `toolBodies`, `targetBody` or `body`, become blocked. A later
 feature that names a blocked body is blocked too and fails without
-evaluating, so its bodies join the set. Other bodies build as usual. Export
-refuses a blocked body; see [API.md](API.md), Inspection & output. Measurement
-refuses a face or edge reference that is not `resolved`, under either
-version.
+evaluating, so its bodies join the set. A feature whose default `targets`
+include a blocked body fails the same way once it has picked them. Other
+bodies build as usual. Export refuses a blocked body; see [API.md](API.md),
+Inspection & output. Measurement refuses a face or edge reference that is not
+`resolved`, under either version.
 
 Under version 1 evaluation is unchanged. No version 1 name carries `~?`, so
 a reference resolves exactly when its body still bears its name, as the
@@ -315,9 +316,13 @@ unchanged.
 
 - Centroid-ordered `~n` disambiguation can swap if an upstream edit moves
   duplicates past each other; the reference then attaches to the sibling
-  subshape. This is rare in practice and fails loudly (wrong-edge fillet or a
-  reported error), never silently. Version 2 rounding still swaps two
-  duplicates when a coordinate moves across a rounding threshold.
+  subshape, which can fail with a reported error or build on the wrong face
+  or edge without one. Version 2 rounding still swaps two duplicates when a
+  coordinate moves across a rounding threshold.
+- Split pieces renumber too. Under version 2, when the first of three
+  identical pieces of a cut disappears, the survivors become `b:x` and
+  `b:x:2` and their `~n` suffixes shift, so a fillet saved on `b:x:2` still
+  resolves and silently moves to the piece that was `b:x:3`.
 - A feature fails without blocking the features after it when its failure
   is not a reference: a fillet whose radius is too large leaves its body as
   it was, and later features build on that body.
@@ -663,7 +668,8 @@ a save would write, in memory: each missing `targets` from the evaluation and
 each missing `sig` from the state before its feature, by the rules above and in
 Reference signatures. It returns a copy that evaluates as the stored document
 does and never saves it, so loading a project never writes its file. Pins
-persist only when a feature add or update saves that feature.
+persist only when a feature add or update saves that feature, or when the
+naming upgrade commits the pinned document; see Naming upgrade.
 
 ## Tangent edge chains
 
