@@ -192,81 +192,7 @@ class DocumentEngine {
     sources?: Sources,
   ): EvaluateResult {
     const t0 = performance.now();
-    if (sources) this.held = sources;
-    const upTo = Math.min(
-      position ?? doc.timelinePosition,
-      doc.features.length,
-    );
-
-    const keys: string[] = [];
-    const keyAt = (i: number) => (keys[i] ??= featureKey(doc.features[i]!));
-    // Drop snapshots from the first stale feature on. Valid snapshots past
-    // upTo stay, so a rewind or stateAt query doesn't discard later work.
-    let valid = 0;
-    while (
-      this.namingVersion === doc.namingVersion &&
-      valid < this.snapshots.length &&
-      valid < doc.features.length &&
-      this.snapshots[valid]!.featureKeys.includes(keyAt(valid))
-    ) {
-      valid++;
-    }
-    releaseSnapshots(this.snapshots.splice(valid), this.snapshots);
-    this.namingVersion = doc.namingVersion;
-    const start = Math.min(valid, upTo);
-
-    let state: EvalState =
-      start === 0 ? emptyState() : cloneState(this.snapshots[start - 1]!.state);
-    let statuses: FeatureStatus[] =
-      start === 0 ? [] : [...this.snapshots[start - 1]!.statuses];
-
-    for (let i = start; i < upTo; i++) {
-      const feature = doc.features[i]!;
-      const next = cloneState(state);
-      let status: FeatureStatus;
-      if (feature.suppressed) {
-        status = { featureId: feature.id, status: "suppressed" };
-      } else {
-        try {
-          const outcome = evaluateTracked(
-            next,
-            feature,
-            doc.features.slice(0, i),
-            this.held,
-            doc.namingVersion,
-          );
-          status = {
-            featureId: feature.id,
-            status: outcome?.warning ? "warning" : "ok",
-            ...outcome,
-          };
-        } catch (err: any) {
-          status = failedStatus(err, state, feature);
-          // keep pre-failure state
-          releaseSnapshots([{ state: next }], this.snapshots);
-          next.bodies = new Map(state.bodies);
-          next.sketches = new Map(state.sketches);
-          next.planes = new Map(state.planes);
-          if (err instanceof BlockedFeature)
-            next.blocked = new Set([...state.blocked, ...err.bodies]);
-        }
-      }
-      statuses = [...statuses, status];
-      this.snapshots.push({
-        featureKeys: featureKeys(feature, keyAt(i), status),
-        state: next,
-        statuses,
-      });
-      state = next;
-    }
-
-    // Rolled-back features
-    for (let i = upTo; i < doc.features.length; i++) {
-      statuses = [
-        ...statuses,
-        { featureId: doc.features[i]!.id, status: "rolledBack" },
-      ];
-    }
+    const { state, statuses } = this.regenerate(doc, position, sources);
 
     // --- payloads ---
     const bodies: BodyPayload[] = [];
@@ -301,6 +227,87 @@ class DocumentEngine {
     };
   }
 
+  private regenerate(
+    doc: CadDocument,
+    position: number | undefined,
+    sources: Sources | undefined,
+  ) {
+    if (sources) this.held = sources;
+    const upTo = Math.min(
+      position ?? doc.timelinePosition,
+      doc.features.length,
+    );
+
+    const keys: string[] = [];
+    const keyAt = (i: number) => (keys[i] ??= featureKey(doc.features[i]!));
+    // Drop snapshots from the first stale feature on. Valid snapshots past
+    // upTo stay, so a rewind or stateAt query doesn't discard later work.
+    let valid = 0;
+    while (
+      this.namingVersion === doc.namingVersion &&
+      valid < this.snapshots.length &&
+      valid < doc.features.length &&
+      this.snapshots[valid]!.featureKeys.includes(keyAt(valid))
+    ) {
+      valid++;
+    }
+    releaseSnapshots(this.snapshots.splice(valid), this.snapshots);
+    this.namingVersion = doc.namingVersion;
+    const start = Math.min(valid, upTo);
+
+    let state: EvalState =
+      start === 0 ? emptyState() : this.snapshots[start - 1]!.state;
+    let statuses: FeatureStatus[] =
+      start === 0 ? [] : [...this.snapshots[start - 1]!.statuses];
+
+    for (let i = start; i < upTo; i++) {
+      const feature = doc.features[i]!;
+      const next = cloneState(state);
+      let status: FeatureStatus;
+      if (feature.suppressed) {
+        status = { featureId: feature.id, status: "suppressed" };
+      } else {
+        try {
+          const outcome = evaluateTracked(
+            next,
+            feature,
+            doc.features.slice(0, i),
+            this.held,
+            doc.namingVersion,
+          );
+          status = {
+            featureId: feature.id,
+            status: outcome?.warning ? "warning" : "ok",
+            ...outcome,
+          };
+        } catch (err: any) {
+          status = failedStatus(err, state, feature);
+          releaseSnapshots([{ state: next }], this.snapshots);
+          next.bodies = new Map(state.bodies);
+          next.sketches = new Map(state.sketches);
+          next.planes = new Map(state.planes);
+          if (err instanceof BlockedFeature)
+            next.blocked = new Set([...state.blocked, ...err.bodies]);
+        }
+      }
+      statuses = [...statuses, status];
+      this.snapshots.push({
+        featureKeys: featureKeys(feature, keyAt(i), status),
+        state: next,
+        statuses,
+      });
+      state = next;
+    }
+
+    for (let i = upTo; i < doc.features.length; i++) {
+      statuses = [
+        ...statuses,
+        { featureId: doc.features[i]!.id, status: "rolledBack" },
+      ];
+    }
+    return { state, statuses };
+  }
+
   private tessellated(body: StateBody, name: string): BodyPayload {
     const hit = cached(body);
     if (hit) return hit;
@@ -316,13 +323,7 @@ class DocumentEngine {
 
   /** Access the evaluated state at the current cache tip (for measure/export). */
   stateAt(doc: CadDocument, position?: number, sources?: Sources): EvalState {
-    this.evaluate(doc, position, sources);
-    const upTo = Math.min(
-      position ?? doc.timelinePosition,
-      doc.features.length,
-    );
-    if (upTo === 0) return emptyState();
-    return this.snapshots[upTo - 1]!.state;
+    return this.regenerate(doc, position, sources).state;
   }
 
   invalidate(): void {
