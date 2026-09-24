@@ -143,5 +143,6 @@ export const documentMigrations: Migrations<CadDocument> = {
       return split.doc;
     },
     11: (doc) => ({ ...doc, namingVersion: 1 }),
+    12: (doc) => splitView(doc).doc,
   },
 };

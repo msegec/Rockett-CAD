@@ -491,6 +491,15 @@ before. New projects get 2. No route changes a stored `namingVersion`:
 `PUT /document` answers 409 to a different value. The engine drops its cached
 timeline when the version changes.
 
+## No visible flags (schema 13)
+
+Some schema 11 and 12 documents still carry `visible` on a sketch, a
+reference image or a body's metadata: project uploads stored the flag every
+response carries. `view.json` owns visibility, so these copies are stale, and
+a feature edit would copy one back into the view. The 12 to 13 migration
+drops every `visible` from features and `bodyMeta` without moving it, backed
+up with the rest of the project before its first save.
+
 ## Tangent edge chains
 
 Fillet/Chamfer store optional tangentChain metadata (absent preserves prior
