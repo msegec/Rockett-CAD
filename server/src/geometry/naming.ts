@@ -67,21 +67,29 @@ function cell(pos: Vec3): Vec3 {
   ];
 }
 
+function sortByPosition<T>(
+  items: T[],
+  positionOf: (item: T) => Vec3,
+  version: NamingVersion,
+): Array<{ item: T; key: Vec3 }> {
+  const keyOf = version === 1 ? (pos: Vec3) => pos : cell;
+  return items
+    .map((item) => ({ item, key: keyOf(positionOf(item)) }))
+    .sort((a, b) => byPosition(a.key, b.key));
+}
+
 export function suffixDuplicates<T>(
   groups: Map<string, T[]>,
   positionOf: (item: T) => Vec3,
   version: NamingVersion,
 ): Array<[T, string]> {
-  const keyOf = version === 1 ? (pos: Vec3) => pos : cell;
   const named: Array<[T, string]> = [];
   for (const [base, group] of groups) {
     if (group.length === 1) {
       named.push([group[0]!, base]);
       continue;
     }
-    const sorted = group
-      .map((item) => ({ item, key: keyOf(positionOf(item)) }))
-      .sort((a, b) => byPosition(a.key, b.key));
+    const sorted = sortByPosition(group, positionOf, version);
     sorted.forEach(({ item, key }, i) => {
       const tied =
         version === 2 &&
@@ -120,19 +128,17 @@ export function finalizeNames(
       result.set(f, name);
     }
     if (unnamed.length > 0) {
-      const sorted = unnamed
-        .map((f) => ({ f, c: faceCentroid(f) }))
-        .sort((a, b) => byPosition(a.c, b.c));
+      const sorted = sortByPosition(unnamed, faceCentroid, active);
       // fallback numbers skip names already present, so a feature that names
       // its faces in several passes never hands out the same name twice
       const taken = new Set(result.values());
       let n = 0;
-      for (const item of sorted) {
+      for (const { item: face } of sorted) {
         let name: string;
         do name = `f:${featureId}:x${++n}`;
         while (taken.has(name));
         taken.add(name);
-        result.set(item.f, name);
+        result.set(face, name);
       }
     }
     return result;

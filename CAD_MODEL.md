@@ -147,7 +147,9 @@ coordinates, so kernel noise of 1e-12 mm in x can decide between two faces
 `LINEAR_TOL`, so noise below that tolerance decides nothing unless it
 crosses a rounding threshold. Under version 2, candidates whose rounded
 centroids are equal get `~?n` instead of `~n`: the `?` reports that their
-order is not persistent. A merge drops `~?n` as it drops `~n`.
+order is not persistent. A merge drops `~?n` as it drops `~n`. The fallback
+`x{n}` numbers use the same comparison, but fallback faces whose rounded
+centroids are equal get no `?` and keep kernel order.
 
 An extrude's `distance` is signed: a negative value builds the prism on the
 opposite side of the sketch plane (after `direction` is applied; `symmetric`
