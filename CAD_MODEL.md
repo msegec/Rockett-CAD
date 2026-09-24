@@ -138,6 +138,7 @@ created and _propagated_ through later operations:
 | Extrude/revolve side face generated from a sketch curve | `f:{featureId}:s:{sketchEntityId}`                                 |
 | Extrude/revolve cap                                     | `f:{featureId}:cap:start` / `f:{featureId}:cap:end`                |
 | Fillet/chamfer face generated from an edge              | `f:{featureId}:fe:{n}`                                             |
+| Press/pull moved face, under `namingVersion` 2          | the source face's name                                             |
 | Mirrored / patterned copy                               | `m:{featureId}:{originalName}` / `p{i}:{featureId}:{originalName}` |
 | Anything the history cannot attribute                   | `f:{featureId}:x{n}` (deterministic centroid order)                |
 

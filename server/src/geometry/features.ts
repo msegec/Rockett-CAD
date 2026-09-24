@@ -1649,7 +1649,14 @@ function evalOffsetFace(state: EvalState, f: OffsetFaceFeature): void {
         throw new Error("offset face prism failed");
       }
       const toolShape = prism.Shape();
-      const toolNames = finalizeNames(toolShape, new ShapeMap(), f.id);
+      const moved = new ShapeMap<string>();
+      if (current.names.version === 2) {
+        const last = prism.LastShape_1();
+        const caps = facesOf(last);
+        for (const cap of caps) moved.set(cap, ref.faceName);
+        release([...caps, last]);
+      }
+      const toolNames = finalizeNames(toolShape, moved, f.id);
       prism.delete();
       v.delete();
 
