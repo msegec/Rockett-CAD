@@ -164,8 +164,8 @@ a live container.
   (basic auth, Authelia, Cloudflare Access, …) if it is reachable beyond your
   LAN. The auth layer is intentionally separable from the CAD logic
   (see ARCHITECTURE.md).
-- Healthcheck hits `/api/health` (60 s start period, because the WASM
-  kernel takes a few seconds to load on first boot). A long regeneration
+- Healthcheck hits `/api/health` (30 s start period, one probe interval,
+  since the WASM kernel loads in under a second). A long regeneration
   blocks the event loop, so each probe waits 5 s, inside Docker's 10 s
   limit, and then exits rather than piling up. The container turns
   unhealthy only after 10 failed probes in a row, 30 s apart: about five

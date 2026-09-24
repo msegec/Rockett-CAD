@@ -52,7 +52,7 @@ USER rockett
 VOLUME /data
 EXPOSE $ROCKETT_PORT
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=10 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=10 \
   CMD node -e "fetch('http://127.0.0.1:$ROCKETT_PORT/api/health',{signal:AbortSignal.timeout(5000)}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 CMD ["node", "server.mjs"]
