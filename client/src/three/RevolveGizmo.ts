@@ -11,6 +11,29 @@ import { Manipulator, type ManipulatorHost } from "./Manipulator";
 import { themeColor } from "../theme/tokens";
 import { GIZMO_APPEARANCE } from "../tunables";
 
+export function ringThrough(
+  point: THREE.Vector3,
+  axisOrigin: THREE.Vector3,
+  axisDir: THREE.Vector3,
+  worldPerPixel: number,
+) {
+  const dir = axisDir.clone().normalize();
+  const along = point.clone().sub(axisOrigin).dot(dir);
+  const center = axisOrigin.clone().addScaledVector(dir, along);
+  const zeroDir = point.clone().sub(center);
+  const radius = zeroDir.length();
+  if (radius >= worldPerPixel * 10) return { center, dir, zeroDir, radius };
+  return {
+    center,
+    dir,
+    zeroDir:
+      Math.abs(dir.z) < 0.9
+        ? new THREE.Vector3(0, 0, 1).cross(dir)
+        : new THREE.Vector3(1, 0, 0).cross(dir),
+    radius: worldPerPixel * 50,
+  };
+}
+
 export class RevolveGizmo extends Manipulator {
   private ring: THREE.Mesh;
   private handle: THREE.Mesh;

@@ -22,6 +22,7 @@ import {
 } from "../store";
 import { api, saveDownload } from "../api";
 import { extrudeReachesBody } from "../extrudeReach";
+import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
 import { createLivePreview } from "../livePreview";
 import { viewportHandle } from "../viewportRef";
 import { DraggablePanel } from "./DraggablePanel";
@@ -142,6 +143,8 @@ function DialogBody({
     const v = Number(params[key]);
     return Number.isFinite(v) ? v : dflt;
   };
+  const main = (d: HandleDialog) =>
+    num(HANDLE_VALUES[d].param, HANDLE_VALUES[d].fallback);
 
   // Picking an edge or sketch line in an axis-based dialog switches the axis
   // to it — the dropdown alone gave no hint the pick was registered.
@@ -523,7 +526,7 @@ function DialogBody({
           <NumField
             label="Depth (mm)"
             autoFocus
-            value={p("depth", 1)}
+            value={p("depth", main("emboss"))}
             onChange={(v) => setParams({ depth: v })}
           />
           <SelectField
@@ -545,7 +548,7 @@ function DialogBody({
           name: p("name", ""),
           suppressed: false,
           profiles: profileRefs(),
-          depth: num("depth", 1),
+          depth: main("emboss"),
           mode: p("embossMode", "emboss"),
         };
       };
@@ -570,7 +573,7 @@ function DialogBody({
           <NumField
             label="Radius (mm)"
             autoFocus
-            value={p("radius", 2)}
+            value={p("radius", main("fillet"))}
             onChange={(v) => setParams({ radius: v })}
           />
         </>
@@ -583,7 +586,7 @@ function DialogBody({
           name: p("name", ""),
           suppressed: false,
           edges: edgeRefs(),
-          radius: num("radius", 2),
+          radius: main("fillet"),
           tangentChain: p("tangentChain", true),
         };
       };
@@ -608,7 +611,7 @@ function DialogBody({
           <NumField
             label="Distance (mm)"
             autoFocus
-            value={p("distance", 1)}
+            value={p("distance", main("chamfer"))}
             onChange={(v) => setParams({ distance: v })}
           />
         </>
@@ -621,7 +624,7 @@ function DialogBody({
           name: p("name", ""),
           suppressed: false,
           edges: edgeRefs(),
-          distance: num("distance", 1),
+          distance: main("chamfer"),
           tangentChain: p("tangentChain", true),
         };
       };
@@ -639,7 +642,7 @@ function DialogBody({
           <NumField
             label="Thickness (mm)"
             autoFocus
-            value={p("thickness", 2)}
+            value={p("thickness", main("shell"))}
             onChange={(v) => setParams({ thickness: v })}
           />
         </>
@@ -650,7 +653,7 @@ function DialogBody({
         name: p("name", ""),
         suppressed: false,
         openFaces: faceRefs(),
-        thickness: num("thickness", 2),
+        thickness: main("shell"),
       });
       break;
     }
@@ -730,7 +733,7 @@ function DialogBody({
           <NumField
             label="Distance (mm, − = inward)"
             autoFocus
-            value={p("distance", 5)}
+            value={p("distance", main("offsetFace"))}
             onChange={(v) => setParams({ distance: v })}
           />
         </>
@@ -743,7 +746,7 @@ function DialogBody({
           name: p("name", ""),
           suppressed: false,
           faces: faceRefs(),
-          distance: num("distance", 5),
+          distance: main("offsetFace"),
         };
       };
       break;
@@ -817,7 +820,7 @@ function DialogBody({
           <NumField
             label="Spacing (mm)"
             autoFocus
-            value={p("spacing", 20)}
+            value={p("spacing", main("linearPattern"))}
             onChange={(v) => setParams({ spacing: v })}
           />
           <CheckField
@@ -841,7 +844,7 @@ function DialogBody({
           bodies: bodies.map((b) => b.bodyId),
           direction,
           count: Math.round(num("count", 3)),
-          spacing: num("spacing", 20),
+          spacing: main("linearPattern"),
           combine: !!p("combine", false),
         };
       };
@@ -871,7 +874,7 @@ function DialogBody({
           />
           <NumField
             label="Total angle (°)"
-            value={p("totalAngle", 360)}
+            value={p("totalAngle", main("circularPattern"))}
             onChange={(v) => setParams({ totalAngle: v })}
           />
           <CheckField
@@ -891,7 +894,7 @@ function DialogBody({
           bodies: bodies.map((b) => b.bodyId),
           axis: axisRef(),
           count: Math.round(num("count", 6)),
-          totalAngle: num("totalAngle", 360),
+          totalAngle: main("circularPattern"),
           combine: !!p("combine", false),
         };
       };
@@ -919,7 +922,7 @@ function DialogBody({
             <NumField
               label="Offset (mm)"
               autoFocus
-              value={p("distance", 10)}
+              value={p("distance", main("constructionPlane"))}
               onChange={(v) => setParams({ distance: v })}
             />
           )}
@@ -948,7 +951,11 @@ function DialogBody({
           suppressed: false,
           method: midplane
             ? { kind: "midplane", a: refs[0]!, b: refs[1]! }
-            : { kind: "offset", base: refs[0]!, distance: num("distance", 10) },
+            : {
+                kind: "offset",
+                base: refs[0]!,
+                distance: main("constructionPlane"),
+              },
         };
       };
       break;

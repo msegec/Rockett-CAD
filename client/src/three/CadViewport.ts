@@ -37,7 +37,10 @@ export interface PickResult {
   area?: number | undefined;
 }
 
-const ORIGIN_PLANE_DEFS: { name: "XY" | "XZ" | "YZ"; frame: PlaneFrame }[] = [
+export const ORIGIN_PLANE_DEFS: {
+  name: "XY" | "XZ" | "YZ";
+  frame: PlaneFrame;
+}[] = [
   {
     name: "XY",
     frame: {

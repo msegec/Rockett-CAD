@@ -98,6 +98,29 @@ or chamfer along a smooth contour as required by its native operation.
 - Replicate: mirror, rectangular pattern and circular pattern.
 - Construction: offset planes and midplanes; sketch on any planar face.
 
+### Drag handles
+
+A feature dialog with a main value shows a handle in the viewport. Dragging it
+changes the dialog field as typing would: the readout follows the pointer, the
+model previews when you pause, and OK adds one undo step.
+
+- Extrude distance, press/pull distance and shell thickness: an arrow on the
+  picked profile or face along its normal. The shell arrow points into the body.
+- Fillet radius and chamfer distance: an arrow at the middle of the first picked
+  edge, halfway between its two faces.
+- Emboss depth: an arrow from the picked region along the sketch normal, into
+  the body for deboss.
+- Construction plane offset: an arrow from the base plane along its normal.
+- Rectangular pattern spacing: an arrow from the body along the direction,
+  ending at the first copy.
+- Revolve angle and circular pattern total angle: a ring about the axis with a
+  round grip.
+- Move: one arrow per axis.
+
+Handles snap to steps that get finer as you zoom in. Holding Ctrl while
+dragging the extrude arrow collapses it to zero. Sweep, loft, combine, mirror,
+split, reference images and STEP import have no handle.
+
 ### Reference images
 
 Attach PNG, JPEG or WebP canvases to planes, up to 25 MB each, and calibrate

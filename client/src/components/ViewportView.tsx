@@ -31,7 +31,14 @@ import { MoveGizmo } from "../three/MoveGizmo";
 import { themeColor } from "../theme/tokens";
 import { SKETCH_APPEARANCE } from "../tunables";
 import { buildRevolveGhost } from "../three/revolveGhost";
-import { RevolveGizmo } from "../three/RevolveGizmo";
+import { RevolveGizmo, ringThrough } from "../three/RevolveGizmo";
+import {
+  faceCentroid,
+  featureHandle,
+  frameAlong,
+  profileCentroid,
+  type FeatureHandle,
+} from "../three/featureHandles";
 import { GizmoSlot } from "../three/gizmoSlot";
 import { clearToolPreview, updateToolPreview } from "../three/toolPreview";
 import { listenWheel } from "../three/wheel";
@@ -115,6 +122,10 @@ export function ViewportView() {
   const [extrudeSlot] = useState(() => new GizmoSlot<ExtrudeGizmo>());
   const [moveSlot] = useState(() => new GizmoSlot<MoveGizmo>());
   const [revolveSlot] = useState(() => new GizmoSlot<RevolveGizmo>());
+  const [featureSlot] = useState(
+    () => new GizmoSlot<ExtrudeGizmo | RevolveGizmo>(),
+  );
+  const featureHandleRef = useRef<FeatureHandle | null>(null);
   /** in-progress dimension-label drag (repositioning the label) */
   const dimDragRef = useRef<{
     id: string;
@@ -301,6 +312,7 @@ export function ViewportView() {
       extrudeSlot.release();
       moveSlot.release();
       revolveSlot.release();
+      featureSlot.release();
       vp.dispose();
       viewportRef.current = null;
       viewportHandle.current = null;
@@ -480,96 +492,37 @@ export function ViewportView() {
         (x) => x.featureId === profSel.sketchId,
       );
       const p = sk && findProfile(sk, profSel.profileId);
-      if (sk && p && p.polygon.length >= 6) {
-        let cx = 0,
-          cy = 0;
-        const n = p.polygon.length / 2;
-        for (let i = 0; i + 1 < p.polygon.length; i += 2) {
-          cx += p.polygon[i]!;
-          cy += p.polygon[i + 1]!;
-        }
-        return { frame: sk.frame, anchorUV: [cx / n, cy / n], profile: p };
-      }
+      if (sk && p && p.polygon.length >= 6)
+        return { frame: sk.frame, anchorUV: profileCentroid(p), profile: p };
     }
     const faceSel = s.selection.find((x) => x.kind === "face") as any;
-    if (faceSel) {
-      const body = previewBodies(s).find((b) => b.bodyId === faceSel.bodyId);
-      const face = body?.faces.find((f) => f.name === faceSel.faceName);
-      if (body && face && face.surface.type === "plane") {
-        let cx = 0,
-          cy = 0,
-          cz = 0,
-          count = 0;
-        const vertexAt = (i: number) => {
-          const vi = body.indices[i];
-          if (vi === undefined) return null;
-          const x = body.positions[vi * 3];
-          const y = body.positions[vi * 3 + 1];
-          const z = body.positions[vi * 3 + 2];
-          if (x === undefined || y === undefined || z === undefined)
-            return null;
-          return { vi, x, y, z };
-        };
-        const seen = new Set<number>();
-        for (let i = face.start; i < face.start + face.count; i++) {
-          const v = vertexAt(i);
-          if (!v) return null;
-          if (seen.has(v.vi)) continue;
-          seen.add(v.vi);
-          cx += v.x;
-          cy += v.y;
-          cz += v.z;
-          count++;
-        }
-        if (count === 0) return null;
-        const centroid: [number, number, number] = [
-          cx / count,
-          cy / count,
-          cz / count,
-        ];
-        const normal = face.surface.normal;
-        const seed: [number, number, number] =
-          Math.abs(normal[0]) > 0.9 ? [0, 1, 0] : [1, 0, 0];
-        const nx = new THREE.Vector3(...normal).normalize();
-        let xAxis = new THREE.Vector3(...seed)
-          .sub(nx.clone().multiplyScalar(nx.dot(new THREE.Vector3(...seed))))
-          .normalize();
-        const yAxis = nx.clone().cross(xAxis).normalize();
-        // ghost data: the face's triangles + its boundary edge polylines
-        const remap = new Map<number, number>();
-        const ghostPositions: number[] = [];
-        const ghostIndices: number[] = [];
-        for (let i = face.start; i < face.start + face.count; i++) {
-          const v = vertexAt(i);
-          if (!v) return null;
-          let ni = remap.get(v.vi);
-          if (ni === undefined) {
-            ni = ghostPositions.length / 3;
-            remap.set(v.vi, ni);
-            ghostPositions.push(v.x, v.y, v.z);
-          }
-          ghostIndices.push(ni);
-        }
-        const boundary = body.edges
-          .filter((ed) => ed.name.includes(faceSel.faceName))
-          .map((ed) => ed.polyline);
-        return {
-          frame: {
-            origin: centroid,
-            xAxis: [xAxis.x, xAxis.y, xAxis.z],
-            yAxis: [yAxis.x, yAxis.y, yAxis.z],
-            normal: [nx.x, nx.y, nx.z],
-          },
-          anchorUV: [0, 0],
-          faceGhost: {
-            positions: ghostPositions,
-            indices: ghostIndices,
-            boundary,
-          },
-        };
+    if (!faceSel) return null;
+    const body = previewBodies(s).find((b) => b.bodyId === faceSel.bodyId);
+    const face = body?.faces.find((f) => f.name === faceSel.faceName);
+    if (!body || !face || face.surface.type !== "plane") return null;
+    const centroid = faceCentroid(body, face);
+    if (!centroid) return null;
+    const remap = new Map<number, number>();
+    const positions: number[] = [];
+    const indices: number[] = [];
+    for (let i = face.start; i < face.start + face.count; i++) {
+      const vi = body.indices[i]!;
+      let ni = remap.get(vi);
+      if (ni === undefined) {
+        ni = positions.length / 3;
+        remap.set(vi, ni);
+        positions.push(...body.positions.slice(vi * 3, vi * 3 + 3));
       }
+      indices.push(ni);
     }
-    return null;
+    const boundary = body.edges
+      .filter((ed) => ed.name.includes(faceSel.faceName))
+      .map((ed) => ed.polyline);
+    return {
+      frame: frameAlong(centroid, new THREE.Vector3(...face.surface.normal)),
+      anchorUV: [0, 0],
+      faceGhost: { positions, indices, boundary },
+    };
   }
 
   // build / rebuild the gizmo when the extrude dialog selection changes
@@ -810,45 +763,20 @@ export function ViewportView() {
     const sel = selectedRevolveProfile();
     const axis = resolveRevolveAxis();
     if (!sel || !axis) return null;
-    const { sk, profile } = sel;
-
-    // ring through the profile centroid, perpendicular to the axis
-    const f = sk.frame;
-    let cu = 0,
-      cv = 0;
-    const n = profile.polygon.length / 2;
-    for (let i = 0; i * 2 + 1 < profile.polygon.length; i++) {
-      cu += profile.polygon[i * 2]!;
-      cv += profile.polygon[i * 2 + 1]!;
-    }
-    cu /= n || 1;
-    cv /= n || 1;
-    const centroid = new THREE.Vector3(
-      f.origin[0] + cu * f.xAxis[0] + cv * f.yAxis[0],
-      f.origin[1] + cu * f.xAxis[1] + cv * f.yAxis[1],
-      f.origin[2] + cu * f.xAxis[2] + cv * f.yAxis[2],
+    const [u, v] = profileCentroid(sel.profile);
+    const ring = ringThrough(
+      uv3(sel.sk.frame, u, v),
+      axis.origin,
+      axis.dir,
+      vp.worldPerPixel(),
     );
-    const d = axis.dir.clone().normalize();
-    const along = centroid.clone().sub(axis.origin).dot(d);
-    const center = axis.origin.clone().add(d.clone().multiplyScalar(along));
-    let zeroDir = centroid.clone().sub(center);
-    let radius = zeroDir.length();
-    const wpp = vp.worldPerPixel();
-    if (radius < wpp * 10) {
-      // profile centered on the axis — pick any perpendicular
-      zeroDir =
-        Math.abs(d.z) < 0.9
-          ? new THREE.Vector3(0, 0, 1).cross(d)
-          : new THREE.Vector3(1, 0, 0).cross(d);
-      radius = wpp * 50;
-    }
     const angle = Number(s.dialogParams.angle);
     return new RevolveGizmo(
       vp,
-      center,
-      d,
-      zeroDir,
-      radius,
+      ring.center,
+      ring.dir,
+      ring.zeroDir,
+      ring.radius,
       Number.isFinite(angle) ? angle : 360,
     );
   }
@@ -860,6 +788,64 @@ export function ViewportView() {
     const a = Number(dialogParams.angle);
     if (Number.isFinite(a)) g.update(a);
   }, [dialogParams]);
+
+  useEffect(() => {
+    featureSlot.rebuild(buildFeatureHandle);
+  }, [mode, selection, evaluation, dialogParams, baseLoads]);
+
+  function buildFeatureHandle(): ExtrudeGizmo | RevolveGizmo | null {
+    const vp = viewportRef.current;
+    const s = useStore.getState();
+    const handle =
+      vp && s.mode.name === "dialog"
+        ? featureHandle({
+            dialog: s.mode.dialog,
+            params: s.dialogParams,
+            selection: s.selection,
+            bodies: previewBodies(s),
+            evaluation: s.evaluation,
+          })
+        : null;
+    featureHandleRef.current = handle;
+    if (!vp || !handle) return null;
+    if (handle.kind === "arrow") {
+      const frame = frameAlong(handle.origin, handle.axis);
+      return new ExtrudeGizmo(vp, { frame, anchorUV: [0, 0] }, handle.value);
+    }
+    const axis = resolveRevolveAxis();
+    if (!axis) return null;
+    const ring = ringThrough(
+      handle.through,
+      axis.origin,
+      axis.dir,
+      vp.worldPerPixel(),
+    );
+    return new RevolveGizmo(
+      vp,
+      ring.center,
+      ring.dir,
+      ring.zeroDir,
+      ring.radius,
+      handle.value,
+    );
+  }
+
+  function dragFeatureHandle(
+    g: ExtrudeGizmo | RevolveGizmo,
+    handle: FeatureHandle,
+    e: PointerEvent,
+  ) {
+    const arc = g instanceof RevolveGizmo;
+    const value = arc
+      ? g.dragAngle(e.clientX, e.clientY)
+      : g.dragValue(e.clientX, e.clientY);
+    if (handle.signed ? value === 0 : value <= 0) return;
+    g.update(value);
+    useStore.getState().setDialogParams({ [handle.param]: value });
+    const at = arc ? g.handleScreenPosition() : g.tipScreenPosition();
+    const text = arc ? formatAngle(value, 3) : formatLength(value, "mm", 3);
+    setGizmoLabel({ ...at, text });
+  }
 
   // switching sketch tools resets pending clicks + previews
   const sketchTool = mode.name === "sketch" ? mode.tool : null;
@@ -928,6 +914,14 @@ export function ViewportView() {
           e.preventDefault();
           return;
         }
+        const handle = featureSlot.current;
+        if (handle?.hitTest(e.clientX, e.clientY)) {
+          if (handle instanceof RevolveGizmo)
+            handle.beginDrag(e.clientX, e.clientY);
+          featureSlot.beginDrag();
+          e.preventDefault();
+          return;
+        }
         handlePrimaryDown(e);
       }
     };
@@ -936,6 +930,12 @@ export function ViewportView() {
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
       if (Math.abs(dx) + Math.abs(dy) > 2) dragMoved = true;
+      if (featureSlot.isDragging && featureSlot.current) {
+        dragFeatureHandle(featureSlot.current, featureHandleRef.current!, e);
+        lastX = e.clientX;
+        lastY = e.clientY;
+        return;
+      }
       if (revolveSlot.isDragging && revolveSlot.current) {
         const g = revolveSlot.current;
         const a = g.dragAngle(e.clientX, e.clientY);
@@ -1048,6 +1048,12 @@ export function ViewportView() {
 
     const onPointerUp = (e: PointerEvent) => {
       el.releasePointerCapture(e.pointerId);
+      if (featureSlot.isDragging) {
+        featureSlot.endDrag();
+        setGizmoLabel(null);
+        button = -1;
+        return;
+      }
       if (revolveSlot.isDragging && revolveSlot.current) {
         revolveSlot.endDrag();
         setGizmoLabel(null);
@@ -1516,6 +1522,9 @@ export function ViewportView() {
         revolveSlot.current.hitTest(e.clientX, e.clientY),
       );
     }
+    featureSlot.current?.setHover(
+      featureSlot.current.hitTest(e.clientX, e.clientY),
+    );
     const s = useStore.getState();
     let picked: Selection | null = null;
     if (s.mode.name === "pickPlane") {
