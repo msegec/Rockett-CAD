@@ -542,7 +542,7 @@ function buildPrism(
     }
     const shape = prism.Shape();
 
-    const provisional: NameMap = new ShapeMap();
+    const provisional = new ShapeMap<string>();
     // side faces from profile edges
     for (const e of edgesOf(face)) {
       const entityId = offsetEdgeEntity.get(shapeHash(e));
@@ -712,7 +712,7 @@ function evalRevolve(state: EvalState, f: RevolveFeature): void {
         );
       }
       const shape = revol.Shape();
-      const provisional: NameMap = new ShapeMap();
+      const provisional = new ShapeMap<string>();
       for (const e of edgesOf(pf.face)) {
         const entityId = pf.edgeEntity.get(shapeHash(e));
         if (!entityId) continue;
@@ -992,7 +992,7 @@ function blendNames(
 ): NameMap {
   const k = getKernel();
   // Modified faces keep names; generated fillet faces are named per edge.
-  const provisional: NameMap = new ShapeMap();
+  const provisional = new ShapeMap<string>();
   const bodyFaces = facesOf(body.shape);
   try {
     for (const face of bodyFaces) {
@@ -1300,7 +1300,7 @@ function chamferByEnvelope(
 
     // Names: the band's slanted faces are the chamfer faces, named per source
     // edge like ChFi3d does; its face on the cap plane keeps the cap's name.
-    const envNames: NameMap = new ShapeMap();
+    const envNames = new ShapeMap<string>();
     const capName = current.names.get(cap.face);
     const mids = cap.edges.map((e) => ({ e, c: edgeCentroid(e) }));
     for (const face of facesOf(envelope)) {

@@ -282,6 +282,7 @@ feature in `detail`, such as `/transform/scale`.
 
 `PUT /projects/:id/document` also parses the document against
 `documentSchema` in the same file: `schemaVersion` equals the current version,
+`namingVersion` is 1 or 2,
 `revision` is a non-negative integer, `savedWith` is `null` or
 `{ version, commit }` with `commit` a string or `null`,
 `units` is `mm`, `cm`, `m` or `in`, `bodyMeta` values are

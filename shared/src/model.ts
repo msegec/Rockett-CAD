@@ -11,7 +11,9 @@
 
 import type { Units } from "./units.js";
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
+
+export type NamingVersion = 1 | 2;
 
 // ---------------------------------------------------------------------------
 // Persistent topology references
@@ -417,6 +419,7 @@ export interface ExtensionData {
 
 export interface CadDocument {
   schemaVersion: number;
+  namingVersion: NamingVersion;
   revision: number;
   savedWith: { version: string; commit: string | null } | null;
   id: string;
@@ -495,6 +498,7 @@ export function createEmptyDocument(id: string, name: string): CadDocument {
   const now = new Date().toISOString();
   return {
     schemaVersion: SCHEMA_VERSION,
+    namingVersion: 2,
     revision: 0,
     savedWith: null,
     id,

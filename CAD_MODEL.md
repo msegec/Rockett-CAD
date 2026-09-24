@@ -140,7 +140,14 @@ and location), so two faces whose hashes collide keep their own names.
 When one input face yields several result faces (e.g. a boolean splits a
 face) the copies are disambiguated with a `~n` suffix in centroid order: by
 x, then y, then z. `suffixDuplicates` in `server/src/geometry/naming.ts` owns
-that order for faces, edges and vertices; a vertex sorts by its point.
+that order for faces, edges and vertices; a vertex sorts by its point. The
+document's `namingVersion` picks the comparison. Version 1 compares exact
+coordinates, so kernel noise of 1e-12 mm in x can decide between two faces
+10 mm apart in y. Version 2 first rounds each coordinate to a multiple of
+`LINEAR_TOL`, so noise below that tolerance decides nothing unless it
+crosses a rounding threshold. Under version 2, candidates whose rounded
+centroids are equal get `~?n` instead of `~n`: the `?` reports that their
+order is not persistent. A merge drops `~?n` as it drops `~n`.
 
 An extrude's `distance` is signed: a negative value builds the prism on the
 opposite side of the sketch plane (after `direction` is applied; `symmetric`
@@ -208,7 +215,10 @@ suffixes in deterministic centroid order.
 - Centroid-ordered `~n` disambiguation can swap if an upstream edit moves
   duplicates past each other; the reference then attaches to the sibling
   subshape. This is rare in practice and fails loudly (wrong-edge fillet or a
-  reported error), never silently.
+  reported error), never silently. Version 2 rounding still swaps two
+  duplicates when a coordinate moves across a rounding threshold.
+- A reference to a `~?n` name still resolves, to whichever candidate the
+  kernel listed at that position.
 - A reference whose face genuinely disappears (e.g. the filleted edge is
   consumed) marks the downstream feature as **error** in the timeline with an
   actionable message; the model up to that feature is preserved. A repair UI
@@ -290,8 +300,8 @@ toggling suppression invalidates exactly the right suffix.
 own constant, even where two numbers match.
 
 - `LINEAR_TOL = 1e-6` mm: coincidence, sewing, loft, thick solid, face
-  classification, zero length and the smallest positive fillet, chamfer, shell,
-  emboss and extrude size.
+  classification, zero length, the rounding step of naming version 2 and the
+  smallest positive fillet, chamfer, shell, emboss and extrude size.
 - `ANGULAR_TOL_DEG = 1e-9` degrees: full-turn tests in revolve and circular
   pattern.
 - `UNIT_DOT_TOL = 1e-6`, no unit: the dot product of unit normals in parallel
@@ -435,6 +445,18 @@ The server checks that envelope and never reads `data`, so it survives load,
 migration, feature edits and `PUT /document` as an equal JSON value. The 9 to
 10 migration adds `extensions: {}`. A server older than schema 10 refuses the
 file instead of saving it without the extension data.
+
+## Naming version (schema 12)
+
+`namingVersion` records the naming rules a document evaluates under; see
+Face names. The engine names every body under it and keeps it on the body's
+name map, so edge and vertex names computed later for tessellation,
+measurement or projection follow the same rules. The 11 to 12 migration sets
+`namingVersion: 1` on every existing document, backed up with the rest of
+the project before its first save, so saved references keep resolving as
+before. New projects get 2. No route upgrades a document, but `PUT /document`
+saves the value the client sends; the engine drops its cached timeline when
+the version changes.
 
 ## Tangent edge chains
 

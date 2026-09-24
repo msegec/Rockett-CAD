@@ -355,6 +355,7 @@ export const groupsSchema = Type.Refine(
 export const documentSchema = Type.Refine(
   Type.Object({
     schemaVersion: Type.Literal(SCHEMA_VERSION),
+    namingVersion: Type.Union([Type.Literal(1), Type.Literal(2)]),
     revision: Type.Integer({ minimum: 0 }),
     savedWith: Type.Union([
       Type.Null(),

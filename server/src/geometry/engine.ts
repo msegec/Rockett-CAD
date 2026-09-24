@@ -18,6 +18,7 @@ import type {
   ConstructionPlanePayload,
   EvaluateResult,
   FeatureStatus,
+  NamingVersion,
   SketchPayload,
 } from "@rockett/shared";
 import {
@@ -29,7 +30,7 @@ import {
 } from "./features.js";
 import type { Sources } from "./importers.js";
 import { movePayload, tessellateBody } from "./tessellate.js";
-import type { NamedBody } from "./naming.js";
+import { withNamingVersion, type NamedBody } from "./naming.js";
 import { shapeHash, type Shape } from "./kernel.js";
 import { ShapeMap, trackShapeMaps } from "./shapeMap.js";
 
@@ -65,11 +66,14 @@ function evaluateTracked(
   feature: CadDocument["features"][number],
   earlier: CadDocument["features"],
   sources: Sources,
+  namingVersion: NamingVersion,
 ): string | void {
   const made: ShapeMap<unknown>[] = [];
   try {
     return trackShapeMaps(made, () =>
-      evaluateFeature(next, feature, earlier, sources),
+      withNamingVersion(namingVersion, () =>
+        evaluateFeature(next, feature, earlier, sources),
+      ),
     );
   } finally {
     const held = new Set<ShapeMap<unknown>>(
@@ -149,6 +153,7 @@ function cached(body: NamedBody): BodyPayload | undefined {
 
 class DocumentEngine {
   private snapshots: Snapshot[] = [];
+  private namingVersion?: NamingVersion;
 
   evaluate(
     doc: CadDocument,
@@ -165,6 +170,7 @@ class DocumentEngine {
     // upTo stay, so a rewind or stateAt query doesn't discard later work.
     let valid = 0;
     while (
+      this.namingVersion === doc.namingVersion &&
       valid < this.snapshots.length &&
       valid < doc.features.length &&
       this.snapshots[valid]!.featureKey === featureKey(doc.features[valid]!)
@@ -172,6 +178,7 @@ class DocumentEngine {
       valid++;
     }
     releaseSnapshots(this.snapshots.splice(valid), this.snapshots);
+    this.namingVersion = doc.namingVersion;
     const start = Math.min(valid, upTo);
 
     let state: EvalState =
@@ -192,6 +199,7 @@ class DocumentEngine {
             feature,
             doc.features.slice(0, i),
             sources,
+            doc.namingVersion,
           );
           status = warning
             ? { featureId: feature.id, status: "warning", warning }

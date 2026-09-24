@@ -19,7 +19,7 @@
  * suffix ordered by centroid.
  */
 
-import type { Vec3 } from "@rockett/shared";
+import { LINEAR_TOL, type NamingVersion, type Vec3 } from "@rockett/shared";
 import {
   edgeCentroid,
   faceCentroid,
@@ -31,7 +31,23 @@ import {
 } from "./kernel.js";
 import { ShapeMap } from "./shapeMap.js";
 
-export type NameMap = ShapeMap<string>;
+export class NameMap extends ShapeMap<string> {
+  constructor(readonly version: NamingVersion) {
+    super();
+  }
+}
+
+let active: NamingVersion = 1;
+
+export function withNamingVersion<T>(version: NamingVersion, run: () => T): T {
+  const outer = active;
+  active = version;
+  try {
+    return run();
+  } finally {
+    active = outer;
+  }
+}
 
 export interface NamedBody {
   bodyId: string;
@@ -43,20 +59,37 @@ export function byPosition(a: Vec3, b: Vec3): number {
   return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 }
 
+function cell(pos: Vec3): Vec3 {
+  return [
+    Math.round(pos[0] / LINEAR_TOL),
+    Math.round(pos[1] / LINEAR_TOL),
+    Math.round(pos[2] / LINEAR_TOL),
+  ];
+}
+
 export function suffixDuplicates<T>(
   groups: Map<string, T[]>,
   positionOf: (item: T) => Vec3,
+  version: NamingVersion,
 ): Array<[T, string]> {
+  const keyOf = version === 1 ? (pos: Vec3) => pos : cell;
   const named: Array<[T, string]> = [];
   for (const [base, group] of groups) {
     if (group.length === 1) {
       named.push([group[0]!, base]);
       continue;
     }
-    group
-      .map((item) => ({ item, pos: positionOf(item) }))
-      .sort((a, b) => byPosition(a.pos, b.pos))
-      .forEach(({ item }, i) => named.push([item, `${base}~${i + 1}`]));
+    const sorted = group
+      .map((item) => ({ item, key: keyOf(positionOf(item)) }))
+      .sort((a, b) => byPosition(a.key, b.key));
+    sorted.forEach(({ item, key }, i) => {
+      const tied =
+        version === 2 &&
+        [sorted[i - 1], sorted[i + 1]].some(
+          (other) => other && byPosition(other.key, key) === 0,
+        );
+      named.push([item, `${base}~${tied ? "?" : ""}${i + 1}`]);
+    });
   }
   return named;
 }
@@ -64,7 +97,7 @@ export function suffixDuplicates<T>(
 /** Assign fallback names + disambiguate duplicates. Returns final NameMap. */
 export function finalizeNames(
   shape: Shape,
-  provisional: NameMap,
+  provisional: ShapeMap<string>,
   featureId: string,
 ): NameMap {
   const allFaces = faces(shape);
@@ -82,8 +115,8 @@ export function finalizeNames(
         unnamed.push(f);
       }
     }
-    const result: NameMap = new ShapeMap();
-    for (const [f, name] of suffixDuplicates(byName, faceCentroid)) {
+    const result = new NameMap(active);
+    for (const [f, name] of suffixDuplicates(byName, faceCentroid, active)) {
       result.set(f, name);
     }
     if (unnamed.length > 0) {
@@ -114,11 +147,11 @@ export function finalizeNames(
  */
 export function propagateNames(
   op: any,
-  inputs: Array<{ shape: Shape; names: NameMap }>,
+  inputs: Array<{ shape: Shape; names: ShapeMap<string> }>,
   resultShape: Shape,
   featureId: string,
 ): NameMap {
-  const provisional: NameMap = new ShapeMap();
+  const provisional = new ShapeMap<string>();
   for (const input of inputs) {
     const inputFaces = faces(input.shape);
     try {
@@ -161,7 +194,7 @@ export function propagateNames(
  */
 export function historyNames(
   history: any,
-  input: { shape: Shape; names: NameMap },
+  input: { shape: Shape; names: ShapeMap<string> },
   resultShape: Shape,
   featureId: string,
 ): NameMap {
@@ -183,9 +216,11 @@ export function historyNames(
   } finally {
     release(inputFaces);
   }
-  const provisional: NameMap = new ShapeMap();
+  const provisional = new ShapeMap<string>();
   for (const [face, names] of candidates.entries()) {
-    const bases = [...new Set(names.map((n) => n.replace(/~\d+$/, "")))].sort();
+    const bases = [
+      ...new Set(names.map((n) => n.replace(/~\??\d+$/, ""))),
+    ].sort();
     provisional.set(face, bases[0]!);
   }
   return finalizeNames(resultShape, provisional, featureId);
@@ -197,7 +232,7 @@ export function transformNames(
   input: { shape: Shape; names: NameMap },
   prefix: string,
 ): NameMap {
-  const out: NameMap = new ShapeMap();
+  const out = new NameMap(input.names.version);
   for (const f of faces(input.shape)) {
     const name = input.names.get(f);
     try {
@@ -274,7 +309,11 @@ export function computeEdgeNames(body: NamedBody): EdgeNames {
     groups.set(e.base, arr);
   }
   const byName = new Map<string, Shape>();
-  for (const [e, name] of suffixDuplicates(groups, (entry) => entry.centroid)) {
+  for (const [e, name] of suffixDuplicates(
+    groups,
+    (entry) => entry.centroid,
+    body.names.version,
+  )) {
     byName.set(name, e.edge);
   }
   return { byName };
@@ -319,7 +358,11 @@ export function computeVertexNames(body: NamedBody): VertexNames {
     groups.set(e.base, arr);
   }
   const byName = new Map<string, Shape>();
-  for (const [e, name] of suffixDuplicates(groups, (entry) => entry.pos)) {
+  for (const [e, name] of suffixDuplicates(
+    groups,
+    (entry) => entry.pos,
+    body.names.version,
+  )) {
     byName.set(name, e.vertex);
   }
   return { byName };
