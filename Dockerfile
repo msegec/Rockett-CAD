@@ -42,7 +42,7 @@ COPY client/package.json client/package.json
 RUN npm ci --omit=dev --workspace server --ignore-scripts --no-audit --no-fund \
   && npm cache clean --force
 
-COPY --from=build /app/server/dist/server.js server.mjs
+COPY --from=build /app/server/dist/server.mjs /app/server/dist/kernel-worker.mjs ./
 COPY --from=build /app/client/dist client/dist
 
 # Non-root user; /data is the single persistent volume.

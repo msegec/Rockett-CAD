@@ -16,7 +16,8 @@ import { ProjectStore } from "./store/projectStore.js";
 import { validateDocument } from "./api/validate.js";
 import { FolderStore } from "./store/folderStore.js";
 import { LocalStorage } from "./store/storage.js";
-import { InProcessKernel } from "./kernel/client.js";
+import { InProcessKernel, type KernelClient } from "./kernel/client.js";
+import { WorkerKernel } from "./kernel/workerKernel.js";
 import { createApp, scheduleSweep } from "./app.js";
 import { parseAllowedOrigins } from "./auth/origin.js";
 
@@ -33,14 +34,30 @@ try {
   process.exit(1);
 }
 
-async function main() {
+async function startKernel(store: ProjectStore): Promise<KernelClient> {
+  if (process.env.ROCKETT_KERNEL !== "inprocess") {
+    console.log("[rockett] starting the kernel worker");
+    return new WorkerKernel(
+      store,
+      new URL(
+        import.meta.url.endsWith(".ts")
+          ? "./kernel/worker.ts"
+          : "./kernel-worker.mjs",
+        import.meta.url,
+      ),
+    );
+  }
   console.log("[rockett] loading OCCT kernel…");
   const t0 = Date.now();
   await initKernel();
   console.log(`[rockett] kernel ready in ${Date.now() - t0}ms`);
+  return new InProcessKernel(store);
+}
 
+async function main() {
   const storage = new LocalStorage(DATA_DIR, fs.promises);
   const store = new ProjectStore(storage, validateDocument);
+  const kernel = await startKernel(store);
   console.log(`[rockett] data dir: ${DATA_DIR}`);
   const { recovered, outdated, failed } = await store.inventory();
   for (const id of recovered)
@@ -66,7 +83,7 @@ async function main() {
   const { app, sweep } = createApp({
     store,
     folders: new FolderStore(storage),
-    kernel: new InProcessKernel(store),
+    kernel,
     clientDir,
     allowedOrigins,
   });

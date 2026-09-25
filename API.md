@@ -129,19 +129,21 @@ would reverse or restore, or `null`.
 
 ## Projects
 
-| Method & path                  | Body                   | Returns                                                                                                                                                        |
-| ------------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /health`                  | none                   | `{ ok: true, version, schemaVersion, commit, describe, kernelVersion }` (`commit` from `ROCKETT_COMMIT`, `describe` from `ROCKETT_DESCRIBE`, each else `null`) |
-| `GET /projects`                | none                   | `ProjectSummary[]`                                                                                                                                             |
-| `POST /projects`               | `{ name?, folderId? }` | `{ document }`                                                                                                                                                 |
-| `GET /projects/:id`            | none                   | `{ document }`                                                                                                                                                 |
-| `DELETE /projects/:id`         | none                   | `{ ok }`                                                                                                                                                       |
-| `POST /projects/:id/duplicate` | `{ name? }`            | `{ document }` (blobs copied)                                                                                                                                  |
-| `POST /projects/:id/rename`    | `{ name }`             | `{ document }`                                                                                                                                                 |
+| Method & path                  | Body                   | Returns                                                                                                                                                                |
+| ------------------------------ | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /health`                  | none                   | `{ ok: true, version, schemaVersion, commit, describe, kernelVersion, kernel }` (`commit` from `ROCKETT_COMMIT`, `describe` from `ROCKETT_DESCRIBE`, each else `null`) |
+| `GET /projects`                | none                   | `ProjectSummary[]`                                                                                                                                                     |
+| `POST /projects`               | `{ name?, folderId? }` | `{ document }`                                                                                                                                                         |
+| `GET /projects/:id`            | none                   | `{ document }`                                                                                                                                                         |
+| `DELETE /projects/:id`         | none                   | `{ ok }`                                                                                                                                                               |
+| `POST /projects/:id/duplicate` | `{ name? }`            | `{ document }` (blobs copied)                                                                                                                                          |
+| `POST /projects/:id/rename`    | `{ name }`             | `{ document }`                                                                                                                                                         |
 
 `kernelVersion` is `{ occt, commit }` from the loaded kernel's
 `versionId()`: the OCCT release and the fork commit it was built from. It is
-`null` until the kernel has loaded; health never waits for it.
+`null` until the kernel has loaded; health never waits for it. `kernel` is
+`starting` until the kernel has loaded and `ready` after; `restarting` is
+reserved for a respawned worker. Health answers 200 in every state.
 
 Every stored project is listed. `status` is `ok`, `invalid` or `tooNew`, and
 the last two carry `error`. A `tooNew` project also carries the

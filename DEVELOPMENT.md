@@ -32,11 +32,11 @@ Data in dev goes to `./data/` (gitignored).
 
 ## Workspaces
 
-| Workspace | Commands                                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------------------- |
-| `shared`  | `npm test -w shared`: solver + profile-detection tests                                                              |
-| `server`  | `npm run dev -w server`, `npm test -w server`, `npm run build -w server` (esbuild bundle → `server/dist/server.js`) |
-| `client`  | `npm run dev -w client`, `npm run build -w client` (Vite → `client/dist`), `npm run test:client` (from the root)    |
+| Workspace | Commands                                                                                                                                                  |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared`  | `npm test -w shared`: solver + profile-detection tests                                                                                                    |
+| `server`  | `npm run dev -w server`, `npm test -w server`, `npm run build -w server` (esbuild bundles → `server/dist/server.mjs` and `server/dist/kernel-worker.mjs`) |
+| `client`  | `npm run dev -w client`, `npm run build -w client` (Vite → `client/dist`), `npm run test:client` (from the root)                                          |
 
 `@rockett/shared` is consumed as TypeScript source (tsx and Vite both
 transpile it); the server production build bundles it via esbuild.

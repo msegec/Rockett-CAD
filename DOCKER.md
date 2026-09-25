@@ -191,6 +191,7 @@ exits 0 when every project is on version 2, and 1 otherwise.
 | `DATA_DIR`                | `/data`  | Persistent root                                                                                                 |
 | `ROCKETT_COMMIT`          | empty    | Git revision reported by `/api/health` (build arg)                                                              |
 | `ROCKETT_DESCRIBE`        | empty    | `git describe --tags --always --dirty` reported by `/api/health` (build arg)                                    |
+| `ROCKETT_KERNEL`          | unset    | `inprocess` runs the kernel on the main thread instead of its worker thread                                     |
 
 ## Security
 
@@ -204,7 +205,10 @@ exits 0 when every project is on version 2, and 1 otherwise.
   LAN. The auth layer is intentionally separable from the CAD logic
   (see ARCHITECTURE.md).
 - Healthcheck hits `/api/health` (30 s start period, one probe interval,
-  since the WASM kernel loads in under a second). A long regeneration
+  ten times the 3 s planning figure for the kernel worker's boot). The
+  kernel runs in a worker thread, so health answers 200 during a long
+  regeneration; its `kernel` field reads `starting` until the worker has
+  loaded, then `ready`. With `ROCKETT_KERNEL=inprocess` a regeneration
   blocks the event loop, so each probe waits 5 s, inside Docker's 10 s
   limit, and then exits rather than piling up. The container turns
   unhealthy only after 10 failed probes in a row, 30 s apart: about five

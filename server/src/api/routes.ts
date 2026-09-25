@@ -289,6 +289,7 @@ export function createApiRouter(
       schemaVersion: SCHEMA_VERSION,
       describe: process.env.ROCKETT_DESCRIBE || null,
       kernelVersion: kernel.version(),
+      kernel: kernel.version() ? "ready" : "starting",
     });
   });
 
