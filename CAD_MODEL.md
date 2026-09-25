@@ -83,7 +83,7 @@ document containing it, so nothing is lost.
 Bodies get stable ids derived from the feature that created them:
 
 - `b:{featureId}`: a `newBody` extrude/revolve/sweep/loft. A `newBody`
-  extrude/revolve of several sketch regions makes one body per region
+  extrude/revolve/sweep of several sketch regions makes one body per region
   (`b:x`, `b:x:2`, …), in selection order under `namingVersion` 1 and in
   face name order under version 2; `join` is what merges regions into a
   single solid (with no existing body to join, the merged solid becomes the new
@@ -198,13 +198,15 @@ extrude keeps its stored operation. The kernel makes a Join that meets no
 body a new body `b:<featureId>`, so the geometry matches New body, but the
 stored Join fuses once an earlier edit puts a body in its path.
 
-Extrude and revolve tools built from several sketch regions pass through
-`ShapeUpgrade_UnifySameDomain` before the boolean, so adjacent regions become
-one face instead of showing the sketch's internal boundaries as edges. Names
-follow the unify history: a face merged from several inputs takes their shared
-base name (the `~n` suffix dropped), or the first distinct base name in sorted
-order when they differ. An extrude, revolve, sweep or loft join also unifies
-the fused result. Under `namingVersion` 1 the other joins keep their seams:
+Extrude, revolve and sweep tools built from several sketch regions pass
+through `ShapeUpgrade_UnifySameDomain` before the boolean, so adjacent regions
+become one face instead of showing the sketch's internal boundaries as edges.
+A sweep of one region keeps its tool as the pipe made it, as before BUG-075
+swept every region. Names follow the unify history: a face merged from several
+inputs takes their shared base name (the `~n` suffix dropped), or the first
+distinct base name in sorted order when they differ. An extrude, revolve,
+sweep or loft join also unifies the fused result. Under `namingVersion` 1 the
+other joins keep their seams:
 Combine join, Mirror and both patterns with combine, and an outward press/pull,
 so saved references to a merged half still resolve. Under version 2 those
 joins unify their result as well. Under version 2 two planar faces count as

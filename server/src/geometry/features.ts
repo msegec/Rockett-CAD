@@ -843,27 +843,43 @@ function evalExtrude(state: EvalState, f: ExtrudeFeature) {
   }
   release(new Set(sources.map(({ pf }) => pf.face)));
 
-  if (f.operation === "newBody") {
-    registerNewBodies(
-      state,
-      f.id,
-      tools,
-      sources.map((s) => s.pf),
-    );
+  return applyProfileTools(
+    state,
+    f.id,
+    tools,
+    sources.map((s) => s.pf),
+    f.operation,
+    f.targets,
+  );
+}
+
+function applyProfileTools(
+  state: EvalState,
+  featureId: string,
+  tools: ToolResult[],
+  regions: ProfileFace[],
+  operation: "newBody" | "join" | "cut" | "intersect",
+  targets?: string[],
+): FeatureOutcome | void {
+  if (operation === "newBody") {
+    registerNewBodies(state, featureId, tools, regions);
     return;
   }
-
-  // merge multiple profile prisms into one tool
   const made = new Set(tools.map((t) => t.shape));
-  let tool = tools[0]!;
-  for (let i = 1; i < tools.length; i++) {
-    tool = fuseNamed(tool, tools[i]!, f.id, "failed to merge profile solids");
-    made.add(tool.shape);
-  }
-  const unified = unifyTool(tool, f.id);
+  const tool = tools.slice(1).reduce((acc, next) => {
+    const fused = fuseNamed(
+      acc,
+      next,
+      featureId,
+      "failed to merge profile solids",
+    );
+    made.add(fused.shape);
+    return fused;
+  }, tools[0]!);
+  const unified = unifyTool(tool, featureId);
   made.add(unified.shape);
   try {
-    return applyToolOperation(state, f.id, unified, f.operation, f.targets);
+    return applyToolOperation(state, featureId, unified, operation, targets);
   } finally {
     release(made);
   }
@@ -944,35 +960,14 @@ function evalRevolve(state: EvalState, f: RevolveFeature) {
     tools.push(tool);
   }
   release(profileFaces.map((pf) => pf.face));
-
-  if (f.operation === "newBody") {
-    registerNewBodies(state, f.id, tools, profileFaces);
-    return;
-  }
-
-  let tool = tools[0]!;
-  for (let i = 1; i < tools.length; i++) {
-    const op = new k.BRepAlgoAPI_Fuse_3(
-      tool.shape,
-      tools[i]!.shape,
-      progress(),
-    );
-    op.Build(progress());
-    const merged = op.Shape();
-    const names = propagateNames(
-      op,
-      [
-        { shape: tool.shape, names: tool.names },
-        { shape: tools[i]!.shape, names: tools[i]!.names },
-      ],
-      merged,
-      f.id,
-    );
-    op.delete();
-    tool = { shape: merged, names };
-  }
-  const unified = unifyTool(tool, f.id);
-  return applyToolOperation(state, f.id, unified, f.operation, f.targets);
+  return applyProfileTools(
+    state,
+    f.id,
+    tools,
+    profileFaces,
+    f.operation,
+    f.targets,
+  );
 }
 
 function evalSweep(state: EvalState, f: SweepFeature) {
@@ -1005,30 +1000,42 @@ function evalSweep(state: EvalState, f: SweepFeature) {
     return w;
   });
 
-  const tool = kernelCall("sweep", () => {
-    const pipe = new k.BRepOffsetAPI_MakePipe_1(wire, profileFaces[0]!.face);
-    pipe.Build(progress());
-    if (!pipe.IsDone()) {
+  const tools = profileFaces.map((pf) =>
+    kernelCall("sweep", (): ToolResult => {
+      const pipe = new k.BRepOffsetAPI_MakePipe_1(wire, pf.face);
+      pipe.Build(progress());
+      if (!pipe.IsDone()) {
+        pipe.delete();
+        throw new Error(
+          "sweep failed: check that the profile lies on the path start",
+        );
+      }
+      const shape = pipe.Shape();
+      const names =
+        namingVersion() === 1
+          ? finalizeNames(shape, new ShapeMap(), f.id)
+          : sweptNames(
+              shape,
+              f.id,
+              sideEdgeNames(f.id, pf),
+              (e) => pipe.Generated_1(e),
+              [pipe.FirstShape(), pipe.LastShape()],
+            );
       pipe.delete();
-      throw new Error(
-        "sweep failed: check that the profile lies on the path start",
+      return { shape, names };
+    }),
+  );
+  release([wire, ...profileFaces.map((pf) => pf.face)]);
+  return tools.length === 1
+    ? applyToolOperation(state, f.id, tools[0]!, f.operation, f.targets)
+    : applyProfileTools(
+        state,
+        f.id,
+        tools,
+        profileFaces,
+        f.operation,
+        f.targets,
       );
-    }
-    const shape = pipe.Shape();
-    const names =
-      namingVersion() === 1
-        ? finalizeNames(shape, new ShapeMap(), f.id)
-        : sweptNames(
-            shape,
-            f.id,
-            sideEdgeNames(f.id, profileFaces[0]!),
-            (e) => pipe.Generated_1(e),
-            [pipe.FirstShape(), pipe.LastShape()],
-          );
-    pipe.delete();
-    return { shape, names };
-  });
-  return applyToolOperation(state, f.id, tool, f.operation, f.targets);
 }
 
 function evalLoft(state: EvalState, f: LoftFeature) {
