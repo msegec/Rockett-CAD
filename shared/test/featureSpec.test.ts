@@ -7,6 +7,7 @@ import {
   featureSpecs,
   registerFeatureSpec,
   ValidationError,
+  type EdgeRef,
   type FaceRef,
   type Feature,
   type FeatureRef,
@@ -121,8 +122,8 @@ const refFace = (faceName: string): FaceRef => ({
   bodyId: "ref:body",
   faceName: `ref:${faceName}`,
 });
-const refEdge = (edgeName: string) => ({
-  kind: "edge" as const,
+const refEdge = (edgeName: string): EdgeRef => ({
+  kind: "edge",
   bodyId: "ref:body",
   edgeName: `ref:${edgeName}`,
 });
@@ -290,6 +291,62 @@ const cases: Record<string, SpecCase> = {
         operation: "newBody",
         targets: ["ref:b1"],
       },
+    ],
+  },
+  fillet: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "fillet",
+        tangentChain: true,
+        edges: [refEdge("E1"), refEdge("E2")],
+        radius: 1,
+      },
+    ],
+    invalid: [
+      [
+        { ...meta, type: "fillet", edges: [refEdge("E1")], radius: 0 },
+        "radius must be >= 0.000001",
+        "/radius",
+      ],
+    ],
+  },
+  chamfer: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "chamfer",
+        tangentChain: false,
+        edges: [refEdge("E1"), refEdge("E2")],
+        distance: 1,
+      },
+    ],
+    invalid: [
+      [
+        { ...meta, type: "chamfer", edges: [], distance: 1 },
+        "edges must not have fewer than 1 items",
+        "/edges",
+      ],
+    ],
+  },
+  offsetFace: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "offsetFace",
+        faces: [refFace("F1"), refFace("F2")],
+        distance: -1,
+      },
+    ],
+    invalid: [
+      [
+        { ...meta, type: "offsetFace", faces: [], distance: 1 },
+        "faces must not have fewer than 1 items",
+        "/faces",
+      ],
     ],
   },
 };

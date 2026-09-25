@@ -1271,7 +1271,7 @@ function blendNames(
   return finalizeNames(result, provisional, featureId);
 }
 
-function evalFillet(state: EvalState, f: FilletFeature): void {
+export function evalFillet(state: EvalState, f: FilletFeature): void {
   if (f.edges.length === 0) throw new Error("no edges selected");
   if (f.radius <= 0) throw new Error("fillet radius must be positive");
   blendPerBody(state, f.edges, (body, refs) =>
@@ -1668,7 +1668,7 @@ function chamferByEnvelope(
   return { shape: current.shape, names: current.names };
 }
 
-function evalChamfer(state: EvalState, f: ChamferFeature): void {
+export function evalChamfer(state: EvalState, f: ChamferFeature): void {
   if (f.edges.length === 0) throw new Error("no edges selected");
   if (f.distance <= 0) throw new Error("chamfer distance must be positive");
   blendPerBody(state, f.edges, (body, refs) =>
@@ -1831,7 +1831,7 @@ export function evalShell(state: EvalState, f: ShellFeature): void {
   });
 }
 
-function evalOffsetFace(state: EvalState, f: OffsetFaceFeature): void {
+export function evalOffsetFace(state: EvalState, f: OffsetFaceFeature): void {
   if (f.faces.length === 0) throw new Error("no faces selected");
   if (f.distance === 0) throw new Error("offset distance must be non-zero");
   const bodyId = f.faces[0]!.bodyId;
@@ -2340,14 +2340,8 @@ export function evaluateFeature(
     }
     case "sketch":
       return evalSketch(state, feature);
-    case "fillet":
-      return evalFillet(state, feature);
-    case "chamfer":
-      return evalChamfer(state, feature);
     case "combine":
       return evalCombine(state, feature);
-    case "offsetFace":
-      return evalOffsetFace(state, feature);
     case "splitBody":
       return evalSplitBody(state, feature);
     case "mirror":

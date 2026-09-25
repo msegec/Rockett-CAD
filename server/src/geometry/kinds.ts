@@ -5,9 +5,12 @@ import {
   type FeatureKind,
 } from "./featureKinds.js";
 import {
+  evalChamfer,
   evalEmboss,
   evalExtrude,
+  evalFillet,
   evalLoft,
+  evalOffsetFace,
   evalRevolve,
   evalShell,
   evalSweep,
@@ -29,6 +32,9 @@ const kinds = [
   kind("emboss", (ctx, f) => evalEmboss(ctx.state, f)),
   kind("sweep", (ctx, f) => evalSweep(ctx.state, f)),
   kind("loft", (ctx, f) => evalLoft(ctx.state, f)),
+  kind("fillet", (ctx, f) => evalFillet(ctx.state, f)),
+  kind("chamfer", (ctx, f) => evalChamfer(ctx.state, f)),
+  kind("offsetFace", (ctx, f) => evalOffsetFace(ctx.state, f)),
 ];
 
 for (const k of kinds) registerFeatureKind(k);

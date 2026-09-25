@@ -2,6 +2,7 @@ import type { TSchema } from "typebox";
 import {
   FEATURE_LABELS,
   type AxisRef,
+  type EdgeRef,
   type FaceRef,
   type Feature,
   type FeatureType,
@@ -13,6 +14,7 @@ import { parse } from "./schema/index.js";
 
 interface RefTargets {
   face: FaceRef;
+  edge: EdgeRef;
   profile: ProfileRef;
   axis: AxisRef;
   body: string;
