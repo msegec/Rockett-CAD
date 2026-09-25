@@ -8,6 +8,7 @@ import {
   pinTargets,
   ROUTES,
   SCHEMA_VERSION,
+  startFirst,
   TX_HEADER,
   ValidationError,
   type ApiErrorBody,
@@ -128,11 +129,15 @@ type Edit = (doc: CadDocument, req: any) => Promise<Mutation>;
 
 const KEEPS_TARGETS = new Set(["name", "suppressed"]);
 
-function retargets(patch: object): boolean {
+function keepsTargets(patch: object): boolean {
   return (
     !("targets" in patch) &&
-    Object.keys(patch).some((key) => !KEEPS_TARGETS.has(key))
+    Object.keys(patch).every((key) => KEEPS_TARGETS.has(key))
   );
+}
+
+function retargets(patch: object): boolean {
+  return !("targets" in patch) && !keepsTargets(patch);
 }
 
 function evaluationPosition(req: any, doc: CadDocument): number | undefined {
@@ -218,11 +223,19 @@ export function createApiRouter(
       ...(evaluation && { evaluation, history: await history.status(doc.id) }),
     });
 
-  async function pinned(doc: CadDocument, index: number) {
+  async function pinned(
+    doc: CadDocument,
+    index: number,
+    hidden: string[] = [],
+  ) {
     const feature = doc.features[index]!;
-    if (!lacksTargets(feature)) return;
-    const evaluation = await kernel.evaluate(doc, index + 1);
-    pinTargets(feature, evaluation.featureStatuses[index]!);
+    if (lacksTargets(feature))
+      pinTargets(feature, await kernel.visibleTargets(doc, index, hidden));
+  }
+
+  async function written(doc: CadDocument, index: number) {
+    await pinned(doc, index, (await store.view(doc.id)).hidden.bodies);
+    startFirst(doc.features[index]!);
   }
 
   async function signed(
@@ -473,7 +486,7 @@ export function createApiRouter(
       await signed(doc, at, feature);
       doc.features.splice(at, 0, feature);
       doc.timelinePosition = at + 1;
-      await pinned(doc, at);
+      await written(doc, at);
       return { label: `Add ${feature.name}` };
     }),
   );
@@ -495,7 +508,7 @@ export function createApiRouter(
       validateFeature(updated);
       await signed(doc, idx, updated, current);
       doc.features[idx] = updated;
-      await pinned(doc, idx);
+      await (keepsTargets(patch) ? pinned(doc, idx) : written(doc, idx));
       return { label: `Edit ${updated.name}`, position };
     }),
   );

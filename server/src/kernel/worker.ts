@@ -68,6 +68,7 @@ const RUN: {
       shouldStop: () => Atomics.load(stop, 0) !== 0,
     }),
   stateQuery: (id, doc, query) => kernelFor(id).stateQuery(doc, query),
+  visibleTargets: (id, ...args) => kernelFor(id).visibleTargets(...args),
   async export(id, doc, job) {
     const { data, ...file } = await kernelFor(id).export(doc, job);
     return { data: owned(data), ...file };
@@ -94,7 +95,11 @@ async function serve({ id, method, args }: Call) {
     const value = await run(id, ...args);
     post(
       { type: "reply", id, settled: { ok: true, value } },
-      "data" in value && value.data instanceof ArrayBuffer ? [value.data] : [],
+      value !== undefined &&
+        "data" in value &&
+        value.data instanceof ArrayBuffer
+        ? [value.data]
+        : [],
     );
   } catch (error) {
     post({ type: "reply", id, settled: { ok: false, error: toWire(error) } });

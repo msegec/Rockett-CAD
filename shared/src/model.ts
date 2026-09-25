@@ -9,7 +9,7 @@
  * server/src/store/migrations.ts whenever the shape of this model changes.
  */
 
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 export type NamingVersion = 1 | 2;
 

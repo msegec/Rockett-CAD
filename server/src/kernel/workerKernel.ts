@@ -177,6 +177,10 @@ export class WorkerKernel implements KernelClient {
     )) as StateAnswers[K];
   }
 
+  visibleTargets(doc: CadDocument, index: number, hidden: readonly string[]) {
+    return this.call("visibleTargets", [doc, index, hidden], this.sources(doc));
+  }
+
   async export(doc: CadDocument, job: ExportJob) {
     const { data, ...file } = await this.call(
       "export",

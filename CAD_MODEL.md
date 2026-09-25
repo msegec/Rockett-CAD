@@ -95,7 +95,8 @@ Bodies get stable ids derived from the feature that created them:
   overlaps, found by bounding box, then by kernel distance, then by a fuse
   that must give one solid, so a tool solid meeting a body only along an edge
   or at a vertex stays a new body. Each result is unified. Bodies one tool
-  solid bridges become one body under the first id, digit runs compared as
+  solid bridges become one body under the id that comes first in stored
+  `targets`. Without them the first id wins, digit runs compared as
   numbers, so `b:x:2` wins over `b:x:10`.
   Tool solids that touch no body become `b:{featureId}`,
   `b:{featureId}:2`, … in face name order. Stored `targets` choose the
@@ -713,11 +714,27 @@ Without `targets` the old rules pick them: join under version 1 and intersect
 take the first body in `state.bodies` order whose bounding box overlaps the
 tool, join under version 2 takes every body the tool touches, and cut takes
 every body whose bounding box overlaps the tool. `FeatureStatus.targets`
-reports the ids used, sorted as bridged bodies are under version 2. Stored,
-they give the same result. Feature add and update write them into the stored
-feature; see [API.md](API.md), Validation. Loading never writes them, and a
-feature without `targets` evaluates as before. The 14 to 15 migration changes
-nothing but the version, and the project is backed up before its first save.
+reports the ids used, in `targets` order, else sorted as bridged bodies are
+under version 2. Stored, they give the same result. Feature add and update
+write them into the stored feature; see [API.md](API.md), Validation. Loading
+never writes them, and a feature without `targets` evaluates as before. The 14
+to 15 migration changes nothing but the version, and the project is backed up
+before its first save.
+
+The ids written follow Fusion (schema 20). Hidden bodies, from the project
+view, are never default participants: when the old rules pick a hidden body,
+the feature is tried again with hidden bodies left out, and the ids from that
+try are written. When that try fails, such as a cut that meets only hidden
+bodies, the edit fails without saving. A rename or suppress that fills `targets` for
+a feature saved without them writes the ids it evaluated, hidden or not, so its
+result stays. A hidden body the user names in `targets` still takes part. An
+extrude or revolve Join from a face writes that face's body first when it is
+among the targets, so the joined body keeps the id, name and visibility of the
+body the tool starts from; otherwise the first target the user picked leads.
+Evaluation never reads the view, so hiding a body changes no result. The 19 to
+20 migration sorts the `targets` of every version 2 join, including an emboss,
+by `compareNames`, so a saved project keeps its body ids, and the project is
+backed up before its first save.
 
 `pinRefs` in `server/src/geometry/pinRefs.ts` gives a loaded document the pins
 a save would write, in memory: each missing `targets` from the evaluation and

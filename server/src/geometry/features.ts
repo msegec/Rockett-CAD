@@ -10,6 +10,7 @@ import {
   projectEdge,
   bodyMadeBy,
   featureRefs,
+  compareNames,
   ANGULAR_TOL_DEG,
   LINEAR_TOL,
   UNIT_DOT_TOL,
@@ -74,7 +75,6 @@ import {
 } from "./kernel.js";
 import {
   assignBodyIds,
-  compareNames,
   computeEdgeNames,
   computeVertexNames,
   finalizeNames,
@@ -127,6 +127,7 @@ export interface EvalState {
   sketches: Map<string, EvaluatedSketch>;
   planes: Map<string, { frame: PlaneFrame; size: number }>;
   blocked: ReadonlySet<string>;
+  hidden?: ReadonlySet<string>;
 }
 
 export function cloneState(state: EvalState): EvalState {
@@ -539,19 +540,23 @@ function missedTarget(operation: string, id: string): Error {
   return new Error(`${operation} target ${id} does not overlap the tool`);
 }
 
+function overlapping(state: EvalState, tool: Shape): StateBody[] {
+  return [...state.bodies.values()].filter(
+    (b) => !state.hidden?.has(b.bodyId) && bboxOverlap(b.shape, tool),
+  );
+}
+
 function joinEvery(
   state: EvalState,
   featureId: string,
   tool: ToolResult,
   targets?: string[],
 ): string[] {
-  const bodies = (
-    targets
-      ? targets.map((id) => targetBody(state, "join", id, tool.shape))
-      : [...state.bodies.values()].filter((b) =>
-          bboxOverlap(b.shape, tool.shape),
-        )
-  ).sort((a, b) => compareNames(a.bodyId, b.bodyId));
+  const bodies = targets
+    ? targets.map((id) => targetBody(state, "join", id, tool.shape))
+    : overlapping(state, tool.shape).sort((a, b) =>
+        compareNames(a.bodyId, b.bodyId),
+      );
   let groups: { bodies: StateBody[]; pieces: ToolResult[] }[] = [];
   const loose: Shape[] = [];
   for (const shape of solids(tool.shape)) {
@@ -573,7 +578,8 @@ function joinEvery(
       },
     ];
   }
-  const used = groups.flatMap((g) => g.bodies.map((b) => b.bodyId));
+  const touched = new Set(groups.flatMap((g) => g.bodies));
+  const used = bodies.filter((b) => touched.has(b)).map((b) => b.bodyId);
   const missed = targets?.find((id) => !used.includes(id));
   if (missed) {
     release([...loose, ...groups.flatMap((g) => g.pieces.map((p) => p.shape))]);
@@ -593,7 +599,7 @@ function joinEvery(
     const joined = unifyTool(fused, featureId);
     registerBodySolids(state, first!.bodyId, joined.shape, joined.names);
   }
-  return used.sort(compareNames);
+  return used;
 }
 
 function applyToolOperation(
@@ -619,9 +625,7 @@ function applyToolOperation(
   if (operation === "cut") {
     const bodies = targets
       ? targets.map((id) => targetBody(state, "cut", id, tool.shape))
-      : [...state.bodies.values()].filter((b) =>
-          bboxOverlap(b.shape, tool.shape),
-        );
+      : overlapping(state, tool.shape);
     if (bodies.length === 0)
       throw new Error("cut tool does not intersect any body");
     for (const body of bodies) {
@@ -647,7 +651,7 @@ function applyToolOperation(
 
   const target = targets
     ? targetBody(state, operation, targets[0]!, tool.shape)
-    : [...state.bodies.values()].find((b) => bboxOverlap(b.shape, tool.shape));
+    : overlapping(state, tool.shape)[0];
 
   if (operation === "join") {
     if (!target) {

@@ -367,6 +367,32 @@ class DocumentEngine {
     return source && movePayload(source, bodyId, copyOf.offset, copyOf.prefix);
   }
 
+  visibleTargets(
+    doc: CadDocument,
+    index: number,
+    hidden: readonly string[],
+    sources?: Sources,
+  ): string[] | undefined {
+    const found = this.regenerate(doc, index + 1, sources).statuses[index]
+      ?.targets;
+    const excluded = new Set(hidden);
+    if (!found?.some((id) => excluded.has(id))) return found;
+    const before =
+      index === 0 ? emptyState() : this.snapshots[index - 1]!.state;
+    const trial: EvalState = { ...cloneState(before), hidden: excluded };
+    try {
+      return evaluateTracked(
+        trial,
+        doc.features[index]!,
+        doc.features.slice(0, index),
+        this.held,
+        doc.namingVersion,
+      )?.targets;
+    } finally {
+      releaseSnapshots([{ state: trial }], this.snapshots);
+    }
+  }
+
   /** Access the evaluated state at the current cache tip (for measure/export). */
   stateAt(doc: CadDocument, position?: number, sources?: Sources): EvalState {
     return this.regenerate(doc, position, sources).state;

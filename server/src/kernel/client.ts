@@ -101,6 +101,11 @@ export interface KernelClient {
     doc: CadDocument,
     query: StateQuery<K>,
   ): Promise<StateAnswers[K]>;
+  visibleTargets(
+    doc: CadDocument,
+    index: number,
+    hidden: readonly string[],
+  ): Promise<string[] | undefined>;
   export(
     doc: CadDocument,
     job: ExportJob,
@@ -267,6 +272,15 @@ export class InProcessKernel implements KernelClient {
       "position" in query ? query.position : undefined,
     );
     return ANSWERS[query.kind](state, query, doc);
+  }
+
+  async visibleTargets(
+    doc: CadDocument,
+    index: number,
+    hidden: readonly string[],
+  ) {
+    const { engine, sources } = await this.sourced(doc);
+    return engine.visibleTargets(doc, index, hidden, sources);
   }
 
   async export(doc: CadDocument, job: ExportJob) {

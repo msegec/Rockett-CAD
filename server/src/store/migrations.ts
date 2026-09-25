@@ -1,4 +1,5 @@
 import {
+  compareNames,
   MANIFEST_VERSION,
   SCHEMA_VERSION,
   UNITS_LENGTH,
@@ -94,6 +95,16 @@ function imageBlob(feature: Value, context: MigrationContext): Value {
   return bytes ? { ...feature, assetId: context.put(bytes) } : feature;
 }
 
+function sortedJoinTargets(feature: Value): Value {
+  const joins =
+    feature.type === "emboss"
+      ? feature.mode === "emboss"
+      : feature.operation === "join";
+  return joins && Array.isArray(feature.targets)
+    ? { ...feature, targets: [...feature.targets].sort(compareNames) }
+    : feature;
+}
+
 export function splitView(doc: Value): { doc: Value; shown: Visibility } {
   const shown: Visibility = { bodies: {}, features: {} };
   const bodyMeta = Object.entries(
@@ -159,6 +170,13 @@ export const documentMigrations: Migrations<CadDocument> = {
         context.setting(UNITS_LENGTH.key, units);
       return doc;
     },
+    19: (doc) =>
+      doc.namingVersion === 2
+        ? {
+            ...doc,
+            features: (doc.features as Value[]).map(sortedJoinTargets),
+          }
+        : doc,
   },
 };
 

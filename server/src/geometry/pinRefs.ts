@@ -15,7 +15,7 @@ export function pinRefs(
   );
   const pinned = structuredClone(doc);
   pinned.features.forEach((feature, index) => {
-    pinTargets(feature, featureStatuses[index]!);
+    pinTargets(feature, featureStatuses[index]!.targets);
     const missing = unsignedRefs(feature);
     if (missing.length)
       signRefs(engine.stateAt(doc, index, sources).bodies, missing);

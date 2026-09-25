@@ -1,4 +1,5 @@
 import {
+  compareNames,
   LINEAR_TOL,
   topoRefPaths,
   ValidationError,
@@ -15,7 +16,7 @@ import {
 import { dropEngine, engineFor } from "./engine.js";
 import type { Sources } from "./importers.js";
 import { faces, getKernel, release, scoped, type Shape } from "./kernel.js";
-import { compareNames, computeEdgeNames, type NamedBody } from "./naming.js";
+import { computeEdgeNames, type NamedBody } from "./naming.js";
 import { pinRefs } from "./pinRefs.js";
 import { BODY_FIELDS, signatureCandidates } from "./resolve.js";
 import { signRefs } from "./signature.js";

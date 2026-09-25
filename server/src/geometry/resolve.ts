@@ -1,5 +1,6 @@
 import {
   collectTopoRefs,
+  compareNames,
   LINEAR_TOL,
   UNIT_DOT_TOL,
   type EdgeRef,
@@ -11,12 +12,7 @@ import {
   type UnresolvedRef,
 } from "@rockett/shared";
 import { faces, release, type Shape } from "./kernel.js";
-import {
-  compareNames,
-  computeEdgeNames,
-  namingVersion,
-  type NamedBody,
-} from "./naming.js";
+import { computeEdgeNames, namingVersion, type NamedBody } from "./naming.js";
 import type { EvalState, FeatureOutcome } from "./features.js";
 import { edgeSignature, faceSignature } from "./signature.js";
 

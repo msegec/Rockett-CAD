@@ -1,4 +1,9 @@
-import { LINEAR_TOL, type NamingVersion, type Vec3 } from "@rockett/shared";
+import {
+  compareNames,
+  LINEAR_TOL,
+  type NamingVersion,
+  type Vec3,
+} from "@rockett/shared";
 import {
   edgeCentroid,
   faceCentroid,
@@ -85,18 +90,6 @@ export function suffixDuplicates<T>(
     });
   }
   return named;
-}
-
-export function compareNames(a: string, b: string): number {
-  const x = a.match(/\d+|\D+/g) ?? [];
-  const y = b.match(/\d+|\D+/g) ?? [];
-  for (let i = 0; i < Math.min(x.length, y.length); i++) {
-    const [p, q] = [x[i]!, y[i]!];
-    if (p === q) continue;
-    const numeric = /^\d/.test(p) && /^\d/.test(q);
-    return (numeric && Number(p) - Number(q)) || (p < q ? -1 : 1);
-  }
-  return x.length - y.length;
 }
 
 export interface BodyPiece {

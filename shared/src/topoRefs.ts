@@ -1,4 +1,3 @@
-import type { FeatureStatus } from "./api.js";
 import type { EdgeRef, FaceRef, Feature } from "./model.js";
 import { FEATURE_SCHEMAS, MAX_TARGETS } from "./schema/features.js";
 
@@ -51,9 +50,29 @@ export function lacksTargets(feature: Feature): boolean {
   );
 }
 
-export function pinTargets(feature: Feature, { targets }: FeatureStatus) {
+export function pinTargets(feature: Feature, targets: string[] | undefined) {
   if (lacksTargets(feature) && targets && targets.length <= MAX_TARGETS)
     Object.assign(feature, { targets });
+}
+
+export function startFirst(feature: Feature) {
+  if (feature.type !== "extrude" && feature.type !== "revolve") return;
+  const start = feature.faces?.[0]?.bodyId;
+  if (feature.operation !== "join" || !start) return;
+  if (feature.targets?.includes(start))
+    feature.targets = [start, ...feature.targets.filter((id) => id !== start)];
+}
+
+export function compareNames(a: string, b: string): number {
+  const x = a.match(/\d+|\D+/g) ?? [];
+  const y = b.match(/\d+|\D+/g) ?? [];
+  for (let i = 0; i < Math.min(x.length, y.length); i++) {
+    const [p, q] = [x[i]!, y[i]!];
+    if (p === q) continue;
+    const numeric = /^\d/.test(p) && /^\d/.test(q);
+    return (numeric && Number(p) - Number(q)) || (p < q ? -1 : 1);
+  }
+  return x.length - y.length;
 }
 
 export const bodyMadeBy = (featureId: string, bodyId: string) =>

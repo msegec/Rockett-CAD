@@ -435,6 +435,7 @@ export function TargetField({ operation }: { operation: string }) {
   const namingVersion = useStore((s) => s.document?.namingVersion);
   const evaluation = useStore((s) => s.evaluation);
   const mode = useStore((s) => s.mode);
+  const hidden = useStore((s) => s.view.hidden.bodies);
   if (operation === "newBody") return null;
   const bodies = previewBodies({ mode, evaluation });
   const many = several(operation, namingVersion);
@@ -442,13 +443,18 @@ export function TargetField({ operation }: { operation: string }) {
   const set = (next: string[]) =>
     setParams({ targets: next.length > 0 ? next : undefined });
   const offered = bodies
-    .filter((b) => !many || !ids.includes(b.bodyId))
+    .filter(
+      (b) => !hidden.includes(b.bodyId) && (!many || !ids.includes(b.bodyId)),
+    )
     .map((b): [string, string] => [b.bodyId, b.name]);
   const missing = many
     ? []
     : ids
-        .filter((id) => !bodies.some((b) => b.bodyId === id))
-        .map((id): [string, string] => [id, id]);
+        .filter((id) => !offered.some(([bodyId]) => bodyId === id))
+        .map((id): [string, string] => [
+          id,
+          bodies.find((b) => b.bodyId === id)?.name ?? id,
+        ]);
   const picks = ids.map((bodyId): Selection => ({ kind: "body", bodyId }));
   const label = many ? "Targets" : "Target";
   return (

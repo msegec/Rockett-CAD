@@ -32,6 +32,10 @@ export interface Calls {
     args: [doc: CadDocument, query: StateQuery];
     result: StateAnswers[keyof StateAnswers];
   };
+  visibleTargets: {
+    args: Parameters<KernelClient["visibleTargets"]>;
+    result: string[] | undefined;
+  };
   export: {
     args: [doc: CadDocument, job: ExportJob];
     result: { data: ArrayBuffer; mime: string; ext: string };
