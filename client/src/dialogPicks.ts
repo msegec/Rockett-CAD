@@ -6,6 +6,7 @@ import {
   type DialogType,
   type Selection,
 } from "./store";
+import { featureUI } from "./features/registry";
 import { chosenTargets, several, targetOperation } from "./toolTargets";
 import { sketchRegions } from "./treeSelection";
 
@@ -70,7 +71,6 @@ const path = input("path", ["sketchEntity", "sketch"], {
 });
 const bodies = input("bodies", ["body"]);
 const edges = input("edges", ["edge"]);
-const faces = input("faces", ["face"]);
 const line = { one: true, straight: true } as const;
 const axis = input("axis", ["edge", "sketchEntity", "axis"], line);
 const planar = (key: string, one: boolean) =>
@@ -91,7 +91,7 @@ const PLANE_INPUTS: Record<PlaneMethod, readonly PickInput[]> = {
   twoEdges: [lines],
 };
 
-export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
+const DIALOG_INPUTS: Partial<Record<DialogType, readonly PickInput[]>> = {
   importStep: [],
   extrude: [profilesOrFaces, targets],
   revolve: [profilesOrFaces, axis, targets],
@@ -100,7 +100,6 @@ export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
   emboss: [profiles, targets],
   fillet: [edges],
   chamfer: [edges],
-  shell: [faces],
   combine: [bodies],
   splitBody: [input("body", ["body"], { one: true }), planar("tool", true)],
   offsetFace: [input("faces", ["face"], { planar: true })],
@@ -113,12 +112,13 @@ export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
   export: [bodies],
 };
 
+const picksOf = (dialog: DialogType): readonly PickInput[] =>
+  featureUI(dialog)?.picks ?? DIALOG_INPUTS[dialog] ?? [];
+
 const inSelection = (i: PickInput) => !i.param;
 
 export function takes(dialog: DialogType, kind: Kind): boolean {
-  return DIALOG_INPUTS[dialog].some(
-    (i) => inSelection(i) && i.kinds.includes(kind),
-  );
+  return picksOf(dialog).some((i) => inSelection(i) && i.kinds.includes(kind));
 }
 
 export function filterSelectionFor(
@@ -127,7 +127,7 @@ export function filterSelectionFor(
 ): Selection[] {
   const s = useStore.getState();
   return selection.filter((sel) =>
-    DIALOG_INPUTS[dialog].some((i) => inSelection(i) && fits(i, sel, s)),
+    picksOf(dialog).some((i) => inSelection(i) && fits(i, sel, s)),
   );
 }
 
@@ -137,7 +137,7 @@ function inputsFor(
 ): readonly PickInput[] {
   return dialog === "constructionPlane"
     ? PLANE_INPUTS[(params.method as PlaneMethod | undefined) ?? "offset"]
-    : DIALOG_INPUTS[dialog];
+    : picksOf(dialog);
 }
 
 function dialogInputs(s: Store): PickInput[] {
@@ -161,7 +161,7 @@ export function heldBy(
   selection: Selection[],
 ): Selection[] {
   return held(
-    DIALOG_INPUTS[dialog].find((i) => i.key === key),
+    picksOf(dialog).find((i) => i.key === key),
     selection,
   );
 }

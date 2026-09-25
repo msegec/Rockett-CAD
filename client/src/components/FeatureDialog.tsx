@@ -50,6 +50,8 @@ import {
   TargetField,
 } from "./form/fields";
 import { DialogFooter } from "./form/DialogFooter";
+import { featureUI } from "../features/registry";
+import "../features/shell";
 
 const OFFSET_TAKES_ONE = "Offset takes one reference; remove the extra one";
 
@@ -282,6 +284,16 @@ function DialogBody({
   let build: (() => Feature) | null = null;
   let panel: ReactElement | null = null;
 
+  const ui = featureUI(dialog);
+  if (ui) {
+    title = ui.title;
+    body = <ui.Form params={params} setParams={setParams} />;
+    build = () => {
+      const built = ui.build(params, selection);
+      if ("error" in built) throw new Error(built.error);
+      return built;
+    };
+  }
   switch (dialog) {
     case "importStep": {
       panel = <ImportPanel editId={editId} onClose={close} />;
@@ -630,33 +642,6 @@ function DialogBody({
           tangentChain: p("tangentChain", true),
         };
       };
-      break;
-    }
-    case "shell": {
-      title = "Shell";
-      body = (
-        <>
-          <SelInfo
-            label="Faces to remove"
-            input="faces"
-            hint="click faces to open"
-          />
-          <NumField
-            label="Thickness (mm)"
-            autoFocus
-            value={p("thickness", main("shell"))}
-            onChange={(v) => setParams({ thickness: v })}
-          />
-        </>
-      );
-      build = () => ({
-        id: editId ?? newId("shell"),
-        type: "shell",
-        name: p("name", ""),
-        suppressed: false,
-        openFaces: faceRefs(),
-        thickness: main("shell"),
-      });
       break;
     }
     case "combine": {

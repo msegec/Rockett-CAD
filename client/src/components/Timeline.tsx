@@ -8,6 +8,7 @@ import type {
   PlaneRef,
 } from "@rockett/shared";
 import { pickInto } from "../dialogPicks";
+import { featureUI } from "../features/registry";
 import {
   useStore,
   selectionKey,
@@ -32,7 +33,6 @@ const TYPE_ICONS: Record<string, string> = {
   loft: "◆",
   fillet: "◠",
   chamfer: "◣",
-  shell: "▢",
   combine: "∪",
   splitBody: "∤",
   offsetFace: "⇱",
@@ -44,6 +44,9 @@ const TYPE_ICONS: Record<string, string> = {
   emboss: "℘",
   move: "✥",
 };
+
+const typeIcon = (type: string) =>
+  featureUI(type)?.icon ?? TYPE_ICONS[type] ?? "•";
 
 function chipTitle(
   f: Feature,
@@ -197,7 +200,7 @@ export function Timeline() {
                   });
                 }}
               >
-                <span className="tl-icon">{TYPE_ICONS[f.type] ?? "•"}</span>
+                <span className="tl-icon">{typeIcon(f.type)}</span>
                 {renaming?.id === f.id ? (
                   <input
                     autoFocus
@@ -300,6 +303,8 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
     void s.editSketch(f.id).then(alignCameraToActiveSketch);
     return;
   }
+  const ui = featureUI(f.type);
+  if (ui) return openDialog(f, ui.prefill(f));
   const anyF = f as any;
   const selection: Selection[] = [];
   for (const p of anyF.profiles ?? []) {
@@ -319,7 +324,7 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
   for (const e of anyF.edges ?? []) {
     selection.push({ kind: "edge", bodyId: e.bodyId, edgeName: e.edgeName });
   }
-  for (const fa of anyF.faces ?? anyF.openFaces ?? []) {
+  for (const fa of anyF.faces ?? []) {
     selection.push({ kind: "face", bodyId: fa.bodyId, faceName: fa.faceName });
   }
   if (anyF.targetBody)
@@ -386,9 +391,6 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
         distance: anyF.distance,
         tangentChain: anyF.tangentChain ?? false,
       });
-      break;
-    case "shell":
-      Object.assign(params, { thickness: anyF.thickness });
       break;
     case "combine":
       Object.assign(params, {
@@ -471,11 +473,19 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
     default:
       break;
   }
+  openDialog(f, { params, selection });
+}
+
+function openDialog(
+  f: Feature,
+  open: { params: Record<string, any>; selection: Selection[] },
+) {
+  const s = useStore.getState();
   s.setMode({
     name: "dialog",
     dialog: (f.type === "importMesh" ? "importStep" : f.type) as DialogType,
     editFeatureId: f.id,
   });
-  s.setDialogParams(params);
-  s.setSelection(selection);
+  s.setDialogParams(open.params);
+  s.setSelection(open.selection);
 }
