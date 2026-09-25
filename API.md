@@ -82,7 +82,7 @@ gives each readable project's `revision`.
 
 The document edits, listed in `DOCUMENT_EDITS` in `shared/src/routes.ts`, are
 rename, `PUT /document`, import into a project, the feature, timeline,
-body and group routes, undo, redo and the naming upgrade commit. Each needs `If-Match: "<revision>"` with the revision
+body and group routes, undo, redo, history restore and the naming upgrade commit. Each needs `If-Match: "<revision>"` with the revision
 the caller last received. Inside the project queue the server compares it
 with the stored document:
 
@@ -126,6 +126,25 @@ A snapshot saved by an older schema is migrated before it is restored.
 Every mutation response carries `history`, `{ canUndo, canRedo, undoLabel,
 redoLabel }` (`HistoryStatus`), where each label is the entry undo or redo
 would reverse or restore, or `null`.
+
+`GET /projects/:id/history` lists the history as `HistoryList`:
+`{ entries, position, checkpoints }`, where `entries` holds the last 50
+entries oldest first, each `{ label, at, snapshot }`, `position` counts the
+entries before the current state, and `checkpoints` lists every checkpoint
+the same way. `POST /projects/:id/checkpoints` with `{ label }` (1 to 200
+characters) names the snapshot at the current state and answers
+`{ checkpoint }`. It edits no document and takes no `If-Match`; a project
+with no history yet gives 400. A checkpoint keeps its snapshot through any
+number of later edits. STEP sources and reference images are kept in the
+project's blob store by sha256 and never deleted, so a checkpoint's sources
+stay available after their features are deleted.
+
+`POST /projects/:id/history/restore` with `{ snapshot, held? }` and
+`If-Match` saves the snapshot of a listed checkpoint or entry as the next
+revision and records it as one entry labelled `Restore <label>`, taking the
+checkpoint's label when both hold the snapshot. Undo reverses it like any
+other edit. The project keeps its current name, and any other snapshot is
+404 `not_found`.
 
 ## Projects
 
@@ -256,6 +275,9 @@ the document, and uploads that take the document beyond 40 MB are rejected.
 | `POST /projects/:id/timeline`        | `{ position }`          | Move the rollback marker                                                     |
 | `POST /projects/:id/undo`            | `{ held? }`             | Restore the snapshot before the latest entry; see History                    |
 | `POST /projects/:id/redo`            | `{ held? }`             | Restore the snapshot of the next undone entry; see History                   |
+| `GET /projects/:id/history`          | none                    | `HistoryList`: entries, position and checkpoints; see History                |
+| `POST /projects/:id/checkpoints`     | `{ label }`             | Name the current state; returns `{ checkpoint }`; see History                |
+| `POST /projects/:id/history/restore` | `{ snapshot, held? }`   | Restore a listed checkpoint or entry as a new, undoable entry                |
 | `PUT /projects/:id/bodies/:bodyId`   | `{ name? }`             | Rename a body; any other field is 400                                        |
 | `PUT /projects/:id/groups`           | `{ groups }`            | Replace the model tree groups; never changes evaluation                      |
 

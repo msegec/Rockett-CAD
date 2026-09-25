@@ -9,7 +9,9 @@ import {
   historyRecord,
   parse,
   type CadDocument,
+  type HistoryList,
   type HistoryLog,
+  type HistoryMark,
   type HistoryRecord,
   type HistoryStatus,
 } from "@rockett/shared";
@@ -225,9 +227,32 @@ export class HistoryStore {
         "conflict",
       );
     const hash = state.entries[cursor - 1]?.snapshot ?? state.base;
+    return { document: await this.restored(current, hash), cursor };
+  }
+
+  async restore(
+    current: CadDocument,
+    hash: string,
+  ): Promise<{ document: CadDocument; label: string }> {
+    const state = await this.read(current.id);
+    const mark = [
+      ...(state?.checkpoints ?? []),
+      ...(state?.entries ?? []),
+    ].find((m) => m.snapshot === hash);
+    if (!mark) throw new StoreError(`snapshot ${hash} not found`, "not_found");
+    return {
+      document: await this.restored(current, hash),
+      label: `Restore ${mark.label}`,
+    };
+  }
+
+  private async restored(
+    current: CadDocument,
+    hash: string,
+  ): Promise<CadDocument> {
     const stored = await this.snapshot(current.id, hash);
     const document = migrate<CadDocument>(documentMigrations, stored);
-    return { document: { ...document, name: current.name }, cursor };
+    return { ...document, name: current.name };
   }
 
   move(doc: CadDocument, cursor: number): Promise<void> {
@@ -267,23 +292,37 @@ export class HistoryStore {
         );
   }
 
-  checkpoint(id: string, label: string): Promise<void> {
+  checkpoint(id: string, label: string): Promise<HistoryMark> {
     return this.store.exclusive(id, async () => {
       const opened = await this.open(id, () => this.revision(id));
-      if (!opened)
+      if (!opened) {
+        await this.revision(id);
         throw new StoreError(`project ${id} has no history to checkpoint`);
+      }
       const { base, entries, position } = replay(opened.heads);
-      const snapshot = entries[position - 1]?.snapshot ?? base;
-      const at = new Date().toISOString();
-      await this.append(id, opened, [
-        frame({
-          kind: "checkpoint",
-          label: label.slice(0, LABEL_LIMIT),
-          at,
-          snapshot,
-        }),
-      ]);
+      const mark = {
+        label: label.slice(0, LABEL_LIMIT),
+        at: new Date().toISOString(),
+        snapshot: entries[position - 1]?.snapshot ?? base,
+      };
+      await this.append(id, opened, [frame({ kind: "checkpoint", ...mark })]);
+      return mark;
     });
+  }
+
+  async list(id: string): Promise<HistoryList> {
+    await this.revision(id);
+    const {
+      entries = [],
+      position = 0,
+      checkpoints = [],
+    } = (await this.read(id)) ?? {};
+    const marks = entries.map(({ label, at, snapshot }) => ({
+      label,
+      at,
+      snapshot,
+    }));
+    return { entries: marks, position, checkpoints };
   }
 
   read(id: string): Promise<History | undefined> {

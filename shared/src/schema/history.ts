@@ -8,9 +8,9 @@ export const TX_ID = /^[\w-]{1,64}$/;
 
 const txId = Type.String({ pattern: TX_ID.source });
 
-const snapshot = Type.String({ pattern: "^[0-9a-f]{64}$" });
+export const snapshotHash = Type.String({ pattern: "^[0-9a-f]{64}$" });
 const label = Type.String({ minLength: 1, maxLength: LABEL_LIMIT });
-const markFields = { label, at: Type.String(), snapshot };
+const markFields = { label, at: Type.String(), snapshot: snapshotHash };
 const mark = Type.Object(markFields);
 const entryFields = {
   ...markFields,
@@ -21,7 +21,7 @@ const entry = Type.Object(entryFields);
 
 export const historyLog = Type.Object({
   version: Type.Literal(1),
-  base: snapshot,
+  base: snapshotHash,
   entries: Type.Array(entry, { maxItems: HISTORY_LIMIT }),
   position: Type.Integer({ minimum: 0 }),
   checkpoints: Type.Array(mark),
@@ -33,9 +33,9 @@ export const historyRecord = Type.Union([
   Type.Object({
     kind: Type.Literal("base"),
     version: Type.Integer({ minimum: 1 }),
-    snapshot,
+    snapshot: snapshotHash,
   }),
-  Type.Object({ kind: Type.Literal("snapshot"), snapshot }),
+  Type.Object({ kind: Type.Literal("snapshot"), snapshot: snapshotHash }),
   Type.Object({ kind: Type.Literal("checkpoint"), ...markFields }),
   Type.Object({ kind: Type.Literal("entry"), ...entryFields }),
   Type.Object({

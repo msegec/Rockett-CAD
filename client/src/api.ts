@@ -334,6 +334,8 @@ export const api = {
     holding(ROUTES.undo, { id }, {}, position),
   redo: (id: string, position?: number) =>
     holding(ROUTES.redo, { id }, {}, position),
+  restoreHistory: (id: string, snapshot: string) =>
+    holding(ROUTES.restoreHistory, { id }, { snapshot }),
   replaceDocument: (id: string, document: CadDocument, position?: number) =>
     holding(ROUTES.replaceDocument, { id }, { document }, position),
   updateBody: (id: string, bodyId: string, patch: { name: string }) =>

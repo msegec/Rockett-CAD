@@ -13,6 +13,8 @@ import type {
   FolderTree,
   Formats,
   HeldMeshes,
+  HistoryList,
+  HistoryMark,
   HistoryStatus,
   MeasureRequest,
   MeasureResult,
@@ -26,6 +28,7 @@ import type {
 } from "./api.js";
 import { VIEW_VERSION } from "./api.js";
 import { edgeRef, faceRef, groupsSchema } from "./schema/features.js";
+import { LABEL_LIMIT, snapshotHash } from "./schema/history.js";
 import {
   createFolderBody,
   folderId,
@@ -257,6 +260,28 @@ export const ROUTES = {
   ),
   undo: route<HeldMeshes, WireMutationResponse>()("POST", "/projects/:id/undo"),
   redo: route<HeldMeshes, WireMutationResponse>()("POST", "/projects/:id/redo"),
+  history: route<never, HistoryList>()("GET", "/projects/:id/history"),
+  createCheckpoint: route<{ label: string }, { checkpoint: HistoryMark }>()(
+    "POST",
+    "/projects/:id/checkpoints",
+    Type.Object({
+      label: Type.String({ minLength: 1, maxLength: LABEL_LIMIT }),
+    }),
+  ),
+  restoreHistory: route<
+    { snapshot: string } & HeldMeshes,
+    WireMutationResponse
+  >()(
+    "POST",
+    "/projects/:id/history/restore",
+    Type.Object(
+      {
+        snapshot: snapshotHash,
+        held: Type.Optional(Type.Array(Type.String())),
+      },
+      { additionalProperties: false },
+    ),
+  ),
   updateBody: route<{ name?: string } & HeldMeshes, WireMutationResponse>()(
     "PUT",
     "/projects/:id/bodies/:bodyId",
@@ -330,6 +355,7 @@ export const DOCUMENT_EDITS: ReadonlySet<Route> = new Set<Route>([
   ROUTES.setTimeline,
   ROUTES.undo,
   ROUTES.redo,
+  ROUTES.restoreHistory,
   ROUTES.updateBody,
   ROUTES.updateGroups,
   ROUTES.commitNamingUpgrade,

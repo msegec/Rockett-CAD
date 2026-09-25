@@ -304,6 +304,18 @@ export interface HistoryStatus {
   redoLabel: string | null;
 }
 
+export interface HistoryMark {
+  label: string;
+  at: string;
+  snapshot: string;
+}
+
+export interface HistoryList {
+  entries: HistoryMark[];
+  position: number;
+  checkpoints: HistoryMark[];
+}
+
 export interface ProjectResponse {
   document: CadDocument;
 }

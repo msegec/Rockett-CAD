@@ -554,6 +554,27 @@ export function createApiRouter(
   on(ROUTES.redo, moveCursor(1));
 
   on(
+    ROUTES.history,
+    wrap(async (req, res) => res.json(await history.list(req.params.id))),
+  );
+  on(
+    ROUTES.createCheckpoint,
+    wrap(async (req, res) =>
+      res.json({
+        checkpoint: await history.checkpoint(req.params.id, req.body.label),
+      }),
+    ),
+  );
+  on(
+    ROUTES.restoreHistory,
+    mutateProject(async (current, req) => {
+      const restored = await history.restore(current, req.body.snapshot);
+      validateDocument(restored.document);
+      return restored;
+    }),
+  );
+
+  on(
     ROUTES.tangentEdges,
     wrap(async (req, res) => {
       const doc = await store.load(req.params.id);
