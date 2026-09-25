@@ -357,7 +357,9 @@ resolve, naming the reference and its status. `format` is required and must
 be a registered exporter's `format`; any other is 400 with detail `/format`,
 naming the supported formats. The file name ends in that exporter's `ext`.
 `stl` is always binary. `quality` is the tessellation tolerance in mm: a
-number, default 0.05, clamped to 0.001 to 1.
+number, default 0.05, clamped to 0.001 to 1. `step` writes each body as an
+exact B-Rep solid named after the body, in millimetres, through
+`writeXdeStep` in `server/src/geometry/xde.ts`, and ignores `quality`.
 
 Each exporter has a `source`. A `bodies` exporter writes bodies as above. A
 `sketch` exporter writes the solved entities of the sketch named by
@@ -373,7 +375,7 @@ and answers 400.
 read from the exporter registry on each request, importers from `IMPORTERS`
 in `server/src/geometry/importers.ts`. An exporter is `{ format, label, ext, mime, source }`
 and an importer `{ format, label, extensions }`. Core registers the `stl`,
-`3mf` and `dxf` exporters through `registerExporter` in
+`3mf`, `step` and `dxf` exporters through `registerExporter` in
 `server/src/geometry/exporters.ts`, which returns a disposer; the export
 panel lists the `bodies` exporters it returns.
 

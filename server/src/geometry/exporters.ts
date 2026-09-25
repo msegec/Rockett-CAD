@@ -20,6 +20,7 @@ import {
 import { writeDxf } from "./dxf.js";
 import { meshCopy } from "./mesh.js";
 import type { NamedBody } from "./naming.js";
+import { writeXdeStep } from "./xde.js";
 
 export const EXPORT_QUALITY = 0.05;
 
@@ -196,6 +197,10 @@ export const exporters = createRegistry<Exporter>(
 
 export const registerExporter = exporters.register;
 
+function bodyName(doc: CadDocument, body: NamedBody): string {
+  return doc.bodyMeta[body.bodyId]?.name ?? body.bodyId;
+}
+
 export function exporterFor(format: string): Exporter {
   const exporter = exporters.get(format);
   if (exporter) return exporter;
@@ -223,11 +228,20 @@ registerExporter({
   source: "bodies",
   write: ({ doc, bodies, options }) =>
     write3mf(
-      bodies.map((body) => ({
-        body,
-        name: doc.bodyMeta[body.bodyId]?.name ?? body.bodyId,
-      })),
+      bodies.map((body) => ({ body, name: bodyName(doc, body) })),
       options.quality,
+    ),
+});
+
+registerExporter({
+  format: "step",
+  label: "STEP AP214 (named solids)",
+  ext: "step",
+  mime: "model/step",
+  source: "bodies",
+  write: ({ doc, bodies }) =>
+    writeXdeStep(
+      bodies.map((body) => ({ shape: body.shape, name: bodyName(doc, body) })),
     ),
 });
 
