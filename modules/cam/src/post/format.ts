@@ -112,6 +112,10 @@ class Writer {
     if (inner) this.push(`${this.comments.open}${inner}${this.comments.close}`);
   }
 
+  hasTemplate(name: TemplateName) {
+    return this.templates[name].length > 0;
+  }
+
   emit(name: TemplateName, vars: Vars = {}, forced: string[] = []) {
     const lines = this.templates[name];
     if (!lines.length && !MAY_BE_EMPTY.has(name))
@@ -194,8 +198,12 @@ function writeMove(out: Writer, move: Move, at: Xyz | undefined) {
   if (move.kind === "cycle") {
     const { clear, top, bottom, feed, dwell } = move;
     const peck = move.cycle === "peck" ? move.peck : undefined;
+    const name =
+      move.cycle === "drill" && dwell && out.hasTemplate("drillDwell")
+        ? "drillDwell"
+        : move.cycle;
     for (const [x, y] of move.points)
-      out.emit(move.cycle, { x, y, clear, top, bottom, feed, dwell, peck });
+      out.emit(name, { x, y, clear, top, bottom, feed, dwell, peck });
     out.emit("cycleEnd");
   }
   out.modal.clear();
@@ -227,8 +235,10 @@ export function formatProgram(
       if (section.toolId !== tool) {
         const found = program.tools.find((t) => t.id === section.toolId);
         if (!found) throw new Error(`tool ${section.toolId} is unknown`);
-        out.emit("toolChange", { tool: found.number });
-        out.emit("toolLength", { tool: found.number });
+        if (program.toolChange) {
+          out.emit("toolChange", { tool: found.number });
+          out.emit("toolLength", { tool: found.number });
+        }
         out.modal.clear();
         tool = section.toolId;
       }

@@ -18,12 +18,13 @@ import type { Post } from "./schema.js";
 
 export type Units = "mm" | "inch";
 
-type Target = Pick<Post, "id" | "capabilities">;
+type Target = Pick<Post, "id" | "capabilities" | "toolChangeDefault">;
 
-export type NormaliseOptions = { units: Units };
+export type NormaliseOptions = { units: Units; toolChange?: boolean };
 
 export type NormalisedProgram = {
   postId: string;
+  toolChange: boolean;
   units: Units;
   setupId: string;
   offsetIndex: number;
@@ -184,6 +185,12 @@ export function normalise(
 ): NormalisedProgram {
   const problems = validateProgram(program);
   if (problems.length) throw new Error(problems.join("\n"));
+  const toolChange =
+    options.toolChange ??
+    post.toolChangeDefault ??
+    post.capabilities.toolChange;
+  if (toolChange && !post.capabilities.toolChange)
+    throw new Error(`post ${post.id} does not support tool changes`);
   const divisor = options.units === "inch" ? MM_PER_INCH : 1;
   let at: Xyz | undefined;
   const sections = program.sections.map((section, s) => ({
@@ -196,10 +203,11 @@ export function normalise(
   }));
   return {
     postId: post.id,
+    toolChange,
     units: options.units,
     setupId: program.setupId,
     offsetIndex: program.offsetIndex,
     tools: program.tools,
-    files: post.capabilities.toolChange ? [sections] : byTool(sections),
+    files: toolChange ? [sections] : byTool(sections),
   };
 }

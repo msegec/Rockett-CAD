@@ -72,6 +72,7 @@ const fake: Post = {
     arcCw: ["{plane} G2 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed}"],
     arcCcw: ["{plane} G3 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed}"],
     drill: ["G81 X{x} Y{y} Z{bottom} R{clear} F{feed}"],
+    drillDwell: [],
     peck: ["G83 X{x} Y{y} Z{bottom} R{clear} Q{peck} F{feed}"],
     cycleEnd: ["G80"],
     dwell: ["G4 P{seconds}"],

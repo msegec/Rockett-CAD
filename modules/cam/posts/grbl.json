@@ -72,6 +72,7 @@
     "arcCw": ["{plane} G2 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed}"],
     "arcCcw": ["{plane} G3 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed}"],
     "drill": [],
+    "drillDwell": [],
     "peck": [],
     "cycleEnd": [],
     "dwell": ["G4 P{seconds}"],

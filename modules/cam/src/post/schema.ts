@@ -31,6 +31,7 @@ const TEMPLATES = {
   arcCw: { needs: [...AXES, "i", "j", "k", "feed", "plane"], unless: "arcs" },
   arcCcw: { needs: [...AXES, "i", "j", "k", "feed", "plane"], unless: "arcs" },
   drill: { needs: [], may: CYCLE, unless: "cycles" },
+  drillDwell: { needs: [], may: CYCLE, unless: "always" },
   peck: { needs: [], may: [...CYCLE, "peck"], unless: "cycles" },
   cycleEnd: { needs: [], unless: "cycles" },
   dwell: { needs: ["seconds"] },
@@ -45,6 +46,7 @@ export type Post = {
   label: string;
   extension: string;
   capabilities: Capabilities;
+  toolChangeDefault?: boolean;
   words: string[];
   formats: Record<string, NumberFormat>;
   modal: (string | string[])[];
@@ -71,6 +73,7 @@ const KEYS = [
   "label",
   "extension",
   "capabilities",
+  "toolChangeDefault",
   "words",
   "formats",
   "modal",
@@ -122,6 +125,11 @@ function scalars(post: Json): string[] {
     if (typeof post[key] !== "string" || !pattern.test(post[key]))
       problems.push(`${key}: must match ${pattern.source}`);
   const caps = post.capabilities;
+  if (
+    post.toolChangeDefault !== undefined &&
+    typeof post.toolChangeDefault !== "boolean"
+  )
+    problems.push("toolChangeDefault: must be a boolean");
   if (!isRecord(caps)) return [...problems, "capabilities: must be an object"];
   problems.push(
     ...unknownKeys(caps, ["arcs", "cycles", "toolChange"], "capabilities."),
