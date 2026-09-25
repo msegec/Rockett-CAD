@@ -9,9 +9,7 @@
  * server/src/store/migrations.ts whenever the shape of this model changes.
  */
 
-import type { Units } from "./units.js";
-
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 export type NamingVersion = 1 | 2;
 
@@ -478,7 +476,6 @@ export interface CadDocument {
   savedWith: { version: string; commit: string | null } | null;
   id: string;
   name: string;
-  units: Units;
   createdAt: string;
   modifiedAt: string;
   features: Feature[];
@@ -557,7 +554,6 @@ export function createEmptyDocument(id: string, name: string): CadDocument {
     savedWith: null,
     id,
     name,
-    units: "mm",
     createdAt: now,
     modifiedAt: now,
     features: [],

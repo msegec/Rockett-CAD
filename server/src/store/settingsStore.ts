@@ -106,6 +106,12 @@ export class SettingsStore {
     });
   }
 
+  async staged(id: string, set: LayerValues): Promise<[string, string]> {
+    const { store, key } = this.locate({ scope: "project", id });
+    const values = { ...(await this.read({ scope: "project", id })), ...set };
+    return store.encode(key, { version: SETTINGS_VERSION, values });
+  }
+
   duplicateProject(from: string, to: string): Promise<void> {
     const source = this.locate({ scope: "project", id: from });
     const target = this.locate({ scope: "project", id: to });

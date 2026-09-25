@@ -1,6 +1,7 @@
 import {
   MANIFEST_VERSION,
   SCHEMA_VERSION,
+  UNITS_LENGTH,
   type CadDocument,
   type ProjectManifest,
   type Visibility,
@@ -12,6 +13,7 @@ export interface MigrationContext {
   put(bytes: Uint8Array): string;
   asset(name: string): Uint8Array | undefined;
   show(visibility: Visibility): void;
+  setting(key: string, value: unknown): void;
 }
 
 export interface Migrations<T> {
@@ -31,6 +33,7 @@ export const NO_BLOBS: MigrationContext = {
   show() {
     throw new Error("this migration needs a view store");
   },
+  setting() {},
 };
 
 export class MissingStepError extends Error {
@@ -151,6 +154,11 @@ export const documentMigrations: Migrations<CadDocument> = {
     15: (doc) => doc,
     16: (doc) => doc,
     17: (doc) => doc,
+    18: ({ units, ...doc }, context) => {
+      if (units !== undefined && units !== "mm")
+        context.setting(UNITS_LENGTH.key, units);
+      return doc;
+    },
   },
 };
 

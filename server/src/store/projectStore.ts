@@ -128,6 +128,8 @@ export class ProjectStore {
             out.set(
               ...this.views.encode(id, withShown(emptyView(), pending.shown)),
             );
+          if (Object.keys(pending.settings).length)
+            out.set(...(await this.settings.staged(id, pending.settings)));
           if (await this.manifests.missing(id))
             out.set(...this.manifests.created(id));
           return out;

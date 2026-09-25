@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Feature, PlaneRef, TreeGroup } from "@rockett/shared";
-import { ORIGIN_AXES } from "@rockett/shared";
+import { ORIGIN_AXES, UNITS_LENGTH } from "@rockett/shared";
 import { pickInto } from "../dialogPicks";
 import { useStore, selectionKey, type Selection } from "../store";
 import {
@@ -521,7 +521,7 @@ export const ModelTree = memo(function ModelTree() {
   return (
     <div className="model-tree">
       <div className="tree-doc">{document_.name}</div>
-      <div className="tree-sub">Units: {document_.units}</div>
+      <div className="tree-sub">Units: {UNITS_LENGTH.default}</div>
 
       {section(
         "origin",

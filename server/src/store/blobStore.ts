@@ -10,6 +10,7 @@ export class PendingBlobs {
   readonly blobs = new Map<string, Buffer>();
   readonly used = new Set<string>();
   shown: Visibility = { bodies: {}, features: {} };
+  readonly settings: Record<string, unknown> = {};
 
   constructor(readonly assets: ReadonlyMap<string, Buffer> = new Map()) {
     for (const bytes of assets.values()) this.put(bytes);
@@ -29,6 +30,10 @@ export class PendingBlobs {
 
   show(visibility: Visibility): void {
     this.shown = visibility;
+  }
+
+  setting(key: string, value: unknown): void {
+    this.settings[key] = value;
   }
 }
 

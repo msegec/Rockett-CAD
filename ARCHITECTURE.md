@@ -95,9 +95,10 @@ run through the kernel. The engine caches per-feature snapshots and
 tessellations so an edit to feature _k_ re-evaluates only features _k..end_
 (see CAD_MODEL.md, "Regeneration").
 
-**Units.** All geometry is internally millimetres. `Units` on the document is
-display metadata. `shared/src/units.ts` owns the conversions (`toMm`,
-`fromMm`) and length and angle formatting; they never mutate stored geometry.
+**Units.** All geometry is internally millimetres. The `units.length`
+setting in `shared/src/settings.ts` is the only owner of the display unit.
+`shared/src/units.ts` owns the conversions (`toMm`, `fromMm`) and length and
+angle formatting; they never mutate stored geometry.
 `LengthField` shows a length in its `units` prop and reports millimetres.
 Every dialog passes `mm` today.
 

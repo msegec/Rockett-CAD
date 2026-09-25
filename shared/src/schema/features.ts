@@ -1,7 +1,7 @@
 import { Type, type TProperties, type TSchema } from "typebox";
 import { ORIGIN_AXES, REF_SIGNATURE_TYPES, SCHEMA_VERSION } from "../model.js";
 import { LINEAR_TOL } from "../tolerance.js";
-import { MB, UNIT_TO_MM, type Units } from "../units.js";
+import { MB } from "../units.js";
 
 export const MAX_DIM = 100_000;
 export const MAX_IMPORT_BYTES = 10 * MB;
@@ -424,7 +424,6 @@ export const documentSchema = Type.Refine(
     ]),
     id,
     name: text,
-    units: Type.Enum(Object.keys(UNIT_TO_MM) as Units[]),
     createdAt: text,
     modifiedAt: text,
     features: Type.Array(Type.Unknown()),

@@ -779,6 +779,18 @@ changes fails and needs its points picked again. The 17 to 18 migration
 changes nothing but the version, and the project is backed up before its first
 save.
 
+## Display units (schema 19)
+
+The document no longer carries `units`. The `units.length` setting owns the
+display unit, resolved from its default `mm` through the app, user and
+project layers. The 18 to 19 migration drops the field. A value other than
+`mm` moves to the project layer, `projects/{id}/settings.json`, keeping the
+layer's other keys. The settings file and the document commit as one
+generation through the migration backup path, so a crash leaves both old or
+both new, and the `v18-{hash}` backup holds the complete old project.
+Restoring a history checkpoint from before schema 19 drops the field, since
+the project layer already holds its value.
+
 ## Tangent edge chains
 
 Fillet/Chamfer store optional tangentChain metadata (absent preserves prior

@@ -1,5 +1,6 @@
-import type { Static, TSchema } from "typebox";
+import { Type, type Static, type TSchema } from "typebox";
 import { parse, ValidationError } from "./schema/index.js";
+import { UNIT_TO_MM, type Units } from "./units.js";
 
 export type SettingScope = "app" | "user" | "project";
 export type SettingSection = SettingScope | `plugin:${string}`;
@@ -19,7 +20,9 @@ export interface SettingDefinition<
   readonly schema: S;
 }
 
-export interface SettingTypes {}
+export interface SettingTypes {
+  "units.length": Units;
+}
 
 export type SettingOf<D extends SettingDefinition> = Static<D["schema"]>;
 
@@ -167,3 +170,14 @@ export function resolveSettings(layers: SettingLayers): ResolvedSettings {
   }
   return resolved;
 }
+
+export const UNITS_LENGTH = defineSetting({
+  key: "units.length",
+  label: "Length units",
+  scopes: ["app", "user", "project"],
+  section: "user",
+  default: "mm",
+  schema: Type.Enum(Object.keys(UNIT_TO_MM) as Units[]),
+});
+
+registerSettings([UNITS_LENGTH]);
