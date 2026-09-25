@@ -13,6 +13,7 @@ import {
   type Feature,
   type FeatureRef,
   type PlaneRef,
+  type PointRef,
   type ProfileRef,
   type ShellFeature,
 } from "../src/index.js";
@@ -502,6 +503,81 @@ const cases: Record<string, SpecCase> = {
         },
         "count must be <= 500",
         "/count",
+      ],
+    ],
+  },
+  constructionPlane: {
+    producesGeometry: false,
+    valid: [
+      ...planes.map((base) => ({
+        kind: "offset" as const,
+        base,
+        distance: 5,
+        flip: true,
+      })),
+      {
+        kind: "midplane" as const,
+        a: planes[1]!,
+        b: planes[2]!,
+        offset: 2,
+        flip: false,
+      },
+      ...axes.map((axis) => ({
+        kind: "angle" as const,
+        axis,
+        base: planes[1]!,
+        angle: 30,
+      })),
+      {
+        kind: "threePoints" as const,
+        points: [
+          { kind: "vertex", bodyId: "ref:body", vertexName: "ref:V1" },
+          { kind: "sketchPoint", sketchId: "ref:sketch", entityId: "ref:p1" },
+          { kind: "vertex", bodyId: "ref:body", vertexName: "ref:V2" },
+        ] as [PointRef, PointRef, PointRef],
+      },
+      { kind: "twoEdges" as const, a: axes[2]!, b: axes[1]! },
+    ].map((method) => ({ ...meta, type: "constructionPlane", method })),
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "constructionPlane",
+          method: { kind: "offset", base: planes[0]!, distance: 1e12 },
+        },
+        "method.distance must be <= 100000",
+        "/method/distance",
+      ],
+    ],
+  },
+  referenceImage: {
+    producesGeometry: false,
+    valid: planes.map((plane) => ({
+      ...meta,
+      type: "referenceImage",
+      plane,
+      assetId: "a".repeat(64),
+      fileName: "photo.png",
+      transform: { u: 1, v: 2, rotation: 15, scale: 0.1 },
+      opacity: 0.5,
+      width: 640,
+      height: 480,
+    })),
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "referenceImage",
+          plane: planes[0]!,
+          assetId: "a".repeat(64),
+          fileName: "photo.png",
+          transform: { u: 0, v: 0, rotation: 0, scale: 1 },
+          opacity: 1e12,
+          width: 640,
+          height: 480,
+        },
+        "opacity must be <= 1",
+        "/opacity",
       ],
     ],
   },

@@ -26,6 +26,8 @@ import "./features/move.js";
 import "./features/mirror.js";
 import "./features/linearPattern.js";
 import "./features/circularPattern.js";
+import "./features/constructionPlane.js";
+import "./features/referenceImage.js";
 export * from "./placement.js";
 export * from "./projection.js";
 export * from "./sketchModify.js";

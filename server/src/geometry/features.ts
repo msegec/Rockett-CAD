@@ -27,6 +27,7 @@ import {
   type LoftFeature,
   type MirrorFeature,
   type MoveFeature,
+  type ReferenceImageFeature,
   type CircularPatternFeature,
   type OffsetFaceFeature,
   type PlaneFrame,
@@ -2272,7 +2273,7 @@ function constructionFrame(
   }
 }
 
-function evalConstructionPlane(
+export function evalConstructionPlane(
   state: EvalState,
   f: ConstructionPlaneFeature,
 ): void {
@@ -2291,6 +2292,14 @@ function evalConstructionPlane(
     );
   }
   state.planes.set(f.id, { frame, size });
+}
+
+export function evalReferenceImage(
+  state: EvalState,
+  f: ReferenceImageFeature,
+): void {
+  const frame = resolvePlaneFrame(state, f.plane);
+  state.planes.set(f.id, { frame, size: 0 });
 }
 
 export function evalEmboss(state: EvalState, f: EmbossFeature) {
@@ -2346,15 +2355,6 @@ export function evaluateFeature(
     }
     case "sketch":
       return evalSketch(state, feature);
-    case "constructionPlane":
-      return evalConstructionPlane(state, feature);
-    case "referenceImage": {
-      // No solid geometry — resolve the frame so the client can render the
-      // image quad on the right plane.
-      const frame = resolvePlaneFrame(state, feature.plane);
-      state.planes.set(feature.id, { frame, size: 0 });
-      return;
-    }
     default:
       throw new Error(`unknown feature type ${feature.type}`);
   }

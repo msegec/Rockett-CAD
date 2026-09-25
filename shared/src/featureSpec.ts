@@ -7,6 +7,7 @@ import {
   type Feature,
   type FeatureType,
   type PlaneRef,
+  type PointRef,
   type ProfileRef,
 } from "./model.js";
 import { createRegistry } from "./registry.js";
@@ -19,6 +20,7 @@ interface RefTargets {
   profile: ProfileRef;
   axis: AxisRef;
   plane: PlaneRef;
+  point: PointRef;
   body: string;
   sketch: string;
 }
@@ -70,12 +72,13 @@ export const refsAt = <K extends RefKind>(
 export function registerCoreSpec<T extends FeatureType>(
   type: T,
   refs: (f: Extract<Feature, { type: T }>) => FeatureRef[],
+  { producesGeometry = true } = {},
 ): () => void {
   const schema = FEATURE_SCHEMAS[type];
   const spec: FeatureSpec<Extract<Feature, { type: T }>> = {
     type,
     label: FEATURE_LABELS[type],
-    producesGeometry: true,
+    producesGeometry,
     version: 1,
     paramsSchema: schema,
     validate: (f) => void parse(schema, f),
