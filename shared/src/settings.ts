@@ -130,3 +130,40 @@ export function validateSettingValue(
     };
   return valueError(definition, value);
 }
+
+export type SettingLayers = Partial<
+  Record<SettingScope, Readonly<Record<string, unknown>>>
+>;
+
+export interface ResolvedSetting {
+  value: unknown;
+  source: SettingScope | "default";
+}
+
+export interface ResolvedSettings {
+  values: Record<string, ResolvedSetting>;
+  errors: (SettingError & { scope: SettingScope })[];
+}
+
+const PRECEDENCE: readonly SettingScope[] = ["app", "user", "project"];
+
+export function resolveSettings(layers: SettingLayers): ResolvedSettings {
+  const resolved: ResolvedSettings = { values: {}, errors: [] };
+  for (const definition of registry.values()) {
+    const { key } = definition;
+    let setting: ResolvedSetting = {
+      value: definition.default,
+      source: "default",
+    };
+    for (const scope of PRECEDENCE) {
+      const layer = layers[scope];
+      if (!layer || !definition.scopes.includes(scope)) continue;
+      if (!Object.hasOwn(layer, key)) continue;
+      const invalid = valueError(definition, layer[key]);
+      if (invalid) resolved.errors.push({ ...invalid, scope });
+      else setting = { value: layer[key], source: scope };
+    }
+    resolved.values[key] = setting;
+  }
+  return resolved;
+}
