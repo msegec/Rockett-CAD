@@ -253,8 +253,26 @@ export interface MeasureResult {
   }>;
 }
 
+export interface ExportFormat {
+  format: string;
+  label: string;
+  ext: string;
+  mime: string;
+}
+
+export interface ImportFormat {
+  format: string;
+  label: string;
+  extensions: string[];
+}
+
+export interface Formats {
+  exporters: ExportFormat[];
+  importers: ImportFormat[];
+}
+
 export interface ExportRequest {
-  format: "stl" | "3mf";
+  format: string;
   bodyIds: string[]; // empty = all visible bodies
   /** Linear tessellation tolerance in mm (default 0.05). */
   quality?: number;

@@ -251,6 +251,7 @@ function fileForm(name: string, file: File): FormData {
 
 export const api = {
   health: () => (health ??= send(ROUTES.health, {})),
+  formats: () => send(ROUTES.formats, {}),
   importStep: (file: File, projectId?: string, signal?: AbortSignal) => {
     const options = { body: fileForm("file", file), signal };
     return projectId

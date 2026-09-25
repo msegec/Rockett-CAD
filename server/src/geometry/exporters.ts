@@ -9,7 +9,13 @@
  */
 
 import { zipSync, strToU8 } from "fflate";
-import { LINEAR_TOL } from "@rockett/shared";
+import {
+  createRegistry,
+  LINEAR_TOL,
+  ValidationError,
+  type CadDocument,
+  type ExportFormat,
+} from "@rockett/shared";
 import { meshCopy } from "./mesh.js";
 import type { NamedBody } from "./naming.js";
 
@@ -169,3 +175,53 @@ export function write3mf(
   });
   return Buffer.from(zipped);
 }
+
+export interface ExportContext {
+  doc: CadDocument;
+  bodies: NamedBody[];
+  options: { quality: number };
+}
+
+export interface Exporter extends ExportFormat {
+  write(ctx: ExportContext): Buffer;
+}
+
+export const exporters = createRegistry<Exporter>(
+  "exporter",
+  (exporter) => exporter.format,
+);
+
+export const registerExporter = exporters.register;
+
+export function exporterFor(format: string): Exporter {
+  const exporter = exporters.get(format);
+  if (exporter) return exporter;
+  const supported = exporters.list().map((e) => e.format);
+  throw new ValidationError(
+    `export format ${format} is not one of ${supported.join(", ")}`,
+    "/format",
+  );
+}
+
+registerExporter({
+  format: "stl",
+  label: "STL (binary)",
+  ext: "stl",
+  mime: "model/stl",
+  write: ({ bodies, options }) => writeStl(bodies, options.quality),
+});
+
+registerExporter({
+  format: "3mf",
+  label: "3MF (multi-body, named)",
+  ext: "3mf",
+  mime: "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+  write: ({ doc, bodies, options }) =>
+    write3mf(
+      bodies.map((body) => ({
+        body,
+        name: doc.bodyMeta[body.bodyId]?.name ?? body.bodyId,
+      })),
+      options.quality,
+    ),
+});

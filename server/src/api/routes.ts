@@ -294,6 +294,13 @@ export function createApiRouter(
   });
 
   on(
+    ROUTES.formats,
+    wrap(async (_req, res) => {
+      res.json(await kernel.formats());
+    }),
+  );
+
+  on(
     ROUTES.listProjects,
     wrap(async (_req, res) => {
       res.json(await store.list());
@@ -631,11 +638,11 @@ export function createApiRouter(
     wrap(async (req, res) => {
       const { doc, view } = await store.open(req.params.id);
       const { retain, ...request }: ExportRequest = req.body;
-      const { data, mime } = await kernel.export(doc, {
+      const { data, mime, ext } = await kernel.export(doc, {
         ...request,
         hidden: view.hidden.bodies,
       });
-      const fileName = `${safeFileName(doc.name) || "model"}.${request.format}`;
+      const fileName = `${safeFileName(doc.name) || "model"}.${ext}`;
       res.setHeader("Content-Type", mime);
       if (retain) {
         await store.saveExport(doc.id, fileName, data);

@@ -3,6 +3,7 @@ import {
   type ApiErrorCode,
   type CadDocument,
   type EvaluateResult,
+  type Formats,
   type Health,
 } from "@rockett/shared";
 import { StoreError } from "../store/projectStore.js";
@@ -33,8 +34,9 @@ export interface Calls {
   };
   export: {
     args: [doc: CadDocument, job: ExportJob];
-    result: { data: ArrayBuffer; mime: string };
+    result: { data: ArrayBuffer; mime: string; ext: string };
   };
+  formats: { args: []; result: Formats };
   importStep: { args: [name: string | undefined]; result: Imported };
   planNamingUpgrade: {
     args: Parameters<KernelClient["planNamingUpgrade"]>;

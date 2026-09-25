@@ -178,12 +178,16 @@ export class WorkerKernel implements KernelClient {
   }
 
   async export(doc: CadDocument, job: ExportJob) {
-    const { data, mime } = await this.call(
+    const { data, ...file } = await this.call(
       "export",
       [doc, job],
       this.sources(doc),
     );
-    return { data: Buffer.from(data), mime };
+    return { data: Buffer.from(data), ...file };
+  }
+
+  formats() {
+    return this.call("formats", []);
   }
 
   importStep(upload: ImportUpload | undefined) {

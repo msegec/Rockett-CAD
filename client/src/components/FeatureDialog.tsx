@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import type {
   AxisRef,
   EdgeRef,
+  ExportFormat,
   FaceRef,
   Feature,
   PlaneRef,
@@ -1222,9 +1223,18 @@ function ExportPanel({ onClose }: { onClose: () => void }) {
   const hiddenBodies = useStore((s) => s.view.hidden.bodies);
   const selection = useStore((s) => s.selection);
   const setError = useStore((s) => s.setError);
-  const [format, setFormat] = useState<"stl" | "3mf">("stl");
+  const [exporters, setExporters] = useState<ExportFormat[]>([]);
+  const [picked, setFormat] = useState("");
+  const format = picked || exporters[0]?.format;
   const [quality, setQuality] = useState(0.05);
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    api.formats().then(
+      (formats) => setExporters(formats.exporters),
+      (e: Error) => setError(e.message),
+    );
+  }, [setError]);
 
   const selectedBodies = useMemo(
     () => selection.filter((s) => s.kind === "body").map((s: any) => s.bodyId),
@@ -1238,7 +1248,7 @@ function ExportPanel({ onClose }: { onClose: () => void }) {
   }, [evaluation, hiddenBodies]);
 
   const doExport = async () => {
-    if (!document_) return;
+    if (!document_ || !format) return;
     setPending(true);
     try {
       saveDownload(
@@ -1266,12 +1276,12 @@ function ExportPanel({ onClose }: { onClose: () => void }) {
         />
         <label className="field">
           <span>Format</span>
-          <select
-            value={format}
-            onChange={(e) => setFormat(e.target.value as any)}
-          >
-            <option value="stl">STL (binary)</option>
-            <option value="3mf">3MF (multi-body, named)</option>
+          <select value={format} onChange={(e) => setFormat(e.target.value)}>
+            {exporters.map((e) => (
+              <option key={e.format} value={e.format}>
+                {e.label}
+              </option>
+            ))}
           </select>
         </label>
         <label className="field">
@@ -1290,6 +1300,7 @@ function ExportPanel({ onClose }: { onClose: () => void }) {
         onOk={() => void doExport()}
         onCancel={onClose}
         pending={pending}
+        okDisabled={!format}
         okLabel={pending ? "Exporting…" : "Download"}
         escapeAnywhere
       />

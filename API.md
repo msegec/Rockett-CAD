@@ -322,18 +322,28 @@ applied. Undo sends the previous document back through `PUT /document`.
 
 ## Inspection & output
 
-| Method & path                | Body                                                             | Returns                                                                                                                                                                   |
-| ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /projects/:id/measure` | `{ refs: [FaceRef\|EdgeRef\|VertexRef, …] }` (1–2)               | `MeasureResult` (distance, ΔXYZ, angle, per-item length/area/radius/position)                                                                                             |
-| `POST /projects/:id/export`  | `{ format: "stl"\|"3mf", bodyIds: string[], quality?, retain? }` | Binary file (`Content-Disposition` attachment). Empty `bodyIds` = every body the view does not hide. `retain: true` also stores a copy under the project's `exports/` dir |
+| Method & path                | Body                                               | Returns                                                                                                                                                                   |
+| ---------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /projects/:id/measure` | `{ refs: [FaceRef\|EdgeRef\|VertexRef, …] }` (1–2) | `MeasureResult` (distance, ΔXYZ, angle, per-item length/area/radius/position)                                                                                             |
+| `POST /projects/:id/export`  | `{ format, bodyIds: string[], quality?, retain? }` | Binary file (`Content-Disposition` attachment). Empty `bodyIds` = every body the view does not hide. `retain: true` also stores a copy under the project's `exports/` dir |
 
 Export returns 400 when an id in `bodyIds` is not a body of the evaluated
 model, and 422 `unprocessable` when a body it would write is blocked by a
 reference that did not resolve (`namingVersion` 2 only); each error names
 the offending ids. Measure returns 400 when a face or edge reference does not
-resolve, naming the reference and its status. `format` is required, and `stl` is
-always binary. `quality` is the tessellation tolerance in mm: a number,
-default 0.05, clamped to 0.001 to 1.
+resolve, naming the reference and its status. `format` is required and must
+be a registered exporter's `format`; any other is 400 with detail `/format`,
+naming the supported formats. The file name ends in that exporter's `ext`.
+`stl` is always binary. `quality` is the tessellation tolerance in mm: a
+number, default 0.05, clamped to 0.001 to 1.
+
+`GET /formats` returns `Formats`: `{ exporters, importers }`. Exporters are
+read from the exporter registry on each request, importers from `IMPORTERS`
+in `server/src/geometry/importers.ts`. An exporter is `{ format, label, ext, mime }`
+and an importer `{ format, label, extensions }`. Core registers `stl` and
+`3mf` exporters through `registerExporter` in
+`server/src/geometry/exporters.ts`, which returns a disposer; the export
+panel lists the exporters it returns.
 
 ## Assets (reference images)
 

@@ -11,6 +11,7 @@ import type {
   ExportRequest,
   Folder,
   FolderTree,
+  Formats,
   HeldMeshes,
   HistoryStatus,
   MeasureRequest,
@@ -167,6 +168,7 @@ export const projectView = Type.Object(
 
 export const ROUTES = {
   health: route<never, Health>()("GET", "/health"),
+  formats: route<never, Formats>()("GET", "/formats"),
   listProjects: route<never, ProjectSummary[]>()("GET", "/projects"),
   createProject: route<{ name?: string; folderId?: string }, ProjectResponse>()(
     "POST",
@@ -295,7 +297,7 @@ export const ROUTES = {
     "POST",
     "/projects/:id/export",
     Type.Object({
-      format: Type.Enum(["stl", "3mf"]),
+      format: Type.String({ minLength: 1, maxLength: 200 }),
       bodyIds: Type.Array(Type.String()),
       quality: Type.Optional(Type.Number()),
       retain: Type.Optional(Type.Boolean()),

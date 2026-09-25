@@ -7,6 +7,7 @@ import {
   type ExportRequest,
   type FaceRef,
   type Feature,
+  type Formats,
   type Health,
   type MeasureRequest,
   type MeasureResult,
@@ -25,13 +26,17 @@ import {
 import { kernelVersion } from "../geometry/kernel.js";
 import { measure } from "../geometry/measure.js";
 import { resolvePlaneFrame, type EvalState } from "../geometry/features.js";
-import { computeEdgeNames, type NamedBody } from "../geometry/naming.js";
+import { computeEdgeNames } from "../geometry/naming.js";
 import { curveInfo } from "../geometry/tessellate.js";
 import { signRefs } from "../geometry/signature.js";
 import { planNamingUpgrade } from "../geometry/upgradeNaming.js";
 import { tangentEdges } from "../geometry/tangentEdges.js";
 import { importerFor, IMPORTERS, type Sources } from "../geometry/importers.js";
-import { EXPORT_QUALITY, write3mf, writeStl } from "../geometry/exporters.js";
+import {
+  EXPORT_QUALITY,
+  exporterFor,
+  exporters,
+} from "../geometry/exporters.js";
 
 interface StateQueries {
   measure: { request: MeasureRequest };
@@ -91,7 +96,8 @@ export interface KernelClient {
   export(
     doc: CadDocument,
     job: ExportJob,
-  ): Promise<{ data: Buffer; mime: string }>;
+  ): Promise<{ data: Buffer; mime: string; ext: string }>;
+  formats(): Promise<Formats>;
   importStep(upload: ImportUpload | undefined): Promise<Imported>;
   planNamingUpgrade(
     doc: CadDocument,
@@ -100,30 +106,6 @@ export interface KernelClient {
   drop(docId: string): void;
   version(): Health["kernelVersion"];
 }
-
-const EXPORTERS: Record<
-  ExportRequest["format"],
-  {
-    mime: string;
-    write: (bodies: NamedBody[], doc: CadDocument, quality: number) => Buffer;
-  }
-> = {
-  stl: {
-    mime: "model/stl",
-    write: (bodies, _doc, quality) => writeStl(bodies, quality),
-  },
-  "3mf": {
-    mime: "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
-    write: (bodies, doc, quality) =>
-      write3mf(
-        bodies.map((b) => ({
-          body: b,
-          name: doc.bodyMeta[b.bodyId]?.name ?? b.bodyId,
-        })),
-        quality,
-      ),
-  },
-};
 
 function asValidation<T>(run: () => T): T {
   try {
@@ -209,7 +191,7 @@ export class InProcessKernel implements KernelClient {
 
   async export(doc: CadDocument, job: ExportJob) {
     const { format, bodyIds, quality = EXPORT_QUALITY, hidden } = job;
-    const exporter = EXPORTERS[format];
+    const exporter = exporterFor(format);
     const state = await this.stateAt(doc);
     const missing = bodyIds.filter((id) => !state.bodies.has(id));
     if (missing.length)
@@ -229,8 +211,26 @@ export class InProcessKernel implements KernelClient {
         "unprocessable",
       );
     return {
-      data: exporter.write(chosen, doc, Math.min(Math.max(quality, 0.001), 1)),
+      data: exporter.write({
+        doc,
+        bodies: chosen,
+        options: { quality: Math.min(Math.max(quality, 0.001), 1) },
+      }),
       mime: exporter.mime,
+      ext: exporter.ext,
+    };
+  }
+
+  async formats() {
+    return {
+      exporters: exporters
+        .list()
+        .map(({ format, label, ext, mime }) => ({ format, label, ext, mime })),
+      importers: IMPORTERS.map(({ format, label, extensions }) => ({
+        format,
+        label,
+        extensions,
+      })),
     };
   }
 

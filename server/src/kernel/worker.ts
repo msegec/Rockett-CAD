@@ -69,9 +69,10 @@ const RUN: {
     }),
   stateQuery: (id, doc, query) => kernelFor(id).stateQuery(doc, query),
   async export(id, doc, job) {
-    const { data, mime } = await kernelFor(id).export(doc, job);
-    return { data: owned(data), mime };
+    const { data, ...file } = await kernelFor(id).export(doc, job);
+    return { data: owned(data), ...file };
   },
+  formats: (id) => kernelFor(id).formats(),
   importStep: (id, name) =>
     kernelFor(id).importStep(
       name === undefined ? undefined : { name, bytes: () => uploadBytes(id) },
