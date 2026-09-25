@@ -34,8 +34,8 @@ Distribution is not approved. Confirm these obligations first:
 
 - LGPL-2.1 section 6: accompany the image with the corresponding source of
   the exact `opencascade.js` build, or a written offer of it.
-- The client bundle is minified without licence comments, and the image
-  carries neither this file nor the licence texts of the client bundle
+- The client and CAM bundles are minified without licence comments, and the
+  image carries neither this file nor the licence texts of the bundled
   packages. Copy both into the image. Each image package keeps its own
   licence file under `node_modules`.
 - The base image `node:24-trixie-slim` carries Node.js and Debian packages
@@ -46,8 +46,10 @@ Distribution is not approved. Confirm these obligations first:
 `image` means the runtime `npm ci --omit=dev --workspace server` installs it.
 `client bundle` means Vite bundles its code into `client/dist`. A
 `build helper` is Vite or Rolldown runtime code that the build emits into the
-bundle. `none (types only)` packages appear in `npm ls` as peers but ship in
-neither artefact.
+bundle. `CAM bundles` means only the bundles built from `modules/cam` carry
+its code; the image's `npm ci` does not install it, and nothing builds those
+bundles before CAM-002. `none (types only)` packages appear in `npm ls` as
+peers but ship in no artefact.
 
 | Package                 | Version                | Licence       | Ships in                     | Upstream                                             |
 | ----------------------- | ---------------------- | ------------- | ---------------------------- | ---------------------------------------------------- |
@@ -59,6 +61,7 @@ neither artefact.
 | bytes                   | 3.1.2                  | MIT           | image                        | https://github.com/visionmedia/bytes.js              |
 | call-bind-apply-helpers | 1.0.2                  | MIT           | image                        | https://github.com/ljharb/call-bind-apply-helpers    |
 | call-bound              | 1.0.4                  | MIT           | image                        | https://github.com/ljharb/call-bound                 |
+| clipper2-ts             | 2.0.1-18               | BSL-1.0       | CAM bundles                  | https://github.com/countertype/clipper2-ts           |
 | content-disposition     | 1.1.0                  | MIT           | image                        | https://github.com/jshttp/content-disposition        |
 | content-type            | 1.0.5                  | MIT           | image                        | https://github.com/jshttp/content-type               |
 | content-type            | 2.1.0                  | MIT           | image                        | https://github.com/jshttp/content-type               |

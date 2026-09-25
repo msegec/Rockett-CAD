@@ -2,5 +2,8 @@
   "name": "@rockett/module-cam",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "clipper2-ts": "2.0.1-18"
+  }
 }
