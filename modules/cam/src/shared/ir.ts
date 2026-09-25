@@ -5,7 +5,7 @@ export type Xy = [number, number];
 export type Role = "cut" | "plunge" | "link";
 export type Plane = "xy" | "zx" | "yz";
 
-type Arc = {
+export type Arc = {
   kind: "arc";
   to: Xyz;
   centre: Xyz;
@@ -16,7 +16,7 @@ type Arc = {
   power?: number;
 };
 
-type Cycle = {
+export type Cycle = {
   kind: "cycle";
   points: Xy[];
   clear: number;
@@ -71,31 +71,34 @@ function nonFinite(value: unknown, path: string): string[] {
   return [];
 }
 
-function inPlane([x, y, z]: Xyz, plane: Plane): Xyz {
+export function inPlane([x, y, z]: Xyz, plane: Plane): Xyz {
   if (plane === "xy") return [x, y, z];
   return plane === "zx" ? [z, x, y] : [y, z, x];
 }
 
-function radii(from: Xyz, arc: Arc): [number, number] {
+export function radii(from: Xyz, arc: Arc): [number, number] {
   const [cu, cv] = inPlane(arc.centre, arc.plane);
   const [su, sv] = inPlane(from, arc.plane);
   const [eu, ev] = inPlane(arc.to, arc.plane);
   return [Math.hypot(su - cu, sv - cv), Math.hypot(eu - cu, ev - cv)];
 }
 
-function arcLength(from: Xyz, arc: Arc): number {
+export function arcSweep(from: Xyz, arc: Arc): number {
   const [cu, cv] = inPlane(arc.centre, arc.plane);
-  const [su, sv, sw] = inPlane(from, arc.plane);
-  const [eu, ev, ew] = inPlane(arc.to, arc.plane);
+  const [su, sv] = inPlane(from, arc.plane);
+  const [eu, ev] = inPlane(arc.to, arc.plane);
   const turn = Math.atan2(ev - cv, eu - cu) - Math.atan2(sv - cv, su - cu);
-  const sweep =
-    Math.hypot(eu - su, ev - sv) <= ARC_TOLERANCE
-      ? TAU
-      : (((arc.dir === "ccw" ? turn : -turn) % TAU) + TAU) % TAU;
-  return Math.hypot(radii(from, arc)[0] * sweep, ew - sw);
+  return Math.hypot(eu - su, ev - sv) <= ARC_TOLERANCE
+    ? TAU
+    : (((arc.dir === "ccw" ? turn : -turn) % TAU) + TAU) % TAU;
 }
 
-function endOf(move: Move, at: Xyz | undefined): Xyz | undefined {
+function arcLength(from: Xyz, arc: Arc): number {
+  const rise = inPlane(arc.to, arc.plane)[2] - inPlane(from, arc.plane)[2];
+  return Math.hypot(radii(from, arc)[0] * arcSweep(from, arc), rise);
+}
+
+export function endOf(move: Move, at: Xyz | undefined): Xyz | undefined {
   if (move.kind === "rapid" || move.kind === "feed" || move.kind === "arc")
     return move.to;
   if (move.kind !== "cycle") return at;
@@ -149,18 +152,21 @@ function distance(a: Xyz | undefined, b: Xyz): number {
   return a ? Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) : 0;
 }
 
+export function pecks(move: Cycle): number {
+  return move.cycle === "peck"
+    ? Math.max(1, Math.ceil((move.top - move.bottom) / move.peck))
+    : 1;
+}
+
 function cycleTotals(move: Cycle, at: Xyz | undefined) {
   let rapid = 0;
   let from = at;
   const depth = move.clear - move.bottom;
-  const pecks =
-    move.cycle === "peck"
-      ? Math.max(1, Math.ceil((move.top - move.bottom) / move.peck))
-      : 1;
+  const steps = pecks(move);
   const retracts =
     move.cycle === "peck"
-      ? 2 * (pecks - 1) * (move.clear - move.top) +
-        move.peck * (pecks - 1) * pecks
+      ? 2 * (steps - 1) * (move.clear - move.top) +
+        move.peck * (steps - 1) * steps
       : 0;
   for (const [x, y] of move.points) {
     const above: Xyz = [x, y, from ? from[2] : move.clear];
