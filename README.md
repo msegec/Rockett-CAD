@@ -53,7 +53,7 @@ everything downstream against persistent topology references.
 - **Modify**: fillet, chamfer, shell, combine, split, press/pull and move bodies; shell with no open face hollows the body.
 - **Tangent chains**: fillet and chamfer pick smooth connected edges in one click, on one or several bodies.
 - **Replicate**: mirror, rectangular pattern and circular pattern.
-- **Construction**: offset planes and midplanes; sketch on any planar face.
+- **Construction**: planes by offset, midplane, angle, three points or two edges, with flip; sketch on any planar face.
 - **Origin axes**: pick X, Y or Z in the model tree or at the origin as a revolve or pattern axis.
 - **Drag handles**: every feature with a main value, from extrude distance to pattern spacing, has an arrow or arc to drag.
 - **Reference images**: place PNG, JPEG or WebP images on planes and calibrate them to real size.

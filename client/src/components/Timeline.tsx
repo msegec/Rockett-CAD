@@ -1,9 +1,11 @@
 import { useState } from "react";
 import type {
+  AxisRef,
   CadDocument,
   EvaluateResult,
   Feature,
   FeatureStatus,
+  PlaneRef,
 } from "@rockett/shared";
 import { pickInto } from "../dialogPicks";
 import {
@@ -280,6 +282,11 @@ export function Timeline() {
   );
 }
 
+const axisParams = (axis: AxisRef | undefined) => ({
+  axisSource: axis?.kind === "originAxis" ? "origin" : "edge",
+  axis: axis?.kind === "originAxis" ? axis.axis : "Z",
+});
+
 /** Open the right editor for a feature: sketch mode, or a prefilled dialog. */
 export async function openFeatureEditor(f: Feature): Promise<void> {
   if (useStore.getState().busy) return;
@@ -355,8 +362,7 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
       Object.assign(params, {
         angle: anyF.angle,
         operation: anyF.operation,
-        axisSource: anyF.axis?.kind === "originAxis" ? "origin" : "edge",
-        axis: anyF.axis?.kind === "originAxis" ? anyF.axis.axis : "Z",
+        ...axisParams(anyF.axis),
       });
       pushAxis(anyF.axis);
       break;
@@ -413,8 +419,7 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
         count: anyF.count,
         totalAngle: anyF.totalAngle,
         combine: anyF.combine,
-        axisSource: anyF.axis?.kind === "originAxis" ? "origin" : "edge",
-        axis: anyF.axis?.kind === "originAxis" ? anyF.axis.axis : "Z",
+        ...axisParams(anyF.axis),
       });
       pushAxis(anyF.axis);
       break;
@@ -422,19 +427,37 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
       if (anyF.tool)
         selection.push({ kind: "plane", ref: anyF.tool, label: "Tool" });
       break;
-    case "constructionPlane":
-      Object.assign(params, {
-        method: anyF.method?.kind,
-        distance: anyF.method?.distance,
-      });
-      if (anyF.method?.kind === "offset" && anyF.method.base) {
-        selection.push({ kind: "plane", ref: anyF.method.base, label: "Base" });
-      }
-      if (anyF.method?.kind === "midplane") {
-        selection.push({ kind: "plane", ref: anyF.method.a, label: "A" });
-        selection.push({ kind: "plane", ref: anyF.method.b, label: "B" });
+    case "constructionPlane": {
+      const m = f.method;
+      const plane = (ref: PlaneRef, label: string) =>
+        selection.push({ kind: "plane", ref, label });
+      params.method = m.kind;
+      switch (m.kind) {
+        case "offset":
+          Object.assign(params, { distance: m.distance, flip: m.flip });
+          plane(m.base, "Base");
+          break;
+        case "midplane":
+          Object.assign(params, { offset: m.offset, flip: m.flip });
+          plane(m.a, "A");
+          plane(m.b, "B");
+          break;
+        case "angle":
+          Object.assign(params, { angle: m.angle, ...axisParams(m.axis) });
+          pushAxis(m.axis);
+          plane(m.base, "Base");
+          break;
+        case "threePoints":
+          for (const point of m.points) selection.push({ ...point });
+          break;
+        case "twoEdges":
+          for (const line of [m.a, m.b])
+            if (line.kind === "originAxis")
+              selection.push({ kind: "axis", axis: line.axis });
+            else pushAxis(line);
       }
       break;
+    }
     case "emboss":
       Object.assign(params, { depth: anyF.depth, embossMode: anyF.mode });
       break;

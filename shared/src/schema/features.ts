@@ -37,6 +37,15 @@ export const edgeRef = Type.Object({
   sig,
 });
 
+const pointRef = Type.Union([
+  Type.Object({ kind: Type.Literal("vertex"), bodyId, vertexName: topoName }),
+  Type.Object({
+    kind: Type.Literal("sketchPoint"),
+    sketchId: id,
+    entityId: id,
+  }),
+]);
+
 const planeRef = Type.Union([
   Type.Object({
     kind: Type.Literal("origin"),
@@ -185,8 +194,26 @@ const constructionPlane = feature("constructionPlane", {
       kind: Type.Literal("offset"),
       base: planeRef,
       distance: coordinate,
+      flip: flag,
     }),
-    Type.Object({ kind: Type.Literal("midplane"), a: planeRef, b: planeRef }),
+    Type.Object({
+      kind: Type.Literal("midplane"),
+      a: planeRef,
+      b: planeRef,
+      offset: Type.Optional(coordinate),
+      flip: flag,
+    }),
+    Type.Object({
+      kind: Type.Literal("angle"),
+      axis: axisRef,
+      base: planeRef,
+      angle: degrees,
+    }),
+    Type.Object({
+      kind: Type.Literal("threePoints"),
+      points: Type.Tuple([pointRef, pointRef, pointRef]),
+    }),
+    Type.Object({ kind: Type.Literal("twoEdges"), a: axisRef, b: axisRef }),
   ]),
 });
 

@@ -420,7 +420,7 @@ meets the others by line fraction or arc and circle angle.
   parallel refs lies halfway between them with the first ref's normal. Refs
   at an angle give the plane of equal signed distance to both: it contains
   their intersection line and, with outward face normals, lies between the
-  faces.
+  faces. The other methods are in Construction plane methods (schema 18).
 
 ## Regeneration engine
 
@@ -750,6 +750,34 @@ choice keeps the constraint id, drops its label offset, and like a typed angle
 removes a `horizontal` or `vertical` constraint on that line. The 16 to 17
 migration changes nothing but the version, and the project is backed up
 before its first save.
+
+## Construction plane methods (schema 18)
+
+A construction plane's `method` is one of five kinds. Refs keep pick order: the
+first ref picked is `a` or `base`.
+
+- `offset { base, distance, flip? }`: `flip` reverses the base normal first, so
+  the plane lies `distance` mm on the other side and faces the other way.
+- `midplane { a, b, offset?, flip? }`: the midplane above, then `flip` reverses
+  its normal and `offset` moves it that many mm along the resulting normal.
+- `angle { axis, base, angle }`: the plane through the axis (an origin axis,
+  sketch line or straight edge) whose normal is the base normal turned `angle`
+  degrees about the axis direction, right-handed. At 0 it is parallel to the
+  base. An axis that is not parallel to the base fails the feature.
+- `threePoints { points }`: the plane through three points, each a body vertex
+  `{ kind: "vertex", bodyId, vertexName }` or a sketch point
+  `{ kind: "sketchPoint", sketchId, entityId }`. Its normal is
+  (p2 - p1) x (p3 - p1). Points on one line fail the feature.
+- `twoEdges { a, b }`: the plane holding two straight lines, each given like
+  the angle axis. Crossing lines take the normal a x b; parallel lines take a x
+  (b origin - a origin). Lines on one line, or not in one plane, fail the
+  feature.
+
+Vertex references carry no signature and the naming upgrade does not map them.
+A vertex name is built from its face names, so a plane whose vertex name
+changes fails and needs its points picked again. The 17 to 18 migration
+changes nothing but the version, and the project is backed up before its first
+save.
 
 ## Tangent edge chains
 

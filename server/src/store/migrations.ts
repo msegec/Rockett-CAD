@@ -150,6 +150,7 @@ export const documentMigrations: Migrations<CadDocument> = {
     14: (doc) => doc,
     15: (doc) => doc,
     16: (doc) => doc,
+    17: (doc) => doc,
   },
 };
 

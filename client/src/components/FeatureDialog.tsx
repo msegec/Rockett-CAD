@@ -7,11 +7,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import type {
   AxisRef,
+  ConstructionPlaneFeature,
   EdgeRef,
   ExportFormat,
   FaceRef,
   Feature,
   PlaneRef,
+  PointRef,
   ProfileRef,
 } from "@rockett/shared";
 import { newId } from "@rockett/shared";
@@ -24,7 +26,12 @@ import {
 import { api, saveDownload } from "../api";
 import { extrudeOperation } from "../extrudeReach";
 import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
-import { clearInput, sketchPicks, takes } from "../dialogPicks";
+import {
+  clearInput,
+  sketchPicks,
+  takes,
+  type PlaneMethod,
+} from "../dialogPicks";
 import { createLivePreview } from "../livePreview";
 import { targetOperation, toolTargets } from "../toolTargets";
 import { viewportHandle } from "../viewportRef";
@@ -43,6 +50,8 @@ import {
   TargetField,
 } from "./form/fields";
 import { DialogFooter } from "./form/DialogFooter";
+
+const OFFSET_TAKES_ONE = "Offset takes one reference; remove the extra one";
 
 function need(cond: unknown, message: string): asserts cond {
   if (!cond) throw new Error(message);
@@ -159,7 +168,10 @@ function DialogBody({
 
   // Picking an edge or sketch line in an axis-based dialog switches the axis
   // to it — the dropdown alone gave no hint the pick was registered.
-  const axisDialog = takes(dialog, "axis");
+  const axisDialog =
+    dialog === "constructionPlane"
+      ? params.method === "angle"
+      : takes(dialog, "axis");
   useEffect(() => {
     if (!axisDialog) return;
     if (
@@ -897,62 +909,169 @@ function DialogBody({
     }
     case "constructionPlane": {
       title = "Construction Plane";
+      const method: PlaneMethod = p("method", "offset");
+      const refs = selection.flatMap((x): PlaneRef[] =>
+        x.kind === "plane"
+          ? [x.ref]
+          : x.kind === "face"
+            ? [{ kind: "face", face: { ...x } }]
+            : [],
+      );
+      const points = selection.flatMap((x): PointRef[] =>
+        x.kind === "vertex" || x.kind === "sketchPoint" ? [{ ...x }] : [],
+      );
+      const lines = selection.flatMap((x): AxisRef[] => {
+        if (x.kind === "edge") return [{ kind: "edge", edge: { ...x } }];
+        if (x.kind === "axis") return [{ kind: "originAxis", axis: x.axis }];
+        return x.kind === "sketchEntity"
+          ? [{ kind: "sketchLine", sketchId: x.sketchId, entityId: x.entityId }]
+          : [];
+      });
+      const flip = !!p("flip", false);
+      const flipField = (
+        <CheckField
+          label="Flip"
+          value={flip}
+          onChange={(v) => setParams({ flip: v })}
+        />
+      );
       body = (
         <>
-          <SelInfo
-            label="Reference plane(s)"
-            input="plane"
-            hint="origin plane / face (2 refs = midplane)"
-          />
           <SelectField
             label="Method"
-            value={p("method", "offset")}
+            value={method}
             options={[
               ["offset", "Offset"],
-              ["midplane", "Midplane (2 refs)"],
+              ["midplane", "Midplane"],
+              ["angle", "At angle"],
+              ["threePoints", "3 points"],
+              ["twoEdges", "2 edges"],
             ]}
             onChange={(v) => setParams({ method: v })}
           />
-          {p("method", "offset") === "offset" && (
-            <NumField
-              label="Offset (mm)"
-              autoFocus
-              value={p("distance", main("constructionPlane"))}
-              onChange={(v) => setParams({ distance: v })}
+          {method === "offset" && (
+            <>
+              <SelInfo
+                label="Reference plane"
+                input="plane"
+                hint="click a plane or planar face"
+              />
+              {refs.length > 1 && (
+                <div className="field-hint">{OFFSET_TAKES_ONE}</div>
+              )}
+              <NumField
+                label="Offset (mm)"
+                autoFocus
+                value={p("distance", main("constructionPlane"))}
+                onChange={(v) => setParams({ distance: v })}
+              />
+              {flipField}
+            </>
+          )}
+          {method === "midplane" && (
+            <>
+              <SelInfo
+                label="Planes"
+                input="plane"
+                hint="click two planes or planar faces"
+              />
+              <NumField
+                label="Offset (mm)"
+                value={p("offset", 0)}
+                onChange={(v) => setParams({ offset: v })}
+              />
+              {flipField}
+            </>
+          )}
+          {method === "angle" && (
+            <>
+              <SelInfo
+                label="Axis"
+                input="axis"
+                picks={[...edges, ...sketchLines]}
+                hint={axisHint}
+              />
+              <AxisField
+                axisSource={params.axisSource}
+                axis={params.axis}
+                onChange={(patch) => chooseAxis("axis", patch)}
+              />
+              <SelInfo
+                label="Reference plane"
+                input="plane"
+                hint="click a plane or planar face"
+              />
+              <AngleField
+                label="Angle"
+                value={p("angle", 90)}
+                onChange={(v) => setParams({ angle: v })}
+              />
+            </>
+          )}
+          {method === "threePoints" && (
+            <SelInfo
+              label="Points"
+              input="points"
+              hint="click three vertices or sketch points"
+            />
+          )}
+          {method === "twoEdges" && (
+            <SelInfo
+              label="Edges"
+              input="lines"
+              hint="click two straight edges in one plane"
             />
           )}
         </>
       );
-      build = () => {
-        const refs: PlaneRef[] = [
-          ...planes.map((x) => x.ref),
-          ...faces.map((f) => ({
-            kind: "face" as const,
-            face: {
-              kind: "face" as const,
-              bodyId: f.bodyId,
-              faceName: f.faceName,
-            },
-          })),
-        ];
-        const midplane = p("method", "offset") === "midplane";
-        if (midplane)
-          need(refs.length >= 2, "Select two references for a midplane");
-        else need(refs.length >= 1, "Select a base plane or face");
-        return {
-          id: editId ?? newId("plane"),
-          type: "constructionPlane",
-          name: p("name", ""),
-          suppressed: false,
-          method: midplane
-            ? { kind: "midplane", a: refs[0]!, b: refs[1]! }
-            : {
-                kind: "offset",
-                base: refs[0]!,
-                distance: main("constructionPlane"),
-              },
-        };
+      const planeMethod = (): ConstructionPlaneFeature["method"] => {
+        switch (method) {
+          case "offset":
+            need(refs.length > 0, "Select a base plane or face");
+            need(refs.length === 1, OFFSET_TAKES_ONE);
+            return {
+              kind: "offset",
+              base: refs[0]!,
+              distance: main("constructionPlane"),
+              ...(flip && { flip }),
+            };
+          case "midplane": {
+            need(refs.length === 2, "Select two references for a midplane");
+            const offset = num("offset", 0);
+            return {
+              kind: "midplane",
+              a: refs[0]!,
+              b: refs[1]!,
+              ...(offset !== 0 && { offset }),
+              ...(flip && { flip }),
+            };
+          }
+          case "angle":
+            need(refs.length === 1, "Select a reference plane or face");
+            return {
+              kind: "angle",
+              axis: axisRef(),
+              base: refs[0]!,
+              angle: num("angle", 90),
+            };
+          case "threePoints":
+            need(points.length === 3, "Select three points");
+            return {
+              kind: "threePoints",
+              points: [points[0]!, points[1]!, points[2]!],
+            };
+          case "twoEdges":
+            need(lines.length === 2, "Select two straight edges");
+            return { kind: "twoEdges", a: lines[0]!, b: lines[1]! };
+        }
       };
+      build = () => ({
+        id: editId ?? newId("plane"),
+        type: "constructionPlane",
+        name: p("name", ""),
+        suppressed: false,
+        method: planeMethod(),
+      });
       break;
     }
     case "referenceImage": {

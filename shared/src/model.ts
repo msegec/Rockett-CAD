@@ -11,7 +11,7 @@
 
 import type { Units } from "./units.js";
 
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 export type NamingVersion = 1 | 2;
 
@@ -44,6 +44,9 @@ export interface VertexRef {
 }
 
 export type TopoRef = FaceRef | EdgeRef | VertexRef;
+
+export type PointRef =
+  VertexRef | { kind: "sketchPoint"; sketchId: string; entityId: string };
 
 export const REF_SIGNATURE_TYPES = [
   "plane",
@@ -362,8 +365,17 @@ export interface CircularPatternFeature extends FeatureBase {
 export interface ConstructionPlaneFeature extends FeatureBase {
   type: "constructionPlane";
   method:
-    | { kind: "offset"; base: PlaneRef; distance: number }
-    | { kind: "midplane"; a: PlaneRef; b: PlaneRef };
+    | { kind: "offset"; base: PlaneRef; distance: number; flip?: boolean }
+    | {
+        kind: "midplane";
+        a: PlaneRef;
+        b: PlaneRef;
+        offset?: number;
+        flip?: boolean;
+      }
+    | { kind: "angle"; axis: AxisRef; base: PlaneRef; angle: number }
+    | { kind: "threePoints"; points: [PointRef, PointRef, PointRef] }
+    | { kind: "twoEdges"; a: AxisRef; b: AxisRef };
 }
 
 export interface ReferenceImageFeature extends FeatureBase {

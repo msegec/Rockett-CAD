@@ -174,7 +174,7 @@ const fixtures: {
       type: "constructionPlane",
       method: { kind: "offset", base: plane, distance: "1" },
     },
-    path: "/method",
+    path: "/method/distance",
   },
   referenceImage: {
     valid: {

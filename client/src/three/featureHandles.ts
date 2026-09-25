@@ -258,10 +258,12 @@ function handleRay(dialog: HandleDialog, input: HandleInput): Ray | null {
         ),
       };
     }
-    case "constructionPlane":
-      return (input.params.method ?? "offset") === "offset"
-        ? planeRay(input)
-        : null;
+    case "constructionPlane": {
+      if ((input.params.method ?? "offset") !== "offset") return null;
+      const ray = planeRay(input);
+      if (ray && input.params.flip) ray.axis.negate();
+      return ray;
+    }
     case "linearPattern": {
       const origin = bodyCenter(input);
       const axis = patternDirection(input);

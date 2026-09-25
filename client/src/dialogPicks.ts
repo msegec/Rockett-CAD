@@ -1,3 +1,4 @@
+import type { ConstructionPlaneFeature } from "@rockett/shared";
 import {
   previewBodies,
   selectionKey,
@@ -74,6 +75,21 @@ const line = { one: true, straight: true } as const;
 const axis = input("axis", ["edge", "sketchEntity", "axis"], line);
 const planar = (key: string, one: boolean) =>
   input(key, ["plane", "face"], { planar: true, ...(one && { one: true }) });
+const planes = planar("plane", false);
+const lines = input("lines", ["edge", "sketchEntity", "axis"], {
+  straight: true,
+});
+const points = input("points", ["vertex", "sketchPoint"]);
+
+export type PlaneMethod = ConstructionPlaneFeature["method"]["kind"];
+
+const PLANE_INPUTS: Record<PlaneMethod, readonly PickInput[]> = {
+  offset: [planes],
+  midplane: [planes],
+  angle: [axis, planar("plane", true)],
+  threePoints: [points],
+  twoEdges: [lines],
+};
 
 export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
   importStep: [],
@@ -91,7 +107,7 @@ export const DIALOG_INPUTS: Record<DialogType, readonly PickInput[]> = {
   mirror: [bodies, planar("plane", true)],
   linearPattern: [bodies, input("direction", ["edge", "axis"], line)],
   circularPattern: [bodies, axis],
-  constructionPlane: [planar("plane", false)],
+  constructionPlane: [planes, axis, points, lines],
   referenceImage: [planar("plane", true)],
   move: [bodies],
   export: [bodies],
@@ -115,10 +131,19 @@ export function filterSelectionFor(
   );
 }
 
+function inputsFor(
+  dialog: DialogType,
+  params: Record<string, any>,
+): readonly PickInput[] {
+  return dialog === "constructionPlane"
+    ? PLANE_INPUTS[(params.method as PlaneMethod | undefined) ?? "offset"]
+    : DIALOG_INPUTS[dialog];
+}
+
 function dialogInputs(s: Store): PickInput[] {
   if (s.mode.name !== "dialog") return [];
   const operation = targetOperation(s.mode.dialog, s.dialogParams);
-  return DIALOG_INPUTS[s.mode.dialog].flatMap((i) => {
+  return inputsFor(s.mode.dialog, s.dialogParams).flatMap((i) => {
     if (i !== targets) return [i];
     if (operation === "newBody") return [];
     return several(operation, s.document?.namingVersion)
@@ -190,12 +215,13 @@ export function pickOptions(i: PickInput | undefined, shift?: boolean) {
   return {
     profiles: has("profile") && !(split && shift),
     edges: has("edge"),
+    vertices: has("vertex"),
     faces: has("face") && (!split || shift),
     bodies: has("body") && !has("face"),
     originPlanes: has("plane"),
     constructionPlanes: has("plane"),
     originAxes: has("axis"),
-    sketchEntities: has("sketchEntity"),
+    sketchEntities: has("sketchEntity") || has("sketchPoint"),
   };
 }
 

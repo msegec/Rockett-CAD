@@ -31,6 +31,7 @@ import {
   type OffsetFaceFeature,
   type PlaneFrame,
   type PlaneRef,
+  type PointRef,
   type Profile,
   type ProfileRef,
   type RevolveFeature,
@@ -71,6 +72,7 @@ import {
   assignBodyIds,
   compareNames,
   computeEdgeNames,
+  computeVertexNames,
   finalizeNames,
   findFace,
   historyNames,
@@ -178,6 +180,31 @@ export function resolvePlaneFrame(state: EvalState, ref: PlaneRef): PlaneFrame {
   return frameFromPlane(plane.origin, plane.normal);
 }
 
+function vertexPoint(vertex: Shape): Vec3 {
+  const p = getKernel().BRep_Tool.Pnt(vertex);
+  const out: Vec3 = [p.X(), p.Y(), p.Z()];
+  p.delete();
+  return out;
+}
+
+function sketchPoint(state: EvalState, sketchId: string, pointId: string) {
+  const sketch = state.sketches.get(sketchId);
+  if (!sketch) throw new Error(`sketch ${sketchId} not found`);
+  const point = sketch.entities.find((e) => e.id === pointId);
+  if (point?.kind !== "point") throw new Error(`point ${pointId} not found`);
+  return uvTo3d(sketch.frame, point.x, point.y);
+}
+
+function resolvePoint(state: EvalState, ref: PointRef): Vec3 {
+  if (ref.kind === "sketchPoint")
+    return sketchPoint(state, ref.sketchId, ref.entityId);
+  const body = state.bodies.get(ref.bodyId);
+  if (!body) throw new Error(`body ${ref.bodyId} no longer exists`);
+  const vertex = computeVertexNames(body).byName.get(ref.vertexName);
+  if (!vertex) throw new Error(`vertex ${ref.vertexName} no longer exists`);
+  return vertexPoint(vertex);
+}
+
 function resolveAxis(
   state: EvalState,
   ref: AxisRef,
@@ -191,16 +218,13 @@ function resolveAxis(
     return { origin: [0, 0, 0], direction: dirs[ref.axis] };
   }
   if (ref.kind === "sketchLine") {
-    const sketch = state.sketches.get(ref.sketchId);
-    if (!sketch) throw new Error(`sketch ${ref.sketchId} not found`);
-    const line = sketch.entities.find(
-      (e) => e.id === ref.entityId && e.kind === "line",
-    ) as any;
-    if (!line) throw new Error(`axis line ${ref.entityId} not found`);
-    const p1 = sketch.entities.find((e) => e.id === line.p1) as any;
-    const p2 = sketch.entities.find((e) => e.id === line.p2) as any;
-    const a = uvTo3d(sketch.frame, p1.x, p1.y);
-    const b = uvTo3d(sketch.frame, p2.x, p2.y);
+    const line = state.sketches
+      .get(ref.sketchId)
+      ?.entities.find((e) => e.id === ref.entityId && e.kind === "line");
+    if (line?.kind !== "line")
+      throw new Error(`axis line ${ref.entityId} not found`);
+    const a = sketchPoint(state, ref.sketchId, line.p1);
+    const b = sketchPoint(state, ref.sketchId, line.p2);
     return { origin: a, direction: V.normalize(V.sub(b, a)) };
   }
   // model edge
@@ -1495,13 +1519,7 @@ function chamferByEnvelope(
     // outline. Built from exact planes — a ruled loft would give BSplines.
     const inner = offsetOutline(-distance);
     if (!inner) return null;
-    const point = (v: Shape): Vec3 => {
-      const p = k.BRep_Tool.Pnt(v);
-      const out: Vec3 = [p.X(), p.Y(), p.Z()];
-      p.delete();
-      return out;
-    };
-    const innerPts = verticesOf(inner).map(point);
+    const innerPts = verticesOf(inner).map(vertexPoint);
     const nearestInner = (q: Vec3): Vec3 | undefined => {
       let best = innerPts[0];
       let bestDist = Infinity;
@@ -1534,7 +1552,7 @@ function chamferByEnvelope(
       return ok;
     };
     for (const e of cap.edges) {
-      const ends = verticesOf(e).map(point);
+      const ends = verticesOf(e).map(vertexPoint);
       if (ends.length !== 2) return null;
       const q1 = nearestInner(ends[0]!);
       const q2 = nearestInner(ends[1]!);
@@ -2158,29 +2176,101 @@ function evalCircularPattern(
   });
 }
 
+function flipped(frame: PlaneFrame, flip: boolean | undefined): PlaneFrame {
+  return flip ? frameFromPlane(frame.origin, V.scale(frame.normal, -1)) : frame;
+}
+
+function midplaneFrame(a: PlaneFrame, b: PlaneFrame): PlaneFrame {
+  if (V.norm(V.cross(a.normal, b.normal)) < UNIT_DOT_TOL)
+    return frameFromPlane(V.scale(V.add(a.origin, b.origin), 0.5), a.normal);
+  const between = V.sub(a.normal, b.normal);
+  const width = V.norm(between);
+  const level =
+    (V.dot(a.normal, a.origin) - V.dot(b.normal, b.origin)) / (width * width);
+  return frameFromPlane(V.scale(between, level), between);
+}
+
+function angledFrame(
+  axis: { origin: Vec3; direction: Vec3 },
+  base: PlaneFrame,
+  degrees: number,
+): PlaneFrame {
+  if (Math.abs(V.dot(axis.direction, base.normal)) > UNIT_DOT_TOL)
+    throw new Error("the axis must be parallel to the reference plane");
+  const turn = (degrees * Math.PI) / 180;
+  const normal = V.add(
+    V.scale(base.normal, Math.cos(turn)),
+    V.scale(V.cross(axis.direction, base.normal), Math.sin(turn)),
+  );
+  return frameFromPlane(axis.origin, normal);
+}
+
+function pointsFrame([a, b, c]: Vec3[]): PlaneFrame {
+  const ab = V.sub(b!, a!);
+  const ac = V.sub(c!, a!);
+  const normal = V.cross(ab, ac);
+  if (V.norm(normal) <= UNIT_DOT_TOL * V.norm(ab) * V.norm(ac))
+    throw new Error("the three points lie on one line");
+  return frameFromPlane(a!, normal);
+}
+
+function edgesFrame(
+  a: { origin: Vec3; direction: Vec3 },
+  b: { origin: Vec3; direction: Vec3 },
+): PlaneFrame {
+  const across = V.sub(b.origin, a.origin);
+  const turn = V.cross(a.direction, b.direction);
+  const normal =
+    V.norm(turn) < UNIT_DOT_TOL ? V.cross(a.direction, across) : turn;
+  if (V.norm(normal) < LINEAR_TOL)
+    throw new Error("the two edges lie on one line");
+  if (Math.abs(V.dot(V.normalize(normal), across)) > LINEAR_TOL)
+    throw new Error("the two edges are not in one plane");
+  return frameFromPlane(a.origin, normal);
+}
+
+function constructionFrame(
+  state: EvalState,
+  method: ConstructionPlaneFeature["method"],
+): PlaneFrame {
+  switch (method.kind) {
+    case "offset":
+      return offsetFrame(
+        flipped(resolvePlaneFrame(state, method.base), method.flip),
+        method.distance,
+      );
+    case "midplane":
+      return offsetFrame(
+        flipped(
+          midplaneFrame(
+            resolvePlaneFrame(state, method.a),
+            resolvePlaneFrame(state, method.b),
+          ),
+          method.flip,
+        ),
+        method.offset ?? 0,
+      );
+    case "angle":
+      return angledFrame(
+        resolveAxis(state, method.axis),
+        resolvePlaneFrame(state, method.base),
+        method.angle,
+      );
+    case "threePoints":
+      return pointsFrame(method.points.map((p) => resolvePoint(state, p)));
+    case "twoEdges":
+      return edgesFrame(
+        resolveAxis(state, method.a),
+        resolveAxis(state, method.b),
+      );
+  }
+}
+
 function evalConstructionPlane(
   state: EvalState,
   f: ConstructionPlaneFeature,
 ): void {
-  let frame: PlaneFrame;
-  if (f.method.kind === "offset") {
-    const base = resolvePlaneFrame(state, f.method.base);
-    frame = offsetFrame(base, f.method.distance);
-  } else {
-    const a = resolvePlaneFrame(state, f.method.a);
-    const b = resolvePlaneFrame(state, f.method.b);
-    if (V.norm(V.cross(a.normal, b.normal)) < UNIT_DOT_TOL) {
-      const midOrigin = V.scale(V.add(a.origin, b.origin), 0.5);
-      frame = frameFromPlane(midOrigin, a.normal);
-    } else {
-      const between = V.sub(a.normal, b.normal);
-      const width = V.norm(between);
-      const level =
-        (V.dot(a.normal, a.origin) - V.dot(b.normal, b.origin)) /
-        (width * width);
-      frame = frameFromPlane(V.scale(between, level), between);
-    }
-  }
+  const frame = constructionFrame(state, f.method);
   // display size heuristic: cover existing model bbox
   let size = 40;
   for (const body of state.bodies.values()) {
