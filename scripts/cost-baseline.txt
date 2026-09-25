@@ -26,6 +26,8 @@ client/src/components/ViewportView.tsx onPointerUp 86
 client/src/components/ViewportView.tsx pointerToSketchUV 221
 client/src/components/ViewportView.tsx useEffect() 99
 client/src/components/ViewportView.tsx useEffect()#2 296
+client/src/features/constructionPlane.tsx PlaneForm 109
+client/src/features/referenceImage.tsx ReferenceImagePanel 188
 client/src/sketchTools.ts 975
 client/src/store.ts 1285
 client/src/store.ts deleteSketchEntities 94
