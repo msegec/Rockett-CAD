@@ -61,7 +61,12 @@ const RUN: {
     ...args: Calls[M]["args"]
   ) => Promise<Calls[M]["result"]>;
 } = {
-  evaluate: (id, ...args) => kernelFor(id).evaluate(...args),
+  evaluate: (id, doc, position, extra, stop) =>
+    kernelFor(id).evaluate(doc, position, extra, {
+      onFeatureStart: (...args) => post({ type: "featureStart", id, args }),
+      onProgress: (...args) => post({ type: "progress", id, args }),
+      shouldStop: () => Atomics.load(stop, 0) !== 0,
+    }),
   stateQuery: (id, doc, query) => kernelFor(id).stateQuery(doc, query),
   async export(id, doc, job) {
     const { data, mime } = await kernelFor(id).export(doc, job);

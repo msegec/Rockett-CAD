@@ -6,6 +6,7 @@ import {
 import type { CadDocument, Health, NamingDecision } from "@rockett/shared";
 import type { ProjectStore } from "../store/projectStore.js";
 import type { Sources } from "../geometry/importers.js";
+import type { EvaluateHooks } from "../geometry/engine.js";
 import type {
   ExportJob,
   ImportUpload,
@@ -21,6 +22,7 @@ import {
   type FromWorker,
   type Method,
   type Payload,
+  type Report,
   type ToWorker,
 } from "./protocol.js";
 
@@ -28,6 +30,7 @@ interface Pending {
   resolve: (value: Calls[Method]["result"]) => void;
   reject: (error: Error) => void;
   payload: (held: string[]) => Promise<Payload>;
+  report?: ((message: Report) => void) | undefined;
 }
 
 const noPayload = () =>
@@ -64,6 +67,10 @@ export class WorkerKernel implements KernelClient {
         return;
       case "ask":
         void this.answer(message.id, message.held);
+        return;
+      case "featureStart":
+      case "progress":
+        this.pending.get(message.id)?.report?.(message);
         return;
       case "reply": {
         const pending = this.pending.get(message.id);
@@ -104,6 +111,7 @@ export class WorkerKernel implements KernelClient {
     method: M,
     args: Calls[M]["args"],
     payload: Pending["payload"] = noPayload,
+    report?: Pending["report"],
   ): Promise<Calls[M]["result"]> {
     return new Promise((resolve, reject) => {
       if (this.failure) return reject(this.failure);
@@ -113,6 +121,7 @@ export class WorkerKernel implements KernelClient {
         resolve: resolve as Pending["resolve"],
         reject,
         payload,
+        report,
       });
     });
   }
@@ -133,8 +142,28 @@ export class WorkerKernel implements KernelClient {
     };
   }
 
-  evaluate(doc: CadDocument, position?: number, extra?: Sources) {
-    return this.call("evaluate", [doc, position, extra], this.sources(doc));
+  evaluate(
+    doc: CadDocument,
+    position?: number,
+    extra?: Sources,
+    hooks: EvaluateHooks = {},
+  ) {
+    const stop = new Int32Array(new SharedArrayBuffer(4));
+    const check = () => {
+      if (hooks.shouldStop?.()) Atomics.store(stop, 0, 1);
+    };
+    check();
+    return this.call(
+      "evaluate",
+      [doc, position, extra, stop],
+      this.sources(doc),
+      (message) => {
+        if (message.type === "featureStart")
+          hooks.onFeatureStart?.(...message.args);
+        else hooks.onProgress?.(...message.args);
+        check();
+      },
+    );
   }
 
   async stateQuery<K extends keyof StateAnswers>(

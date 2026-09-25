@@ -2,9 +2,12 @@ import {
   ValidationError,
   type ApiErrorCode,
   type CadDocument,
+  type EvaluateResult,
   type Health,
 } from "@rockett/shared";
 import { StoreError } from "../store/projectStore.js";
+import type { Sources } from "../geometry/importers.js";
+import type { EvaluateHooks } from "../geometry/engine.js";
 import type {
   ExportJob,
   Imported,
@@ -16,8 +19,13 @@ import type {
 
 export interface Calls {
   evaluate: {
-    args: Parameters<KernelClient["evaluate"]>;
-    result: Awaited<ReturnType<KernelClient["evaluate"]>>;
+    args: [
+      doc: CadDocument,
+      position: number | undefined,
+      extra: Sources | undefined,
+      stop: Int32Array,
+    ];
+    result: EvaluateResult;
   };
   stateQuery: {
     args: [doc: CadDocument, query: StateQuery];
@@ -62,7 +70,16 @@ export type ToWorker =
   | { type: "drop"; docId: string }
   | { type: "payload"; id: number; settled: Settled<Payload> };
 
+type HookArgs<K extends keyof EvaluateHooks> = Parameters<
+  NonNullable<EvaluateHooks[K]>
+>;
+
+export type Report =
+  | { type: "featureStart"; id: number; args: HookArgs<"onFeatureStart"> }
+  | { type: "progress"; id: number; args: HookArgs<"onProgress"> };
+
 export type FromWorker =
+  | Report
   | { type: "ready"; version: Health["kernelVersion"] }
   | { type: "ask"; id: number; held: string[] }
   | { type: "reply"; id: number; settled: Settled<Calls[Method]["result"]> };
