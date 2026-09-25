@@ -18,6 +18,7 @@ import { JsonStore, sha256, StoreError } from "./jsonStore.js";
 import type { Inventory, Write } from "./jsonStore.js";
 import { checkManifest, ID_RE, ManifestStore } from "./manifestStore.js";
 import { documentMigrations, TooNewError } from "./migrations.js";
+import { SettingsStore } from "./settingsStore.js";
 import type { Storage } from "./storage.js";
 import { TIMING_MS } from "../tunables.js";
 
@@ -79,6 +80,7 @@ export class ProjectStore {
   private views: JsonStore<ProjectView>;
   private manifests: ManifestStore;
   readonly uploads: Uploads;
+  readonly settings: SettingsStore;
 
   constructor(
     private readonly storage: Storage,
@@ -86,6 +88,7 @@ export class ProjectStore {
     private readonly now: () => number = Date.now,
   ) {
     this.uploads = new Uploads(storage);
+    this.settings = new SettingsStore(storage);
     this.views = new JsonStore({
       storage,
       root: "projects",
@@ -290,6 +293,7 @@ export class ProjectStore {
       const bytes = await this.blob(id, hash).catch(() => undefined);
       if (bytes) await this.blobs(copy.id).put(bytes);
     }
+    await this.settings.duplicateProject(id, copy.id);
     await this.add(copy);
     return copy;
   }

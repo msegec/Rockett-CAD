@@ -101,6 +101,12 @@ docker run -d --name rockett-cad \
 │       └── history1-{hash}/    # the version 1 history files, copied before they moved into log.bin
 ├── folders/
 │   └── folders.json        # the shared folder tree and project placement
+├── settings/
+│   └── app.json            # app-wide setting values
+├── users/
+│   ├── users.json          # accounts
+│   └── {userId}/
+│       └── settings.json   # the user's setting values
 ├── uploads/                # model imports while they stream in; each is removed when its request ends
 └── projects/
     └── {projectId}/
@@ -108,6 +114,7 @@ docker run -d --name rockett-cad \
         ├── documents/
         │   └── {projectId}.json  # the part document (full history)
         ├── view.json       # hidden bodies and features, outside the document
+        ├── settings.json   # the project's setting values, copied by duplicate
         ├── temporary.json  # present only on a temporary copy of a browser project
         ├── blobs/          # reference images and STEP, IGES and BREP sources, each named by its sha256
         ├── history/        # undo history: log.bin, an append-only log of records holding gzip snapshots
