@@ -14,13 +14,11 @@ import {
   type Xy,
   type Xyz,
 } from "../shared/ir.js";
+import type { Post } from "./schema.js";
 
 export type Units = "mm" | "inch";
 
-export type Post = {
-  id: string;
-  capabilities: { arcs: boolean; cycles: boolean; toolChange: boolean };
-};
+type Target = Pick<Post, "id" | "capabilities">;
 
 export type NormaliseOptions = { units: Units };
 
@@ -159,7 +157,7 @@ function scale(move: Move, divisor: number): Move {
     : scaled;
 }
 
-function expand(move: Move, at: Xyz | undefined, post: Post, path: string) {
+function expand(move: Move, at: Xyz | undefined, post: Target, path: string) {
   if (move.kind === "raw" && move.post !== post.id)
     throw new Error(`${path} raw is for post ${move.post}, not ${post.id}`);
   if (move.kind === "arc" && !post.capabilities.arcs && at)
@@ -181,7 +179,7 @@ function byTool(sections: Section[]): Section[][] {
 
 export function normalise(
   program: Program,
-  post: Post,
+  post: Target,
   options: NormaliseOptions,
 ): NormalisedProgram {
   const problems = validateProgram(program);

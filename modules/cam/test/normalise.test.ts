@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { normalise, type Post } from "../src/post/normalise.js";
+import { normalise } from "../src/post/normalise.js";
+import type { Post } from "../src/post/schema.js";
 import {
   programStats,
   type Move,
@@ -7,6 +8,8 @@ import {
   type Section,
   type Xyz,
 } from "../src/shared/ir.js";
+
+type Target = Pick<Post, "id" | "capabilities">;
 
 const tool = {
   id: "t1",
@@ -21,11 +24,11 @@ const tool = {
   centreCutting: true,
 };
 
-const plain: Post = {
+const plain: Target = {
   id: "plain",
   capabilities: { arcs: false, cycles: false, toolChange: false },
 };
-const full: Post = {
+const full: Target = {
   id: "full",
   capabilities: { arcs: true, cycles: true, toolChange: true },
 };
@@ -52,7 +55,7 @@ function program(moves: Move[]): Program {
   };
 }
 
-function normalised(p: Program, post: Post) {
+function normalised(p: Program, post: Target) {
   return normalise(p, post, { units: "mm" }).files.flatMap((file) =>
     file.flatMap((s) => s.moves),
   );
