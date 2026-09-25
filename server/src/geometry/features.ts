@@ -822,7 +822,7 @@ function faceProfile(
   };
 }
 
-function evalExtrude(state: EvalState, f: ExtrudeFeature) {
+export function evalExtrude(state: EvalState, f: ExtrudeFeature) {
   const dist = Math.abs(f.distance);
   if (dist <= 0) throw new Error("extrude distance must be non-zero");
   const faceRefs = f.faces ?? [];
@@ -935,7 +935,7 @@ function revolveSources(state: EvalState, f: RevolveFeature) {
   ];
 }
 
-function evalRevolve(state: EvalState, f: RevolveFeature) {
+export function evalRevolve(state: EvalState, f: RevolveFeature) {
   const sources = revolveSources(state, f);
   const profileFaces = sources.map((s) => s.pf);
   const axis = resolveAxis(state, f.axis);
@@ -2287,7 +2287,7 @@ function evalConstructionPlane(
   state.planes.set(f.id, { frame, size });
 }
 
-function evalEmboss(state: EvalState, f: EmbossFeature) {
+export function evalEmboss(state: EvalState, f: EmbossFeature) {
   // Emboss = extrude the sketch profiles by `depth` and join (emboss) or
   // cut (deboss) into the underlying body.
   const pseudo: ExtrudeFeature = {
@@ -2340,10 +2340,6 @@ export function evaluateFeature(
     }
     case "sketch":
       return evalSketch(state, feature);
-    case "extrude":
-      return evalExtrude(state, feature);
-    case "revolve":
-      return evalRevolve(state, feature);
     case "sweep":
       return evalSweep(state, feature);
     case "loft":
@@ -2373,8 +2369,6 @@ export function evaluateFeature(
       state.planes.set(feature.id, { frame, size: 0 });
       return;
     }
-    case "emboss":
-      return evalEmboss(state, feature);
     case "move":
       return evalMove(state, feature, earlier);
     default:

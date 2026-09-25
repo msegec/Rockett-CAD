@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  FEATURE_LABELS,
   FEATURE_SCHEMAS,
   featureRefs,
   featureSpec,
@@ -7,6 +8,9 @@ import {
   registerFeatureSpec,
   ValidationError,
   type FaceRef,
+  type Feature,
+  type FeatureRef,
+  type ProfileRef,
   type ShellFeature,
 } from "../src/index.js";
 
@@ -108,5 +112,185 @@ describe("feature spec registry", () => {
     unsubscribe();
     registerFeatureSpec(first)();
     expect(calls).toHaveLength(6);
+  });
+});
+
+const meta = { id: "f1", name: "F1", suppressed: false };
+const refFace = (faceName: string): FaceRef => ({
+  kind: "face",
+  bodyId: "ref:body",
+  faceName: `ref:${faceName}`,
+});
+const refEdge = (edgeName: string) => ({
+  kind: "edge" as const,
+  bodyId: "ref:body",
+  edgeName: `ref:${edgeName}`,
+});
+const refProfile = (profileId: string): ProfileRef => ({
+  sketchId: "ref:sketch",
+  profileId: `ref:${profileId}`,
+});
+
+interface SpecCase {
+  producesGeometry: boolean;
+  valid: Feature[];
+  invalid: [Feature, string, string][];
+}
+
+const cases: Record<string, SpecCase> = {
+  extrude: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "extrude",
+        profiles: [refProfile("p1"), refProfile("p2")],
+        faces: [refFace("F1")],
+        distance: 5,
+        distance2: 2,
+        startOffset: 1,
+        direction: "twoSided",
+        operation: "join",
+        targets: ["ref:b1", "ref:b2"],
+      },
+    ],
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "extrude",
+          profiles: [refProfile("p1")],
+          distance: 0,
+          direction: "normal",
+          operation: "newBody",
+        },
+        "distance must be non-zero",
+        "/distance",
+      ],
+    ],
+  },
+  revolve: {
+    producesGeometry: true,
+    valid: (
+      [
+        { kind: "originAxis", axis: "Z" },
+        { kind: "sketchLine", sketchId: "ref:axisSketch", entityId: "ref:l1" },
+        { kind: "edge", edge: refEdge("E1") },
+      ] as const
+    ).map((axis) => ({
+      ...meta,
+      type: "revolve",
+      profiles: [refProfile("p1")],
+      faces: [refFace("F1")],
+      axis,
+      angle: 90,
+      operation: "cut",
+      targets: ["ref:b1"],
+    })),
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "revolve",
+          profiles: [refProfile("p1")],
+          axis: { kind: "originAxis", axis: "Z" },
+          angle: 1e12,
+          operation: "newBody",
+        },
+        "angle must be <= 360",
+        "/angle",
+      ],
+    ],
+  },
+  emboss: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "emboss",
+        profiles: [refProfile("p1"), refProfile("p2")],
+        depth: 1,
+        mode: "deboss",
+        targets: ["ref:b1"],
+      },
+    ],
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "emboss",
+          profiles: [refProfile("p1")],
+          depth: 0,
+          mode: "emboss",
+        },
+        "depth must be >= 0.000001",
+        "/depth",
+      ],
+    ],
+  },
+};
+
+const valueAt = (f: Feature, path: string) =>
+  path
+    .split("/")
+    .slice(1)
+    .reduce<unknown>((v, key) => (v as Record<string, unknown>)[key], f);
+
+const markedPaths = (v: unknown, at = ""): string[] =>
+  typeof v === "string"
+    ? v.startsWith("ref:")
+      ? [at]
+      : []
+    : typeof v === "object" && v !== null
+      ? Object.entries(v).flatMap(([key, child]) =>
+          markedPaths(child, `${at}/${key}`),
+        )
+      : [];
+
+const target = (ref: FeatureRef) =>
+  (ref as unknown as Record<string, unknown>)[ref.kind];
+
+describe.each(Object.entries(cases))("%s feature spec", (type, specCase) => {
+  const spec = featureSpec(type)!;
+
+  it("is registered with its schema and label", () => {
+    expect(spec).toMatchObject({
+      type,
+      label: FEATURE_LABELS[type as Feature["type"]],
+      producesGeometry: specCase.producesGeometry,
+      version: 1,
+      displayOnly: [],
+    });
+    expect(spec.paramsSchema).toBe(FEATURE_SCHEMAS[type as Feature["type"]]);
+  });
+
+  it("accepts valid features", () => {
+    for (const f of specCase.valid)
+      expect(() => spec.validate(f)).not.toThrow();
+  });
+
+  it("rejects invalid features with the message and path", () => {
+    for (const [f, message, detail] of specCase.invalid) {
+      expect(() => spec.validate(f)).toThrow(ValidationError);
+      expect(() => spec.validate(f)).toThrow(
+        expect.objectContaining({ message, detail }),
+      );
+    }
+  });
+
+  it("lists every reference with its param path", () => {
+    for (const f of specCase.valid) {
+      const properties = Object.keys(FEATURE_SCHEMAS[f.type].properties);
+      expect(properties.filter((key) => !(key in f))).toEqual([]);
+      const refs = featureRefs(f);
+      for (const ref of refs) expect(valueAt(f, ref.path)).toEqual(target(ref));
+      const missed = markedPaths(f).filter(
+        (path) =>
+          !refs.some(
+            (ref) => path === ref.path || path.startsWith(`${ref.path}/`),
+          ),
+      );
+      expect(missed).toEqual([]);
+    }
   });
 });

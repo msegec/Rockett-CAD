@@ -1,9 +1,30 @@
-import type { ShellFeature } from "@rockett/shared";
-import { registerFeatureKind, type FeatureKind } from "./featureKinds.js";
-import { evalShell } from "./features.js";
+import type { Feature, FeatureType } from "@rockett/shared";
+import {
+  registerFeatureKind,
+  type EvalContext,
+  type FeatureKind,
+} from "./featureKinds.js";
+import {
+  evalEmboss,
+  evalExtrude,
+  evalRevolve,
+  evalShell,
+  type FeatureOutcome,
+} from "./features.js";
 
-const kinds: FeatureKind<ShellFeature>[] = [
-  { type: "shell", evaluate: (ctx, f) => evalShell(ctx.state, f) },
+const kind = <T extends FeatureType>(
+  type: T,
+  evaluate: (
+    ctx: EvalContext,
+    f: Extract<Feature, { type: T }>,
+  ) => FeatureOutcome | void,
+): FeatureKind => ({ type, evaluate });
+
+const kinds = [
+  kind("shell", (ctx, f) => evalShell(ctx.state, f)),
+  kind("extrude", (ctx, f) => evalExtrude(ctx.state, f)),
+  kind("revolve", (ctx, f) => evalRevolve(ctx.state, f)),
+  kind("emboss", (ctx, f) => evalEmboss(ctx.state, f)),
 ];
 
-for (const kind of kinds) registerFeatureKind(kind);
+for (const k of kinds) registerFeatureKind(k);
