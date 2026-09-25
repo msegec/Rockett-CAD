@@ -32,11 +32,11 @@ const input = (
   rules: Omit<PickInput, "key" | "kinds"> = {},
 ): PickInput => ({ key, kinds, ...rules });
 
-const profiles = input("profiles", ["profile"]);
+export const profiles = input("profiles", ["profile"]);
 const profilesOrFaces = input("profiles", ["profile", "face"], {
   planar: true,
 });
-const targets = input("targets", ["body"], {
+export const targets = input("targets", ["body"], {
   optional: true,
   param: {
     read: (s) =>
@@ -54,21 +54,6 @@ const targets = input("targets", ["body"], {
   },
 });
 
-export const sketchPicks = (sketchId: string | undefined): Selection[] =>
-  sketchId ? [{ kind: "sketch", sketchId }] : [];
-
-const path = input("path", ["sketchEntity", "sketch"], {
-  one: true,
-  param: {
-    read: (s) => sketchPicks(s.dialogParams.pathSketchId),
-    write: (next, s) =>
-      s.setDialogParams({
-        pathSketchId: next.flatMap((x) =>
-          "sketchId" in x ? [x.sketchId] : [],
-        )[0],
-      }),
-  },
-});
 const bodies = input("bodies", ["body"]);
 const edges = input("edges", ["edge"]);
 const line = { one: true, straight: true } as const;
@@ -95,9 +80,6 @@ const DIALOG_INPUTS: Partial<Record<DialogType, readonly PickInput[]>> = {
   importStep: [],
   extrude: [profilesOrFaces, targets],
   revolve: [profilesOrFaces, axis, targets],
-  sweep: [profiles, path, targets],
-  loft: [profiles, targets],
-  emboss: [profiles, targets],
   fillet: [edges],
   chamfer: [edges],
   combine: [bodies],

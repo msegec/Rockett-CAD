@@ -29,8 +29,6 @@ const TYPE_ICONS: Record<string, string> = {
   sketch: "✏",
   extrude: "⬆",
   revolve: "↻",
-  sweep: "〰",
-  loft: "◆",
   fillet: "◠",
   chamfer: "◣",
   combine: "∪",
@@ -41,7 +39,6 @@ const TYPE_ICONS: Record<string, string> = {
   circularPattern: "❋",
   constructionPlane: "▱",
   referenceImage: "🖼",
-  emboss: "℘",
   move: "✥",
 };
 
@@ -314,13 +311,6 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
       profileId: p.profileId,
     });
   }
-  for (const p of anyF.sections ?? []) {
-    selection.push({
-      kind: "profile",
-      sketchId: p.sketchId,
-      profileId: p.profileId,
-    });
-  }
   for (const e of anyF.edges ?? []) {
     selection.push({ kind: "edge", bodyId: e.bodyId, edgeName: e.edgeName });
   }
@@ -370,15 +360,6 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
         ...axisParams(anyF.axis),
       });
       pushAxis(anyF.axis);
-      break;
-    case "sweep":
-      Object.assign(params, {
-        pathSketchId: anyF.pathSketchId,
-        operation: anyF.operation,
-      });
-      break;
-    case "loft":
-      Object.assign(params, { operation: anyF.operation });
       break;
     case "fillet":
       Object.assign(params, {
@@ -460,9 +441,6 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
       }
       break;
     }
-    case "emboss":
-      Object.assign(params, { depth: anyF.depth, embossMode: anyF.mode });
-      break;
     case "move":
       Object.assign(params, {
         tx: anyF.translation?.[0] ?? 0,

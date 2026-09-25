@@ -475,3 +475,23 @@ export function TargetField({ operation }: { operation: string }) {
     </>
   );
 }
+
+export function OperationField() {
+  const operation: string = useStore((s) => s.dialogParams.operation ?? "join");
+  const setParams = useStore((s) => s.setDialogParams);
+  return (
+    <>
+      <SelectField
+        label="Operation"
+        value={operation}
+        options={[
+          ["newBody", "New body"],
+          ["join", "Join"],
+          ["cut", "Cut"],
+        ]}
+        onChange={(v) => setParams({ operation: v })}
+      />
+      <TargetField operation={operation} />
+    </>
+  );
+}

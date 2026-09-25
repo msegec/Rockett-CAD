@@ -26,14 +26,9 @@ import {
 import { api, saveDownload } from "../api";
 import { extrudeOperation } from "../extrudeReach";
 import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
-import {
-  clearInput,
-  sketchPicks,
-  takes,
-  type PlaneMethod,
-} from "../dialogPicks";
+import { clearInput, takes, type PlaneMethod } from "../dialogPicks";
 import { createLivePreview } from "../livePreview";
-import { targetOperation, toolTargets } from "../toolTargets";
+import { toolTargets } from "../toolTargets";
 import { viewportHandle } from "../viewportRef";
 import { DraggablePanel } from "./DraggablePanel";
 import { ImportPanel } from "./ImportPanel";
@@ -50,6 +45,9 @@ import {
   TargetField,
 } from "./form/fields";
 import { DialogFooter } from "./form/DialogFooter";
+import "../features/sweep";
+import "../features/loft";
+import "../features/emboss";
 import { featureUI } from "../features/registry";
 import "../features/shell";
 
@@ -449,121 +447,6 @@ function DialogBody({
           suppressed: false,
           bodies: bodies.map((b) => b.bodyId),
           translation: [num("tx", 0), num("ty", 0), num("tz", 0)],
-        };
-      };
-      break;
-    }
-    case "sweep": {
-      title = "Sweep";
-      const sketches = (document_?.features ?? []).filter(
-        (f) => f.type === "sketch",
-      );
-      body = (
-        <>
-          <SelInfo
-            label="Profile"
-            input="profiles"
-            hint="click a sketch region"
-          />
-          <SelectField
-            label="Path sketch"
-            value={p("pathSketchId", "")}
-            options={[
-              ["", "Choose"],
-              ...sketches.map((s) => [s.id, s.name] as [string, string]),
-            ]}
-            onChange={(v) => setParams({ pathSketchId: v })}
-          />
-          <SelInfo
-            label="Path sketch"
-            input="path"
-            picks={sketchPicks(params.pathSketchId)}
-            hint="click a curve of the path sketch"
-            onRemove={() => clearInput("path")}
-          />
-          {operationField(false)}
-        </>
-      );
-      build = () => {
-        need(profiles.length > 0, "Select a profile");
-        need(p("pathSketchId", ""), "Choose a path sketch");
-        return {
-          id: editId ?? newId("sweep"),
-          type: "sweep",
-          name: p("name", ""),
-          suppressed: false,
-          profiles: profileRefs(),
-          pathSketchId: p("pathSketchId", ""),
-          operation: p("operation", "join"),
-          ...targets(p("operation", "join")),
-        };
-      };
-      break;
-    }
-    case "loft": {
-      title = "Loft";
-      body = (
-        <>
-          <SelInfo
-            label="Sections (in order)"
-            input="profiles"
-            hint="click 2+ profiles"
-          />
-          {operationField(false)}
-        </>
-      );
-      build = () => {
-        need(profiles.length >= 2, "Select at least two section profiles");
-        return {
-          id: editId ?? newId("loft"),
-          type: "loft",
-          name: p("name", ""),
-          suppressed: false,
-          sections: profileRefs(),
-          operation: p("operation", "join"),
-          ...targets(p("operation", "join")),
-        };
-      };
-      break;
-    }
-    case "emboss": {
-      title = "Emboss";
-      body = (
-        <>
-          <SelInfo
-            label="Profiles"
-            input="profiles"
-            hint="sketch on a face, then pick regions"
-          />
-          <NumField
-            label="Depth (mm)"
-            autoFocus
-            value={p("depth", main("emboss"))}
-            onChange={(v) => setParams({ depth: v })}
-          />
-          <SelectField
-            label="Mode"
-            value={p("embossMode", "emboss")}
-            options={[
-              ["emboss", "Emboss (raise)"],
-              ["deboss", "Deboss (engrave)"],
-            ]}
-            onChange={(v) => setParams({ embossMode: v })}
-          />
-          <TargetField operation={targetOperation(dialog, params)} />
-        </>
-      );
-      build = () => {
-        need(profiles.length > 0, "Select profiles");
-        return {
-          id: editId ?? newId("emboss"),
-          type: "emboss",
-          name: p("name", ""),
-          suppressed: false,
-          profiles: profileRefs(),
-          depth: main("emboss"),
-          mode: p("embossMode", "emboss"),
-          ...targets(targetOperation(dialog, params)),
         };
       };
       break;
