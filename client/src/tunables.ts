@@ -1,10 +1,10 @@
 export const TIMING_MS = {
-  previewDebounce: 30,
-  timelinePeekDwell: 200,
-  dragThrottle: 150,
-  viewTurn: 200,
-  wheelGestureIdle: 125,
-  sketchAlignDelay: 30,
+  previewDebounce: 36,
+  timelinePeekDwell: 72,
+  dragThrottle: 72,
+  viewTurn: 72,
+  wheelGestureIdle: 72,
+  sketchAlignDelay: 36,
 } as const;
 
 export const PREVIEW_APPEARANCE = {
