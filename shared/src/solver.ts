@@ -230,17 +230,10 @@ function buildProblem(input: SolveInput): Problem {
         const lineId = lines.has(c.a) ? c.a : lines.has(c.b) ? c.b : null;
         const circId = lines.has(c.a) ? c.b : c.a;
         if (lineId) {
-          const l = lineEnds(lineId);
+          const offset = lineOffset(lineEnds(lineId));
           const { cx, cy } = centerOf(circId);
           const r = radius(circId);
-          residuals.push((x) => {
-            const dx = l.x2(x) - l.x1(x),
-              dy = l.y2(x) - l.y1(x);
-            const len = Math.hypot(dx, dy) || 1;
-            const dist =
-              Math.abs(dx * (cy(x) - l.y1(x)) - dy * (cx(x) - l.x1(x))) / len;
-            return dist - r(x);
-          });
+          residuals.push((x) => Math.abs(offset(x, cx(x), cy(x))) - r(x));
         } else {
           const A = centerOf(c.a),
             B = centerOf(c.b);
@@ -290,27 +283,33 @@ function buildProblem(input: SolveInput): Problem {
         break;
       }
       case "collinear": {
-        const a = lineEnds(c.a),
-          b = lineEnds(c.b);
-        const cross = (x: Float64Array, ptx: number, pty: number) => {
-          const dax = a.x2(x) - a.x1(x),
-            day = a.y2(x) - a.y1(x);
-          const la = Math.hypot(dax, day) || 1;
-          return (dax * (pty - a.y1(x)) - day * (ptx - a.x1(x))) / la;
-        };
-        residuals.push((x) => cross(x, b.x1(x), b.y1(x)));
-        residuals.push((x) => cross(x, b.x2(x), b.y2(x)));
+        const offset = lineOffset(lineEnds(c.a));
+        const b = lineEnds(c.b);
+        residuals.push((x) => offset(x, b.x1(x), b.y1(x)));
+        residuals.push((x) => offset(x, b.x2(x), b.y2(x)));
         break;
       }
       case "pointOnLine": {
+        const offset = lineOffset(lineEnds(c.line));
         const p = { x: px(c.point), y: py(c.point) };
-        const l = lineEnds(c.line);
-        residuals.push((x) => {
-          const dx = l.x2(x) - l.x1(x),
-            dy = l.y2(x) - l.y1(x);
-          const len = Math.hypot(dx, dy) || 1;
-          return (dx * (p.y(x) - l.y1(x)) - dy * (p.x(x) - l.x1(x))) / len;
-        });
+        residuals.push((x) => offset(x, p.x(x), p.y(x)));
+        break;
+      }
+      case "pointLineDistance": {
+        const offset = lineOffset(lineEnds(c.line));
+        const p = { x: px(c.point), y: py(c.point) };
+        const v = c.value;
+        residuals.push((x) => Math.abs(offset(x, p.x(x), p.y(x))) - v);
+        break;
+      }
+      case "lineDistance": {
+        const offset = lineOffset(lineEnds(c.a));
+        const b = lineEnds(c.b);
+        const v = c.value;
+        residuals.push((x) => Math.abs(offset(x, b.x1(x), b.y1(x))) - v);
+        residuals.push(
+          (x) => offset(x, b.x2(x), b.y2(x)) - offset(x, b.x1(x), b.y1(x)),
+        );
         break;
       }
       case "pointOnCircle": {
@@ -347,7 +346,7 @@ function buildProblem(input: SolveInput): Problem {
       }
       case "lineAngle": {
         const l = lineEnds(c.line);
-        const v = (c.value * Math.PI) / 180;
+        const v = ((c.value + (c.axis === "y" ? 90 : 0)) * Math.PI) / 180;
         const ux = Math.cos(v),
           uy = Math.sin(v);
         residuals.push((x) => {
@@ -419,6 +418,20 @@ function buildProblem(input: SolveInput): Problem {
     hardCount,
     apply,
     numVars: vars.length,
+  };
+}
+
+function lineOffset(l: {
+  x1: Residual;
+  y1: Residual;
+  x2: Residual;
+  y2: Residual;
+}) {
+  return (x: Float64Array, ptx: number, pty: number) => {
+    const dx = l.x2(x) - l.x1(x),
+      dy = l.y2(x) - l.y1(x);
+    const len = Math.hypot(dx, dy) || 1;
+    return (dx * (pty - l.y1(x)) - dy * (ptx - l.x1(x))) / len;
   };
 }
 

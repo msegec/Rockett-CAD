@@ -149,6 +149,7 @@ export const documentMigrations: Migrations<CadDocument> = {
     13: (doc) => doc,
     14: (doc) => doc,
     15: (doc) => doc,
+    16: (doc) => doc,
   },
 };
 

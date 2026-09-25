@@ -67,9 +67,10 @@ import {
   pickInto,
   takes,
 } from "../dialogPicks";
-import { dimensionLayout } from "../dimensionLayout";
+import { dimensionLayout, dimensionMaps } from "../dimensionLayout";
 import { SketchOffsetIndicators } from "./SketchOffsetIndicators";
 import { ViewportContextMenu } from "./ViewportContextMenu";
+import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { repick } from "./RefRepair";
 import { dragPreview as livePreview, previewEdit } from "../toolTargets";
 
@@ -116,6 +117,12 @@ export function ViewportView() {
     fields: DimEditField[];
     x: number;
     y: number;
+  } | null>(null);
+
+  const [dimMenu, setDimMenu] = useState<{
+    x: number;
+    y: number;
+    items: MenuItem[];
   } | null>(null);
 
   const [ctxMenu, setCtxMenu] = useState<{
@@ -191,10 +198,7 @@ export function ViewportView() {
     clicks: tools.UV[];
     dragPointId: string | null;
     chainPointId: string | null;
-    dimTargets: Array<{
-      kind: "point" | "line" | "circle" | "arc";
-      id: string;
-    }>;
+    dimTargets: tools.DimTarget[];
     pickDepth: number;
     lastPickPos: { x: number; y: number };
     /** press position for drag-to-draw */
@@ -422,18 +426,9 @@ export function ViewportView() {
         (s) => s.featureId === activeSketchId,
       );
       if (sk) {
-        const pts = new Map<string, { x: number; y: number }>();
-        for (const e of draftSketch.entities) {
-          if (e.kind === "point") pts.set(e.id, e);
-        }
-        const lines = new Map<string, { p1: string; p2: string }>();
-        const circles = new Map<string, { center: string; radius: number }>();
-        for (const e of draftSketch.entities) {
-          if (e.kind === "line") lines.set(e.id, e);
-          if (e.kind === "circle") circles.set(e.id, e);
-        }
+        const { points, lines, circles } = dimensionMaps(draftSketch.entities);
         for (const c of draftSketch.constraints) {
-          const layout = dimensionLayout(c, pts, lines, circles);
+          const layout = dimensionLayout(c, points, lines, circles);
           if (layout) {
             const anchor = layout.label;
             const off = c.labelOffset;
@@ -2346,21 +2341,21 @@ export function ViewportView() {
               : ent.kind === "circle"
                 ? "circle"
                 : "arc";
-        ts.dimTargets.push({ kind, id: ent.id } as any);
-
-        const tryDim = (
-          targets: typeof ts.dimTargets,
-        ): SketchConstraint | null => tools.dimensionFor(targets as any, 0);
-
-        // single-target dimensions apply immediately; two points/lines need 2 clicks
-        let constraint: SketchConstraint | null = null;
-        if (kind === "line" || kind === "circle" || kind === "arc") {
-          constraint = tryDim([ts.dimTargets[ts.dimTargets.length - 1]!]);
-          ts.dimTargets = [];
-        } else if (ts.dimTargets.length >= 2) {
-          constraint = tryDim(ts.dimTargets.slice(-2));
-          ts.dimTargets = [];
+        const target: tools.DimTarget = { kind, id: ent.id };
+        if (kind === "line" && (e.ctrlKey || e.metaKey)) {
+          ts.dimTargets = [target];
+          return;
         }
+        const pending = ts.dimTargets.at(-1);
+        const targets =
+          kind === "circle" || kind === "arc" || !pending
+            ? [target]
+            : [pending, target];
+        ts.dimTargets = kind === "point" && !pending ? [target] : [];
+        const constraint =
+          targets.length === 2 || kind !== "point"
+            ? tools.dimensionFor(targets, draft.entities)
+            : null;
         if (constraint) {
           // already dimensioned? edit that one instead of stacking another
           const existing = tools.findExistingDimension(
@@ -2380,24 +2375,9 @@ export function ViewportView() {
             });
             return;
           }
-          const currentValue = measureCurrent(constraint, draft.entities);
-          (constraint as any).value = currentValue;
-          s.updateDraftSketch(draft.entities, [
-            ...draft.constraints,
-            constraint,
-          ]);
-          await s.commitDraftSketch();
           // open the label editor immediately
-          setDimEdit({
-            fields: [
-              {
-                constraintId: constraint.id,
-                value: String(round3(currentValue)),
-              },
-            ],
-            x: e.clientX,
-            y: e.clientY,
-          });
+          const at = { x: e.clientX, y: e.clientY };
+          await commitDimension((cs) => [...cs, constraint], constraint, at);
         }
         return;
       }
@@ -2501,19 +2481,10 @@ export function ViewportView() {
     }
     const constraint = tools.dimensionFor(
       [{ kind: ent.kind, id: entityId }],
-      0,
+      draft.entities,
     );
     if (!constraint) return;
-    (constraint as any).value = measureCurrent(constraint, draft.entities);
-    s.updateDraftSketch(draft.entities, [...draft.constraints, constraint]);
-    await s.commitDraftSketch();
-    setDimEdit({
-      fields: [
-        {
-          constraintId: constraint.id,
-          value: String(round3((constraint as any).value)),
-        },
-      ],
+    await commitDimension((cs) => [...cs, constraint], constraint, {
       x: e.clientX,
       y: e.clientY,
     });
@@ -2751,6 +2722,48 @@ export function ViewportView() {
     setDimEdit(null);
   }
 
+  function openDimensionChoices(
+    id: string,
+    e: { clientX: number; clientY: number },
+  ) {
+    const draft = useStore.getState().draftSketch;
+    const c = draft?.constraints.find((x) => x.id === id);
+    const choices = c && draft ? tools.dimensionChoices(c, draft.entities) : [];
+    if (!choices.length) return;
+    const at = { x: e.clientX, y: e.clientY };
+    dimDragRef.current = null;
+    setDimEdit(null);
+    setDimMenu({
+      ...at,
+      items: choices.map((choice) => ({
+        label: choice.label,
+        action: () =>
+          void commitDimension(
+            (cs) => tools.chooseDimension(cs, choice.constraint),
+            choice.constraint,
+            at,
+          ),
+      })),
+    });
+  }
+
+  async function commitDimension(
+    edit: (constraints: SketchConstraint[]) => SketchConstraint[],
+    placed: SketchConstraint,
+    at: { x: number; y: number },
+  ) {
+    const s = useStore.getState();
+    const draft = s.draftSketch;
+    if (!draft) return;
+    s.updateDraftSketch(draft.entities, edit(draft.constraints));
+    await s.commitDraftSketch();
+    const value = round3(tools.measureDimension(placed, draft.entities));
+    setDimEdit({
+      fields: [{ constraintId: placed.id, value: String(value) }],
+      ...at,
+    });
+  }
+
   /** Remove the dimension whose label is being edited. */
   async function deleteDimEdit(ids: string[]) {
     const s = useStore.getState();
@@ -2779,6 +2792,7 @@ export function ViewportView() {
           <div
             key={l.id}
             className="dim-label"
+            onContextMenu={(e) => openDimensionChoices(l.id, e)}
             onPointerDown={(e) => {
               e.stopPropagation();
               (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -2971,6 +2985,14 @@ export function ViewportView() {
       >
         ⌂
       </button>
+      {dimMenu && (
+        <ContextMenu
+          x={dimMenu.x}
+          y={dimMenu.y}
+          items={dimMenu.items}
+          onClose={() => setDimMenu(null)}
+        />
+      )}
       {ctxMenu && (
         <ViewportContextMenu
           menu={ctxMenu}
@@ -3007,7 +3029,7 @@ function ViewportHud() {
       slot: "Click two centres, then the radius",
       point: "Click to place points",
       dimension:
-        "Click an entity (or two points / two lines), then type the value",
+        "Click an entity or two points · Ctrl-click a line, then a line or point · right-click a dimension to change its kind",
       project:
         "Click a model edge to create a linked purple reference · source must precede this sketch",
       trim: "Click the section between intersections to remove · Esc cancels",
@@ -3058,21 +3080,16 @@ function dimAnchorFor(
   c: SketchConstraint,
   entities: SketchEntity[],
 ): { x: number; y: number } | null {
-  const pts = new Map<string, { x: number; y: number }>();
-  const lines = new Map<string, { p1: string; p2: string }>();
-  const circles = new Map<string, { center: string; radius: number }>();
-  for (const e of entities) {
-    if (e.kind === "point") pts.set(e.id, e);
-    else if (e.kind === "line") lines.set(e.id, e);
-    else if (e.kind === "circle") circles.set(e.id, e);
-  }
-  return dimensionLayout(c, pts, lines, circles)?.label ?? null;
+  const { points, lines, circles } = dimensionMaps(entities);
+  return dimensionLayout(c, points, lines, circles)?.label ?? null;
 }
 
 function dimensionText(c: SketchConstraint): string {
   switch (c.type) {
     case "length":
     case "distance":
+    case "pointLineDistance":
+    case "lineDistance":
       return `${round3((c as any).value)}`;
     case "radius":
       return `R${round3((c as any).value)}`;
@@ -3099,48 +3116,4 @@ function angleSnapped(
 
 function round3(v: number): number {
   return Math.round(v * 1000) / 1000;
-}
-
-function measureCurrent(c: SketchConstraint, entities: SketchEntity[]): number {
-  const pts = new Map<string, { x: number; y: number }>();
-  for (const e of entities) if (e.kind === "point") pts.set(e.id, e);
-  if (c.type === "length") {
-    const l = entities.find((e) => e.id === c.line) as any;
-    const a = pts.get(l.p1)!,
-      b = pts.get(l.p2)!;
-    return Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  if (c.type === "distance") {
-    const a = pts.get(c.a)!,
-      b = pts.get(c.b)!;
-    if (c.axis === "x") return Math.abs(b.x - a.x);
-    if (c.axis === "y") return Math.abs(b.y - a.y);
-    return Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  if (c.type === "radius" || c.type === "diameter") {
-    const ent = entities.find((e) => e.id === (c as any).entity) as any;
-    if (ent?.kind === "circle") {
-      return c.type === "radius" ? ent.radius : ent.radius * 2;
-    }
-    if (ent?.kind === "arc") {
-      const cc = pts.get(ent.center)!;
-      const s = pts.get(ent.start)!;
-      const r = Math.hypot(s.x - cc.x, s.y - cc.y);
-      return c.type === "radius" ? r : r * 2;
-    }
-  }
-  if (c.type === "angle") {
-    const la = entities.find((e) => e.id === c.a) as any;
-    const lb = entities.find((e) => e.id === c.b) as any;
-    const a1 = pts.get(la.p1)!,
-      a2 = pts.get(la.p2)!;
-    const b1 = pts.get(lb.p1)!,
-      b2 = pts.get(lb.p2)!;
-    const va = { x: a2.x - a1.x, y: a2.y - a1.y };
-    const vb = { x: b2.x - b1.x, y: b2.y - b1.y };
-    const dot = va.x * vb.x + va.y * vb.y;
-    const cross = va.x * vb.y - va.y * vb.x;
-    return (Math.atan2(Math.abs(cross), dot) * 180) / Math.PI;
-  }
-  return 0;
 }

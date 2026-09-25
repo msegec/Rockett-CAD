@@ -16,17 +16,17 @@ client/src/components/Timeline.tsx openFeatureEditor 175
 client/src/components/Toolbar.tsx SketchToolbar 98
 client/src/components/Toolbar.tsx Toolbar 92
 client/src/components/ViewportContextMenu.tsx ViewportContextMenu 137
-client/src/components/ViewportView.tsx 3146
-client/src/components/ViewportView.tsx ViewportView 2895
+client/src/components/ViewportView.tsx 3119
+client/src/components/ViewportView.tsx ViewportView 2916
 client/src/components/ViewportView.tsx handleHover 138
 client/src/components/ViewportView.tsx handlePrimaryUp 178
-client/src/components/ViewportView.tsx handleSketchClick 245
+client/src/components/ViewportView.tsx handleSketchClick 230
 client/src/components/ViewportView.tsx onPointerMove 119
 client/src/components/ViewportView.tsx onPointerUp 86
 client/src/components/ViewportView.tsx pointerToSketchUV 221
-client/src/components/ViewportView.tsx useEffect() 108
+client/src/components/ViewportView.tsx useEffect() 99
 client/src/components/ViewportView.tsx useEffect()#2 296
-client/src/sketchTools.ts 827
+client/src/sketchTools.ts 975
 client/src/store.ts 1285
 client/src/store.ts deleteSketchEntities 94
 client/src/store.ts useStore 792
@@ -48,11 +48,11 @@ server/src/geometry/sketchGeom.ts buildWire 84
 server/src/geometry/sketchGeom.ts subtractSketchRegionsFromFace 133
 server/src/geometry/tangentEdges.ts tangentEdges 110
 server/src/geometry/tessellate.ts tessellateBody 104
-shared/src/model.ts 566
+shared/src/model.ts 583
 shared/src/profiles.ts 589
 shared/src/sketchModify.ts 741
 shared/src/sketchModify.ts joinOffsetEndpoints 110
 shared/src/sketchModify.ts offsetRoundedChain 124
 shared/src/sketchModify.ts offsetSketch 159
-shared/src/solver.ts 628
-shared/src/solver.ts buildProblem 360
+shared/src/solver.ts 641
+shared/src/solver.ts buildProblem 359

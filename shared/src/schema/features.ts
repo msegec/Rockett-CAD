@@ -143,8 +143,11 @@ const sketchConstraint = Type.Union([
     value,
   }),
   constraint("length", { line: id, value }),
+  constraint("pointLineDistance", { point: id, line: id, value }),
+  constraint("lineDistance", { ...pair, value }),
   constraint("lineAngle", {
     line: id,
+    axis: Type.Optional(Type.Literal("y")),
     value: Type.Number({ exclusiveMinimum: -180, maximum: 180 }),
   }),
   constraint("radius", { entity: id, value }),

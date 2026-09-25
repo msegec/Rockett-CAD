@@ -37,6 +37,7 @@ everything downstream against persistent topology references.
 
 - **Sketcher**: draw lines, rectangles, circles, arcs, polygons, slots, points and construction geometry.
 - **Constraints and dimensions**: constrain shapes, drive them with editable dimensions and watch the remaining degrees of freedom.
+- **Dimension kinds**: point to line, parallel lines, line to line or axis angles; right-click a dimension for horizontal, vertical or radius.
 - **Line angles**: a typed angle is kept; double-click a line to edit its length and angle.
 - **Regions**: crossing and touching curves split a sketch into regions, such as the four corners around an inscribed circle.
 - **Angle snap**: hold Shift to snap a line to 15 degree steps; press A to lock its angle.

@@ -11,7 +11,7 @@
 
 import type { Units } from "./units.js";
 
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 export type NamingVersion = 1 | 2;
 
@@ -171,7 +171,24 @@ export type DimensionConstraint =
       value: number; // mm
     })
   | (ConstraintBase & { type: "length"; line: string; value: number })
-  | (ConstraintBase & { type: "lineAngle"; line: string; value: number })
+  | (ConstraintBase & {
+      type: "pointLineDistance";
+      point: string;
+      line: string;
+      value: number;
+    })
+  | (ConstraintBase & {
+      type: "lineDistance";
+      a: string;
+      b: string;
+      value: number;
+    })
+  | (ConstraintBase & {
+      type: "lineAngle";
+      line: string;
+      axis?: "y";
+      value: number;
+    })
   | (ConstraintBase & { type: "radius"; entity: string; value: number })
   | (ConstraintBase & { type: "diameter"; entity: string; value: number })
   | (ConstraintBase & { type: "angle"; a: string; b: string; value: number }); // degrees

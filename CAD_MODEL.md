@@ -730,6 +730,27 @@ fails the feature with an error naming it. A revolve without `faces` evaluates
 as before. The 15 to 16 migration changes nothing but the version, and the
 project is backed up before its first save.
 
+## Sketch distances and axis angles (schema 17)
+
+Two dimension constraints join the sketch. `pointLineDistance { point, line,
+value }` holds a point at `value` mm from the infinite line through `line`, on
+either side; it removes one degree of freedom. `lineDistance { a, b, value }`
+holds both ends of `b` at the same signed distance from line `a`, so `b` stays
+parallel to `a` at `value` mm; it removes two. A `lineAngle` may carry
+`axis: "y"`, measuring from the sketch +Y axis instead of +X, in the same
+(-180, 180] range; without `axis` it measures from +X as before.
+
+The Dimension tool picks one line for its length, one circle or arc for its
+diameter, two points for their distance, a point and a line for their
+distance, and two lines for their angle or, when parallel, their distance.
+Ctrl-click holds a line as the first pick. Right-clicking a placed dimension
+lists the other kinds for the same geometry: aligned, horizontal or vertical
+distance; radius or diameter; length or the angle to the X or Y axis. The
+choice keeps the constraint id, drops its label offset, and like a typed angle
+removes a `horizontal` or `vertical` constraint on that line. The 16 to 17
+migration changes nothing but the version, and the project is backed up
+before its first save.
+
 ## Tangent edge chains
 
 Fillet/Chamfer store optional tangentChain metadata (absent preserves prior

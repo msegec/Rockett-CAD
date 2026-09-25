@@ -4,7 +4,7 @@
  */
 
 import type { SketchConstraint, SketchEntity } from "@rockett/shared";
-import { newId, normalizeDegrees } from "@rockett/shared";
+import { newId, normalizeDegrees, UNIT_DOT_TOL } from "@rockett/shared";
 
 export interface Created {
   entities: SketchEntity[];
@@ -427,47 +427,191 @@ export function createPoint(at: UV, construction?: boolean): Created {
   return { entities, constraints };
 }
 
-/**
- * Build the right dimensional constraint for the current selection.
- * Returns null when the selection doesn't support a dimension.
- */
+export type DimTarget = {
+  kind: "point" | "line" | "circle" | "arc";
+  id: string;
+};
+
+type XY = { x: number; y: number };
+
+function geometry(entities: SketchEntity[]) {
+  const at = new Map(entities.map((e) => [e.id, e]));
+  const point = (id: string): XY => {
+    const p = at.get(id);
+    if (p?.kind !== "point") throw new Error(`unknown point ${id}`);
+    return p;
+  };
+  const line = (id: string) => {
+    const l = at.get(id);
+    if (l?.kind !== "line") throw new Error(`unknown line ${id}`);
+    return { a: point(l.p1), b: point(l.p2) };
+  };
+  const radius = (id: string) => {
+    const e = at.get(id);
+    if (e?.kind === "circle") return e.radius;
+    if (e?.kind === "arc") {
+      const c = point(e.center);
+      const p = point(e.start);
+      return Math.hypot(p.x - c.x, p.y - c.y);
+    }
+    throw new Error(`entity ${id} has no radius`);
+  };
+  const offset = (lineId: string, p: XY) => {
+    const { a, b } = line(lineId);
+    const dx = b.x - a.x,
+      dy = b.y - a.y;
+    return (dx * (p.y - a.y) - dy * (p.x - a.x)) / (Math.hypot(dx, dy) || 1);
+  };
+  const direction = (lineId: string) => {
+    const { a, b } = line(lineId);
+    return Math.atan2(b.y - a.y, b.x - a.x);
+  };
+  return { point, line, radius, offset, direction };
+}
+
+const degrees = (radians: number) => (radians * 180) / Math.PI;
+
+export function measureDimension(
+  c: SketchConstraint,
+  entities: SketchEntity[],
+): number {
+  const g = geometry(entities);
+  switch (c.type) {
+    case "length": {
+      const { a, b } = g.line(c.line);
+      return Math.hypot(b.x - a.x, b.y - a.y);
+    }
+    case "distance": {
+      const a = g.point(c.a),
+        b = g.point(c.b);
+      if (c.axis === "x") return Math.abs(b.x - a.x);
+      if (c.axis === "y") return Math.abs(b.y - a.y);
+      return Math.hypot(b.x - a.x, b.y - a.y);
+    }
+    case "radius":
+      return g.radius(c.entity);
+    case "diameter":
+      return 2 * g.radius(c.entity);
+    case "angle": {
+      const diff = g.direction(c.b) - g.direction(c.a);
+      return degrees(Math.abs(Math.atan2(Math.sin(diff), Math.cos(diff))));
+    }
+    case "lineAngle":
+      return normalizeDegrees(
+        degrees(g.direction(c.line)) - (c.axis === "y" ? 90 : 0),
+      );
+    case "pointLineDistance":
+      return Math.abs(g.offset(c.line, g.point(c.point)));
+    case "lineDistance":
+      return Math.abs(g.offset(c.a, g.line(c.b).a));
+    default:
+      return 0;
+  }
+}
+
+function measured(c: SketchConstraint, entities: SketchEntity[]) {
+  return { ...c, value: measureDimension(c, entities) } as SketchConstraint;
+}
+
+function parallel(entities: SketchEntity[], a: string, b: string): boolean {
+  const g = geometry(entities);
+  return Math.abs(Math.sin(g.direction(a) - g.direction(b))) < UNIT_DOT_TOL;
+}
+
 export function dimensionFor(
-  targets: Array<
-    | { kind: "point"; id: string }
-    | { kind: "line"; id: string }
-    | { kind: "circle"; id: string }
-    | { kind: "arc"; id: string }
-  >,
-  value: number,
+  targets: DimTarget[],
+  entities: SketchEntity[],
 ): SketchConstraint | null {
-  if (targets.length === 1) {
-    const t = targets[0]!;
-    if (t.kind === "line") {
-      return { id: newId("c"), type: "length", line: t.id, value };
-    }
-    if (t.kind === "circle" || t.kind === "arc") {
-      return { id: newId("c"), type: "diameter", entity: t.id, value };
-    }
+  const [a, b, ...rest] = targets.filter(
+    (t, i) => targets.findIndex((u) => u.id === t.id) === i,
+  );
+  if (!a || rest.length) return null;
+  const id = newId("c");
+  const value = 0;
+  if (!b) {
+    if (a.kind === "line")
+      return measured({ id, type: "length", line: a.id, value }, entities);
+    if (a.kind === "circle" || a.kind === "arc")
+      return measured({ id, type: "diameter", entity: a.id, value }, entities);
     return null;
   }
-  if (targets.length === 2) {
-    const a = targets[0]!;
-    const b = targets[1]!;
-    if (a.kind === "point" && b.kind === "point") {
-      return {
-        id: newId("c"),
-        type: "distance",
-        a: a.id,
-        b: b.id,
-        axis: null,
-        value,
-      };
+  if (a.kind === "point" && b.kind === "point")
+    return measured(
+      { id, type: "distance", a: a.id, b: b.id, axis: null, value },
+      entities,
+    );
+  const point = [a, b].find((t) => t.kind === "point");
+  const line = [a, b].find((t) => t.kind === "line");
+  if (point && line)
+    return measured(
+      { id, type: "pointLineDistance", point: point.id, line: line.id, value },
+      entities,
+    );
+  if (a.kind !== "line" || b.kind !== "line") return null;
+  const type = parallel(entities, a.id, b.id) ? "lineDistance" : "angle";
+  return measured({ id, type, a: a.id, b: b.id, value }, entities);
+}
+
+const kind = (label: string, constraint: SketchConstraint) => ({
+  label,
+  constraint,
+});
+
+function dimensionKinds(c: SketchConstraint) {
+  const { id } = c;
+  const value = 0;
+  switch (c.type) {
+    case "distance": {
+      const pair = { id, type: c.type, a: c.a, b: c.b, value };
+      return [
+        kind("Aligned distance", { ...pair, axis: null }),
+        kind("Horizontal distance", { ...pair, axis: "x" }),
+        kind("Vertical distance", { ...pair, axis: "y" }),
+      ];
     }
-    if (a.kind === "line" && b.kind === "line") {
-      return { id: newId("c"), type: "angle", a: a.id, b: b.id, value };
+    case "radius":
+    case "diameter":
+      return [
+        kind("Radius", { id, type: "radius", entity: c.entity, value }),
+        kind("Diameter", { id, type: "diameter", entity: c.entity, value }),
+      ];
+    case "length":
+    case "lineAngle": {
+      const angle = { id, type: "lineAngle", line: c.line, value } as const;
+      return [
+        kind("Length", { id, type: "length", line: c.line, value }),
+        kind("Angle to X axis", angle),
+        kind("Angle to Y axis", { ...angle, axis: "y" }),
+      ];
     }
+    default:
+      return [];
   }
-  return null;
+}
+
+const dimensionKind = (c: SketchConstraint) =>
+  `${c.type}:${"axis" in c ? (c.axis ?? "") : ""}`;
+
+export function dimensionChoices(
+  c: SketchConstraint,
+  entities: SketchEntity[],
+) {
+  return dimensionKinds(c)
+    .filter((k) => dimensionKind(k.constraint) !== dimensionKind(c))
+    .map(({ label, constraint }) => ({
+      label,
+      constraint: measured(constraint, entities),
+    }));
+}
+
+export function chooseDimension(
+  constraints: SketchConstraint[],
+  choice: SketchConstraint,
+): SketchConstraint[] {
+  return dedupeDimensions(
+    withoutAxisLocks(constraints.map((c) => (c.id === choice.id ? choice : c))),
+    choice.id,
+  );
 }
 
 /**
@@ -502,6 +646,10 @@ export function dimensionKey(c: SketchConstraint): string | null {
       return `distance:${[x.a, x.b].sort().join("|")}:${x.axis ?? ""}`;
     case "angle":
       return `angle:${[x.a, x.b].sort().join("|")}`;
+    case "lineDistance":
+      return `lineDistance:${[x.a, x.b].sort().join("|")}`;
+    case "pointLineDistance":
+      return `pointLine:${x.point}|${x.line}`;
     default:
       return null;
   }
