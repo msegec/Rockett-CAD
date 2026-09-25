@@ -94,6 +94,7 @@ import { geometryNames } from "./signature.js";
 import { curveInfo } from "./tessellate.js";
 import { tangentEdges } from "./tangentEdges.js";
 import { readImport, readMesh, type Sources } from "./importers.js";
+import { featureKind } from "./featureKinds.js";
 import {
   arcEdge,
   buildProfileFace,
@@ -1742,7 +1743,7 @@ function evalCombine(state: EvalState, f: CombineFeature): void {
   });
 }
 
-function evalShell(state: EvalState, f: ShellFeature): void {
+export function evalShell(state: EvalState, f: ShellFeature): void {
   if (f.thickness <= 0) throw new Error("shell thickness must be positive");
   const bodyId = f.openFaces[0]?.bodyId ?? [...state.bodies.keys()][0];
   const body = bodyId === undefined ? undefined : state.bodies.get(bodyId);
@@ -2223,6 +2224,9 @@ export function evaluateFeature(
   earlier: Feature[],
   sources: Sources = new Map(),
 ): FeatureOutcome | void {
+  const kind = featureKind(feature.type);
+  if (kind)
+    return kind.evaluate({ state, earlier, index: earlier.length }, feature);
   switch (feature.type) {
     case "importStep": {
       const shape = readImport(feature, sources);
@@ -2260,8 +2264,6 @@ export function evaluateFeature(
       return evalChamfer(state, feature);
     case "combine":
       return evalCombine(state, feature);
-    case "shell":
-      return evalShell(state, feature);
     case "offsetFace":
       return evalOffsetFace(state, feature);
     case "splitBody":
@@ -2285,9 +2287,7 @@ export function evaluateFeature(
       return evalEmboss(state, feature);
     case "move":
       return evalMove(state, feature, earlier);
-    default: {
-      const t: never = feature;
-      throw new Error(`unknown feature type ${(t as any).type}`);
-    }
+    default:
+      throw new Error(`unknown feature type ${feature.type}`);
   }
 }

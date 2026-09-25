@@ -29,6 +29,7 @@ import {
   type FeatureOutcome,
   type StateBody,
 } from "./features.js";
+import "./kinds.js";
 import type { Sources } from "./importers.js";
 import { movePayload, tessellateBody } from "./tessellate.js";
 import { withNamingVersion, type NamedBody } from "./naming.js";
