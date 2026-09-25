@@ -6,7 +6,8 @@
   "workspaces": [
     "shared",
     "server",
-    "client"
+    "client",
+    "modules/cam"
   ],
   "scripts": {
     "bench:client": "vitest bench --run --reporter=default client/test",
@@ -21,7 +22,7 @@
     "lint:comments": "sh scripts/check-comments.sh",
     "lint:cost": "node scripts/cost.mjs --check",
     "lint:notices": "sh scripts/check-notices.sh",
-    "lint:pins": "grep -nE '\"[~^*]' package.json shared/package.json server/package.json client/package.json; [ $? -eq 1 ]",
+    "lint:pins": "grep -nE '\"[~^*]' package.json shared/package.json server/package.json client/package.json modules/cam/package.json; [ $? -eq 1 ]",
     "lint:readme": "sh scripts/check-readme.sh",
     "lint:writing": "test -f ~/masterrulez/scripts/lint-writing || { echo 'masterrulez lint-writing is missing; clone masterrulez to ~/masterrulez' >&2; exit 1; } && node ~/masterrulez/scripts/lint-writing",
     "prepare": "husky",
@@ -29,7 +30,7 @@
     "test": "npm run typecheck && vitest run --project node --project dom",
     "test:browser": "vitest run --project browser",
     "test:client": "vitest run --project node --project dom client/test",
-    "typecheck": "tsc -p shared && tsc -p server && tsc -p client"
+    "typecheck": "tsc -p shared && tsc -p server && tsc -p client && tsc -p modules/cam"
   },
   "devDependencies": {
     "gltf-validator": "2.0.0-dev.3.10",
