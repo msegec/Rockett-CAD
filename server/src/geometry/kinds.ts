@@ -6,11 +6,14 @@ import {
 } from "./featureKinds.js";
 import {
   evalChamfer,
+  evalCircularPattern,
   evalCombine,
   evalEmboss,
   evalExtrude,
   evalFillet,
+  evalLinearPattern,
   evalLoft,
+  evalMirror,
   evalMove,
   evalOffsetFace,
   evalRevolve,
@@ -41,6 +44,9 @@ const kinds = [
   kind("combine", (ctx, f) => evalCombine(ctx.state, f)),
   kind("splitBody", (ctx, f) => evalSplitBody(ctx.state, f)),
   kind("move", evalMove),
+  kind("mirror", (ctx, f) => evalMirror(ctx.state, f)),
+  kind("linearPattern", (ctx, f) => evalLinearPattern(ctx.state, f)),
+  kind("circularPattern", (ctx, f) => evalCircularPattern(ctx.state, f)),
 ];
 
 for (const k of kinds) registerFeatureKind(k);

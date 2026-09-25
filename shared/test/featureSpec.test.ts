@@ -7,6 +7,7 @@ import {
   featureSpecs,
   registerFeatureSpec,
   ValidationError,
+  type AxisRef,
   type EdgeRef,
   type FaceRef,
   type Feature,
@@ -139,6 +140,12 @@ const planes: PlaneRef[] = [
   { kind: "face", face: refFace("F9") },
 ];
 
+const axes: AxisRef[] = [
+  { kind: "originAxis", axis: "Z" },
+  { kind: "sketchLine", sketchId: "ref:axisSketch", entityId: "ref:l1" },
+  { kind: "edge", edge: refEdge("E1") },
+];
+
 interface SpecCase {
   producesGeometry: boolean;
   valid: Feature[];
@@ -180,13 +187,7 @@ const cases: Record<string, SpecCase> = {
   },
   revolve: {
     producesGeometry: true,
-    valid: (
-      [
-        { kind: "originAxis", axis: "Z" },
-        { kind: "sketchLine", sketchId: "ref:axisSketch", entityId: "ref:l1" },
-        { kind: "edge", edge: refEdge("E1") },
-      ] as const
-    ).map((axis) => ({
+    valid: axes.map((axis) => ({
       ...meta,
       type: "revolve",
       profiles: [refProfile("p1")],
@@ -419,6 +420,88 @@ const cases: Record<string, SpecCase> = {
         },
         "translation.0 must be <= 100000",
         "/translation/0",
+      ],
+    ],
+  },
+  mirror: {
+    producesGeometry: true,
+    valid: planes.map((plane) => ({
+      ...meta,
+      type: "mirror",
+      bodies: ["ref:b1", "ref:b2"],
+      plane,
+      combine: true,
+    })),
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "mirror",
+          bodies: [],
+          plane: planes[0]!,
+          combine: false,
+        },
+        "bodies must not have fewer than 1 items",
+        "/bodies",
+      ],
+    ],
+  },
+  linearPattern: {
+    producesGeometry: true,
+    valid: (
+      [
+        { kind: "axis", axis: "X" },
+        { kind: "edge", edge: refEdge("E1") },
+      ] as const
+    ).map((direction) => ({
+      ...meta,
+      type: "linearPattern",
+      bodies: ["ref:b1", "ref:b2"],
+      direction,
+      count: 3,
+      spacing: 5,
+      combine: false,
+    })),
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "linearPattern",
+          bodies: ["b1"],
+          direction: { kind: "axis", axis: "X" },
+          count: 0,
+          spacing: 5,
+          combine: false,
+        },
+        "count must be >= 2",
+        "/count",
+      ],
+    ],
+  },
+  circularPattern: {
+    producesGeometry: true,
+    valid: axes.map((axis) => ({
+      ...meta,
+      type: "circularPattern",
+      bodies: ["ref:b1", "ref:b2"],
+      axis,
+      count: 4,
+      totalAngle: 360,
+      combine: true,
+    })),
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "circularPattern",
+          bodies: ["b1"],
+          axis: axes[0]!,
+          count: 1e12,
+          totalAngle: 360,
+          combine: false,
+        },
+        "count must be <= 500",
+        "/count",
       ],
     ],
   },

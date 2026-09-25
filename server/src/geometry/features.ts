@@ -1980,7 +1980,7 @@ function mirrorTrsfFor(frame: PlaneFrame): any {
   return trsf;
 }
 
-function evalMirror(state: EvalState, f: MirrorFeature): void {
+export function evalMirror(state: EvalState, f: MirrorFeature): void {
   const frame = resolvePlaneFrame(state, f.plane);
   kernelCall("mirror", () => {
     const trsf = mirrorTrsfFor(frame);
@@ -2069,7 +2069,10 @@ export function evalMove(
   }
 }
 
-function evalLinearPattern(state: EvalState, f: LinearPatternFeature): void {
+export function evalLinearPattern(
+  state: EvalState,
+  f: LinearPatternFeature,
+): void {
   if (f.count < 2) throw new Error("pattern count must be ≥ 2");
   let direction: Vec3;
   if (f.direction.kind === "axis") {
@@ -2128,7 +2131,7 @@ function evalLinearPattern(state: EvalState, f: LinearPatternFeature): void {
   });
 }
 
-function evalCircularPattern(
+export function evalCircularPattern(
   state: EvalState,
   f: CircularPatternFeature,
 ): void {
@@ -2343,12 +2346,6 @@ export function evaluateFeature(
     }
     case "sketch":
       return evalSketch(state, feature);
-    case "mirror":
-      return evalMirror(state, feature);
-    case "linearPattern":
-      return evalLinearPattern(state, feature);
-    case "circularPattern":
-      return evalCircularPattern(state, feature);
     case "constructionPlane":
       return evalConstructionPlane(state, feature);
     case "referenceImage": {
