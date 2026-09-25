@@ -38,6 +38,11 @@ export const historyRecord = Type.Union([
   Type.Object({ kind: Type.Literal("snapshot"), snapshot }),
   Type.Object({ kind: Type.Literal("checkpoint"), ...markFields }),
   Type.Object({ kind: Type.Literal("entry"), ...entryFields }),
+  Type.Object({
+    kind: Type.Literal("cursor"),
+    position: Type.Integer({ minimum: 0 }),
+    revision: Type.Optional(Type.Integer({ minimum: 1 })),
+  }),
 ]);
 
 export type HistoryRecord = Static<typeof historyRecord>;

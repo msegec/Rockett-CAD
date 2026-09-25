@@ -115,12 +115,13 @@ const requireRevision = check((req, res) => {
   res.locals.revision = ifMatchRevision(req.get("If-Match"));
 });
 
-interface Mutation {
-  label: string;
+type Mutation = (
+  { label: string; cursor?: never } | { cursor: number; label?: never }
+) & {
   document?: CadDocument;
   position?: number | undefined;
   [extra: string]: unknown;
-}
+};
 
 type Edit = (doc: CadDocument, req: any) => Promise<Mutation>;
 
@@ -204,8 +205,17 @@ export function createApiRouter(
     return doc;
   };
 
-  const send = (res: any, doc: CadDocument, evaluation?: EvaluateResult) =>
-    reply(res, { document: doc, ...(evaluation && { evaluation }) });
+  const send = async (
+    res: any,
+    doc: CadDocument,
+    evaluation?: EvaluateResult,
+    extra?: object,
+  ) =>
+    reply(res, {
+      ...extra,
+      document: doc,
+      ...(evaluation && { evaluation, history: await history.status(doc.id) }),
+    });
 
   async function pinned(doc: CadDocument, index: number) {
     const feature = doc.features[index]!;
@@ -259,13 +269,16 @@ export function createApiRouter(
         const loaded = await editable(req, res);
         const {
           label,
+          cursor,
           position,
           document = loaded,
           ...extra
         } = await edit(loaded, req);
         const evaluation = await evaluateAndSync(document, position);
-        await history.save(document, label, tx);
-        reply(res, { ...extra, document, evaluation });
+        await (label === undefined
+          ? history.move(document, cursor)
+          : history.save(document, label, tx));
+        await send(res, document, evaluation, extra);
       }),
     );
 
@@ -309,7 +322,7 @@ export function createApiRouter(
   on(
     ROUTES.getProject,
     wrap(async (req, res) => {
-      send(res, await store.load(req.params.id));
+      await send(res, await store.load(req.params.id));
     }),
   );
 
@@ -340,7 +353,7 @@ export function createApiRouter(
       const doc = await editable(req, res);
       doc.name = (req.body.name ?? doc.name).slice(0, 200);
       await history.save(doc);
-      send(res, doc);
+      await send(res, doc);
     }),
   );
 
@@ -422,7 +435,7 @@ export function createApiRouter(
           await insert(doc, upload);
           const evaluation = await evaluateAndSync(doc);
           await store.save(doc);
-          send(res, doc, evaluation);
+          await send(res, doc, evaluation);
         } catch (error) {
           kernel.drop(doc.id);
           await store.remove(doc.id);
@@ -522,6 +535,15 @@ export function createApiRouter(
       return { label: "Roll timeline" };
     }),
   );
+
+  const moveCursor = (step: -1 | 1) =>
+    mutateProject(async (current, req) => {
+      const { document, cursor } = await history.peek(current, step);
+      validateDocument(document);
+      return { cursor, document, position: evaluationPosition(req, document) };
+    });
+  on(ROUTES.undo, moveCursor(-1));
+  on(ROUTES.redo, moveCursor(1));
 
   on(
     ROUTES.tangentEdges,

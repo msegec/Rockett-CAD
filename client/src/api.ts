@@ -329,6 +329,10 @@ export const api = {
     holding(ROUTES.deleteFeature, { id, fid }, {}),
   setTimeline: (id: string, position: number) =>
     holding(ROUTES.setTimeline, { id }, { position }),
+  undo: (id: string, position?: number) =>
+    holding(ROUTES.undo, { id }, {}, position),
+  redo: (id: string, position?: number) =>
+    holding(ROUTES.redo, { id }, {}, position),
   replaceDocument: (id: string, document: CadDocument, position?: number) =>
     holding(ROUTES.replaceDocument, { id }, { document }, position),
   updateBody: (id: string, bodyId: string, patch: { name: string }) =>

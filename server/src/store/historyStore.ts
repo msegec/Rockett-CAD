@@ -11,10 +11,12 @@ import {
   type CadDocument,
   type HistoryLog,
   type HistoryRecord,
+  type HistoryStatus,
 } from "@rockett/shared";
 import { BlobStore } from "./blobStore.js";
 import { backupNamespace, sha256, StoreError } from "./jsonStore.js";
 import { ID_RE } from "./manifestStore.js";
+import { documentMigrations, migrate } from "./migrations.js";
 import type { ProjectStore } from "./projectStore.js";
 import type { Storage } from "./storage.js";
 
@@ -25,10 +27,20 @@ const FRAME = 8;
 const LOG = "history/log.bin";
 const LEGACY_LOG = "history/log.json";
 const LEGACY_SNAPSHOTS = "history/snapshots";
-const MARKS = new Set<HistoryRecord["kind"]>(["entry", "checkpoint"]);
+const MARKS = new Set<HistoryRecord["kind"]>(["entry", "checkpoint", "cursor"]);
 
 export type History = Omit<HistoryLog, "version">;
 type Revision = () => Promise<number>;
+type Bodied = Exclude<HistoryRecord, { kind: "checkpoint" | "cursor" }>;
+type Records = (
+  opened: Opened | undefined,
+  revision: number,
+  file: string,
+  text: string,
+) => Promise<Buffer[]>;
+
+const bodied = (head: HistoryRecord): head is Bodied =>
+  head.kind !== "checkpoint" && head.kind !== "cursor";
 
 interface Framed {
   head: HistoryRecord;
@@ -67,10 +79,12 @@ function unframe(log: Buffer, at: number): Framed | undefined {
   const end = start + log.readUInt32BE(at + 4);
   if (end > log.length) return undefined;
   const found = decode(log.toString("utf8", at + FRAME, start));
-  if (!found || (found.kind === "checkpoint") !== (start === end))
-    return undefined;
-  const last = end === log.length && start < end;
-  if (last && sha256(log.subarray(start, end)) !== found.snapshot)
+  if (!found || bodied(found) === (start === end)) return undefined;
+  if (
+    bodied(found) &&
+    end === log.length &&
+    sha256(log.subarray(start, end)) !== found.snapshot
+  )
     return undefined;
   return { head: found, body: [start, end] };
 }
@@ -86,6 +100,8 @@ function records(log: Buffer): Framed[] {
 
 function replay(heads: HistoryRecord[]): History {
   let base = "";
+  let position = 0;
+  let joinable = false;
   const entries: History["entries"] = [];
   const checkpoints: History["checkpoints"] = [];
   for (const record of heads)
@@ -98,15 +114,26 @@ function replay(heads: HistoryRecord[]): History {
         checkpoints.push(mark);
         break;
       }
+      case "cursor":
+        position = record.position;
+        joinable = false;
+        break;
       case "entry": {
         const { kind: _kind, ...entry } = record;
-        if (entry.tx !== undefined && entries.at(-1)?.tx === entry.tx)
+        entries.splice(position);
+        if (
+          joinable &&
+          entry.tx !== undefined &&
+          entries.at(-1)?.tx === entry.tx
+        )
           entry.label = entries.pop()!.label;
         entries.push(entry);
         if (entries.length > HISTORY_LIMIT) base = entries.shift()!.snapshot;
+        position = entries.length;
+        joinable = true;
       }
     }
-  return { base, entries, position: entries.length, checkpoints };
+  return { base, entries, position, checkpoints };
 }
 
 function retained(history: History): Set<string> {
@@ -122,7 +149,7 @@ async function compose(
   history: History,
   body: (hash: string) => Promise<Buffer>,
 ): Promise<Buffer> {
-  const { base, entries, checkpoints } = history;
+  const { base, entries, position, checkpoints } = history;
   const inEntries = new Set(entries.map((e) => e.snapshot));
   const pinned = new Set(checkpoints.map((c) => c.snapshot));
   pinned.delete(base);
@@ -137,8 +164,12 @@ async function compose(
       out.push(frame({ kind: "snapshot", snapshot }, await body(snapshot)));
   for (const mark of checkpoints)
     out.push(frame({ kind: "checkpoint", ...mark }));
-  for (const entry of entries)
+  for (const [at, entry] of entries.entries()) {
+    if (entry.tx !== undefined && entries[at - 1]?.tx === entry.tx)
+      out.push(frame({ kind: "cursor", position: at }));
     out.push(frame({ kind: "entry", ...entry }, await body(entry.snapshot)));
+  }
+  if (position < entries.length) out.push(frame({ kind: "cursor", position }));
   return Buffer.concat(out);
 }
 
@@ -150,11 +181,9 @@ export class HistoryStore {
     private readonly store: ProjectStore,
   ) {}
 
-  async save(doc: CadDocument, label?: string, tx?: string): Promise<void> {
-    const { id } = doc;
-    await this.store.save(doc, async (file, text, saved) => {
-      const opened = await this.open(id, async () => saved.revision - 1);
-      if (label === undefined) return this.storage.writeAtomic(file, text);
+  save(doc: CadDocument, label?: string, tx?: string): Promise<void> {
+    if (label === undefined) return this.commit(doc);
+    return this.commit(doc, async (opened, revision, file, text) => {
       const added: Buffer[] = [];
       if (!opened) {
         const stored = await gzip(await this.storage.read(file), FAST);
@@ -174,12 +203,57 @@ export class HistoryStore {
             label: label.slice(0, LABEL_LIMIT),
             at: new Date().toISOString(),
             snapshot: sha256(body),
-            revision: saved.revision,
+            revision,
             ...(tx !== undefined && { tx }),
           },
           body,
         ),
       );
+      return added;
+    });
+  }
+
+  async peek(
+    current: CadDocument,
+    step: -1 | 1,
+  ): Promise<{ document: CadDocument; cursor: number }> {
+    const state = await this.read(current.id);
+    const cursor = (state?.position ?? 0) + step;
+    if (!state || cursor < 0 || cursor > state.entries.length)
+      throw new StoreError(
+        step < 0 ? "Nothing to undo." : "Nothing to redo.",
+        "conflict",
+      );
+    const hash = state.entries[cursor - 1]?.snapshot ?? state.base;
+    const stored = await this.snapshot(current.id, hash);
+    const document = migrate<CadDocument>(documentMigrations, stored);
+    return { document: { ...document, name: current.name }, cursor };
+  }
+
+  move(doc: CadDocument, cursor: number): Promise<void> {
+    return this.commit(doc, async (opened, revision) => {
+      if (!opened)
+        throw new StoreError(`project ${doc.id} has no history to move`);
+      return [frame({ kind: "cursor", position: cursor, revision })];
+    });
+  }
+
+  async status(id: string): Promise<HistoryStatus> {
+    const { entries = [], position = 0 } = (await this.read(id)) ?? {};
+    return {
+      canUndo: position > 0,
+      canRedo: position < entries.length,
+      undoLabel: entries[position - 1]?.label ?? null,
+      redoLabel: entries[position]?.label ?? null,
+    };
+  }
+
+  private async commit(doc: CadDocument, records?: Records): Promise<void> {
+    const { id } = doc;
+    await this.store.save(doc, async (file, text, saved) => {
+      const opened = await this.open(id, async () => saved.revision - 1);
+      if (!records) return this.storage.writeAtomic(file, text);
+      const added = await records(opened, saved.revision, file, text);
       await this.append(id, opened, added, () =>
         this.storage.writeAtomic(file, text),
       );
@@ -268,7 +342,7 @@ export class HistoryStore {
     const heads = [...(opened?.heads ?? [])];
     for (const { head, body } of records(bytes)) {
       heads.push(head);
-      if (head.kind !== "checkpoint")
+      if (bodied(head))
         bodies.set(head.snapshot, [body[0] + size, body[1] + size]);
     }
     this.opened.set(id, {
@@ -298,7 +372,10 @@ export class HistoryStore {
         "internal",
       );
     const last = found.at(-1)?.head;
-    if (last?.kind === "entry" && (last.revision ?? 0) > (await revision()))
+    if (
+      (last?.kind === "entry" || last?.kind === "cursor") &&
+      (last.revision ?? 0) > (await revision())
+    )
       found.pop();
     while (found.length && !MARKS.has(found.at(-1)!.head.kind)) found.pop();
     const size = found.at(-1)?.body[1] ?? 0;
@@ -317,7 +394,7 @@ export class HistoryStore {
     const bodies = new Map<string, [number, number]>();
     for (const { head, body } of records(log)) {
       heads.push(head);
-      if (head.kind !== "checkpoint") bodies.set(head.snapshot, body);
+      if (bodied(head)) bodies.set(head.snapshot, body);
     }
     const opened: Opened = {
       heads,

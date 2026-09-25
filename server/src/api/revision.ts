@@ -3,6 +3,7 @@ import {
   TX_ID,
   type CadDocument,
   type EvaluateResult,
+  type HistoryStatus,
 } from "@rockett/shared";
 import { StoreError } from "../store/projectStore.js";
 
@@ -54,7 +55,11 @@ export function keepNamingVersion(
 
 export function reply(
   res: { set(field: string, value: string): { json(body: unknown): unknown } },
-  body: { document: CadDocument; evaluation?: EvaluateResult },
+  body: {
+    document: CadDocument;
+    evaluation?: EvaluateResult;
+    history?: HistoryStatus;
+  },
 ): void {
   res.set("ETag", `"${body.document.revision}"`).json(body);
 }

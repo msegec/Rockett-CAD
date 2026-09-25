@@ -25,10 +25,11 @@ status:
 | `kernel`                | 503    | The geometry kernel cannot serve the request.             |
 | `internal`              | 500    | Server fault. The message is generic; the log has detail. |
 
-Mutating endpoints return `{ document, evaluation }`: the updated document
-plus a fresh incremental evaluation (bodies with tagged tessellation, feature
-statuses, solved sketches with profiles, construction-plane frames). The
-server persists on every mutation (autosave).
+Mutating endpoints return `{ document, evaluation, history }`: the updated
+document, a fresh incremental evaluation (bodies with tagged tessellation,
+feature statuses, solved sketches with profiles, construction-plane frames)
+and the project's undo state (see History). The server persists on every
+mutation (autosave).
 
 A failed feature's status may carry `refs`, one entry per face or edge
 reference that did not resolve: `{ ref, status, candidates, suggestions }`,
@@ -56,8 +57,9 @@ full `BodyPayload`s. Evaluate is `POST` because 1,000 keys of 64 hex
 characters, about 65 KB, exceed Node's 16 KB request header limit in a URL.
 Feature delete stays `DELETE` and sends `{ held }` as its JSON body.
 
-`POST /projects/:id/evaluate`, `PUT /projects/:id/features/:fid`, and
-`PUT /projects/:id/document` accept an optional `?position=N` for the returned
+`POST /projects/:id/evaluate`, `PUT /projects/:id/features/:fid`,
+`PUT /projects/:id/document`, `POST /projects/:id/undo` and
+`POST /projects/:id/redo` accept an optional `?position=N` for the returned
 evaluation. This temporarily evaluates the first N features without moving the
 document's saved timeline marker, for sketch editing and undo/redo in a sketch.
 
@@ -80,7 +82,7 @@ gives each readable project's `revision`.
 
 The document edits, listed in `DOCUMENT_EDITS` in `shared/src/routes.ts`, are
 rename, `PUT /document`, import into a project, the feature, timeline,
-body and group routes, and the naming upgrade commit. Each needs `If-Match: "<revision>"` with the revision
+body and group routes, undo, redo and the naming upgrade commit. Each needs `If-Match: "<revision>"` with the revision
 the caller last received. Inside the project queue the server compares it
 with the stored document:
 
@@ -112,6 +114,18 @@ written. Without it the request is its own entry. When the id matches the
 latest entry's, the edit replaces that entry's snapshot and keeps its label,
 so undo returns to the state before the transaction's first edit. Any other
 entry in between starts a new one.
+
+`POST /projects/:id/undo` and `POST /projects/:id/redo` take `If-Match` and
+an optional `held` body, move the project's history cursor one entry back or
+forward, and save the snapshot at the new cursor as the next revision. The
+project keeps its current name. Nothing to undo or redo is 409 `conflict`.
+An edit after an undo drops the entries that redo would have restored, and
+starts a new entry even when its `X-Rockett-Tx` matches the entry before it.
+A snapshot saved by an older schema is migrated before it is restored.
+
+Every mutation response carries `history`, `{ canUndo, canRedo, undoLabel,
+redoLabel }` (`HistoryStatus`), where each label is the entry undo or redo
+would reverse or restore, or `null`.
 
 ## Projects
 
@@ -238,6 +252,8 @@ the document, and uploads that take the document beyond 40 MB are rejected.
 | `PUT /projects/:id/features/:fid`    | `{ feature }` (partial) | Edit parameters/name/suppressed; id immutable                                |
 | `DELETE /projects/:id/features/:fid` | `{ held? }`             | Marker adjusts if needed                                                     |
 | `POST /projects/:id/timeline`        | `{ position }`          | Move the rollback marker                                                     |
+| `POST /projects/:id/undo`            | `{ held? }`             | Restore the snapshot before the latest entry; see History                    |
+| `POST /projects/:id/redo`            | `{ held? }`             | Restore the snapshot of the next undone entry; see History                   |
 | `PUT /projects/:id/bodies/:bodyId`   | `{ name? }`             | Rename a body; any other field is 400                                        |
 | `PUT /projects/:id/groups`           | `{ groups }`            | Replace the model tree groups; never changes evaluation                      |
 

@@ -12,6 +12,7 @@ import type {
   Folder,
   FolderTree,
   HeldMeshes,
+  HistoryStatus,
   MeasureRequest,
   MeasureResult,
   NamingDecision,
@@ -34,11 +35,13 @@ import {
 export interface MutationResponse {
   document: CadDocument;
   evaluation: EvaluateResult;
+  history?: HistoryStatus;
 }
 
 export interface WireMutationResponse {
   document: CadDocument;
   evaluation: WireEvaluateResult;
+  history?: HistoryStatus;
 }
 
 export interface NamingUpgradeResponse extends WireMutationResponse {
@@ -249,6 +252,8 @@ export const ROUTES = {
       beforeFeatureId: Type.Optional(Type.String()),
     }),
   ),
+  undo: route<HeldMeshes, WireMutationResponse>()("POST", "/projects/:id/undo"),
+  redo: route<HeldMeshes, WireMutationResponse>()("POST", "/projects/:id/redo"),
   updateBody: route<{ name?: string } & HeldMeshes, WireMutationResponse>()(
     "PUT",
     "/projects/:id/bodies/:bodyId",
@@ -320,6 +325,8 @@ export const DOCUMENT_EDITS: ReadonlySet<Route> = new Set<Route>([
   ROUTES.updateFeature,
   ROUTES.deleteFeature,
   ROUTES.setTimeline,
+  ROUTES.undo,
+  ROUTES.redo,
   ROUTES.updateBody,
   ROUTES.updateGroups,
   ROUTES.commitNamingUpgrade,
