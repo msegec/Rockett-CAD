@@ -7,13 +7,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import type {
   AxisRef,
-  ConstructionPlaneFeature,
   EdgeRef,
   ExportFormat,
   FaceRef,
   Feature,
   PlaneRef,
-  PointRef,
   ProfileRef,
 } from "@rockett/shared";
 import { newId } from "@rockett/shared";
@@ -26,19 +24,15 @@ import {
 import { api, saveDownload } from "../api";
 import { extrudeOperation } from "../extrudeReach";
 import { HANDLE_VALUES, type HandleDialog } from "../three/featureHandles";
-import { clearInput, takes, type PlaneMethod } from "../dialogPicks";
+import { clearInput, takes } from "../dialogPicks";
 import { createLivePreview } from "../livePreview";
 import { toolTargets } from "../toolTargets";
-import { viewportHandle } from "../viewportRef";
 import { DraggablePanel } from "./DraggablePanel";
-import { ImportPanel } from "./ImportPanel";
 import { RefRepair } from "./RefRepair";
 import {
-  AngleField,
   AxisField,
   axisOptions,
   CheckField,
-  LengthField,
   NumField,
   SelInfo,
   SelectField,
@@ -49,10 +43,12 @@ import "../features/sweep";
 import "../features/loft";
 import "../features/emboss";
 import "../features/move";
+import "../features/constructionPlane";
+import "../features/referenceImage";
+import "../features/importStep";
 import { featureUI } from "../features/registry";
+import { selectedPlane } from "../features/inputs";
 import "../features/shell";
-
-const OFFSET_TAKES_ONE = "Offset takes one reference; remove the extra one";
 
 function need(cond: unknown, message: string): asserts cond {
   if (!cond) throw new Error(message);
@@ -145,10 +141,6 @@ function DialogBody({
     Selection,
     { kind: "body" }
   >[];
-  const planes = selection.filter((s) => s.kind === "plane") as Extract<
-    Selection,
-    { kind: "plane" }
-  >[];
   // selected sketch LINES (axis candidates for revolve / circular pattern)
   const sketchLines = (
     selection.filter((s) => s.kind === "sketchEntity") as any[]
@@ -216,11 +208,7 @@ function DialogBody({
       }),
     };
   };
-  const planeRef = (): PlaneRef | null => {
-    if (planes.length > 0) return planes[0]!.ref;
-    if (faces.length > 0) return { kind: "face", face: faceRefs()[0]! };
-    return null;
-  };
+  const planeRef = (): PlaneRef | null => selectedPlane(selection);
   const axisMissing =
     axisDialog &&
     p("axisSource", "origin") === "edge" &&
@@ -284,20 +272,18 @@ function DialogBody({
   let panel: ReactElement | null = null;
 
   const ui = featureUI(dialog);
-  if (ui) {
+  if (ui?.Form) {
     title = ui.title;
     body = <ui.Form params={params} setParams={setParams} />;
+  }
+  const uiBuild = ui?.build;
+  if (uiBuild)
     build = () => {
-      const built = ui.build(params, selection);
+      const built = uiBuild(params, selection);
       if ("error" in built) throw new Error(built.error);
       return built;
     };
-  }
   switch (dialog) {
-    case "importStep": {
-      panel = <ImportPanel editId={editId} onClose={close} />;
-      break;
-    }
     case "extrude": {
       title = "Extrude";
       body = (
@@ -740,183 +726,6 @@ function DialogBody({
       };
       break;
     }
-    case "constructionPlane": {
-      title = "Construction Plane";
-      const method: PlaneMethod = p("method", "offset");
-      const refs = selection.flatMap((x): PlaneRef[] =>
-        x.kind === "plane"
-          ? [x.ref]
-          : x.kind === "face"
-            ? [{ kind: "face", face: { ...x } }]
-            : [],
-      );
-      const points = selection.flatMap((x): PointRef[] =>
-        x.kind === "vertex" || x.kind === "sketchPoint" ? [{ ...x }] : [],
-      );
-      const lines = selection.flatMap((x): AxisRef[] => {
-        if (x.kind === "edge") return [{ kind: "edge", edge: { ...x } }];
-        if (x.kind === "axis") return [{ kind: "originAxis", axis: x.axis }];
-        return x.kind === "sketchEntity"
-          ? [{ kind: "sketchLine", sketchId: x.sketchId, entityId: x.entityId }]
-          : [];
-      });
-      const flip = !!p("flip", false);
-      const flipField = (
-        <CheckField
-          label="Flip"
-          value={flip}
-          onChange={(v) => setParams({ flip: v })}
-        />
-      );
-      body = (
-        <>
-          <SelectField
-            label="Method"
-            value={method}
-            options={[
-              ["offset", "Offset"],
-              ["midplane", "Midplane"],
-              ["angle", "At angle"],
-              ["threePoints", "3 points"],
-              ["twoEdges", "2 edges"],
-            ]}
-            onChange={(v) => setParams({ method: v })}
-          />
-          {method === "offset" && (
-            <>
-              <SelInfo
-                label="Reference plane"
-                input="plane"
-                hint="click a plane or planar face"
-              />
-              {refs.length > 1 && (
-                <div className="field-hint">{OFFSET_TAKES_ONE}</div>
-              )}
-              <NumField
-                label="Offset (mm)"
-                autoFocus
-                value={p("distance", main("constructionPlane"))}
-                onChange={(v) => setParams({ distance: v })}
-              />
-              {flipField}
-            </>
-          )}
-          {method === "midplane" && (
-            <>
-              <SelInfo
-                label="Planes"
-                input="plane"
-                hint="click two planes or planar faces"
-              />
-              <NumField
-                label="Offset (mm)"
-                value={p("offset", 0)}
-                onChange={(v) => setParams({ offset: v })}
-              />
-              {flipField}
-            </>
-          )}
-          {method === "angle" && (
-            <>
-              <SelInfo
-                label="Axis"
-                input="axis"
-                picks={[...edges, ...sketchLines]}
-                hint={axisHint}
-              />
-              <AxisField
-                axisSource={params.axisSource}
-                axis={params.axis}
-                onChange={(patch) => chooseAxis("axis", patch)}
-              />
-              <SelInfo
-                label="Reference plane"
-                input="plane"
-                hint="click a plane or planar face"
-              />
-              <AngleField
-                label="Angle"
-                value={p("angle", 90)}
-                onChange={(v) => setParams({ angle: v })}
-              />
-            </>
-          )}
-          {method === "threePoints" && (
-            <SelInfo
-              label="Points"
-              input="points"
-              hint="click three vertices or sketch points"
-            />
-          )}
-          {method === "twoEdges" && (
-            <SelInfo
-              label="Edges"
-              input="lines"
-              hint="click two straight edges in one plane"
-            />
-          )}
-        </>
-      );
-      const planeMethod = (): ConstructionPlaneFeature["method"] => {
-        switch (method) {
-          case "offset":
-            need(refs.length > 0, "Select a base plane or face");
-            need(refs.length === 1, OFFSET_TAKES_ONE);
-            return {
-              kind: "offset",
-              base: refs[0]!,
-              distance: main("constructionPlane"),
-              ...(flip && { flip }),
-            };
-          case "midplane": {
-            need(refs.length === 2, "Select two references for a midplane");
-            const offset = num("offset", 0);
-            return {
-              kind: "midplane",
-              a: refs[0]!,
-              b: refs[1]!,
-              ...(offset !== 0 && { offset }),
-              ...(flip && { flip }),
-            };
-          }
-          case "angle":
-            need(refs.length === 1, "Select a reference plane or face");
-            return {
-              kind: "angle",
-              axis: axisRef(),
-              base: refs[0]!,
-              angle: num("angle", 90),
-            };
-          case "threePoints":
-            need(points.length === 3, "Select three points");
-            return {
-              kind: "threePoints",
-              points: [points[0]!, points[1]!, points[2]!],
-            };
-          case "twoEdges":
-            need(lines.length === 2, "Select two straight edges");
-            return { kind: "twoEdges", a: lines[0]!, b: lines[1]! };
-        }
-      };
-      build = () => ({
-        id: editId ?? newId("plane"),
-        type: "constructionPlane",
-        name: p("name", ""),
-        suppressed: false,
-        method: planeMethod(),
-      });
-      break;
-    }
-    case "referenceImage": {
-      panel = (
-        <ReferenceImagePanel
-          editId={editId}
-          planeRef={planeRef}
-          onClose={close}
-        />
-      );
-      break;
-    }
     case "export": {
       panel = <ExportPanel onClose={close} />;
       break;
@@ -930,6 +739,10 @@ function DialogBody({
     },
     [],
   );
+  if (ui?.Panel)
+    return (
+      <ui.Panel editId={editId} onClose={close} cancelPreview={live.cancel} />
+    );
   if (panel) return panel;
 
   const ok = async () => {
@@ -969,196 +782,6 @@ function DialogBody({
         onCancel={close}
         pending={pending}
         okDisabled={axisMissing}
-        escapeAnywhere
-      />
-    </DraggablePanel>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Reference image panel
-// ---------------------------------------------------------------------------
-
-function ReferenceImagePanel({
-  editId,
-  planeRef,
-  onClose,
-}: {
-  editId?: string | undefined;
-  planeRef: () => PlaneRef | null;
-  onClose: () => void;
-}) {
-  const document_ = useStore((s) => s.document);
-  const addFeature = useStore((s) => s.addFeature);
-  const updateFeature = useStore((s) => s.updateFeature);
-  const setError = useStore((s) => s.setError);
-  const [file, setFile] = useState<File | null>(null);
-  const [pending, setPending] = useState(false);
-
-  const existing = editId
-    ? (document_?.features.find((f) => f.id === editId) as any)
-    : null;
-  const [opacity, setOpacity] = useState<number>(existing?.opacity ?? 0.6);
-  const [scale, setScale] = useState<number>(existing?.transform.scale ?? 0.5);
-  const [rotation, setRotation] = useState<number>(
-    existing?.transform.rotation ?? 0,
-  );
-  const [u, setU] = useState<number>(existing?.transform.u ?? 0);
-  const [v, setV] = useState<number>(existing?.transform.v ?? 0);
-  const [calibrating, setCalibrating] = useState(false);
-
-  const live = useLivePreview(
-    editId,
-    existing
-      ? { ...existing, opacity, transform: { u, v, rotation, scale } }
-      : null,
-  );
-
-  const onOk = async () => {
-    live.cancel();
-    setPending(true);
-    try {
-      if (existing) {
-        await updateFeature(editId!, {
-          opacity,
-          transform: { u, v, rotation, scale },
-        } as any);
-        onClose();
-        return;
-      }
-      if (!file) {
-        setError("Choose an image file (PNG, JPEG, WebP)");
-        return;
-      }
-      const plane = planeRef() ?? {
-        kind: "origin" as const,
-        plane: "XY" as const,
-      };
-      const { assetId } = await api.uploadImage(document_!.id, file);
-      const img = new Image();
-      const dims = await new Promise<{ w: number; h: number }>(
-        (resolve, reject) => {
-          img.onload = () =>
-            resolve({ w: img.naturalWidth, h: img.naturalHeight });
-          img.onerror = reject;
-          img.src = URL.createObjectURL(file);
-        },
-      );
-      await addFeature({
-        id: newId("canvas"),
-        type: "referenceImage",
-        name: "",
-        suppressed: false,
-        plane,
-        assetId,
-        fileName: file.name,
-        transform: { u, v, rotation, scale },
-        opacity,
-        width: dims.w,
-        height: dims.h,
-      });
-      onClose();
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const calibrate = async () => {
-    // Two clicks on the image plane, then a real-world distance.
-    setCalibrating(true);
-    const vp = viewportHandle.current;
-    if (!vp || !existing) {
-      setCalibrating(false);
-      return;
-    }
-    const clicks: { x: number; y: number; z: number }[] = [];
-    const el = vp.renderer.domElement;
-    const evalState = useStore.getState().evaluation;
-    const frame = evalState?.planes.find((p) => p.featureId === editId)?.frame;
-    if (!frame) {
-      setCalibrating(false);
-      return;
-    }
-    const handler = (e: PointerEvent) => {
-      const pt = vp.screenToPlanePoint(e.clientX, e.clientY, frame);
-      if (!pt) return;
-      clicks.push({ x: pt.x, y: pt.y, z: pt.z });
-      if (clicks.length === 2) {
-        el.removeEventListener("pointerdown", handler, true);
-        const a = clicks[0]!;
-        const b = clicks[1]!;
-        const d = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-        const desired = Number(
-          window.prompt("Real distance between the two points (mm):", "100"),
-        );
-        setCalibrating(false);
-        if (Number.isFinite(desired) && desired > 0 && d > 1e-9) {
-          setScale((s) => s * (desired / d));
-        }
-      }
-      e.stopPropagation();
-    };
-    el.addEventListener("pointerdown", handler, true);
-  };
-
-  return (
-    <DraggablePanel title="Reference Image">
-      <div className="dialog-body">
-        {!existing && (
-          <>
-            <SelInfo
-              label="Plane"
-              input="plane"
-              hint="click a plane/face (default XY)"
-            />
-            <label className="field">
-              <span>Image file</span>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
-          </>
-        )}
-        <NumField
-          label="Scale (mm / pixel)"
-          autoFocus
-          value={scale}
-          onChange={setScale}
-        />
-        <AngleField label="Rotation" value={rotation} onChange={setRotation} />
-        <LengthField label="Position U" units="mm" value={u} onChange={setU} />
-        <LengthField label="Position V" units="mm" value={v} onChange={setV} />
-        <label className="field">
-          <span>Opacity</span>
-          <input
-            type="range"
-            min={0.05}
-            max={1}
-            step={0.05}
-            value={opacity}
-            onChange={(e) => setOpacity(Number(e.target.value))}
-          />
-        </label>
-        {existing && (
-          <button
-            className="btn"
-            disabled={calibrating}
-            onClick={() => void calibrate()}
-          >
-            {calibrating
-              ? "Click two points on the image…"
-              : "Calibrate (2 points)"}
-          </button>
-        )}
-      </div>
-      <DialogFooter
-        onOk={() => void onOk()}
-        onCancel={onClose}
-        pending={pending}
         escapeAnywhere
       />
     </DraggablePanel>

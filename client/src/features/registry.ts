@@ -10,16 +10,36 @@ export interface FeatureFormProps {
   setParams: (patch: DialogParams) => void;
 }
 
-export interface FeatureUI<F extends Feature = Feature> {
+export interface FeaturePanelProps {
+  editId?: string | undefined;
+  onClose: () => void;
+  cancelPreview: () => void;
+}
+
+type Build<F extends Feature> = (
+  params: DialogParams,
+  selection: Selection[],
+) => F | { error: string };
+
+interface FeatureUIBase<F extends Feature> {
   type: F["type"];
   icon: string;
   title: string;
   group: string;
   picks: readonly PickInput[];
-  Form: ComponentType<FeatureFormProps>;
-  build(params: DialogParams, selection: Selection[]): F | { error: string };
+  picksFor?: (params: DialogParams) => readonly PickInput[];
   prefill(f: F): { params: DialogParams; selection: Selection[] };
 }
+
+export type FeatureUI<F extends Feature = Feature> = FeatureUIBase<F> &
+  (
+    | { Form: ComponentType<FeatureFormProps>; build: Build<F>; Panel?: never }
+    | {
+        Panel: ComponentType<FeaturePanelProps>;
+        build?: Build<F>;
+        Form?: never;
+      }
+  );
 
 const featureUIs = createRegistry<FeatureUI>("feature UI", (ui) => ui.type);
 

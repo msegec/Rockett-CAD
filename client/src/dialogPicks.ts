@@ -1,4 +1,3 @@
-import type { ConstructionPlaneFeature } from "@rockett/shared";
 import {
   previewBodies,
   selectionKey,
@@ -57,27 +56,11 @@ export const targets = input("targets", ["body"], {
 export const bodies = input("bodies", ["body"]);
 const edges = input("edges", ["edge"]);
 const line = { one: true, straight: true } as const;
-const axis = input("axis", ["edge", "sketchEntity", "axis"], line);
-const planar = (key: string, one: boolean) =>
+export const axis = input("axis", ["edge", "sketchEntity", "axis"], line);
+export const planar = (key: string, one: boolean) =>
   input(key, ["plane", "face"], { planar: true, ...(one && { one: true }) });
-const planes = planar("plane", false);
-const lines = input("lines", ["edge", "sketchEntity", "axis"], {
-  straight: true,
-});
-const points = input("points", ["vertex", "sketchPoint"]);
-
-export type PlaneMethod = ConstructionPlaneFeature["method"]["kind"];
-
-const PLANE_INPUTS: Record<PlaneMethod, readonly PickInput[]> = {
-  offset: [planes],
-  midplane: [planes],
-  angle: [axis, planar("plane", true)],
-  threePoints: [points],
-  twoEdges: [lines],
-};
 
 const DIALOG_INPUTS: Partial<Record<DialogType, readonly PickInput[]>> = {
-  importStep: [],
   extrude: [profilesOrFaces, targets],
   revolve: [profilesOrFaces, axis, targets],
   fillet: [edges],
@@ -88,8 +71,6 @@ const DIALOG_INPUTS: Partial<Record<DialogType, readonly PickInput[]>> = {
   mirror: [bodies, planar("plane", true)],
   linearPattern: [bodies, input("direction", ["edge", "axis"], line)],
   circularPattern: [bodies, axis],
-  constructionPlane: [planes, axis, points, lines],
-  referenceImage: [planar("plane", true)],
   export: [bodies],
 };
 
@@ -116,9 +97,7 @@ function inputsFor(
   dialog: DialogType,
   params: Record<string, any>,
 ): readonly PickInput[] {
-  return dialog === "constructionPlane"
-    ? PLANE_INPUTS[(params.method as PlaneMethod | undefined) ?? "offset"]
-    : picksOf(dialog);
+  return featureUI(dialog)?.picksFor?.(params) ?? picksOf(dialog);
 }
 
 function dialogInputs(s: Store): PickInput[] {
