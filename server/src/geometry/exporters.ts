@@ -15,9 +15,8 @@ import {
   ValidationError,
   type CadDocument,
   type ExportFormat,
-  type SketchEntity,
 } from "@rockett/shared";
-import { writeDxf } from "./dxf.js";
+import { writeDxf, type Drawing } from "./dxf.js";
 import { meshCopy } from "./mesh.js";
 import type { NamedBody } from "./naming.js";
 import { writeXdeStep } from "./xde.js";
@@ -179,10 +178,9 @@ export function write3mf(
   return Buffer.from(zipped);
 }
 
-export interface ExportContext {
+export interface ExportContext extends Drawing {
   doc: CadDocument;
   bodies: NamedBody[];
-  sketch: readonly SketchEntity[];
   options: { quality: number };
 }
 
@@ -247,9 +245,9 @@ registerExporter({
 
 registerExporter({
   format: "dxf",
-  label: "DXF R12 (sketch)",
+  label: "DXF R12 (sketch or face)",
   ext: "dxf",
   mime: "image/vnd.dxf",
-  source: "sketch",
-  write: ({ sketch }) => writeDxf(sketch),
+  source: ["sketch", "face"],
+  write: ({ sketch, polylines }) => writeDxf(sketch, polylines),
 });

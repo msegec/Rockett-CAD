@@ -260,7 +260,7 @@ export interface ExportFormat {
   label: string;
   ext: string;
   mime: string;
-  source: ExportSource;
+  source: ExportSource | ExportSource[];
 }
 
 export interface ImportFormat {
@@ -278,6 +278,7 @@ export interface ExportRequest {
   format: string;
   bodyIds: string[]; // empty = all visible bodies
   sketchId?: string;
+  face?: FaceRef;
   /** Linear tessellation tolerance in mm (default 0.05). */
   quality?: number;
   /** Also store a copy under the project's exports/ directory. */

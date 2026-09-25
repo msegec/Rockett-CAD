@@ -325,6 +325,7 @@ export const ROUTES = {
       format: Type.String({ minLength: 1, maxLength: 200 }),
       bodyIds: Type.Array(Type.String()),
       sketchId: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })),
+      face: Type.Optional(faceRef),
       quality: Type.Optional(Type.Number()),
       retain: Type.Optional(Type.Boolean()),
     }),

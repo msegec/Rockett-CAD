@@ -344,10 +344,10 @@ applied. Undo sends the previous document back through `PUT /document`.
 
 ## Inspection & output
 
-| Method & path                | Body                                                          | Returns                                                                                                                                                                   |
-| ---------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /projects/:id/measure` | `{ refs: [FaceRef\|EdgeRef\|VertexRef, …] }` (1–2)            | `MeasureResult` (distance, ΔXYZ, angle, per-item length/area/radius/position)                                                                                             |
-| `POST /projects/:id/export`  | `{ format, bodyIds: string[], sketchId?, quality?, retain? }` | Binary file (`Content-Disposition` attachment). Empty `bodyIds` = every body the view does not hide. `retain: true` also stores a copy under the project's `exports/` dir |
+| Method & path                | Body                                                                 | Returns                                                                                                                                                                   |
+| ---------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /projects/:id/measure` | `{ refs: [FaceRef\|EdgeRef\|VertexRef, …] }` (1–2)                   | `MeasureResult` (distance, ΔXYZ, angle, per-item length/area/radius/position)                                                                                             |
+| `POST /projects/:id/export`  | `{ format, bodyIds: string[], sketchId?, face?, quality?, retain? }` | Binary file (`Content-Disposition` attachment). Empty `bodyIds` = every body the view does not hide. `retain: true` also stores a copy under the project's `exports/` dir |
 
 Export returns 400 when an id in `bodyIds` is not a body of the evaluated
 model, and 422 `unprocessable` when a body it would write is blocked by a
@@ -361,15 +361,21 @@ number, default 0.05, clamped to 0.001 to 1. `step` writes each body as an
 exact B-Rep solid named after the body, in millimetres, through
 `writeXdeStep` in `server/src/geometry/xde.ts`, and ignores `quality`.
 
-Each exporter has a `source`. A `bodies` exporter writes bodies as above. A
+Each exporter has a `source`, one of `bodies`, `sketch` or `face`, or a list
+of them. A `bodies` exporter writes bodies as above. A
 `sketch` exporter writes the solved entities of the sketch named by
 `sketchId` and ignores `bodyIds`; a missing `sketchId`, or a sketch that is
-not in the evaluated model, is 400 with detail `/sketchId`. `dxf` is a
-sketch exporter: ASCII DXF R12 (`AC1009`) in sketch plane coordinates.
+not in the evaluated model, is 400 with detail `/sketchId`. A `face`
+exporter writes the edges of the planar face named by `face`, a `FaceRef`,
+in the frame a sketch on that face uses; a face that is missing or not
+planar is 400 with detail `/face`. An exporter with both takes the face when
+the request has one, otherwise the sketch. `dxf` takes a sketch or a face:
+ASCII DXF R12 (`AC1009`) in sketch plane or face frame coordinates.
 Coordinates are millimetres; R12 has no unit field. Lines, arcs and circles become
 `LINE`, `ARC` and `CIRCLE`, a point no curve uses becomes `POINT`, and
-construction geometry goes on the `CONSTRUCTION` layer. `face` is reserved
-and answers 400.
+construction geometry goes on the `CONSTRUCTION` layer. Any other face edge,
+such as a spline, becomes a `POLYLINE` sampled so the curve midpoint of each
+span lies within `quality` mm of its chord.
 
 `GET /formats` returns `Formats`: `{ exporters, importers }`. Exporters are
 read from the exporter registry on each request, importers from `IMPORTERS`

@@ -29,6 +29,7 @@ import { measure } from "../geometry/measure.js";
 import { resolvePlaneFrame, type EvalState } from "../geometry/features.js";
 import { computeEdgeNames } from "../geometry/naming.js";
 import { curveInfo } from "../geometry/tessellate.js";
+import { faceDrawing } from "../geometry/dxf.js";
 import { signRefs } from "../geometry/signature.js";
 import { planNamingUpgrade } from "../geometry/upgradeNaming.js";
 import { tangentEdges } from "../geometry/tangentEdges.js";
@@ -109,11 +110,11 @@ export interface KernelClient {
   version(): Health["kernelVersion"];
 }
 
-function asValidation<T>(run: () => T): T {
+function asValidation<T>(run: () => T, detail?: string): T {
   try {
     return run();
   } catch (error) {
-    throw new ValidationError((error as Error).message);
+    throw new ValidationError((error as Error).message, detail);
   }
 }
 
@@ -170,7 +171,7 @@ function exportBodies(state: EvalState, { bodyIds, hidden }: ExportJob) {
       `export bodies depend on unresolved references: ${blocked.map((b) => b.bodyId).join(", ")}`,
       "unprocessable",
     );
-  return { bodies: chosen, sketch: [] };
+  return { bodies: chosen, sketch: [], polylines: [] };
 }
 
 function exportSketch(state: EvalState, { format, sketchId }: ExportJob) {
@@ -182,19 +183,44 @@ function exportSketch(state: EvalState, { format, sketchId }: ExportJob) {
       `sketch ${sketchId} is not in the model`,
       "/sketchId",
     );
-  return { bodies: [], sketch: sketch.entities };
+  return { bodies: [], sketch: sketch.entities, polylines: [] };
+}
+
+function exportFace(
+  state: EvalState,
+  { format, face }: ExportJob,
+  quality: number,
+) {
+  if (!face)
+    throw new ValidationError(`${format} export needs a face`, "/face");
+  const drawing = asValidation(() => {
+    const frame = resolvePlaneFrame(state, { kind: "face", face });
+    return faceDrawing(
+      state.bodies.get(face.bodyId)!,
+      face.faceName,
+      frame,
+      quality,
+    );
+  }, "/face");
+  return { bodies: [], ...drawing };
 }
 
 const SOURCES: Record<
   ExportSource,
-  (state: EvalState, job: ExportJob) => Pick<ExportContext, "bodies" | "sketch">
+  (
+    state: EvalState,
+    job: ExportJob,
+    quality: number,
+  ) => Omit<ExportContext, "doc" | "options">
 > = {
   bodies: exportBodies,
   sketch: exportSketch,
-  face: (_state, { format }) => {
-    throw new ValidationError(`${format} face export is not available`);
-  },
+  face: exportFace,
 };
+
+function sourceFor(accepted: ExportSource[], job: ExportJob): ExportSource {
+  return job.face && accepted.includes("face") ? "face" : accepted[0]!;
+}
 
 export class InProcessKernel implements KernelClient {
   constructor(private readonly store: Pick<ProjectStore, "sources">) {}
@@ -242,7 +268,11 @@ export class InProcessKernel implements KernelClient {
     return {
       data: exporter.write({
         doc,
-        ...SOURCES[exporter.source](state, job),
+        ...SOURCES[sourceFor([exporter.source].flat(), job)](
+          state,
+          job,
+          quality,
+        ),
         options: { quality },
       }),
       mime: exporter.mime,

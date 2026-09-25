@@ -1,6 +1,26 @@
-import type { SketchEntity, SketchPoint } from "@rockett/shared";
+import {
+  projectEdge,
+  type PlaneFrame,
+  type SketchEntity,
+  type SketchPoint,
+  type Vec3,
+} from "@rockett/shared";
+import { pointToUV, V } from "./frames.js";
+import { getKernel, release, scoped, type Shape } from "./kernel.js";
+import { computeEdgeNames, findFace, type NamedBody } from "./naming.js";
+import { curveInfo } from "./tessellate.js";
 
 type Pair = [number, string];
+
+export type Polyline = [number, number][];
+
+export interface Drawing {
+  sketch: SketchEntity[];
+  polylines: Polyline[];
+}
+
+const MIN_SPLITS = 3;
+const MAX_SPLITS = 16;
 
 const CONSTRUCTION = "CONSTRUCTION";
 
@@ -96,14 +116,117 @@ function entityPairs(entities: readonly SketchEntity[]) {
   return out;
 }
 
-export function writeDxf(entities: readonly SketchEntity[]): Buffer {
+function polylinePairs(polylines: readonly Polyline[]): Pair[] {
+  const xy = ([x, y]: [number, number]): Pair[] => [
+    [10, real(x)],
+    [20, real(y)],
+    [30, "0.0"],
+  ];
+  return polylines.flatMap((points): Pair[] => [
+    [0, "POLYLINE"],
+    [8, "0"],
+    [66, "1"],
+    ...xy([0, 0]),
+    ...points.flatMap((p): Pair[] => [[0, "VERTEX"], [8, "0"], ...xy(p)]),
+    [0, "SEQEND"],
+    [8, "0"],
+  ]);
+}
+
+function gapToChord(p: Vec3, a: Vec3, b: Vec3): number {
+  const ab = V.sub(b, a);
+  const t = Math.min(
+    1,
+    Math.max(0, V.dot(V.sub(p, a), ab) / (V.dot(ab, ab) || 1)),
+  );
+  return V.norm(V.sub(p, V.add(a, V.scale(ab, t))));
+}
+
+function sampleCurve(edge: Shape, quality: number): Vec3[] {
+  const k = getKernel();
+  return scoped((own) => {
+    const curve = own(new k.BRepAdaptor_Curve_2(edge));
+    const at = (u: number): Vec3 =>
+      scoped((mine) => {
+        const p = mine(curve.Value(u));
+        return [p.X(), p.Y(), p.Z()];
+      });
+    const first = curve.FirstParameter();
+    const points = [at(first)];
+    const split = (a: number, pa: Vec3, b: number, pb: Vec3, depth: number) => {
+      const m = (a + b) / 2;
+      const pm = at(m);
+      if (
+        depth < MAX_SPLITS &&
+        (depth < MIN_SPLITS || gapToChord(pm, pa, pb) > quality)
+      ) {
+        split(a, pa, m, pm, depth + 1);
+        split(m, pm, b, pb, depth + 1);
+      } else points.push(pb);
+    };
+    const last = curve.LastParameter();
+    split(first, points[0]!, last, at(last), 0);
+    return points;
+  });
+}
+
+export function faceDrawing(
+  body: NamedBody,
+  faceName: string,
+  frame: PlaneFrame,
+  quality: number,
+): Drawing {
+  const k = getKernel();
+  const face = findFace(body, faceName);
+  if (!face) throw new Error(`face ${faceName} not found`);
+  const onFace = new k.TopTools_IndexedMapOfShape_1();
+  const named = computeEdgeNames(body).byName;
+  try {
+    k.TopExp.MapShapes_1(face, k.TopAbs_ShapeEnum.TopAbs_EDGE, onFace);
+    const drawing: Drawing = { sketch: [], polylines: [] };
+    for (const [edgeName, edge] of named) {
+      if (!onFace.Contains(edge)) continue;
+      const curve = curveInfo(edge);
+      if (curve.type === "other")
+        drawing.polylines.push(
+          sampleCurve(edge, quality).map((p) => {
+            const { u, v } = pointToUV(frame, p);
+            return [u, v];
+          }),
+        );
+      else
+        drawing.sketch.push(
+          ...projectEdge(
+            curve,
+            frame,
+            edgeName,
+            { kind: "edge", bodyId: body.bodyId, edgeName },
+            false,
+          ),
+        );
+    }
+    return drawing;
+  } finally {
+    release(named.values());
+    onFace.delete();
+    face.delete();
+  }
+}
+
+export function writeDxf(
+  entities: readonly SketchEntity[],
+  polylines: readonly Polyline[] = [],
+): Buffer {
   const pairs = [
     ...section("HEADER", [
       [9, "$ACADVER"],
       [1, "AC1009"],
     ]),
     ...section("TABLES", layerTable()),
-    ...section("ENTITIES", entityPairs(entities)),
+    ...section("ENTITIES", [
+      ...entityPairs(entities),
+      ...polylinePairs(polylines),
+    ]),
     [0, "EOF"] as Pair,
   ];
   return Buffer.from(
