@@ -2,10 +2,12 @@ import {
   findProfile,
   LINEAR_TOL,
   type BodyPayload,
+  type FaceInfo,
   type SketchPayload,
   type Vec3,
 } from "@rockett/shared";
-import { previewBodies, useStore } from "./store";
+import type { PreviewGhost } from "./livePreview";
+import { previewBodies, previewedFeature, useStore } from "./store";
 
 interface Base {
   points: Vec3[];
@@ -77,21 +79,29 @@ function overlaps(a: Bounds, b: Bounds, margin: number): boolean {
   return true;
 }
 
+function span(
+  direction: string,
+  distance: number,
+  start: number,
+  distance2: number,
+): [number, number] {
+  const d = direction === "reverse" ? -distance : distance;
+  const back = Math.sign(d) * Math.abs(distance2);
+  return direction === "symmetric"
+    ? [start - Math.abs(d) / 2, start + Math.abs(d) / 2]
+    : direction === "twoSided"
+      ? [start - back, start + d]
+      : [start, start + d];
+}
+
 export function extrudeOperation(
   direction: string,
   distance: number,
   start: number,
   distance2: number,
 ): "newBody" | "join" | "cut" {
-  const d = direction === "reverse" ? -distance : distance;
-  const back = Math.sign(d) * Math.abs(distance2);
-  const [from, to] =
-    direction === "symmetric"
-      ? [start - Math.abs(d) / 2, start + Math.abs(d) / 2]
-      : direction === "twoSided"
-        ? [start - back, start + d]
-        : [start, start + d];
-  const into = d < 0 && (direction === "normal" || direction === "reverse");
+  const [from, to] = span(direction, distance, start, distance2);
+  const into = to < from && (direction === "normal" || direction === "reverse");
   const s = useStore.getState();
   const bodies = previewBodies(s);
   const tools = s.selection.flatMap((sel) => {
@@ -107,4 +117,117 @@ export function extrudeOperation(
     tools.some((t) => bodies.some((b) => overlaps(t, b.bbox, margin)));
   if (into && meets(LINEAR_TOL)) return "cut";
   return meets(-LINEAR_TOL) ? "join" : "newBody";
+}
+
+function across([a, b, c]: Vec3[]): Vec3 {
+  const u = [b![0] - a![0], b![1] - a![1], b![2] - a![2]] as const;
+  const v = [c![0] - a![0], c![1] - a![1], c![2] - a![2]] as const;
+  return [
+    u[1] * v[2] - u[2] * v[1],
+    u[2] * v[0] - u[0] * v[2],
+    u[0] * v[1] - u[1] * v[0],
+  ];
+}
+
+interface Mesh {
+  positions: number[];
+  normals: number[];
+}
+
+function triangle(out: Mesh, points: Vec3[]) {
+  const n = across(points);
+  const size = Math.hypot(...n) || 1;
+  for (const p of points) {
+    out.positions.push(...p);
+    out.normals.push(n[0] / size, n[1] / size, n[2] / size);
+  }
+}
+
+function prism(
+  body: BodyPayload,
+  face: FaceInfo,
+  normal: Vec3,
+  [low, high]: number[],
+  out: Mesh,
+) {
+  const at = (v: number, t = 0): Vec3 => [
+    body.positions[v * 3]! + normal[0] * t,
+    body.positions[v * 3 + 1]! + normal[1] * t,
+    body.positions[v * 3 + 2]! + normal[2] * t,
+  ];
+  const open = new Map<string, [number, number]>();
+  for (let i = face.start; i + 2 < face.start + face.count; i += 3) {
+    const tri = body.indices.slice(i, i + 3);
+    const n = across(tri.map((v) => at(v)));
+    if (n[0] * normal[0] + n[1] * normal[1] + n[2] * normal[2] < 0)
+      tri.reverse();
+    triangle(
+      out,
+      tri.map((v) => at(v, high)),
+    );
+    triangle(
+      out,
+      tri.toReversed().map((v) => at(v, low)),
+    );
+    for (const [k, u] of tri.entries()) {
+      const w = tri[(k + 1) % 3]!;
+      if (!open.delete(`${at(w)} ${at(u)}`))
+        open.set(`${at(u)} ${at(w)}`, [u, w]);
+    }
+  }
+  for (const [u, w] of open.values()) {
+    triangle(out, [at(u, low), at(w, low), at(w, high)]);
+    triangle(out, [at(u, low), at(w, high), at(u, high)]);
+  }
+}
+
+export function extrudeGhosts(ghosts: PreviewGhost[]): PreviewGhost[] {
+  const s = useStore.getState();
+  const feature = previewedFeature(s);
+  const bodies = previewBodies(s);
+  const tint = ghosts[0]?.tint;
+  if (
+    !tint ||
+    feature?.type !== "extrude" ||
+    feature.profiles.length > 0 ||
+    !feature.faces?.length ||
+    feature.operation === "intersect"
+  )
+    return ghosts;
+  const ends = span(
+    feature.direction,
+    feature.distance,
+    feature.startOffset ?? 0,
+    feature.distance2 ?? 0,
+  ).toSorted((a, b) => a - b);
+  const out: Mesh = { positions: [], normals: [] };
+  const keys: string[] = [];
+  for (const ref of feature.faces) {
+    const body = bodies.find((b) => b.bodyId === ref.bodyId);
+    const face = body?.faces.find((f) => f.name === ref.faceName);
+    if (!body || !face || face.surface.type !== "plane") return ghosts;
+    keys.push(body.meshKey, face.name);
+    prism(body, face, face.surface.normal, ends, out);
+  }
+  const boxes = feature.faces.map((ref) =>
+    swept(faceBase(ref, bodies)!, ends[0]!, ends[1]!),
+  );
+  const corner = (pick: (b: Bounds) => Vec3, f: typeof Math.min) =>
+    [0, 1, 2].map((i) => f(...boxes.map((b) => pick(b)[i]!))) as Vec3;
+  const indices = Array.from({ length: out.positions.length / 3 }, (_, i) => i);
+  const body: BodyPayload = {
+    bodyId: feature.faces[0]!.bodyId,
+    name: feature.name,
+    meshKey: `extrude ${feature.id} ${ends} ${keys}`,
+    ...out,
+    indices,
+    faces: [],
+    edges: [],
+    vertices: [],
+    bbox: {
+      min: corner((b) => b.min, Math.min),
+      max: corner((b) => b.max, Math.max),
+    },
+  };
+  return [{ body, tint, ranges: [{ start: 0, count: indices.length }] }];
 }

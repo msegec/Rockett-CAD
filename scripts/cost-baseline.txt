@@ -16,7 +16,7 @@ client/src/components/Timeline.tsx openFeatureEditor 175
 client/src/components/Toolbar.tsx SketchToolbar 98
 client/src/components/Toolbar.tsx Toolbar 92
 client/src/components/ViewportContextMenu.tsx ViewportContextMenu 137
-client/src/components/ViewportView.tsx 3145
+client/src/components/ViewportView.tsx 3146
 client/src/components/ViewportView.tsx ViewportView 2895
 client/src/components/ViewportView.tsx handleHover 138
 client/src/components/ViewportView.tsx handlePrimaryUp 178

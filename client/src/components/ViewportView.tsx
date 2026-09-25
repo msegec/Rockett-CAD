@@ -44,6 +44,7 @@ import { GizmoSlot } from "../three/gizmoSlot";
 import { clearToolPreview, updateToolPreview } from "../three/toolPreview";
 import { listenWheel } from "../three/wheel";
 import { isProfileUsed, sketchUsage } from "../sketchUsage";
+import { extrudeGhosts } from "../extrudeReach";
 import {
   loadPreviewBase,
   previewBodies,
@@ -337,7 +338,7 @@ export function ViewportView() {
     const scene = previewScene(useStore.getState());
     vp.syncBodies(scene.bodies, new Set(hiddenBodies));
     vp.setBodyTints(scene.tints);
-    vp.setPreviewGhosts(scene.ghosts);
+    vp.setPreviewGhosts(extrudeGhosts(scene.ghosts));
   }, [
     evaluation,
     document_,
