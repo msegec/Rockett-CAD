@@ -402,8 +402,8 @@ function reparametrisedCylinderEdges(shape: Shape): Shape[] {
 /**
  * Merge coplanar faces and collinear edges of a tool solid, so a body made
  * from several adjacent sketch regions reads as one solid instead of showing
- * the sketch's internal boundaries as edges. Purely cosmetic: on any kernel
- * failure the unmerged tool is kept.
+ * the sketch's internal boundaries as edges. On any kernel failure the
+ * unmerged tool is kept.
  */
 function unifyTool(tool: ToolResult, featureId: string): ToolResult {
   const k = getKernel();
@@ -414,6 +414,13 @@ function unifyTool(tool: ToolResult, featureId: string): ToolResult {
       true,
       false,
     );
+    if (tool.names.version === 2) {
+      const { min, max } = bboxOf(tool.shape);
+      uni.SetLinearTolerance(LINEAR_TOL);
+      uni.SetAngularTolerance(
+        LINEAR_TOL / Math.max(1, V.norm(V.sub(max, min))),
+      );
+    }
     const seams = reparametrisedCylinderEdges(tool.shape);
     for (const edge of seams) uni.KeepShape(edge);
     release(seams);

@@ -40,7 +40,7 @@ client/src/three/sketchRender.ts buildSketch 177
 client/src/three/toolPreview.ts updateToolPreview 158
 server/src/api/routes.ts 648
 server/src/api/routes.ts createApiRouter 478
-server/src/geometry/features.ts 2271
+server/src/geometry/features.ts 2278
 server/src/geometry/features.ts applyToolOperation 82
 server/src/geometry/features.ts buildPrism 86
 server/src/geometry/features.ts chamferByEnvelope 272

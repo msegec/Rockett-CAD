@@ -207,7 +207,17 @@ order when they differ. An extrude, revolve, sweep or loft join also unifies
 the fused result. Under `namingVersion` 1 the other joins keep their seams:
 Combine join, Mirror and both patterns with combine, and an outward press/pull,
 so saved references to a merged half still resolve. Under version 2 those
-joins unify their result as well. Two cylinder faces merge only when their
+joins unify their result as well. Under version 2 two planar faces count as
+one surface when they stay within `LINEAR_TOL` of each other across the
+shape: the unify takes `LINEAR_TOL` as its linear tolerance and `LINEAR_TOL`
+over the shape's bounding box diagonal, at least 1 mm, as its angular one.
+The sketch solver stops with constrained lines up to about 1e-10 mm off, so a
+mirror of a constrained sketch met its original at about 3e-12 rad, above the
+kernel's default 1e-12 rad, and kept a seam no fillet can take (BUG-073).
+Version 1 keeps the kernel defaults, so saved names stay. The fillet builder
+treats faces meeting within 0.1 rad (about 5.7 degrees) as smooth and refuses
+the edge at any radius; the feature error says the faces meet smoothly
+there. Two cylinder faces merge only when their
 surfaces share the same X and Y axes. OCCT 7.6 never returned from merging a
 fillet's cylinder with a coaxial prism cylinder whose angle starts a quarter
 turn away, so cylinders whose axes differ keep the edge between them
