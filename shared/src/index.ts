@@ -28,6 +28,8 @@ import "./features/linearPattern.js";
 import "./features/circularPattern.js";
 import "./features/constructionPlane.js";
 import "./features/referenceImage.js";
+import "./features/sketch.js";
+import "./features/importStep.js";
 export * from "./placement.js";
 export * from "./projection.js";
 export * from "./sketchModify.js";

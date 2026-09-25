@@ -72,7 +72,13 @@ export const refsAt = <K extends RefKind>(
 export function registerCoreSpec<T extends FeatureType>(
   type: T,
   refs: (f: Extract<Feature, { type: T }>) => FeatureRef[],
-  { producesGeometry = true } = {},
+  {
+    producesGeometry = true,
+    check = () => {},
+  }: {
+    producesGeometry?: boolean;
+    check?: (f: Extract<Feature, { type: T }>) => void;
+  } = {},
 ): () => void {
   const schema = FEATURE_SCHEMAS[type];
   const spec: FeatureSpec<Extract<Feature, { type: T }>> = {
@@ -81,7 +87,10 @@ export function registerCoreSpec<T extends FeatureType>(
     producesGeometry,
     version: 1,
     paramsSchema: schema,
-    validate: (f) => void parse(schema, f),
+    validate: (f) => {
+      parse(schema, f);
+      check(f);
+    },
     refs,
     displayOnly: [],
   };

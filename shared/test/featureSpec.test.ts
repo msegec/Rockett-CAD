@@ -16,6 +16,7 @@ import {
   type PointRef,
   type ProfileRef,
   type ShellFeature,
+  type SketchEntity,
 } from "../src/index.js";
 
 const face = (faceName: string): FaceRef => ({
@@ -147,10 +148,33 @@ const axes: AxisRef[] = [
   { kind: "edge", edge: refEdge("E1") },
 ];
 
+const sketchEntities: SketchEntity[] = [
+  { id: "p1", kind: "point", x: 0, y: 0 },
+  { id: "p2", kind: "point", x: 10, y: 0, external: true },
+  { id: "l1", kind: "line", p1: "p1", p2: "p2" },
+  {
+    id: "l2",
+    kind: "line",
+    p1: "p1",
+    p2: "p2",
+    external: true,
+    projection: refEdge("E1"),
+  },
+  {
+    id: "c2",
+    kind: "circle",
+    center: "p1",
+    radius: 3,
+    external: true,
+    projection: refEdge("E2"),
+  },
+  { id: "l3", kind: "line", p1: "p2", p2: "p1" },
+];
+
 interface SpecCase {
   producesGeometry: boolean;
   valid: Feature[];
-  invalid: [Feature, string, string][];
+  invalid: [Feature, string, string | undefined][];
   refsOnly?: Feature[];
 }
 
@@ -578,6 +602,88 @@ const cases: Record<string, SpecCase> = {
         },
         "opacity must be <= 1",
         "/opacity",
+      ],
+    ],
+  },
+  sketch: {
+    producesGeometry: false,
+    valid: planes.map((plane) => ({
+      ...meta,
+      type: "sketch",
+      plane,
+      entities: sketchEntities,
+      constraints: [{ id: "c1", type: "length", line: "l1", value: 10 }],
+      offsets: [
+        {
+          id: "o1",
+          distance: 1,
+          sourceIds: ["l1"],
+          entityIds: ["l3"],
+          joinTolerance: 0,
+        },
+      ],
+    })),
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "sketch",
+          plane: null as never,
+          entities: [],
+          constraints: [],
+        },
+        "plane must match a schema in anyOf",
+        "/plane",
+      ],
+      [
+        {
+          ...meta,
+          type: "sketch",
+          plane: planes[0]!,
+          entities: [sketchEntities[0]!, sketchEntities[0]!],
+          constraints: [],
+        },
+        "duplicate sketch entity ID",
+        undefined,
+      ],
+      [
+        {
+          ...meta,
+          type: "sketch",
+          plane: planes[0]!,
+          entities: sketchEntities,
+          constraints: [],
+          offsets: [
+            {
+              id: "o1",
+              distance: 0,
+              sourceIds: ["l1"],
+              entityIds: ["l3"],
+              joinTolerance: 0,
+            },
+          ],
+        },
+        "offset distance must be non-zero",
+        undefined,
+      ],
+    ],
+  },
+  importStep: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "importStep",
+        filename: "part.brep",
+        format: "brep",
+        blob: "0".repeat(64),
+      },
+    ],
+    invalid: [
+      [
+        { ...meta, type: "importStep", filename: "part.step", blob: "x" },
+        'blob must match pattern "^[0-9a-f]{64}$"',
+        "/blob",
       ],
     ],
   },

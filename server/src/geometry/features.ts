@@ -23,6 +23,7 @@ import {
   type Feature,
   type FeatureStatus,
   type FilletFeature,
+  type ImportStepFeature,
   type LinearPatternFeature,
   type LoftFeature,
   type MirrorFeature,
@@ -678,7 +679,7 @@ function applyToolOperation(
 // Individual feature evaluators
 // ---------------------------------------------------------------------------
 
-function evalSketch(state: EvalState, f: SketchFeature): void {
+export function evalSketch(state: EvalState, f: SketchFeature): void {
   const frame = resolvePlaneFrame(state, f.plane);
   let entities = f.entities.map((e) => ({ ...e }));
   for (const entity of f.entities) {
@@ -2294,6 +2295,21 @@ export function evalConstructionPlane(
   state.planes.set(f.id, { frame, size });
 }
 
+export function evalImportStep(
+  { state, sources }: EvalContext,
+  f: ImportStepFeature,
+): void {
+  const shape = readImport(f, sources);
+  registerBodySolids(
+    state,
+    `b:${f.id}`,
+    shape,
+    namingVersion() === 1
+      ? finalizeNames(shape, new ShapeMap(), f.id)
+      : geometryNames(shape, f.id),
+  );
+}
+
 export function evalReferenceImage(
   state: EvalState,
   f: ReferenceImageFeature,
@@ -2331,20 +2347,11 @@ export function evaluateFeature(
 ): FeatureOutcome | void {
   const kind = featureKind(feature.type);
   if (kind)
-    return kind.evaluate({ state, earlier, index: earlier.length }, feature);
+    return kind.evaluate(
+      { state, earlier, index: earlier.length, sources },
+      feature,
+    );
   switch (feature.type) {
-    case "importStep": {
-      const shape = readImport(feature, sources);
-      registerBodySolids(
-        state,
-        `b:${feature.id}`,
-        shape,
-        namingVersion() === 1
-          ? finalizeNames(shape, new ShapeMap(), feature.id)
-          : geometryNames(shape, feature.id),
-      );
-      return;
-    }
     case "importMesh": {
       const { shape, warning } = readMesh(feature),
         bodyId = `b:${feature.id}`,
@@ -2353,8 +2360,6 @@ export function evaluateFeature(
       state.bodies.set(bodyId, { bodyId, shape, names });
       return { warning };
     }
-    case "sketch":
-      return evalSketch(state, feature);
     default:
       throw new Error(`unknown feature type ${feature.type}`);
   }

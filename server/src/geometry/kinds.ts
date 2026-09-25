@@ -12,6 +12,7 @@ import {
   evalEmboss,
   evalExtrude,
   evalFillet,
+  evalImportStep,
   evalLinearPattern,
   evalLoft,
   evalMirror,
@@ -20,6 +21,7 @@ import {
   evalReferenceImage,
   evalRevolve,
   evalShell,
+  evalSketch,
   evalSplitBody,
   evalSweep,
   type FeatureOutcome,
@@ -51,6 +53,8 @@ const kinds = [
   kind("circularPattern", (ctx, f) => evalCircularPattern(ctx.state, f)),
   kind("constructionPlane", (ctx, f) => evalConstructionPlane(ctx.state, f)),
   kind("referenceImage", (ctx, f) => evalReferenceImage(ctx.state, f)),
+  kind("sketch", (ctx, f) => evalSketch(ctx.state, f)),
+  kind("importStep", evalImportStep),
 ];
 
 for (const k of kinds) registerFeatureKind(k);
