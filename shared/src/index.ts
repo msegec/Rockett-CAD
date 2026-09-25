@@ -8,6 +8,7 @@ export * from "./schema/index.js";
 export * from "./schema/features.js";
 export * from "./schema/folders.js";
 export * from "./schema/history.js";
+export * from "./settings.js";
 export * from "./placement.js";
 export * from "./projection.js";
 export * from "./sketchModify.js";
