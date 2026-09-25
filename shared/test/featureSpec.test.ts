@@ -135,6 +135,7 @@ interface SpecCase {
   producesGeometry: boolean;
   valid: Feature[];
   invalid: [Feature, string, string][];
+  refsOnly?: Feature[];
 }
 
 const cases: Record<string, SpecCase> = {
@@ -228,6 +229,69 @@ const cases: Record<string, SpecCase> = {
       ],
     ],
   },
+  sweep: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "sweep",
+        profiles: [refProfile("p1"), refProfile("p2")],
+        pathSketchId: "ref:path",
+        operation: "join",
+        targets: ["ref:b1"],
+      },
+    ],
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "sweep",
+          profiles: [refProfile("p1")],
+          pathSketchId: null as never,
+          operation: "newBody",
+        },
+        "pathSketchId must be string",
+        "/pathSketchId",
+      ],
+    ],
+  },
+  loft: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "loft",
+        sections: [refProfile("p1"), refProfile("p2")],
+        operation: "newBody",
+        targets: ["ref:b1"],
+      },
+    ],
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "loft",
+          sections: [refProfile("p1")],
+          operation: "newBody",
+        },
+        "sections must not have fewer than 2 items",
+        "/sections",
+      ],
+    ],
+    refsOnly: [
+      {
+        ...meta,
+        type: "loft",
+        sections: [
+          refProfile("p1"),
+          { sketchId: "ref:whole" } as ProfileRef,
+          refProfile("p3"),
+        ],
+        operation: "newBody",
+        targets: ["ref:b1"],
+      },
+    ],
+  },
 };
 
 const valueAt = (f: Feature, path: string) =>
@@ -279,7 +343,7 @@ describe.each(Object.entries(cases))("%s feature spec", (type, specCase) => {
   });
 
   it("lists every reference with its param path", () => {
-    for (const f of specCase.valid) {
+    for (const f of [...specCase.valid, ...(specCase.refsOnly ?? [])]) {
       const properties = Object.keys(FEATURE_SCHEMAS[f.type].properties);
       expect(properties.filter((key) => !(key in f))).toEqual([]);
       const refs = featureRefs(f);
@@ -293,4 +357,14 @@ describe.each(Object.entries(cases))("%s feature spec", (type, specCase) => {
       expect(missed).toEqual([]);
     }
   });
+});
+
+it("lists a loft section without a profile id as its whole sketch", () => {
+  const refs = featureRefs(cases.loft!.refsOnly![0]!);
+  expect(refs.map((ref) => [ref.kind, ref.path])).toEqual([
+    ["profile", "/sections/0"],
+    ["sketch", "/sections/1/sketchId"],
+    ["profile", "/sections/2"],
+    ["body", "/targets/0"],
+  ]);
 });

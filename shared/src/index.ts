@@ -15,6 +15,8 @@ import "./features/shell.js";
 import "./features/extrude.js";
 import "./features/revolve.js";
 import "./features/emboss.js";
+import "./features/sweep.js";
+import "./features/loft.js";
 export * from "./placement.js";
 export * from "./projection.js";
 export * from "./sketchModify.js";

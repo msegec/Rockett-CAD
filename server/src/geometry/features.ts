@@ -995,7 +995,7 @@ export function evalRevolve(state: EvalState, f: RevolveFeature) {
   );
 }
 
-function evalSweep(state: EvalState, f: SweepFeature) {
+export function evalSweep(state: EvalState, f: SweepFeature) {
   const { faces: profileFaces } = resolveProfiles(state, f.profiles);
   const pathSketch = state.sketches.get(f.pathSketchId);
   if (!pathSketch) throw new Error(`path sketch ${f.pathSketchId} not found`);
@@ -1063,7 +1063,7 @@ function evalSweep(state: EvalState, f: SweepFeature) {
       );
 }
 
-function evalLoft(state: EvalState, f: LoftFeature) {
+export function evalLoft(state: EvalState, f: LoftFeature) {
   const k = getKernel();
   if (f.sections.length < 2)
     throw new Error("loft requires at least two sections");
@@ -2340,10 +2340,6 @@ export function evaluateFeature(
     }
     case "sketch":
       return evalSketch(state, feature);
-    case "sweep":
-      return evalSweep(state, feature);
-    case "loft":
-      return evalLoft(state, feature);
     case "fillet":
       return evalFillet(state, feature);
     case "chamfer":

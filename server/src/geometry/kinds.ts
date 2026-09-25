@@ -7,8 +7,10 @@ import {
 import {
   evalEmboss,
   evalExtrude,
+  evalLoft,
   evalRevolve,
   evalShell,
+  evalSweep,
   type FeatureOutcome,
 } from "./features.js";
 
@@ -25,6 +27,8 @@ const kinds = [
   kind("extrude", (ctx, f) => evalExtrude(ctx.state, f)),
   kind("revolve", (ctx, f) => evalRevolve(ctx.state, f)),
   kind("emboss", (ctx, f) => evalEmboss(ctx.state, f)),
+  kind("sweep", (ctx, f) => evalSweep(ctx.state, f)),
+  kind("loft", (ctx, f) => evalLoft(ctx.state, f)),
 ];
 
 for (const k of kinds) registerFeatureKind(k);

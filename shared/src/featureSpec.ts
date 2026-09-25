@@ -16,6 +16,7 @@ interface RefTargets {
   profile: ProfileRef;
   axis: AxisRef;
   body: string;
+  sketch: string;
 }
 
 type RefKind = keyof RefTargets;
