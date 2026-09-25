@@ -893,19 +893,19 @@ function applyProfileTools(
     return;
   }
   const made = new Set(tools.map((t) => t.shape));
-  const tool = tools.slice(1).reduce((acc, next) => {
-    const fused = fuseNamed(
-      acc,
-      next,
-      featureId,
-      "failed to merge profile solids",
-    );
-    made.add(fused.shape);
-    return fused;
-  }, tools[0]!);
-  const unified = unifyTool(tool, featureId);
-  made.add(unified.shape);
   try {
+    const tool = tools.slice(1).reduce((acc, next) => {
+      const fused = fuseNamed(
+        acc,
+        next,
+        featureId,
+        "failed to merge profile solids",
+      );
+      made.add(fused.shape);
+      return fused;
+    }, tools[0]!);
+    const unified = unifyTool(tool, featureId);
+    made.add(unified.shape);
     return applyToolOperation(state, featureId, unified, operation, targets);
   } finally {
     release(made);

@@ -33,7 +33,7 @@ import "./kinds.js";
 import type { Sources } from "./importers.js";
 import { movePayload, tessellateBody } from "./tessellate.js";
 import { withNamingVersion, type NamedBody } from "./naming.js";
-import { shapeHash, type Shape } from "./kernel.js";
+import { cancellable, shapeHash, type Shape } from "./kernel.js";
 import { ShapeMap, trackShapeMaps } from "./shapeMap.js";
 import { BlockedFeature, evaluateResolved, unresolvedRefs } from "./resolve.js";
 
@@ -69,13 +69,16 @@ function evaluateTracked(
   earlier: CadDocument["features"],
   sources: Sources,
   namingVersion: NamingVersion,
+  shouldStop?: () => boolean,
 ): FeatureOutcome | void {
   const made: ShapeMap<unknown>[] = [];
   const run = () => evaluateFeature(next, feature, earlier, sources);
   try {
-    return trackShapeMaps(made, () =>
-      withNamingVersion(namingVersion, () =>
-        namingVersion === 1 ? run() : evaluateResolved(next, feature, run),
+    return cancellable(shouldStop, () =>
+      trackShapeMaps(made, () =>
+        withNamingVersion(namingVersion, () =>
+          namingVersion === 1 ? run() : evaluateResolved(next, feature, run),
+        ),
       ),
     );
   } finally {
@@ -268,9 +271,8 @@ class DocumentEngine {
       valid < this.snapshots.length &&
       valid < doc.features.length &&
       this.snapshots[valid]!.featureKeys.includes(keyAt(valid))
-    ) {
+    )
       valid++;
-    }
     releaseSnapshots(this.snapshots.splice(valid), this.snapshots);
     this.namingVersion = doc.namingVersion;
     const start = Math.min(valid, upTo);
@@ -296,6 +298,7 @@ class DocumentEngine {
             doc.features.slice(0, i),
             this.held,
             doc.namingVersion,
+            hooks?.shouldStop,
           );
           status = {
             featureId: feature.id,
@@ -303,8 +306,9 @@ class DocumentEngine {
             ...outcome,
           };
         } catch (err: any) {
-          status = failedStatus(err, state, feature);
           releaseSnapshots([{ state: next }], this.snapshots);
+          if (hooks?.shouldStop?.()) break;
+          status = failedStatus(err, state, feature);
           next.bodies = new Map(state.bodies);
           next.sketches = new Map(state.sketches);
           next.planes = new Map(state.planes);

@@ -440,10 +440,12 @@ meets the others by line fraction or arc and circle angle.
 4. The timeline marker simply truncates evaluation; rolled-back features are
    reported as `rolledBack`. A caller may pass `onFeatureStart` and
    `onProgress`, called before and after each evaluated feature, and
-   `shouldStop`, read at each feature boundary. A stop keeps the snapshots
-   made so far and reports the features left before the marker as
-   `cancelled`; no snapshot holds that status, so the next evaluation resumes
-   at the first cancelled feature.
+   `shouldStop`, read at each feature boundary and, through an OCCT progress
+   indicator, inside the kernel calls of a feature. A stop keeps the
+   snapshots made so far and reports the features left before the marker as
+   `cancelled`, including a feature the kernel abandoned mid-call; no
+   snapshot holds that status, so the next evaluation resumes at the first
+   cancelled feature.
 5. A failing feature records `error` with the kernel's message; evaluation
    continues from the pre-failure state so independent downstream features
    still build. Nothing is silently discarded. Under `namingVersion` 2 a

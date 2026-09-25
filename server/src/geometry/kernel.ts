@@ -14,6 +14,7 @@ export type Shape = any; // TopoDS_Shape
 
 let oc: OC | null = null;
 let range: any = null;
+let cancel: { indicator: any; ranges: any[] } | null = null;
 let initPromise: Promise<OC> | null = null;
 
 export async function initKernel(): Promise<OC> {
@@ -172,7 +173,30 @@ export function transformOp(shape: Shape, trsf: any): any {
 
 export function progress(): any {
   getKernel();
-  return range;
+  if (!cancel) return range;
+  const started = cancel.indicator.Start();
+  cancel.ranges.push(started);
+  return started;
+}
+
+export function cancellable<T>(
+  isCancelled: (() => boolean) | undefined,
+  fn: () => T,
+): T {
+  if (!isCancelled) return fn();
+  const outer = cancel;
+  const scope = {
+    indicator: new (getKernel().CancelIndicator)(isCancelled),
+    ranges: [],
+  };
+  cancel = scope;
+  try {
+    return fn();
+  } finally {
+    cancel = outer;
+    release(scope.ranges);
+    scope.indicator.delete();
+  }
 }
 
 /** Volume of a solid shape in mm³. */
