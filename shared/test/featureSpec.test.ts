@@ -11,6 +11,7 @@ import {
   type FaceRef,
   type Feature,
   type FeatureRef,
+  type PlaneRef,
   type ProfileRef,
   type ShellFeature,
 } from "../src/index.js";
@@ -131,6 +132,12 @@ const refProfile = (profileId: string): ProfileRef => ({
   sketchId: "ref:sketch",
   profileId: `ref:${profileId}`,
 });
+
+const planes: PlaneRef[] = [
+  { kind: "origin", plane: "XZ" },
+  { kind: "construction", featureId: "ref:plane" },
+  { kind: "face", face: refFace("F9") },
+];
 
 interface SpecCase {
   producesGeometry: boolean;
@@ -346,6 +353,72 @@ const cases: Record<string, SpecCase> = {
         { ...meta, type: "offsetFace", faces: [], distance: 1 },
         "faces must not have fewer than 1 items",
         "/faces",
+      ],
+    ],
+  },
+  combine: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "combine",
+        operation: "cut",
+        targetBody: "ref:target",
+        toolBodies: ["ref:t1", "ref:t2"],
+        keepTools: true,
+      },
+    ],
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "combine",
+          operation: "join",
+          targetBody: "b1",
+          toolBodies: [],
+          keepTools: false,
+        },
+        "toolBodies must not have fewer than 1 items",
+        "/toolBodies",
+      ],
+    ],
+  },
+  splitBody: {
+    producesGeometry: true,
+    valid: planes.map((tool) => ({
+      ...meta,
+      type: "splitBody",
+      body: "ref:b1",
+      tool,
+    })),
+    invalid: [
+      [
+        { ...meta, type: "splitBody", body: "b1", tool: null as never },
+        "tool must match a schema in anyOf",
+        "/tool",
+      ],
+    ],
+  },
+  move: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "move",
+        bodies: ["ref:b1", "ref:b2"],
+        translation: [1, 2, 3],
+      },
+    ],
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "move",
+          bodies: ["b1"],
+          translation: [1e12, 0, 0],
+        },
+        "translation.0 must be <= 100000",
+        "/translation/0",
       ],
     ],
   },

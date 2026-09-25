@@ -96,7 +96,7 @@ import { geometryNames } from "./signature.js";
 import { curveInfo } from "./tessellate.js";
 import { tangentEdges } from "./tangentEdges.js";
 import { readImport, readMesh, type Sources } from "./importers.js";
-import { featureKind } from "./featureKinds.js";
+import { featureKind, type EvalContext } from "./featureKinds.js";
 import {
   arcEdge,
   buildProfileFace,
@@ -1722,7 +1722,7 @@ function chamferBody(
   });
 }
 
-function evalCombine(state: EvalState, f: CombineFeature): void {
+export function evalCombine(state: EvalState, f: CombineFeature): void {
   const target = state.bodies.get(f.targetBody);
   if (!target) throw new Error(`target body ${f.targetBody} not found`);
   const tools = f.toolBodies.map((id) => {
@@ -1895,7 +1895,7 @@ export function evalOffsetFace(state: EvalState, f: OffsetFaceFeature): void {
   });
 }
 
-function evalSplitBody(state: EvalState, f: SplitBodyFeature): void {
+export function evalSplitBody(state: EvalState, f: SplitBodyFeature): void {
   const body = state.bodies.get(f.body);
   if (!body) throw new Error(`body ${f.body} not found`);
   const frame = resolvePlaneFrame(state, f.tool);
@@ -2015,7 +2015,10 @@ function evalMirror(state: EvalState, f: MirrorFeature): void {
  * body (drawn on its faces, or consumed by the feature that created it) have
  * their frames translated too, so they stay attached visually and any later
  * features built from them land at the moved position. */
-function evalMove(state: EvalState, f: MoveFeature, earlier: Feature[]): void {
+export function evalMove(
+  { state, earlier }: EvalContext,
+  f: MoveFeature,
+): void {
   if (f.bodies.length === 0)
     throw new Error("select at least one body to move");
   const placement = Placement.fromTranslation(f.translation);
@@ -2340,10 +2343,6 @@ export function evaluateFeature(
     }
     case "sketch":
       return evalSketch(state, feature);
-    case "combine":
-      return evalCombine(state, feature);
-    case "splitBody":
-      return evalSplitBody(state, feature);
     case "mirror":
       return evalMirror(state, feature);
     case "linearPattern":
@@ -2359,8 +2358,6 @@ export function evaluateFeature(
       state.planes.set(feature.id, { frame, size: 0 });
       return;
     }
-    case "move":
-      return evalMove(state, feature, earlier);
     default:
       throw new Error(`unknown feature type ${feature.type}`);
   }

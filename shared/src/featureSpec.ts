@@ -6,6 +6,7 @@ import {
   type FaceRef,
   type Feature,
   type FeatureType,
+  type PlaneRef,
   type ProfileRef,
 } from "./model.js";
 import { createRegistry } from "./registry.js";
@@ -17,6 +18,7 @@ interface RefTargets {
   edge: EdgeRef;
   profile: ProfileRef;
   axis: AxisRef;
+  plane: PlaneRef;
   body: string;
   sketch: string;
 }

@@ -6,13 +6,16 @@ import {
 } from "./featureKinds.js";
 import {
   evalChamfer,
+  evalCombine,
   evalEmboss,
   evalExtrude,
   evalFillet,
   evalLoft,
+  evalMove,
   evalOffsetFace,
   evalRevolve,
   evalShell,
+  evalSplitBody,
   evalSweep,
   type FeatureOutcome,
 } from "./features.js";
@@ -35,6 +38,9 @@ const kinds = [
   kind("fillet", (ctx, f) => evalFillet(ctx.state, f)),
   kind("chamfer", (ctx, f) => evalChamfer(ctx.state, f)),
   kind("offsetFace", (ctx, f) => evalOffsetFace(ctx.state, f)),
+  kind("combine", (ctx, f) => evalCombine(ctx.state, f)),
+  kind("splitBody", (ctx, f) => evalSplitBody(ctx.state, f)),
+  kind("move", evalMove),
 ];
 
 for (const k of kinds) registerFeatureKind(k);
