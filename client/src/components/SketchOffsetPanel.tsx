@@ -9,7 +9,6 @@ import {
 import { useStore } from "../store";
 import { viewportHandle } from "../viewportRef";
 import { uv3 } from "../three/CadViewport";
-import { disposeGroup } from "../three/dispose";
 import { themeColor } from "../theme/tokens";
 import { SKETCH_APPEARANCE } from "../tunables";
 import { DraggablePanel } from "./DraggablePanel";
@@ -146,11 +145,11 @@ function OffsetBody() {
       markers.renderOrder = 10;
       group.add(markers);
     }
-    vp.scene.add(group);
+    const layer = vp.addLayer("sketchOffsetPreview");
+    layer.group.add(group);
     vp.requestRender();
     return () => {
-      vp.scene.remove(group);
-      disposeGroup(group);
+      layer.dispose();
       vp.requestRender();
     };
   }, [preview, draft, evaluation, editing]);

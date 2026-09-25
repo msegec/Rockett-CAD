@@ -8,25 +8,28 @@ import type { PlaneFrame } from "@rockett/shared";
 import { CadViewport, uv3 } from "./CadViewport";
 import { themeColor } from "../theme/tokens";
 import { SKETCH_APPEARANCE } from "../tunables";
-import { clearGroup } from "./dispose";
+import type { LayerHandle } from "./sceneLayers";
 import type { SketchTool } from "../store";
 import type { UV } from "../sketchTools";
 
-let group: THREE.Group | null = null;
+const layers = new WeakMap<CadViewport, LayerHandle>();
 
 function ensureGroup(viewport: CadViewport): THREE.Group {
   viewport.requestRender();
-  if (!group || group.parent !== viewport.scene) {
-    group = new THREE.Group();
-    group.renderOrder = 9;
-    viewport.scene.add(group);
+  let layer = layers.get(viewport);
+  if (!layer) {
+    layer = viewport.addLayer("toolPreview");
+    layer.group.renderOrder = 9;
+    layers.set(viewport, layer);
   }
-  return group;
+  return layer.group;
 }
 
 export function clearToolPreview(viewport: CadViewport | null): void {
-  if (!viewport || !group) return;
-  clearGroup(group);
+  if (!viewport) return;
+  const layer = layers.get(viewport);
+  if (!layer) return;
+  layer.clear();
   viewport.requestRender();
 }
 

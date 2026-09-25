@@ -1,6 +1,6 @@
 /**
  * Renders sketches (entities, points, profile regions) into the viewport's
- * sketch root. Rebuilt whenever sketch data or selection changes.
+ * sketch layer. Rebuilt whenever sketch data or selection changes.
  */
 
 import * as THREE from "three";
@@ -37,7 +37,7 @@ export function renderSketches(
   selection: Selection[],
   hover: Selection | null,
 ): void {
-  const root = viewport.getSketchRoot();
+  const root = viewport.sketches.group;
   const stale = [...root.children];
   const spare = new Map(stale.map((g) => [g.userData.renderKey, g]));
   root.clear();

@@ -23,7 +23,7 @@ import {
 } from "@rockett/shared";
 import { CadViewport, uv3 } from "../three/CadViewport";
 import { ViewCube } from "../three/ViewCube";
-import { clearGroup, disposeGroup } from "../three/dispose";
+import type { LayerHandle } from "../three/sceneLayers";
 import { worldToClient } from "../three/screen";
 import { syncReferenceImages } from "../three/referenceImages";
 import { renderSketches, type SketchRenderInput } from "../three/sketchRender";
@@ -229,7 +229,7 @@ export function ViewportView() {
   const TWO_POINT_TOOLS = ["line", "rect", "centerRect", "circle", "polygon"];
 
   const dimLabelsRef = useRef<DimLabel[]>([]);
-  const leaderGroupRef = useRef<THREE.Group | null>(null);
+  const leaderLayerRef = useRef<LayerHandle | null>(null);
 
   /**
    * Faint dashed leader lines from repositioned dimension labels back to the
@@ -238,12 +238,11 @@ export function ViewportView() {
   function updateDimLeaders() {
     const vp = viewportRef.current;
     if (!vp) return;
-    if (!leaderGroupRef.current || leaderGroupRef.current.parent !== vp.scene) {
-      leaderGroupRef.current = new THREE.Group();
-      vp.scene.add(leaderGroupRef.current);
+    if (leaderLayerRef.current?.group.parent !== vp.scene) {
+      leaderLayerRef.current = vp.addLayer("dimLeaders");
     }
-    const g = leaderGroupRef.current;
-    clearGroup(g);
+    const layer = leaderLayerRef.current;
+    layer.clear();
     const wpp = vp.worldPerPixel();
     const dashed = (from: THREE.Vector3, to: THREE.Vector3) => {
       const geom = new THREE.BufferGeometry().setFromPoints([from, to]);
@@ -260,7 +259,7 @@ export function ViewportView() {
       );
       line.computeLineDistances();
       line.renderOrder = 7;
-      g.add(line);
+      layer.group.add(line);
     };
     for (const l of dimLabelsRef.current) {
       if (l.reference) dashed(...l.reference);
@@ -690,15 +689,8 @@ export function ViewportView() {
   }
 
   // translucent ghost of a NEW revolve (profile swept around the chosen axis)
-  const revolveGhostRef = useRef<THREE.Group | null>(null);
   useEffect(() => {
     const vp = viewportRef.current;
-    if (revolveGhostRef.current && vp) {
-      vp.scene.remove(revolveGhostRef.current);
-      disposeGroup(revolveGhostRef.current);
-      revolveGhostRef.current = null;
-      vp.requestRender();
-    }
     if (!vp) return;
     const s = useStore.getState();
     if (
@@ -722,16 +714,12 @@ export function ViewportView() {
       axis.dir,
       Number.isFinite(angle) ? angle : 360,
     );
-    vp.scene.add(ghost);
+    const layer = vp.addLayer("revolveGhost");
+    layer.group.add(ghost);
     vp.requestRender();
-    revolveGhostRef.current = ghost;
     return () => {
-      if (revolveGhostRef.current && viewportRef.current) {
-        viewportRef.current.scene.remove(revolveGhostRef.current);
-        disposeGroup(revolveGhostRef.current);
-        revolveGhostRef.current = null;
-        viewportRef.current.requestRender();
-      }
+      layer.dispose();
+      vp.requestRender();
     };
   }, [mode, selection, evaluation, dialogParams, baseLoads]);
 

@@ -123,12 +123,12 @@ export class CadViewport {
     string,
     THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
   >();
-  private sketchRoot = new THREE.Group();
   private overlayRoot = new THREE.Group();
   private originRoot = new THREE.Group();
   private layers = sceneLayers(this.scene);
   readonly addLayer = this.layers.addLayer;
   private planes: LayerHandle;
+  readonly sketches: LayerHandle;
   private raycaster = new THREE.Raycaster();
   private rect: DOMRect | null = null;
   private forgetRect = () => {
@@ -183,7 +183,7 @@ export class CadViewport {
     this.planes = this.addLayer("constructionPlanes");
     this.scene.add(this.bodyRoot);
     this.scene.add(this.ghostRoot);
-    this.scene.add(this.sketchRoot);
+    this.sketches = this.addLayer("sketches");
     this.scene.add(this.overlayRoot);
 
     this.buildOriginDisplay();
@@ -384,9 +384,9 @@ export class CadViewport {
         any = true;
       }
     }
-    this.sketchRoot.updateWorldMatrix(true, true);
-    if (this.sketchRoot.children.length > 0) {
-      box.expandByObject(this.sketchRoot);
+    this.sketches.group.updateWorldMatrix(true, true);
+    if (this.sketches.group.children.length > 0) {
+      box.expandByObject(this.sketches.group);
       any = true;
     }
     if (!any)
@@ -850,7 +850,8 @@ export class CadViewport {
     if (opts.constructionPlanes || opts.profiles || opts.sketchEntities) {
       const targets: THREE.Object3D[] = [];
       if (opts.constructionPlanes) targets.push(this.planes.group);
-      if (opts.profiles || opts.sketchEntities) targets.push(this.sketchRoot);
+      if (opts.profiles || opts.sketchEntities)
+        targets.push(this.sketches.group);
       const hits = this.raycaster.intersectObjects(targets, true);
       for (const h of hits) {
         const ud = h.object.userData;
@@ -1039,14 +1040,6 @@ export class CadViewport {
       }
     }
     // profile/sketch entity highlights handled by the sketch renderer
-  }
-
-  // -------------------------------------------------------------------------
-  // Construction planes & sketch content roots (populated externally)
-  // -------------------------------------------------------------------------
-
-  getSketchRoot(): THREE.Group {
-    return this.sketchRoot;
   }
 
   syncConstructionPlanes(
