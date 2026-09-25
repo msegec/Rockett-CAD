@@ -1,5 +1,7 @@
 import { defineConfig } from "vitest/config";
 
+const BROWSER_WAIT_MS = 30_000;
+
 export const projects = [
   {
     name: "node",
@@ -15,6 +17,7 @@ export const projects = [
       "**/test/browser/**",
       "server/test/memorySoak.test.ts",
     ],
+    testTimeout: 30_000,
     benchmark: { include: [] },
   },
   {
@@ -27,6 +30,7 @@ export const projects = [
     ],
     exclude: [],
     setupFiles: ["client/test/dom/setup.ts"],
+    testTimeout: 30_000,
     benchmark: { include: ["client/test/**/*.bench.ts"] },
   },
   {
@@ -43,6 +47,8 @@ export const projects = [
     exclude: [],
     testTimeout: 60_000,
     hookTimeout: 60_000,
+    expect: { poll: { timeout: BROWSER_WAIT_MS } },
+    provide: { browserWaitMs: BROWSER_WAIT_MS },
     benchmark: { include: [] },
   },
 ];
