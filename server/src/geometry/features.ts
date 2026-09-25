@@ -2161,9 +2161,17 @@ function evalConstructionPlane(
   } else {
     const a = resolvePlaneFrame(state, f.method.a);
     const b = resolvePlaneFrame(state, f.method.b);
-    // midplane between two (near-)parallel planes
-    const midOrigin = V.scale(V.add(a.origin, b.origin), 0.5);
-    frame = frameFromPlane(midOrigin, a.normal);
+    if (V.norm(V.cross(a.normal, b.normal)) < UNIT_DOT_TOL) {
+      const midOrigin = V.scale(V.add(a.origin, b.origin), 0.5);
+      frame = frameFromPlane(midOrigin, a.normal);
+    } else {
+      const between = V.sub(a.normal, b.normal);
+      const width = V.norm(between);
+      const level =
+        (V.dot(a.normal, a.origin) - V.dot(b.normal, b.origin)) /
+        (width * width);
+      frame = frameFromPlane(V.scale(between, level), between);
+    }
   }
   // display size heuristic: cover existing model bbox
   let size = 40;

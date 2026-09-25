@@ -414,8 +414,11 @@ meets the others by line fraction or arc and circle angle.
   closest to the global origin (stable under lateral model edits: the sketch
   rides the face if it moves along its normal); axes derived deterministically
   from the global axes.
-- Construction planes: base frame offset along its normal / averaged for
-  midplanes.
+- Construction planes: base frame offset along its normal. A midplane of
+  parallel refs lies halfway between them with the first ref's normal. Refs
+  at an angle give the plane of equal signed distance to both: it contains
+  their intersection line and, with outward face normals, lies between the
+  faces.
 
 ## Regeneration engine
 
