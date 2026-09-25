@@ -20,6 +20,7 @@ import type { Selection } from "../store";
 import type { PreviewGhost, PreviewTint } from "../livePreview";
 import { clientToNdc } from "./screen";
 import { clearGroup, disposeGroup, disposeObject } from "./dispose";
+import { type LayerHandle, sceneLayers } from "./sceneLayers";
 import { themeColor } from "../theme/tokens";
 import { cameraTween, orbitAbout, type CameraPose } from "./camera";
 import { frameScheduler } from "./frameScheduler";
@@ -123,9 +124,11 @@ export class CadViewport {
     THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
   >();
   private sketchRoot = new THREE.Group();
-  private planeRoot = new THREE.Group();
   private overlayRoot = new THREE.Group();
   private originRoot = new THREE.Group();
+  private layers = sceneLayers(this.scene);
+  readonly addLayer = this.layers.addLayer;
+  private planes: LayerHandle;
   private raycaster = new THREE.Raycaster();
   private rect: DOMRect | null = null;
   private forgetRect = () => {
@@ -177,7 +180,7 @@ export class CadViewport {
     this.scene.add(key);
 
     this.scene.add(this.originRoot);
-    this.scene.add(this.planeRoot);
+    this.planes = this.addLayer("constructionPlanes");
     this.scene.add(this.bodyRoot);
     this.scene.add(this.ghostRoot);
     this.scene.add(this.sketchRoot);
@@ -191,6 +194,7 @@ export class CadViewport {
   dispose() {
     this.frames.dispose();
     window.removeEventListener("scroll", this.forgetRect, true);
+    this.layers.dispose();
     clearGroup(this.scene);
     this.bodies.clear();
     this.ghosts.clear();
@@ -845,7 +849,7 @@ export class CadViewport {
 
     if (opts.constructionPlanes || opts.profiles || opts.sketchEntities) {
       const targets: THREE.Object3D[] = [];
-      if (opts.constructionPlanes) targets.push(this.planeRoot);
+      if (opts.constructionPlanes) targets.push(this.planes.group);
       if (opts.profiles || opts.sketchEntities) targets.push(this.sketchRoot);
       const hits = this.raycaster.intersectObjects(targets, true);
       for (const h of hits) {
@@ -1041,10 +1045,6 @@ export class CadViewport {
   // Construction planes & sketch content roots (populated externally)
   // -------------------------------------------------------------------------
 
-  getPlaneRoot(): THREE.Group {
-    return this.planeRoot;
-  }
-
   getSketchRoot(): THREE.Group {
     return this.sketchRoot;
   }
@@ -1054,7 +1054,7 @@ export class CadViewport {
     featureNames: Map<string, string>,
     visibleIds: Set<string>,
   ) {
-    clearGroup(this.planeRoot);
+    this.planes.clear();
     for (const p of planes) {
       if (p.size <= 0) continue; // reference image frames
       if (!visibleIds.has(p.featureId)) continue;
@@ -1079,7 +1079,7 @@ export class CadViewport {
         }),
       );
       mesh.add(border);
-      this.planeRoot.add(mesh);
+      this.planes.group.add(mesh);
     }
     this.requestRender();
   }
