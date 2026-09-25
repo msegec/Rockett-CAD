@@ -1,6 +1,7 @@
 import {
   documentSchema,
   FEATURE_SCHEMAS,
+  featureSpec,
   parse,
   ValidationError,
   type CadDocument,
@@ -73,6 +74,8 @@ function sketchReferences(f: SketchFeature): void {
 
 export function validateFeature(f: Feature): void {
   record(f, "feature");
+  const spec = featureSpec(f.type);
+  if (spec) return spec.validate(f);
   parse(schemaFor(f.type), f);
   if (f.type === "sketch") sketchReferences(f);
 }
