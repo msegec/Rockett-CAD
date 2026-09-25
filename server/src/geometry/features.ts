@@ -47,6 +47,7 @@ import {
   Placement,
 } from "@rockett/shared";
 import {
+  areaOf,
   bboxOf,
   dir,
   edgeCentroid,
@@ -144,6 +145,8 @@ export function emptyState(): EvalState {
     blocked: new Set(),
   };
 }
+
+export class NoCorner extends Error {}
 
 export class FeatureError extends Error {
   constructor(
@@ -1302,7 +1305,7 @@ function filletBody(
         if (!op.Contour(edge)) op.Add_2(f.radius, edge);
       }
       if (op.NbContours() === 0) {
-        throw new Error(
+        throw new NoCorner(
           `no sharp corner to fillet on ${sourceEdges.map((s) => s.name).join(", ")}: the faces meet smoothly there`,
         );
       }
@@ -1372,7 +1375,7 @@ function rejectInvalid(
   );
 }
 
-function invalidPart(shape: Shape): string | null {
+export function invalidPart(shape: Shape): string | null {
   const check = new (getKernel().BRepCheck_Analyzer)(shape, true, false, false);
   try {
     if (check.IsValid_2()) return null;
@@ -1763,6 +1766,12 @@ export function evalCombine(state: EvalState, f: CombineFeature): void {
   });
 }
 
+function hollowed(before: Shape, after: Shape): boolean {
+  const skin = LINEAR_TOL * areaOf(before);
+  const kept = volumeOf(after);
+  return kept > skin && volumeOf(before) - kept > skin;
+}
+
 export function evalShell(state: EvalState, f: ShellFeature): void {
   if (f.thickness <= 0) throw new Error("shell thickness must be positive");
   const bodyId = f.openFaces[0]?.bodyId ?? [...state.bodies.keys()][0];
@@ -1808,6 +1817,10 @@ export function evalShell(state: EvalState, f: ShellFeature): void {
           `${f.thickness} mm`,
           "try a different wall thickness",
         );
+        if (!hollowed(body.shape, shape))
+          throw new Error(
+            `shell of ${f.thickness} mm left no hollow, so the wall is too thick for this body: try a thinner wall; the previous body has been kept`,
+          );
       } catch (err) {
         shape.delete();
         throw err;

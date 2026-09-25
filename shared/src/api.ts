@@ -4,8 +4,11 @@
 
 import type {
   CadDocument,
+  ChamferFeature,
   EdgeRef,
   FaceRef,
+  FilletFeature,
+  ShellFeature,
   SketchSolveStatus,
   SketchEntity,
 } from "./model.js";
@@ -273,6 +276,19 @@ export interface Formats {
   exporters: ExportFormat[];
   importers: ImportFormat[];
 }
+
+export type SizedFeature = FilletFeature | ChamferFeature | ShellFeature;
+
+export interface SizeLimitRequest {
+  feature: SizedFeature;
+}
+
+export type SizeLimit = { builds: number } & (
+  | { kind: "upTo"; size: number }
+  | { kind: "smooth" }
+  | { kind: "none"; below: number }
+  | { kind: "slow" }
+);
 
 export interface ExportRequest {
   format: string;

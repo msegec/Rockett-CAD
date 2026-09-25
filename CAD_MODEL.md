@@ -251,6 +251,11 @@ kind of part the check rejects and keeps the previous body. When the body was
 already invalid before the feature, the error says the fault comes from an
 earlier feature.
 
+A shell must also leave a hollow. When the wall reaches half the body, or a
+fillet radius, the kernel can return the solid unshelled and report success.
+Shell errors when the result keeps no volume, or removes no more than a
+skin of `LINEAR_TOL` times the body area, and keeps the previous body.
+
 Sketch-curve attribution deserves a note: wire construction can rebuild edge
 shapes (vertex merging), so after building a profile face we re-derive the
 edge→sketch-entity map _geometrically_ (each face edge's midpoint is matched

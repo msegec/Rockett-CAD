@@ -46,6 +46,7 @@ import "../features/move";
 import "../features/constructionPlane";
 import "../features/referenceImage";
 import "../features/importStep";
+import { SizeLimitHint } from "./form/SizeLimitHint";
 import { featureUI } from "../features/registry";
 import { selectedPlane } from "../features/inputs";
 import "../features/shell";
@@ -732,7 +733,8 @@ function DialogBody({
     }
   }
 
-  const live = useLivePreview(editId, attempt(build));
+  const draft = attempt(build);
+  const live = useLivePreview(editId, draft);
   useEffect(
     () => () => {
       void useStore.getState().cancelPreview();
@@ -776,6 +778,7 @@ function DialogBody({
       <div className="dialog-body">
         <RefRepair />
         {body}
+        <SizeLimitHint draft={draft} />
       </div>
       <DialogFooter
         onOk={() => void ok()}

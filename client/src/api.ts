@@ -20,6 +20,7 @@ import {
   type PathParams,
   type ProjectView,
   type Route,
+  type SizedFeature,
   type TreeGroup,
   type WireEvaluateResult,
   type WireMutationResponse,
@@ -315,6 +316,8 @@ export const api = {
   },
   tangentEdges: (id: string, edge: EdgeRef, beforeFeatureId?: string) =>
     send(ROUTES.tangentEdges, { id }, { body: { edge, beforeFeatureId } }),
+  sizeLimit: (id: string, feature: SizedFeature, position: number) =>
+    send(ROUTES.sizeLimit, { id }, { body: { feature }, position }),
   projectEdge: (id: string, fid: string, edge: EdgeRef, entityId: string) =>
     send(ROUTES.projectEdge, { id, fid }, { body: { edge, entityId } }),
 

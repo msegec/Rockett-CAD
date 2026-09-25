@@ -6,4 +6,9 @@ export const TIMING_MS = {
   temporaryProjectSweep: HOUR,
   sessionIdle: 7 * DAY,
   sessionAbsolute: 30 * DAY,
+  sizeLimitSearch: 1000,
+} as const;
+
+export const TRIAL_BUDGET = {
+  sizeLimitBuilds: 8,
 } as const;

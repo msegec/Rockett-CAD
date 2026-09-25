@@ -24,6 +24,8 @@ import type {
   ProjectResponse,
   ProjectSummary,
   ProjectView,
+  SizeLimit,
+  SizeLimitRequest,
   WireEvaluateResult,
 } from "./api.js";
 import { VIEW_VERSION } from "./api.js";
@@ -310,6 +312,10 @@ export const ROUTES = {
     "PUT",
     "/projects/:id/view",
     projectView,
+  ),
+  sizeLimit: route<SizeLimitRequest, SizeLimit>()(
+    "POST",
+    "/projects/:id/size-limit",
   ),
   measure: route<MeasureRequest, MeasureResult>()(
     "POST",

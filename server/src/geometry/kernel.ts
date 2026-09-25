@@ -310,6 +310,8 @@ export function kernelCall<T>(label: string, fn: () => T): T {
       k.decrementExceptionRefcount(err);
       throw new Error(`${label}: ${message}`);
     }
-    throw new Error(`${label}: ${err?.message ?? String(err)}`);
+    throw new Error(`${label}: ${err?.message ?? String(err)}`, {
+      cause: err,
+    });
   }
 }

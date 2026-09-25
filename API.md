@@ -481,3 +481,15 @@ update endpoint, which also provides undo/redo integration in the client.
 Read-only chain query: { edge: EdgeRef, beforeFeatureId?: string } returns
 { edges: EdgeRef[] }. An edit supplies beforeFeatureId to resolve its inputs
 before the feature. Source errors return 400; no document changes are persisted.
+
+### POST /api/projects/:id/size-limit
+
+Read-only size query: { feature } with a fillet, chamfer or shell returns
+{ kind, builds }. `upTo` carries `size`, the largest size that built valid;
+`smooth` means the picked edges have no corner to blend; `none` carries
+`below`, the smallest size tried, which failed; `slow` means the search ran out
+of time before any build finished. The worker runs trial builds at the
+`position` query parameter, or at the saved timeline position without one, and
+stops after 8 builds or 1 s. The feature's own size is ignored. Invalid
+features, positions and missing picks return 400; no document changes are
+persisted.

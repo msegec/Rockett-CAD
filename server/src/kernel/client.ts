@@ -16,6 +16,8 @@ import {
   type NamingMapping,
   type PlaneRef,
   type RefSignature,
+  type SizeLimit,
+  type SizedFeature,
   type SketchEntity,
 } from "@rockett/shared";
 import { StoreError, type ProjectStore } from "../store/projectStore.js";
@@ -33,6 +35,7 @@ import { faceDrawing } from "../geometry/dxf.js";
 import { signRefs } from "../geometry/signature.js";
 import { planNamingUpgrade } from "../geometry/upgradeNaming.js";
 import { tangentEdges } from "../geometry/tangentEdges.js";
+import { sizeLimit } from "../geometry/sizeLimit.js";
 import { importerFor, IMPORTERS, type Sources } from "../geometry/importers.js";
 import {
   EXPORT_QUALITY,
@@ -51,6 +54,7 @@ interface StateQueries {
     entityId: string;
   };
   sign: { position: number; refs: Array<FaceRef | EdgeRef> };
+  sizeLimit: { position: number | undefined; feature: SizedFeature };
 }
 
 export type StateQuery<K extends keyof StateQueries = keyof StateQueries> = {
@@ -62,6 +66,7 @@ export interface StateAnswers {
   tangentEdges: EdgeRef[];
   projectEdge: SketchEntity[];
   sign: Array<RefSignature | undefined>;
+  sizeLimit: SizeLimit;
 }
 
 export interface ExportJob extends Omit<ExportRequest, "retain"> {
@@ -122,6 +127,7 @@ const ANSWERS: {
   [K in keyof StateQueries]: (
     state: EvalState,
     query: StateQuery<K>,
+    doc: CadDocument,
   ) => StateAnswers[K];
 } = {
   measure: (state, { request }) => measure(state, request),
@@ -151,6 +157,8 @@ const ANSWERS: {
     signRefs(state.bodies, signed);
     return signed.map((ref) => ref.sig);
   },
+  sizeLimit: (state, { position, feature }, doc) =>
+    sizeLimit(state, doc, position, feature),
 };
 
 function exportBodies(state: EvalState, { bodyIds, hidden }: ExportJob) {
@@ -258,7 +266,7 @@ export class InProcessKernel implements KernelClient {
       doc,
       "position" in query ? query.position : undefined,
     );
-    return ANSWERS[query.kind](state, query);
+    return ANSWERS[query.kind](state, query, doc);
   }
 
   async export(doc: CadDocument, job: ExportJob) {

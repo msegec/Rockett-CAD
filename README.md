@@ -52,6 +52,7 @@ everything downstream against persistent topology references.
 - **Tool targets**: join, cut and intersect act on the bodies you choose, from the list or by click, or on Auto.
 - **Modify**: fillet, chamfer, shell, combine, split, press/pull and move bodies; shell with no open face hollows the body.
 - **Tangent chains**: fillet and chamfer pick smooth connected edges in one click, on one or several bodies.
+- **Size hints**: fillet, chamfer and shell show the largest size that builds for the current picks.
 - **Replicate**: mirror, rectangular pattern and circular pattern.
 - **Construction**: planes by offset, midplane, angle, three points or two edges, with flip; sketch on any planar face.
 - **Origin axes**: pick X, Y or Z in the model tree or at the origin as a revolve or pattern axis.

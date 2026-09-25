@@ -89,6 +89,30 @@ function evaluateTracked(
   }
 }
 
+export function trialBuild<T>(
+  state: EvalState,
+  feature: CadDocument["features"][number],
+  earlier: CadDocument["features"],
+  namingVersion: NamingVersion,
+  shouldStop: () => boolean,
+  inspect: (built: EvalState) => T,
+): T {
+  const next = cloneState(state);
+  try {
+    evaluateTracked(
+      next,
+      feature,
+      earlier,
+      new Map(),
+      namingVersion,
+      shouldStop,
+    );
+    return inspect(next);
+  } finally {
+    releaseSnapshots([{ state: next }], [{ state }]);
+  }
+}
+
 function failedStatus(
   err: any,
   state: EvalState,

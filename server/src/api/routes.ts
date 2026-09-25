@@ -18,6 +18,7 @@ import {
   type Feature,
   type Method,
   type Route,
+  type SizedFeature,
   unsignedRefs,
 } from "@rockett/shared";
 import { build } from "../build.js";
@@ -641,6 +642,29 @@ export function createApiRouter(
     wrap(async (req, res) => {
       await store.setView(req.params.id, req.body);
       res.json(req.body);
+    }),
+  );
+
+  on(
+    ROUTES.sizeLimit,
+    wrap(async (req, res) => {
+      const feature = req.body?.feature as SizedFeature;
+      record(feature, "feature");
+      if (!["fillet", "chamfer", "shell"].includes(feature.type))
+        throw new ValidationError(
+          "size limits cover fillet, chamfer and shell",
+        );
+      const doc = await store.load(req.params.id);
+      knownKeys(feature, feature.type);
+      feature.name ||= nextFeatureName(doc, feature.type);
+      validateFeature(feature);
+      res.json(
+        await kernel.stateQuery(doc, {
+          kind: "sizeLimit",
+          position: evaluationPosition(req, doc),
+          feature,
+        }),
+      );
     }),
   );
 
