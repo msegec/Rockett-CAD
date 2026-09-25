@@ -2,10 +2,8 @@ import path from "node:path";
 import crypto from "node:crypto";
 import {
   createEmptyDocument,
-  DAY,
   emptyView,
   MB,
-  MINUTE,
   parse,
   projectView,
   VIEW_VERSION,
@@ -21,6 +19,7 @@ import type { Inventory, Write } from "./jsonStore.js";
 import { checkManifest, ID_RE, ManifestStore } from "./manifestStore.js";
 import { documentMigrations, TooNewError } from "./migrations.js";
 import type { Storage } from "./storage.js";
+import { TIMING_MS } from "../tunables.js";
 
 export { StoreError };
 
@@ -301,7 +300,7 @@ export class ProjectStore {
 
   async touch(id: string): Promise<void> {
     const at = await this.touchedAt(id);
-    if (at !== undefined && this.now() - at >= MINUTE)
+    if (at !== undefined && this.now() - at >= TIMING_MS.temporaryProjectTouch)
       await this.writeMarker(id);
   }
 
@@ -314,7 +313,11 @@ export class ProjectStore {
 
   async expire(id: string): Promise<boolean> {
     const at = await this.touchedAt(id);
-    if (at === undefined || this.now() - at < DAY) return false;
+    if (
+      at === undefined ||
+      this.now() - at < TIMING_MS.temporaryProjectLifetime
+    )
+      return false;
     await this.remove(id);
     return true;
   }

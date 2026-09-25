@@ -1,8 +1,6 @@
 import crypto from "node:crypto";
-import { DAY } from "@rockett/shared";
+import { TIMING_MS } from "../tunables.js";
 
-const IDLE_MS = 7 * DAY;
-const ABSOLUTE_MS = 30 * DAY;
 const MAX_PER_USER = 20;
 
 interface Session {
@@ -56,8 +54,8 @@ export class SessionStore {
 
   private expired(session: Session, now: number): boolean {
     return (
-      now - session.lastSeenAt >= IDLE_MS ||
-      now - session.createdAt >= ABSOLUTE_MS
+      now - session.lastSeenAt >= TIMING_MS.sessionIdle ||
+      now - session.createdAt >= TIMING_MS.sessionAbsolute
     );
   }
 }

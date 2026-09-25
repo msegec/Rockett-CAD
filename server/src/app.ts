@@ -1,5 +1,4 @@
 import express, { type Express, type Router } from "express";
-import { HOUR } from "@rockett/shared";
 import { readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { Server } from "node:http";
@@ -13,6 +12,7 @@ import type { ProjectStore } from "./store/projectStore.js";
 import type { FolderStore } from "./store/folderStore.js";
 import { ProjectQueue } from "./store/projectQueue.js";
 import type { KernelClient } from "./kernel/client.js";
+import { TIMING_MS } from "./tunables.js";
 
 const COMPRESSIBLE = /\.(?:js|css|html)$/;
 const gzipAsync = promisify(gzip);
@@ -110,6 +110,6 @@ export function scheduleSweep(server: Server, sweep: () => Promise<void>) {
       console.error("[rockett] temporary project sweep failed:", err),
     );
   run();
-  const timer = setInterval(run, HOUR);
+  const timer = setInterval(run, TIMING_MS.temporaryProjectSweep);
   server.once("close", () => clearInterval(timer));
 }
