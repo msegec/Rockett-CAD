@@ -3,8 +3,10 @@ import type {
   CadDocument,
   EvaluateResult,
   Feature,
+  FeatureRef,
   FeatureStatus,
 } from "@rockett/shared";
+import { featureRefs } from "@rockett/shared";
 import { pickInto } from "../dialogPicks";
 import { featureUI } from "../features/registry";
 import { axisParams, axisSelection } from "../features/inputs";
@@ -277,6 +279,31 @@ export function Timeline() {
   );
 }
 
+const refPick = (ref: FeatureRef): Selection[] => {
+  switch (ref.kind) {
+    case "profile":
+      return [
+        {
+          kind: "profile",
+          sketchId: ref.profile.sketchId,
+          profileId: ref.profile.profileId,
+        },
+      ];
+    case "edge":
+      return [
+        { kind: "edge", bodyId: ref.edge.bodyId, edgeName: ref.edge.edgeName },
+      ];
+    case "face":
+      return [
+        { kind: "face", bodyId: ref.face.bodyId, faceName: ref.face.faceName },
+      ];
+    case "body":
+      return [{ kind: "body", bodyId: ref.body }];
+    default:
+      return [];
+  }
+};
+
 /** Open the right editor for a feature: sketch mode, or a prefilled dialog. */
 export async function openFeatureEditor(f: Feature): Promise<void> {
   if (useStore.getState().busy) return;
@@ -293,26 +320,9 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
   const ui = featureUI(f.type);
   if (ui) return openDialog(f, ui.prefill(f));
   const anyF = f as any;
-  const selection: Selection[] = [];
-  for (const p of anyF.profiles ?? []) {
-    selection.push({
-      kind: "profile",
-      sketchId: p.sketchId,
-      profileId: p.profileId,
-    });
-  }
-  for (const e of anyF.edges ?? []) {
-    selection.push({ kind: "edge", bodyId: e.bodyId, edgeName: e.edgeName });
-  }
-  for (const fa of anyF.faces ?? []) {
-    selection.push({ kind: "face", bodyId: fa.bodyId, faceName: fa.faceName });
-  }
-  if (anyF.targetBody)
-    selection.push({ kind: "body", bodyId: anyF.targetBody });
-  for (const b of anyF.toolBodies ?? anyF.bodies ?? []) {
-    selection.push({ kind: "body", bodyId: b });
-  }
-  if (anyF.body) selection.push({ kind: "body", bodyId: anyF.body });
+  const selection = featureRefs(f)
+    .filter((ref) => !ref.path.startsWith("/targets/"))
+    .flatMap(refPick);
 
   /** Reselect an edge or sketch-line axis so OK rebuilds the same axis. */
   const pushAxis = (axis: any) => selection.push(...axisSelection(axis));
@@ -370,7 +380,6 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
         axisSource: anyF.direction?.kind === "axis" ? "origin" : "edge",
         axis: anyF.direction?.kind === "axis" ? anyF.direction.axis : "X",
       });
-      pushAxis(anyF.direction);
       break;
     case "circularPattern":
       Object.assign(params, {

@@ -30,6 +30,7 @@ import "./features/constructionPlane.js";
 import "./features/referenceImage.js";
 import "./features/sketch.js";
 import "./features/importStep.js";
+import "./features/importMesh.js";
 export * from "./placement.js";
 export * from "./projection.js";
 export * from "./sketchModify.js";

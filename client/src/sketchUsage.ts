@@ -4,7 +4,7 @@
  * extruded from the tree.
  */
 
-import type { CadDocument } from "@rockett/shared";
+import { featureRefs, type CadDocument } from "@rockett/shared";
 
 export interface SketchUsage {
   /** `${sketchId}:${profileId}` of every region referenced by a feature */
@@ -19,16 +19,12 @@ export const profileKey = (sketchId: string, profileId: string) =>
 export function sketchUsage(document: CadDocument): SketchUsage {
   const profiles = new Set<string>();
   const sketches = new Set<string>();
-  for (const f of document.features) {
-    const anyF = f as any;
-    for (const p of anyF.profiles ?? [])
-      profiles.add(profileKey(p.sketchId, p.profileId));
-    for (const p of anyF.sections ?? []) {
-      if (p.profileId) profiles.add(profileKey(p.sketchId, p.profileId));
-      else sketches.add(p.sketchId);
+  for (const f of document.features)
+    for (const ref of featureRefs(f)) {
+      if (ref.kind === "profile")
+        profiles.add(profileKey(ref.profile.sketchId, ref.profile.profileId));
+      if (ref.kind === "sketch") sketches.add(ref.sketch);
     }
-    if (anyF.pathSketchId) sketches.add(anyF.pathSketchId);
-  }
   return { profiles, sketches };
 }
 

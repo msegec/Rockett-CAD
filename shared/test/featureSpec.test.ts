@@ -687,6 +687,31 @@ const cases: Record<string, SpecCase> = {
       ],
     ],
   },
+  importMesh: {
+    producesGeometry: true,
+    valid: [
+      {
+        ...meta,
+        type: "importMesh",
+        filename: "part.stl",
+        format: "stl",
+        data: "c29saWQ=",
+      },
+    ],
+    invalid: [
+      [
+        {
+          ...meta,
+          type: "importMesh",
+          filename: "part.stl",
+          format: "stl",
+          data: "solid part",
+        },
+        'data must match pattern "^[A-Za-z0-9+/]*={0,2}$"',
+        "/data",
+      ],
+    ],
+  },
 };
 
 const valueAt = (f: Feature, path: string) =>

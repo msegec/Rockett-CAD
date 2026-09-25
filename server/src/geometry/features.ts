@@ -9,6 +9,7 @@ import {
   solveSketch,
   projectEdge,
   bodyMadeBy,
+  featureRefs,
   ANGULAR_TOL_DEG,
   LINEAR_TOL,
   UNIT_DOT_TOL,
@@ -2060,21 +2061,17 @@ export function evalMove(
     const feat = earlier.find((g) => g.id === skId && g.type === "sketch") as
       SketchFeature | undefined;
     if (!feat) continue;
-    let follows =
-      feat.plane.kind === "face" && movedIds.has(feat.plane.face.bodyId);
-    if (!follows) {
-      for (const g of earlier) {
-        const anyG = g as any;
-        const consumes =
-          [...(anyG.profiles ?? []), ...(anyG.sections ?? [])].some(
-            (p: any) => p.sketchId === skId,
-          ) || anyG.pathSketchId === skId;
-        if (consumes && createdBy(g)) {
-          follows = true;
-          break;
-        }
-      }
-    }
+    const follows =
+      (feat.plane.kind === "face" && movedIds.has(feat.plane.face.bodyId)) ||
+      earlier.some(
+        (g) =>
+          createdBy(g) &&
+          featureRefs(g).some(
+            (ref) =>
+              (ref.kind === "profile" && ref.profile.sketchId === skId) ||
+              (ref.kind === "sketch" && ref.sketch === skId),
+          ),
+      );
     if (follows) {
       state.sketches.set(skId, {
         ...sk,
