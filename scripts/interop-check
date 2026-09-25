@@ -112,6 +112,14 @@ def threemf(path):
         "warnings": warnings,
     }
 
+def dxf_geometry(e):
+    fields = {"LINE": ("start", "end"), "CIRCLE": ("center", "radius"),
+              "ARC": ("center", "radius", "start_angle", "end_angle"), "POINT": ("location",)}
+    def plain(v):
+        return [round(c, 6) for c in v] if hasattr(v, "__iter__") else round(v, 6)
+    return {"type": e.dxftype(), "layer": e.dxf.layer,
+            **{f: plain(e.dxf.get(f)) for f in fields.get(e.dxftype(), ())}}
+
 def dxf(path):
     import collections, ezdxf
     doc = ezdxf.readfile(path)
@@ -121,6 +129,7 @@ def dxf(path):
         "dxfversion": doc.dxfversion,
         "insunits": doc.header.get("$INSUNITS"),
         "entities": dict(collections.Counter(e.dxftype() for e in doc.modelspace())),
+        "geometry": [dxf_geometry(e) for e in doc.modelspace()],
         "layers": sorted(layer.dxf.name for layer in doc.layers),
         "errors": [e.message for e in auditor.errors],
         "fixes": len(auditor.fixes),

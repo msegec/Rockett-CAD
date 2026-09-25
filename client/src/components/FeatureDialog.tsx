@@ -1335,7 +1335,8 @@ function ExportPanel({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     api.formats().then(
-      (formats) => setExporters(formats.exporters),
+      (formats) =>
+        setExporters(formats.exporters.filter((e) => e.source === "bodies")),
       (e: Error) => setError(e.message),
     );
   }, [setError]);

@@ -15,7 +15,9 @@ import {
   ValidationError,
   type CadDocument,
   type ExportFormat,
+  type SketchEntity,
 } from "@rockett/shared";
+import { writeDxf } from "./dxf.js";
 import { meshCopy } from "./mesh.js";
 import type { NamedBody } from "./naming.js";
 
@@ -179,6 +181,7 @@ export function write3mf(
 export interface ExportContext {
   doc: CadDocument;
   bodies: NamedBody[];
+  sketch: readonly SketchEntity[];
   options: { quality: number };
 }
 
@@ -208,6 +211,7 @@ registerExporter({
   label: "STL (binary)",
   ext: "stl",
   mime: "model/stl",
+  source: "bodies",
   write: ({ bodies, options }) => writeStl(bodies, options.quality),
 });
 
@@ -216,6 +220,7 @@ registerExporter({
   label: "3MF (multi-body, named)",
   ext: "3mf",
   mime: "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+  source: "bodies",
   write: ({ doc, bodies, options }) =>
     write3mf(
       bodies.map((body) => ({
@@ -224,4 +229,13 @@ registerExporter({
       })),
       options.quality,
     ),
+});
+
+registerExporter({
+  format: "dxf",
+  label: "DXF R12 (sketch)",
+  ext: "dxf",
+  mime: "image/vnd.dxf",
+  source: "sketch",
+  write: ({ sketch }) => writeDxf(sketch),
 });

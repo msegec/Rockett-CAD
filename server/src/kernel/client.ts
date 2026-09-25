@@ -5,6 +5,7 @@ import {
   type EdgeRef,
   type EvaluateResult,
   type ExportRequest,
+  type ExportSource,
   type FaceRef,
   type Feature,
   type Formats,
@@ -36,6 +37,7 @@ import {
   EXPORT_QUALITY,
   exporterFor,
   exporters,
+  type ExportContext,
 } from "../geometry/exporters.js";
 
 interface StateQueries {
@@ -150,6 +152,50 @@ const ANSWERS: {
   },
 };
 
+function exportBodies(state: EvalState, { bodyIds, hidden }: ExportJob) {
+  const missing = bodyIds.filter((id) => !state.bodies.has(id));
+  if (missing.length)
+    throw new ValidationError(
+      `export bodies not in the model: ${missing.join(", ")}`,
+    );
+  const chosen = [...state.bodies.values()].filter((b) =>
+    bodyIds.length > 0
+      ? bodyIds.includes(b.bodyId)
+      : !hidden.includes(b.bodyId),
+  );
+  if (chosen.length === 0) throw new ValidationError("no bodies to export");
+  const blocked = chosen.filter((b) => state.blocked.has(b.bodyId));
+  if (blocked.length)
+    throw new StoreError(
+      `export bodies depend on unresolved references: ${blocked.map((b) => b.bodyId).join(", ")}`,
+      "unprocessable",
+    );
+  return { bodies: chosen, sketch: [] };
+}
+
+function exportSketch(state: EvalState, { format, sketchId }: ExportJob) {
+  if (!sketchId)
+    throw new ValidationError(`${format} export needs a sketchId`, "/sketchId");
+  const sketch = state.sketches.get(sketchId);
+  if (!sketch)
+    throw new ValidationError(
+      `sketch ${sketchId} is not in the model`,
+      "/sketchId",
+    );
+  return { bodies: [], sketch: sketch.entities };
+}
+
+const SOURCES: Record<
+  ExportSource,
+  (state: EvalState, job: ExportJob) => Pick<ExportContext, "bodies" | "sketch">
+> = {
+  bodies: exportBodies,
+  sketch: exportSketch,
+  face: (_state, { format }) => {
+    throw new ValidationError(`${format} face export is not available`);
+  },
+};
+
 export class InProcessKernel implements KernelClient {
   constructor(private readonly store: Pick<ProjectStore, "sources">) {}
 
@@ -190,31 +236,14 @@ export class InProcessKernel implements KernelClient {
   }
 
   async export(doc: CadDocument, job: ExportJob) {
-    const { format, bodyIds, quality = EXPORT_QUALITY, hidden } = job;
-    const exporter = exporterFor(format);
+    const exporter = exporterFor(job.format);
     const state = await this.stateAt(doc);
-    const missing = bodyIds.filter((id) => !state.bodies.has(id));
-    if (missing.length)
-      throw new ValidationError(
-        `export bodies not in the model: ${missing.join(", ")}`,
-      );
-    const chosen = [...state.bodies.values()].filter((b) =>
-      bodyIds.length > 0
-        ? bodyIds.includes(b.bodyId)
-        : !hidden.includes(b.bodyId),
-    );
-    if (chosen.length === 0) throw new ValidationError("no bodies to export");
-    const blocked = chosen.filter((b) => state.blocked.has(b.bodyId));
-    if (blocked.length)
-      throw new StoreError(
-        `export bodies depend on unresolved references: ${blocked.map((b) => b.bodyId).join(", ")}`,
-        "unprocessable",
-      );
+    const quality = Math.min(Math.max(job.quality ?? EXPORT_QUALITY, 0.001), 1);
     return {
       data: exporter.write({
         doc,
-        bodies: chosen,
-        options: { quality: Math.min(Math.max(quality, 0.001), 1) },
+        ...SOURCES[exporter.source](state, job),
+        options: { quality },
       }),
       mime: exporter.mime,
       ext: exporter.ext,
@@ -225,7 +254,13 @@ export class InProcessKernel implements KernelClient {
     return {
       exporters: exporters
         .list()
-        .map(({ format, label, ext, mime }) => ({ format, label, ext, mime })),
+        .map(({ format, label, ext, mime, source }) => ({
+          format,
+          label,
+          ext,
+          mime,
+          source,
+        })),
       importers: IMPORTERS.map(({ format, label, extensions }) => ({
         format,
         label,

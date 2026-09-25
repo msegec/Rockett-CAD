@@ -253,11 +253,14 @@ export interface MeasureResult {
   }>;
 }
 
+export type ExportSource = "bodies" | "sketch" | "face";
+
 export interface ExportFormat {
   format: string;
   label: string;
   ext: string;
   mime: string;
+  source: ExportSource;
 }
 
 export interface ImportFormat {
@@ -274,6 +277,7 @@ export interface Formats {
 export interface ExportRequest {
   format: string;
   bodyIds: string[]; // empty = all visible bodies
+  sketchId?: string;
   /** Linear tessellation tolerance in mm (default 0.05). */
   quality?: number;
   /** Also store a copy under the project's exports/ directory. */
