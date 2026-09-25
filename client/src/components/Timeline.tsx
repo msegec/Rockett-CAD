@@ -39,7 +39,6 @@ const TYPE_ICONS: Record<string, string> = {
   circularPattern: "❋",
   constructionPlane: "▱",
   referenceImage: "🖼",
-  move: "✥",
 };
 
 const typeIcon = (type: string) =>
@@ -441,13 +440,6 @@ export async function openFeatureEditor(f: Feature): Promise<void> {
       }
       break;
     }
-    case "move":
-      Object.assign(params, {
-        tx: anyF.translation?.[0] ?? 0,
-        ty: anyF.translation?.[1] ?? 0,
-        tz: anyF.translation?.[2] ?? 0,
-      });
-      break;
     default:
       break;
   }

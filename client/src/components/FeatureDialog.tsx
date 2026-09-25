@@ -48,6 +48,7 @@ import { DialogFooter } from "./form/DialogFooter";
 import "../features/sweep";
 import "../features/loft";
 import "../features/emboss";
+import "../features/move";
 import { featureUI } from "../features/registry";
 import "../features/shell";
 
@@ -411,42 +412,6 @@ function DialogBody({
           angle: num("angle", 360),
           operation: p("operation", "join"),
           ...targets(p("operation", "join")),
-        };
-      };
-      break;
-    }
-    case "move": {
-      title = "Move";
-      body = (
-        <>
-          <SelInfo label="Bodies" input="bodies" hint="click bodies" />
-          <NumField
-            label="X (mm)"
-            autoFocus
-            value={p("tx", 0)}
-            onChange={(v) => setParams({ tx: v })}
-          />
-          <NumField
-            label="Y (mm)"
-            value={p("ty", 0)}
-            onChange={(v) => setParams({ ty: v })}
-          />
-          <NumField
-            label="Z (mm)"
-            value={p("tz", 0)}
-            onChange={(v) => setParams({ tz: v })}
-          />
-        </>
-      );
-      build = () => {
-        need(bodies.length > 0, "Select at least one body");
-        return {
-          id: editId ?? newId("move"),
-          type: "move",
-          name: p("name", ""),
-          suppressed: false,
-          bodies: bodies.map((b) => b.bodyId),
-          translation: [num("tx", 0), num("ty", 0), num("tz", 0)],
         };
       };
       break;

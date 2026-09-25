@@ -1,8 +1,8 @@
 client/src/App.tsx Workspace 137
 client/src/components/ControlsHelp.tsx ControlsHelp 121
 client/src/components/DraggablePanel.tsx DraggablePanel 130
-client/src/components/FeatureDialog.tsx 1297
-client/src/components/FeatureDialog.tsx DialogBody 898
+client/src/components/FeatureDialog.tsx 1262
+client/src/components/FeatureDialog.tsx DialogBody 862
 client/src/components/FeatureDialog.tsx ExportPanel 91
 client/src/components/FeatureDialog.tsx ReferenceImagePanel 185
 client/src/components/ModelTree.tsx 629
@@ -13,7 +13,7 @@ client/src/components/ProjectItems.tsx ProjectItems 154
 client/src/components/ProjectList.tsx ProjectList 109
 client/src/components/SketchOffsetPanel.tsx OffsetBody 247
 client/src/components/Timeline.tsx Timeline 180
-client/src/components/Timeline.tsx openFeatureEditor 165
+client/src/components/Timeline.tsx openFeatureEditor 158
 client/src/components/Toolbar.tsx SketchToolbar 98
 client/src/components/Toolbar.tsx Toolbar 92
 client/src/components/ViewportContextMenu.tsx ViewportContextMenu 137

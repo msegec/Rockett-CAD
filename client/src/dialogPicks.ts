@@ -54,7 +54,7 @@ export const targets = input("targets", ["body"], {
   },
 });
 
-const bodies = input("bodies", ["body"]);
+export const bodies = input("bodies", ["body"]);
 const edges = input("edges", ["edge"]);
 const line = { one: true, straight: true } as const;
 const axis = input("axis", ["edge", "sketchEntity", "axis"], line);
@@ -90,7 +90,6 @@ const DIALOG_INPUTS: Partial<Record<DialogType, readonly PickInput[]>> = {
   circularPattern: [bodies, axis],
   constructionPlane: [planes, axis, points, lines],
   referenceImage: [planar("plane", true)],
-  move: [bodies],
   export: [bodies],
 };
 
