@@ -23,20 +23,32 @@ import { parseAllowedOrigins } from "./auth/origin.js";
 import { SessionStore } from "./auth/sessions.js";
 import { UserStore } from "./auth/userStore.js";
 import { cookieConfig, type CookieConfig } from "./auth/cookie.js";
+import { resetPassword } from "./auth/resetPassword.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = Number(process.env.ROCKETT_PORT || DEFAULT_PORT);
 const DATA_DIR = process.env.DATA_DIR || path.resolve(here, "../../data");
 
-let allowedOrigins: string[];
-let cookie: CookieConfig;
-try {
-  allowedOrigins = parseAllowedOrigins(process.env.ROCKETT_ALLOWED_ORIGINS);
-  cookie = cookieConfig(process.env.ROCKETT_COOKIE_SECURE);
-} catch (err) {
-  console.error(`[rockett] ${(err as Error).message}`);
-  process.exit(1);
+async function run() {
+  if (process.argv[2] === "reset-password") {
+    if (process.argv.length !== 4)
+      throw new Error("Usage: reset-password <username>");
+    const users = new UserStore(new LocalStorage(DATA_DIR, fs.promises));
+    try {
+      await resetPassword(users, process.argv[3]!, process.stdin);
+    } catch {
+      throw new Error("Password reset failed");
+    }
+    console.log("Password reset complete");
+    return;
+  }
+  if (process.argv.length > 2) throw new Error("Unknown command");
+  const allowedOrigins = parseAllowedOrigins(
+    process.env.ROCKETT_ALLOWED_ORIGINS,
+  );
+  const cookie: CookieConfig = cookieConfig(process.env.ROCKETT_COOKIE_SECURE);
+  await main(allowedOrigins, cookie);
 }
 
 async function startKernel(store: ProjectStore): Promise<KernelClient> {
@@ -59,7 +71,7 @@ async function startKernel(store: ProjectStore): Promise<KernelClient> {
   return new InProcessKernel(store);
 }
 
-async function main() {
+async function main(allowedOrigins: string[], cookie: CookieConfig) {
   console.log(
     `[rockett] session cookie: ${cookie.secure ? "secure" : "plain HTTP"}`,
   );
@@ -113,7 +125,7 @@ async function main() {
   scheduleSweep(server, sweep);
 }
 
-main().catch((err) => {
-  console.error("[rockett] fatal:", err);
+run().catch((err) => {
+  console.error(`[rockett] ${(err as Error).message}`);
   process.exit(1);
 });

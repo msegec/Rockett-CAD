@@ -1,5 +1,6 @@
 import { Router, json } from "express";
 import { AUTH_ROUTES, loginBody, parse } from "@rockett/shared";
+import { registerBootstrapRoutes } from "./bootstrap.js";
 import {
   cookieConfig,
   readSessionCookie,
@@ -14,8 +15,10 @@ export function createAuthRouter(
   users: UserStore,
   sessions: SessionStore,
   cookie: CookieConfig = cookieConfig(process.env.ROCKETT_COOKIE_SECURE),
+  setupToken: string | undefined = process.env.ROCKETT_SETUP_TOKEN,
 ): Router {
   const router = Router();
+  registerBootstrapRoutes(router, users, setupToken);
   router.post(
     AUTH_ROUTES.login.path,
     json({ limit: "1kb" }),

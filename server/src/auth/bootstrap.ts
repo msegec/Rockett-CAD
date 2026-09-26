@@ -1,0 +1,81 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+import { json, type Router } from "express";
+import {
+  AUTH_ROUTES,
+  parse,
+  setupBody,
+  ValidationError,
+} from "@rockett/shared";
+import { StoreError } from "../store/jsonStore.js";
+import { checkPasswordPolicy, hashPassword } from "./password.js";
+import { toPublicUser, type UserStore } from "./userStore.js";
+
+export function setupTokenMatches(
+  configured: string | undefined,
+  supplied: string,
+): boolean {
+  if (!configured) return false;
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(configured), digest(supplied));
+}
+
+export async function createFirstAdmin(
+  users: UserStore,
+  input: { username: string; displayName: string; password: string },
+) {
+  if (!checkPasswordPolicy(input.password))
+    throw new Error("Password does not meet policy");
+  return users.createFirstAdmin({
+    username: input.username,
+    displayName: input.displayName,
+    passwordHash: await hashPassword(input.password),
+  });
+}
+
+export function registerBootstrapRoutes(
+  router: Router,
+  users: UserStore,
+  setupToken: string | undefined,
+): void {
+  router.get(AUTH_ROUTES.status.path, async (_req, res, next) => {
+    try {
+      const usersExist = (await users.list()).length > 0;
+      res.json({
+        setup: usersExist ? "done" : setupToken ? "ready" : "needs-token",
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+  router.post(
+    AUTH_ROUTES.setup.path,
+    json({ limit: "1kb" }),
+    async (req, res, next) => {
+      try {
+        if ((await users.list()).length)
+          return res.status(409).json({ error: "setup is complete" });
+        const { token } = req.body ?? {};
+        if (typeof token !== "string" || !setupTokenMatches(setupToken, token))
+          return res.status(403).json({ error: "invalid setup token" });
+        const { username, displayName, password } = parse(setupBody, req.body);
+        const record = await createFirstAdmin(users, {
+          username,
+          displayName,
+          password,
+        });
+        res.status(201).json(toPublicUser(record));
+      } catch (err) {
+        if (err instanceof ValidationError)
+          return res.status(400).json({ error: "invalid setup input" });
+        if (err instanceof StoreError && err.code === "conflict")
+          return res.status(409).json({ error: "setup is complete" });
+        if (
+          err instanceof Error &&
+          err.message === "Password does not meet policy"
+        )
+          return res.status(400).json({ error: err.message });
+        next(err);
+      }
+    },
+  );
+}

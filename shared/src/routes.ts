@@ -137,7 +137,25 @@ export const loginBody = Type.Object(
   { additionalProperties: false },
 );
 
+export const setupBody = Type.Object(
+  {
+    token: Type.String({ minLength: 1, maxLength: 256 }),
+    username: Type.String({ minLength: 1, maxLength: 32 }),
+    displayName: Type.String({ minLength: 1, maxLength: 100 }),
+    password: Type.String({ minLength: 1, maxLength: 1024 }),
+  },
+  { additionalProperties: false },
+);
+
 export const AUTH_ROUTES = {
+  status: route<never, { setup: "needs-token" | "ready" | "done" }>()(
+    "GET",
+    "/auth/status",
+  ),
+  setup: route<
+    { token: string; username: string; displayName: string; password: string },
+    User
+  >()("POST", "/auth/setup", setupBody),
   login: route<{ username: string; password: string }, User>()(
     "POST",
     "/auth/login",

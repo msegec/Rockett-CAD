@@ -7,6 +7,8 @@ import { toPublicUser, type UserStore } from "./userStore.js";
 export const PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   "GET /api/health",
   `${AUTH_ROUTES.login.method} /api${AUTH_ROUTES.login.path}`,
+  `${AUTH_ROUTES.status.method} /api${AUTH_ROUTES.status.path}`,
+  `${AUTH_ROUTES.setup.method} /api${AUTH_ROUTES.setup.path}`,
 ]);
 
 export function requireSession(

@@ -90,6 +90,7 @@ export interface AppDeps {
   users: UserStore;
   sessions: SessionStore;
   cookie?: CookieConfig;
+  setupToken?: string;
 }
 
 export function createApp({
@@ -101,6 +102,7 @@ export function createApp({
   users,
   sessions,
   cookie = cookieConfig(process.env.ROCKETT_COOKIE_SECURE),
+  setupToken = process.env.ROCKETT_SETUP_TOKEN,
 }: AppDeps): { app: Express; sweep: () => Promise<void> } {
   const app = express();
   const projects = new ProjectQueue();
@@ -108,7 +110,7 @@ export function createApp({
   app.use("/api", requireAllowedOrigin(allowedOrigins));
   app.use("/api", gzipJson);
   app.use("/api", requireSession(sessions, users, cookie.name));
-  app.use("/api", createAuthRouter(users, sessions, cookie));
+  app.use("/api", createAuthRouter(users, sessions, cookie, setupToken));
   app.use("/api", createApiRouter(store, folders, projects, {}, kernel));
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Not found" });

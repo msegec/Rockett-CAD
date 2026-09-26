@@ -84,25 +84,31 @@ export class UserStore {
   }
 
   create(input: NewUser): Promise<UserRecord> {
+    return this.change((users, at) => this.insert(users, input, at));
+  }
+
+  createFirstAdmin(input: Omit<NewUser, "role">): Promise<UserRecord> {
     return this.change((users, at) => {
-      const record = check({
-        id: crypto.randomBytes(6).toString("hex"),
-        username: normalise(input.username),
-        displayName: input.displayName,
-        role: input.role,
-        status: "active",
-        createdAt: at,
-        modifiedAt: at,
-        passwordHash: input.passwordHash,
-      });
-      if (users.some((other) => other.username === record.username))
-        throw new StoreError(
-          `username ${record.username} is taken`,
-          "conflict",
-        );
-      users.push(record);
-      return record;
+      if (users.length) throw new StoreError("setup is complete", "conflict");
+      return this.insert(users, { ...input, role: "admin" }, at);
     });
+  }
+
+  private insert(users: UserRecord[], input: NewUser, at: string): UserRecord {
+    const record = check({
+      id: crypto.randomBytes(6).toString("hex"),
+      username: normalise(input.username),
+      displayName: input.displayName,
+      role: input.role,
+      status: "active",
+      createdAt: at,
+      modifiedAt: at,
+      passwordHash: input.passwordHash,
+    });
+    if (users.some((other) => other.username === record.username))
+      throw new StoreError(`username ${record.username} is taken`, "conflict");
+    users.push(record);
+    return record;
   }
 
   update(id: string, patch: UserPatch): Promise<UserRecord> {
