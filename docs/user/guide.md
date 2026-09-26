@@ -39,6 +39,13 @@ Construction geometry never splits a region.
 
 ### Project, trim and extend
 
+Starting a sketch on a planar body face includes its existing boundary as
+linked curves. A line between two boundary points divides the face into two
+selectable regions, either of which can be extruded. The boundary follows the
+source face; if an edge disappears, the sketch reports a broken reference.
+Faces with boundary curves the sketcher cannot project yet report an error;
+choose a construction plane or a face with straight or circular edges.
+
 - Project: click an earlier model edge to add a purple linked reference. Snap or
   constrain new shapes to it to follow source edits. References are construction
   geometry by default; toggle Construction on a selected reference to use it in

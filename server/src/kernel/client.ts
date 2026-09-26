@@ -53,6 +53,7 @@ interface StateQueries {
     edge: EdgeRef;
     entityId: string;
   };
+  projectFace: { position: number; face: FaceRef };
   sign: { position: number; refs: Array<FaceRef | EdgeRef> };
   sizeLimit: { position: number | undefined; feature: SizedFeature };
 }
@@ -65,6 +66,7 @@ export interface StateAnswers {
   measure: MeasureResult;
   tangentEdges: EdgeRef[];
   projectEdge: SketchEntity[];
+  projectFace: SketchEntity[];
   sign: Array<RefSignature | undefined>;
   sizeLimit: SizeLimit;
 }
@@ -156,6 +158,22 @@ const ANSWERS: {
         ref,
       ),
     );
+  },
+  projectFace(state, { face: ref }) {
+    const body = state.bodies.get(ref.bodyId);
+    if (!body)
+      throw new ValidationError(
+        "Face body is not available before this sketch",
+      );
+    return asValidation(() => {
+      const frame = resolvePlaneFrame(state, { kind: "face", face: ref });
+      const drawing = faceDrawing(body, ref.faceName, frame, 0.1);
+      if (drawing.polylines.length > 0)
+        throw new Error(
+          "This face has unsupported boundary curves. Choose a construction plane or a face with straight or circular edges.",
+        );
+      return drawing.sketch;
+    });
   },
   sign(state, { refs }) {
     const signed = structuredClone(refs);

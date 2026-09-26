@@ -542,9 +542,13 @@ references. Schema 1 migrates to schema 2 without changing existing features.
 
 Projected curves default to construction geometry. Users can toggle construction
 to include them in profiles. Tilted circles (ellipses), splines and degenerate
-line projections are rejected. Direct face snapping remains position-only; use
-Project first when a persistent geometric relationship is required. Deleting a
-projection releases surviving shared endpoints as ordinary editable points.
+line projections are rejected. A new sketch started on a planar face stores
+that face's analytic boundary edges as linked, non-construction projections.
+The existing profile detector uses those edges to close regions. A missing
+source fails the sketch through the same reference path. Existing saved sketches
+are unchanged because the boundary is added only when a new sketch is created.
+Face snapping outside those stored boundary curves remains position-only.
+Deleting a projection releases surviving shared endpoints as ordinary editable points.
 
 Trim cuts at `curveHits` (`shared/src/profiles.ts`), the crossings, tangent
 contacts and T-junctions the region split uses, so construction curves never

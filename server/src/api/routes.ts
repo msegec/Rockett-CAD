@@ -483,6 +483,18 @@ export function createApiRouter(
       if (doc.features.some((f) => f.id === feature.id))
         throw new ValidationError("duplicate feature id");
       const at = Math.min(doc.timelinePosition, doc.features.length);
+      if (
+        feature.type === "sketch" &&
+        feature.plane.kind === "face" &&
+        feature.entities.length === 0
+      ) {
+        feature.entities = await kernel.stateQuery(doc, {
+          kind: "projectFace",
+          position: at,
+          face: feature.plane.face,
+        });
+        validateFeature(feature);
+      }
       await signed(doc, at, feature);
       doc.features.splice(at, 0, feature);
       doc.timelinePosition = at + 1;
