@@ -44,7 +44,7 @@ everything downstream against persistent topology references.
 - **Offsets**: offset a curve or chain, then change its distance later from the badge in the sketch.
 - **Project, trim and extend**: link earlier model edges into a sketch, trim the highlighted piece of a curve (T), extend curves to boundaries.
 - **Insert DXF and SVG**: bring DXF lines, arcs, circles and points, or SVG paths and shapes, into the open sketch as editable geometry.
-- **Edit in place**: editing a sketch rolls the model back to it; Finish Sketch returns to the saved position.
+- **Edit in place**: history rolls back while editing; Finish Sketch restores it, or Extrude opens with the selected region.
 
 ### Model
 

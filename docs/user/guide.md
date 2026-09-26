@@ -67,6 +67,9 @@ create an undo step.
 
 Opening a sketch from the model tree or timeline faces its plane automatically.
 Undo/redo stays inside an existing sketch and returns to Select.
+**Extrude** in the sketch toolbar finishes the sketch and opens Extrude. A
+selected region fills Profiles; otherwise, pick a profile in the dialog.
+If the sketch cannot be saved, it stays open with the error shown.
 
 ## Model
 

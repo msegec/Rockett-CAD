@@ -13,7 +13,7 @@ client/src/components/ProjectList.tsx ProjectList 109
 client/src/components/SketchOffsetPanel.tsx OffsetBody 247
 client/src/components/Timeline.tsx Timeline 180
 client/src/components/Timeline.tsx openFeatureEditor 94
-client/src/components/Toolbar.tsx SketchToolbar 98
+client/src/components/Toolbar.tsx SketchToolbar 117
 client/src/components/Toolbar.tsx Toolbar 92
 client/src/components/ViewportContextMenu.tsx ViewportContextMenu 137
 client/src/components/ViewportView.tsx 3107

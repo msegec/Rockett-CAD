@@ -273,6 +273,7 @@ function ViewButtons() {
 
 function SketchToolbar() {
   const mode = useStore((s) => s.mode);
+  const busy = useStore((s) => s.busy);
   const setSketchTool = useStore((s) => s.setSketchTool);
   const finishSketch = useStore((s) => s.finishSketch);
   const setMode = useStore((s) => s.setMode);
@@ -295,6 +296,17 @@ function SketchToolbar() {
       return;
     }
     await addSketchConstraints([c]);
+  };
+
+  const extrudeSketch = async () => {
+    const s = useStore.getState();
+    const selected = s.selection.filter(
+      (item) => item.kind === "profile" && item.sketchId === mode.sketchId,
+    );
+    await s.finishSketch();
+    if (useStore.getState().mode.name !== "idle") return;
+    useStore.getState().setSelection(selected);
+    openDialog("extrude");
   };
 
   return (
@@ -359,6 +371,13 @@ function SketchToolbar() {
       </ToolGroup>
       <div className="tb-spacer" />
       <div className="tb-group">
+        <ToolButton
+          icon="extrude"
+          label="Extrude"
+          title="Finish Sketch and extrude a profile"
+          disabled={busy}
+          onClick={() => void extrudeSketch()}
+        />
         <ToolButton
           icon="finishSketch"
           label="Finish Sketch"
