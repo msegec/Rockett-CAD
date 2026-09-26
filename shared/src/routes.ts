@@ -1,4 +1,5 @@
 import { Type, type Static, type TSchema } from "typebox";
+import type { User } from "./auth.js";
 import type {
   CadDocument,
   EdgeRef,
@@ -127,6 +128,24 @@ const route =
     body?: S & (Static<S> extends Req ? unknown : never),
   ): Route<P, Req, Res> =>
     body ? { method, path, body } : { method, path };
+
+export const loginBody = Type.Object(
+  {
+    username: Type.String({ minLength: 1, maxLength: 32 }),
+    password: Type.String({ minLength: 1, maxLength: 256 }),
+  },
+  { additionalProperties: false },
+);
+
+export const AUTH_ROUTES = {
+  login: route<{ username: string; password: string }, User>()(
+    "POST",
+    "/auth/login",
+    loginBody,
+  ),
+  logout: route<never, { ok: true }>()("POST", "/auth/logout"),
+  me: route<never, User>()("GET", "/me"),
+};
 
 const name = Type.Object({ name: Type.Optional(Type.String()) });
 

@@ -22,6 +22,7 @@ import { createApp, scheduleSweep } from "./app.js";
 import { parseAllowedOrigins } from "./auth/origin.js";
 import { SessionStore } from "./auth/sessions.js";
 import { UserStore } from "./auth/userStore.js";
+import { cookieConfig, type CookieConfig } from "./auth/cookie.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,8 +30,10 @@ const PORT = Number(process.env.ROCKETT_PORT || DEFAULT_PORT);
 const DATA_DIR = process.env.DATA_DIR || path.resolve(here, "../../data");
 
 let allowedOrigins: string[];
+let cookie: CookieConfig;
 try {
   allowedOrigins = parseAllowedOrigins(process.env.ROCKETT_ALLOWED_ORIGINS);
+  cookie = cookieConfig(process.env.ROCKETT_COOKIE_SECURE);
 } catch (err) {
   console.error(`[rockett] ${(err as Error).message}`);
   process.exit(1);
@@ -57,6 +60,9 @@ async function startKernel(store: ProjectStore): Promise<KernelClient> {
 }
 
 async function main() {
+  console.log(
+    `[rockett] session cookie: ${cookie.secure ? "secure" : "plain HTTP"}`,
+  );
   const storage = new LocalStorage(DATA_DIR, fs.promises);
   const store = new ProjectStore(storage, validateDocument);
   const kernel = await startKernel(store);
@@ -90,6 +96,7 @@ async function main() {
     allowedOrigins,
     users: new UserStore(storage),
     sessions: new SessionStore(),
+    cookie,
   });
   if (clientDir) {
     console.log(`[rockett] serving client from ${clientDir}`);
