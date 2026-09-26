@@ -217,10 +217,11 @@ over the shape's bounding box diagonal, at least 1 mm, as its angular one.
 The sketch solver stops with constrained lines up to about 1e-10 mm off, so a
 mirror of a constrained sketch met its original at about 3e-12 rad, above the
 kernel's default 1e-12 rad, and kept a seam no fillet can take (BUG-073).
-Version 1 keeps the kernel defaults, so saved names stay. The fillet builder
-treats faces meeting within 0.1 rad (about 5.7 degrees) as smooth and refuses
-the edge at any radius; the feature error says the faces meet smoothly
-there. Two cylinder faces merge only when their
+Version 1 keeps the kernel defaults, so saved names stay. The pinned OCCT fork
+accepts explicitly selected planar folds down to the tested 1 degree for
+Fillet and Chamfer; its contour check still rejects a nearly tangent 0.001
+degree fold. Nonplanar faces retain the 0.1 rad G1 continuity check. Two
+cylinder faces merge only when their
 surfaces share the same X and Y axes. OCCT 7.6 never returned from merging a
 fillet's cylinder with a coaxial prism cylinder whose angle starts a quarter
 turn away, so cylinders whose axes differ keep the edge between them

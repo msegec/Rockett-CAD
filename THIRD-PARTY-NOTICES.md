@@ -12,13 +12,13 @@ yet.
 
 ## opencascade.js
 
-`opencascade.js` `2.0.0-msegec.occt801.1` is the WebAssembly build of Open
+`opencascade.js` `2.0.0-msegec.occt801.2` is the WebAssembly build of Open
 CASCADE Technology 8.0.1, licensed LGPL-2.1-only. It is built from the fork at
 https://github.com/msegec/opencascade.js.
 
 - The corresponding source is the fork's tagged commit
-  `v2.0.0-msegec.occt801.1`. Its `Dockerfile` builds this package from OCCT
-  tag `V8_0_1`.
+  `v2.0.0-msegec.occt801.2`. Its `Dockerfile` builds this package from OCCT
+  tag `V8_0_1` and applies the explicit planar fold patch.
 - The image installs the release asset that `server/package.json` pins with
   `npm ci`. Its licence text ships beside it in
   `node_modules/opencascade.js/LICENSE`.
@@ -108,7 +108,7 @@ peers but ship in no artefact.
 | object-inspect          | 1.13.4                 | MIT           | image                        | https://github.com/inspect-js/object-inspect         |
 | on-finished             | 2.4.1                  | MIT           | image                        | https://github.com/jshttp/on-finished                |
 | once                    | 1.4.0                  | ISC           | image                        | https://github.com/isaacs/once                       |
-| opencascade.js          | 2.0.0-msegec.occt801.1 | LGPL-2.1-only | image                        | https://github.com/msegec/opencascade.js             |
+| opencascade.js          | 2.0.0-msegec.occt801.2 | LGPL-2.1-only | image                        | https://github.com/msegec/opencascade.js             |
 | parseurl                | 1.3.3                  | MIT           | image                        | https://github.com/pillarjs/parseurl                 |
 | path-to-regexp          | 8.4.2                  | MIT           | image                        | https://github.com/pillarjs/path-to-regexp           |
 | proxy-addr              | 2.0.8                  | MIT           | image                        | https://github.com/jshttp/proxy-addr                 |

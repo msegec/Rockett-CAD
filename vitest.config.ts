@@ -9,6 +9,7 @@ export const projects = [
     include: [
       "shared/test/**/*.test.ts",
       "server/test/**/*.test.ts",
+      "server/src/**/*.test.ts",
       "client/test/**/*.test.ts",
       "modules/*/test/**/*.test.ts",
     ],
