@@ -28,7 +28,11 @@ function cacheControl(urlPath: string) {
 function serveClient(clientDir: string): Router {
   const files = new Set(
     readdirSync(clientDir, { recursive: true, encoding: "utf8" })
-      .filter((file) => COMPRESSIBLE.test(file))
+      .filter(
+        (file) =>
+          COMPRESSIBLE.test(file) &&
+          !file.split(path.sep).some((part) => part.startsWith(".")),
+      )
       .map(toUrl),
   );
   const gzipped = new Map<string, Promise<Buffer>>();
@@ -67,7 +71,7 @@ function serveClient(clientDir: string): Router {
   );
   router.get("/{*splat}", (_req, res) => {
     res.set("Cache-Control", "no-cache");
-    res.sendFile(path.join(clientDir, "index.html"));
+    res.sendFile("index.html", { root: clientDir });
   });
   return router;
 }
