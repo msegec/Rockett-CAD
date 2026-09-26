@@ -6,6 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { gzip } from "node:zlib";
 import { createApiRouter } from "./api/routes.js";
+import { ValidationError } from "@rockett/shared";
 import { gzipJson } from "./api/gzipJson.js";
 import { requireAllowedOrigin } from "./auth/origin.js";
 import { requireSession } from "./auth/middleware.js";
@@ -116,6 +117,32 @@ export function createApp({
     res.status(404).json({ error: "Not found" });
   });
   if (clientDir) app.use(serveClient(clientDir));
+  app.use(
+    (
+      err: unknown,
+      req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      const status =
+        err instanceof ValidationError
+          ? 400
+          : typeof err === "object" &&
+              err !== null &&
+              "status" in err &&
+              typeof err.status === "number" &&
+              err.status >= 400 &&
+              err.status < 500
+            ? err.status
+            : 500;
+      console.error(
+        `[rockett] ${status} ${req.route?.path ?? "unmatched"}: ${status === 500 ? "Internal server error" : "Request failed"}`,
+      );
+      res.status(status).json({
+        error: status === 500 ? "Internal server error" : "Request failed",
+      });
+    },
+  );
   const sweep = async () => {
     for (const id of await store.temporaryIds())
       if (await projects.run(id, () => store.expire(id))) kernel.drop(id);

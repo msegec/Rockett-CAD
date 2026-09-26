@@ -1,4 +1,4 @@
-import { Router, json, type RequestHandler } from "express";
+import { Router, json, type Request, type RequestHandler } from "express";
 import {
   DOCUMENT_EDITS,
   lacksTargets,
@@ -83,7 +83,7 @@ function sendError(res: any, body: ApiErrorBody) {
   res.status(STATUS[body.code]).json(body);
 }
 
-function fail(res: any, err: any) {
+function fail(req: Request, res: any, err: any) {
   const code: ApiErrorCode =
     err instanceof StoreError || err instanceof ValidationError
       ? err.code
@@ -95,7 +95,7 @@ function fail(res: any, err: any) {
       ...(err.detail !== undefined && { detail: err.detail }),
       ...(err instanceof RevisionConflict && { revision: err.revision }),
     });
-  console.error(err);
+  console.error(`[rockett] 500 ${req.route?.path}: Internal server error`);
   sendError(res, { error: "Internal server error", code });
 }
 
@@ -104,7 +104,7 @@ function check(test: (req: any, res: any) => void): RequestHandler {
     try {
       test(req, res);
     } catch (err) {
-      return fail(res, err);
+      return fail(req, res, err);
     }
     next();
   };
@@ -202,7 +202,7 @@ export function createApiRouter(
       const result = id
         ? projects.run(id, () => store.touch(id).then(() => fn(req, res)))
         : fn(req, res);
-      result.catch((err) => fail(res, err));
+      result.catch((err) => fail(req, res, err));
     };
 
   const editable = async (req: any, res: any) => {
