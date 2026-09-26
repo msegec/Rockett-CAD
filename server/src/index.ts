@@ -20,6 +20,8 @@ import { InProcessKernel, type KernelClient } from "./kernel/client.js";
 import { WorkerKernel } from "./kernel/workerKernel.js";
 import { createApp, scheduleSweep } from "./app.js";
 import { parseAllowedOrigins } from "./auth/origin.js";
+import { SessionStore } from "./auth/sessions.js";
+import { UserStore } from "./auth/userStore.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -86,6 +88,8 @@ async function main() {
     kernel,
     clientDir,
     allowedOrigins,
+    users: new UserStore(storage),
+    sessions: new SessionStore(),
   });
   if (clientDir) {
     console.log(`[rockett] serving client from ${clientDir}`);

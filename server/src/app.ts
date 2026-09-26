@@ -8,6 +8,9 @@ import { gzip } from "node:zlib";
 import { createApiRouter } from "./api/routes.js";
 import { gzipJson } from "./api/gzipJson.js";
 import { requireAllowedOrigin } from "./auth/origin.js";
+import { requireSession } from "./auth/middleware.js";
+import type { SessionStore } from "./auth/sessions.js";
+import type { UserStore } from "./auth/userStore.js";
 import type { ProjectStore } from "./store/projectStore.js";
 import type { FolderStore } from "./store/folderStore.js";
 import { ProjectQueue } from "./store/projectQueue.js";
@@ -82,6 +85,8 @@ export interface AppDeps {
   kernel: KernelClient;
   clientDir?: string | undefined;
   allowedOrigins: readonly string[];
+  users: UserStore;
+  sessions: SessionStore;
 }
 
 export function createApp({
@@ -90,12 +95,15 @@ export function createApp({
   kernel,
   clientDir,
   allowedOrigins,
+  users,
+  sessions,
 }: AppDeps): { app: Express; sweep: () => Promise<void> } {
   const app = express();
   const projects = new ProjectQueue();
   app.disable("x-powered-by");
   app.use("/api", requireAllowedOrigin(allowedOrigins));
   app.use("/api", gzipJson);
+  app.use("/api", requireSession(sessions, users));
   app.use("/api", createApiRouter(store, folders, projects, {}, kernel));
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "Not found" });
