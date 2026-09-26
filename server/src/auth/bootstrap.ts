@@ -8,6 +8,7 @@ import {
 } from "@rockett/shared";
 import { StoreError } from "../store/jsonStore.js";
 import { checkPasswordPolicy, hashPassword } from "./password.js";
+import { AuthRateLimiter } from "./rateLimit.js";
 import { toPublicUser, type UserStore } from "./userStore.js";
 
 export function setupTokenMatches(
@@ -22,13 +23,14 @@ export function setupTokenMatches(
 export async function createFirstAdmin(
   users: UserStore,
   input: { username: string; displayName: string; password: string },
+  limiter: AuthRateLimiter,
 ) {
   if (!checkPasswordPolicy(input.password))
     throw new Error("Password does not meet policy");
   return users.createFirstAdmin({
     username: input.username,
     displayName: input.displayName,
-    passwordHash: await hashPassword(input.password),
+    passwordHash: await limiter.hash(() => hashPassword(input.password)),
   });
 }
 
@@ -36,6 +38,7 @@ export function registerBootstrapRoutes(
   router: Router,
   users: UserStore,
   setupToken: string | undefined,
+  limiter: AuthRateLimiter,
 ): void {
   router.get(AUTH_ROUTES.status.path, async (_req, res, next) => {
     try {
@@ -58,11 +61,11 @@ export function registerBootstrapRoutes(
         if (typeof token !== "string" || !setupTokenMatches(setupToken, token))
           return res.status(403).json({ error: "invalid setup token" });
         const { username, displayName, password } = parse(setupBody, req.body);
-        const record = await createFirstAdmin(users, {
-          username,
-          displayName,
-          password,
-        });
+        const record = await createFirstAdmin(
+          users,
+          { username, displayName, password },
+          limiter,
+        );
         res.status(201).json(toPublicUser(record));
       } catch (err) {
         if (err instanceof ValidationError)

@@ -6,6 +6,7 @@ export const TIMING_MS = {
   temporaryProjectSweep: HOUR,
   sessionIdle: 7 * DAY,
   sessionAbsolute: 30 * DAY,
+  authFailureWindow: 15 * MINUTE,
   sizeLimitSearch: 1000,
 } as const;
 
