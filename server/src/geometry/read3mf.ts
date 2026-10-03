@@ -2,6 +2,7 @@ import { inflateRawSync } from "node:zlib";
 import type { MeshPart } from "./importers.js";
 
 const MAX_3MF_EXPANDED = 256 * 1024 * 1024;
+const MAX_3MF_COMPONENTS = 100_000;
 
 const UNITS: Record<string, number> = {
   micron: 0.001,
@@ -53,20 +54,21 @@ function zipEntries(zip: Buffer): Map<string, Entry> {
   return entries;
 }
 
-function expand({ data, method, flags }: Entry): string {
+function expand({ data, method, flags }: Entry, limit: number): Buffer {
   if (flags & 1)
     throw new Error("The 3MF file is encrypted, which is not supported.");
-  if (method === 0) return data.toString("utf8");
-  if (method !== 8) throw invalid();
-  try {
-    return inflateRawSync(data, {
-      maxOutputLength: MAX_3MF_EXPANDED,
-    }).toString("utf8");
-  } catch (error) {
-    if ((error as { code?: string }).code === "ERR_BUFFER_TOO_LARGE")
-      throw tooLarge();
-    throw invalid();
-  }
+  if (method !== 0 && method !== 8) throw invalid();
+  let out = data;
+  if (method === 8)
+    try {
+      out = inflateRawSync(data, { maxOutputLength: Math.max(limit, 1) });
+    } catch (error) {
+      if ((error as { code?: string }).code === "ERR_BUFFER_TOO_LARGE")
+        throw tooLarge();
+      throw invalid();
+    }
+  if (out.length > limit) throw tooLarge();
+  return out;
 }
 
 function* tags(xml: string) {
@@ -80,53 +82,64 @@ function* tags(xml: string) {
   }
 }
 
-function modelPath(entries: Map<string, Entry>): string {
-  const rels = entries.get("_rels/.rels");
-  for (const { name, attrs } of rels ? tags(expand(rels)) : [])
+function modelPath(rels: string | undefined): string {
+  for (const { name, attrs } of rels ? tags(rels) : [])
     if (name === "Relationship" && attrs.Type?.endsWith("/3dmodel"))
-      return attrs.Target!.replace(/^\//, "").toLowerCase();
-  return "3d/3dmodel.model";
+      return attrs.Target!;
+  return "/3D/3dmodel.model";
 }
 
-function transformOf(value: string | undefined, scale: number): number[] {
+function transformOf(value: string | undefined): number[] {
   const m = (value ?? "1 0 0 0 1 0 0 0 1 0 0 0")
     .trim()
     .split(/\s+/)
     .map(Number);
   if (m.length !== 12 || !m.every(Number.isFinite))
-    throw new Error(`The 3MF build item transform "${value}" is not valid.`);
-  return m.map((v) => v * scale);
+    throw new Error(`The 3MF transform "${value}" is not valid.`);
+  return m;
 }
 
-export function read3mf(bytes: Buffer): MeshPart[] {
-  let zip: Map<string, Entry>;
-  try {
-    zip = zipEntries(bytes);
-  } catch (error) {
-    if (error instanceof RangeError) throw invalid();
-    throw error;
-  }
-  const model = zip.get(modelPath(zip));
-  if (!model) throw new Error("The 3MF file has no 3D model part.");
-  const meshes = new Map<string, { nodes: number[]; triangles: number[] }>(),
-    parts: MeshPart[] = [];
-  let scale = 1,
-    object: { id: string; nodes: number[]; triangles: number[] } | undefined,
-    meshed = false;
-  for (const { close, name, attrs, empty } of tags(expand(model))) {
+const key = (path: string) => path.replace(/^\//, "").toLowerCase();
+
+const compose = (a: number[], b: number[]) =>
+  Array.from({ length: 12 }, (_, n) => {
+    const i = 3 * Math.floor(n / 3),
+      j = n % 3;
+    return (
+      a[i]! * b[j]! +
+      a[i + 1]! * b[3 + j]! +
+      a[i + 2]! * b[6 + j]! +
+      (i === 9 ? b[9 + j]! : 0)
+    );
+  });
+
+interface ModelObject {
+  id: string;
+  nodes: number[];
+  triangles: number[];
+  components: { objectid: string; path?: string; transform?: string }[];
+}
+
+interface Model {
+  scale: number;
+  objects: Map<string, ModelObject>;
+  items: { objectid: string; transform?: string }[];
+}
+
+function parseModel(xml: string): Model {
+  const model: Model = { scale: 1, objects: new Map(), items: [] };
+  let object: ModelObject | undefined;
+  for (const { close, name, attrs, empty } of tags(xml)) {
     if (name === "model" && !close) {
       const unit = attrs.unit ?? "millimeter";
       if (!Object.hasOwn(UNITS, unit))
         throw new Error(`The 3MF unit "${unit}" is not supported.`);
-      scale = UNITS[unit]!;
+      model.scale = UNITS[unit]!;
     } else if (name === "object" && !close && !empty) {
-      object = { id: attrs.id ?? "", nodes: [], triangles: [] };
-      meshed = false;
+      object = { id: attrs.id ?? "", nodes: [], triangles: [], components: [] };
     } else if (name === "object" && close) {
-      if (object && meshed) meshes.set(object.id, object);
+      if (object) model.objects.set(object.id, object);
       object = undefined;
-    } else if (name === "mesh" && object) {
-      meshed = true;
     } else if (name === "vertex" && object) {
       const point = [attrs.x, attrs.y, attrs.z].map(Number);
       if (!point.every(Number.isFinite))
@@ -143,16 +156,94 @@ export function read3mf(bytes: Buffer): MeshPart[] {
           `The 3MF object ${object.id} has a triangle outside its vertices.`,
         );
       object.triangles.push(...corners);
+    } else if (name === "component" && object) {
+      object.components.push({
+        objectid: attrs.objectid ?? "",
+        ...(attrs["p:path"] !== undefined && { path: attrs["p:path"] }),
+        ...(attrs.transform !== undefined && { transform: attrs.transform }),
+      });
     } else if (name === "item") {
-      const mesh = meshes.get(attrs.objectid ?? "");
-      if (!mesh)
-        throw new Error(
-          `The 3MF build item ${attrs.objectid} is not a mesh object; components are not supported.`,
-        );
+      model.items.push({
+        objectid: attrs.objectid ?? "",
+        ...(attrs.transform !== undefined && { transform: attrs.transform }),
+      });
+    }
+  }
+  return model;
+}
+
+type Step =
+  { path: string; id: string; transform: number[] } | { leave: string };
+
+export function read3mf(bytes: Buffer): MeshPart[] {
+  let zip: Map<string, Entry>;
+  try {
+    zip = zipEntries(bytes);
+  } catch (error) {
+    if (error instanceof RangeError) throw invalid();
+    throw error;
+  }
+  let left = MAX_3MF_EXPANDED;
+  const text = (entry: Entry) => {
+    const out = expand(entry, left);
+    left -= out.length;
+    return out.toString("utf8");
+  };
+  const models = new Map<string, Model>(),
+    load = (path: string) => {
+      if (!models.has(key(path))) {
+        const entry = zip.get(key(path));
+        if (!entry)
+          throw new Error(`The 3MF file has no 3D model part ${path}.`);
+        models.set(key(path), parseModel(text(entry)));
+      }
+      return models.get(key(path))!;
+    };
+  const rels = zip.get("_rels/.rels"),
+    root = modelPath(rels && text(rels)),
+    { scale, items } = load(root),
+    parts: MeshPart[] = [],
+    open = new Set<string>(),
+    steps: Step[] = items
+      .map(({ objectid, transform }) => ({
+        path: root,
+        id: objectid,
+        transform: transformOf(transform).map((v) => v * scale),
+      }))
+      .toReversed();
+  let placed = 0;
+  for (let step = steps.pop(); step; step = steps.pop()) {
+    if ("leave" in step) {
+      open.delete(step.leave);
+      continue;
+    }
+    const { path, id, transform } = step,
+      object = load(path).objects.get(id),
+      at = `${key(path)}#${id}`;
+    if (!object)
+      throw new Error(`The 3MF file has no object ${id} in ${path}.`);
+    if (open.has(at))
+      throw new Error(
+        `The 3MF object ${id} in ${path} contains itself through its components.`,
+      );
+    if (!object.components.length)
       parts.push({
-        nodes: mesh.nodes,
-        triangles: mesh.triangles,
-        transform: transformOf(attrs.transform, scale),
+        nodes: object.nodes,
+        triangles: object.triangles,
+        transform,
+      });
+    open.add(at);
+    steps.push({ leave: at });
+    for (const component of object.components.toReversed()) {
+      if (++placed > MAX_3MF_COMPONENTS)
+        throw new Error(
+          `The 3MF file places more than ${MAX_3MF_COMPONENTS.toLocaleString("en")} components, the limit.`,
+        );
+      const child = component.path ?? path;
+      steps.push({
+        path: child,
+        id: component.objectid,
+        transform: compose(transformOf(component.transform), transform),
       });
     }
   }
