@@ -28,11 +28,16 @@ export const registerPanel = panels.register;
 export const HELP_PANEL = "design.help";
 export const HISTORY_PANEL = "design.history";
 
-export function togglePanel(id: string): void {
+function showPanel(id: string, show: boolean): void {
   opened.setState(({ open }) => ({
-    open: open.includes(id) ? open.filter((o) => o !== id) : [...open, id],
+    open: [...open.filter((o) => o !== id), ...(show ? [id] : [])],
   }));
 }
+
+export const openPanel = (id: string) => showPanel(id, true);
+export const closePanel = (id: string) => showPanel(id, false);
+export const togglePanel = (id: string) =>
+  showPanel(id, !opened.getState().open.includes(id));
 
 export const usePanelOpen = (id: string) => opened((s) => s.open.includes(id));
 

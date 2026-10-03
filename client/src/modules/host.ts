@@ -1,13 +1,21 @@
 import { createElement, type ComponentType } from "react";
 import type {
   ClientContext,
+  ClientUi,
   Dispose,
   Layer,
+  NumberFieldProps,
   OpenProject,
   ProjectView,
   Workbench,
 } from "@rockett/plugin-api";
-import { REGISTRY_ID, type ModuleInfo } from "@rockett/shared";
+import {
+  DOCUMENT_EDITS,
+  REGISTRY_ID,
+  type ModuleInfo,
+  type Route,
+} from "@rockett/shared";
+import { send, type MutationResponse } from "../api";
 import {
   registerCommand,
   registerToolbarGroup,
@@ -15,9 +23,24 @@ import {
 } from "../commands/registry";
 import { iconOf, registerModuleIcon } from "../icons";
 import { registerSelectionKind } from "../selection/kinds";
-import { PanelBoundary, registerPanel } from "../shell/panels";
+import { DraggablePanel } from "../components/DraggablePanel";
+import { DialogFooter } from "../components/form/DialogFooter";
+import {
+  AngleField,
+  CheckField,
+  LengthField,
+  NumField,
+  SelectField,
+} from "../components/form/fields";
+import { useSetting } from "../settings";
+import {
+  closePanel,
+  openPanel,
+  PanelBoundary,
+  registerPanel,
+} from "../shell/panels";
 import { registerWorkbench } from "../shell/workbench";
-import { useStore } from "../store";
+import { useStore, type State } from "../store";
 import { registerPickProvider } from "../three/pickProviders";
 import { registerLayer } from "../three/sceneLayers";
 
@@ -87,23 +110,57 @@ function registerModuleLayer(moduleId: string, layer: Layer) {
   return registerLayer(guardedLayer(layer));
 }
 
-let open: OpenProject = { projectId: null, document: null };
+type Viewed = Pick<State, "projectId" | "document" | "evaluation">;
+
+const changed = (now: Viewed, before: Viewed) =>
+  now.projectId !== before.projectId ||
+  now.document !== before.document ||
+  now.evaluation !== before.evaluation;
+
+let seen: Viewed = { projectId: null, document: null, evaluation: null };
+let open: OpenProject = { projectId: null, document: null, bodies: [] };
 
 const project: ProjectView = {
   get() {
-    const { projectId, document } = useStore.getState();
-    if (projectId !== open.projectId || document !== open.document)
-      open = { projectId, document };
+    const now = useStore.getState();
+    if (!changed(now, seen)) return open;
+    const { projectId, document, evaluation } = now;
+    seen = { projectId, document, evaluation };
+    const bodies = (evaluation?.bodies ?? []).map(({ bodyId, name, bbox }) => ({
+      id: bodyId,
+      name,
+      bbox,
+    }));
+    open = { projectId, document, bodies };
     return open;
   },
   subscribe: (listener) =>
     useStore.subscribe((now, before) => {
-      if (
-        now.projectId !== before.projectId ||
-        now.document !== before.document
-      )
-        listener();
+      if (changed(now, before)) listener();
     }),
+  async mutate(route, body) {
+    const { projectId, mutate } = useStore.getState();
+    if (!projectId) throw new Error("No project is open.");
+    if (!DOCUMENT_EDITS(route))
+      throw new Error(`${route.path} is not a document edit`);
+    const edit = route as Route<string, unknown, MutationResponse>;
+    await mutate((tx) => send(edit, { id: projectId }, { body, tx }));
+  },
+};
+
+const ModuleLengthField = (props: NumberFieldProps & { label: string }) =>
+  createElement(LengthField, { ...props, units: useSetting("units.length") });
+
+const ui: ClientUi = {
+  DraggablePanel,
+  DialogFooter,
+  NumField,
+  LengthField: ModuleLengthField,
+  AngleField,
+  SelectField,
+  CheckField,
+  openPanel,
+  closePanel,
 };
 
 function moduleContext(own: Dispose[], moduleId: string) {
@@ -130,6 +187,7 @@ function moduleContext(own: Dispose[], moduleId: string) {
   return {
     register,
     project: { ...project, subscribe: track(project.subscribe) },
+    ui,
   };
 }
 

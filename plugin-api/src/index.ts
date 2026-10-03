@@ -1,6 +1,12 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { Group, Object3D } from "three";
-import type { CadDocument, PathParams, Route, User } from "@rockett/shared";
+import type {
+  BodyPayload,
+  CadDocument,
+  PathParams,
+  Route,
+  User,
+} from "@rockett/shared";
 
 export type {
   CadDocument,
@@ -207,19 +213,71 @@ export interface ClientRegister {
   layer(layer: Layer): Dispose;
 }
 
+export interface ProjectBody {
+  readonly id: string;
+  readonly name: string;
+  readonly bbox: BodyPayload["bbox"];
+}
+
 export interface OpenProject {
   readonly projectId: string | null;
   readonly document: CadDocument | null;
+  readonly bodies: readonly ProjectBody[];
 }
+
+export type ProjectRoute = Route<`/projects/:id/${string}`>;
 
 export interface ProjectView {
   get(): OpenProject;
   subscribe(listener: () => void): Dispose;
+  mutate<R extends ProjectRoute>(route: R, body: RouteBody<R>): Promise<void>;
+}
+
+export interface NumberFieldProps {
+  label?: string;
+  value: number;
+  onChange(value: number): void;
+  min?: number;
+  max?: number;
+  above?: number;
+  int?: boolean;
+  step?: number;
+  ariaLabel?: string;
+  autoFocus?: boolean;
+}
+
+export interface ClientUi {
+  DraggablePanel: ComponentType<{ title: string; children: ReactNode }>;
+  DialogFooter: ComponentType<{
+    onOk?: () => void;
+    onCancel: () => void;
+    pending?: boolean;
+    okLabel?: string;
+    cancelLabel?: string;
+    okDisabled?: boolean;
+  }>;
+  NumField: ComponentType<NumberFieldProps>;
+  LengthField: ComponentType<NumberFieldProps & { label: string }>;
+  AngleField: ComponentType<NumberFieldProps & { label: string }>;
+  SelectField<T extends string>(props: {
+    label: string;
+    value: T;
+    options: [T, string][];
+    onChange: (value: NoInfer<T>) => void;
+  }): ReactNode;
+  CheckField: ComponentType<{
+    label: string;
+    value: boolean;
+    onChange: (value: boolean) => void;
+  }>;
+  openPanel(id: string): void;
+  closePanel(id: string): void;
 }
 
 export interface ClientContext {
   readonly register: ClientRegister;
   readonly project: ProjectView;
+  readonly ui: ClientUi;
 }
 
 export interface ServerModule {
