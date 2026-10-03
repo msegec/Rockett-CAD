@@ -13,6 +13,7 @@ export type {
   PathParams,
   Registry,
   Route,
+  User,
 } from "@rockett/shared";
 
 export const PLUGIN_API_VERSION = "0.2.0";
@@ -38,18 +39,30 @@ export type ProjectMutation = (
   [extra: string]: unknown;
 };
 
+export interface RouteContext {
+  user: User;
+}
+
 export interface RouteModuleApi {
   projectRoute<R extends Route>(
     route: R,
     read: (
       doc: CadDocument,
       req: RouteRequest<R>,
-      ctx: { user: User },
+      ctx: RouteContext,
     ) => Promise<unknown>,
   ): void;
   projectMutation<R extends Route>(
     route: R,
-    edit: (doc: CadDocument, req: RouteRequest<R>) => Promise<ProjectMutation>,
+    edit: (
+      doc: CadDocument,
+      req: RouteRequest<R>,
+      ctx: RouteContext,
+    ) => Promise<ProjectMutation>,
+  ): void;
+  userRoute<R extends Route>(
+    route: R,
+    handle: (req: RouteRequest<R>, ctx: RouteContext) => Promise<unknown>,
   ): void;
 }
 
@@ -97,9 +110,22 @@ export interface ServerRegister {
   kernelJob(id: string, entry: URL): Dispose;
 }
 
+export interface UserDataEntry {
+  version: number;
+  data: unknown;
+  etag: string;
+  readOnly: boolean;
+}
+
+export interface UserData {
+  read(user: User): Promise<UserDataEntry | null>;
+  write(user: User, data: unknown, etag: string | null): Promise<UserDataEntry>;
+}
+
 export interface ServerContext {
   readonly register: ServerRegister;
   readonly startKernelJob: StartKernelJob;
+  userData(name: string, version: number): UserData;
 }
 
 export interface Anchored {

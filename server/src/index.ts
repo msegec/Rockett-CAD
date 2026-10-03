@@ -92,7 +92,7 @@ async function main(allowedOrigins: string[], cookie: CookieConfig) {
       `[rockett] ${outdated.length} projects predate schema ${SCHEMA_VERSION} or the project manifest; each is backed up and migrated on its next save`,
     );
 
-  await loadModules(serverModules, kernel);
+  await loadModules(serverModules, kernel, storage);
   for (const { id, status, error } of listModules())
     if (error) console.error(`[rockett] module ${id} ${status}: ${error}`);
 

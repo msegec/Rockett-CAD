@@ -251,7 +251,9 @@ key grammar, so removed plugin values survive:
 - `registerRouteModule` (`server/src/api/routeModules.ts`) mounts project
   routes behind the access guard and project queue. `projectMutation` needs
   `If-Match`. A non-core module id `<moduleId>.<name>` must mount under
-  `/projects/:id/m/<moduleId>/`, or mounting throws.
+  `/projects/:id/m/<moduleId>/`, or mounting throws. Its `userRoute` mounts
+  under `/m/<moduleId>/` for the signed-in user; one with an `effect` or an
+  `:id` parameter throws.
 - `registerExporter` (`server/src/geometry/exporters.ts`) and
   `registerImporter` (`server/src/api/importers.ts`) return a disposer.
 - Document `extensions` (`shared/src/model.ts`) survive upload, edits and
@@ -286,17 +288,28 @@ module, in load order:
 - A manifest that fails `parseManifest` reports `failed` with whichever of
   its identity fields are strings; the rest are empty.
 - `activate` receives `ServerContext` (`plugin-api/src/index.ts`):
-  `register` and `startKernelJob`. `register.routeModule` and
+  `register`, `startKernelJob` and `userData`. `register.routeModule` and
   `register.kernelJob` take `plugin-api` types; `exporter`, `importer`,
   `featureKind` and `extensionSpec` still take core types. Each call is
   tracked under the module's one disposer.
-- A route module's `projectRoute` and `projectMutation` handlers get
-  `params` from the route path and `body` as the route's request type when
-  it has a body schema, `unknown` without one. Every route module receives
+- A route module's `projectRoute`, `projectMutation` and `userRoute`
+  handlers get `params` from the route path and `body` as the route's
+  request type when it has a body schema, `unknown` without one, and
+  `{ user }`, the signed-in user. A user route needs a session as project
+  routes do and takes no user id from the request. Every route module receives
   `kernel` at runtime, but only the core `ModuleApi` type declares it.
 - `register.kernelJob(id, entry)` registers a kernel job: `id` starts with
   the module id and a dot, and `entry` is the URL of a file whose default
   export, from `defineKernelJobs`, holds the job under that id.
+- `userData(name, version)` gives the module a per-user store at
+  `users/<userId>/modules/<moduleId>/<name>.json`, holding
+  `{ version, data }`. `name` follows the store id rule, or activation
+  fails. `read(user)` returns `{ version, data, etag, readOnly }` or null.
+  `write(user, data, etag)` needs the etag it read, or null for none yet,
+  and runs in the store's write queue: a stale etag is 409 `conflict`, a
+  file over the cap 413 `too_large`, and neither writes. Data saved at a
+  higher `version` than the module passes reads as `readOnly`, and a write
+  over it is 409. Code: `server/src/store/moduleData.ts`.
 - `startKernelJob(id, input, { onProgress, signal })` runs one of the
   module's own jobs in the kernel worker and resolves to its result. A job is
   synchronous; one that returns a promise is refused. The job
@@ -368,3 +381,4 @@ blob, so a `.rockett` file and a browser project carry them as assets.
 | Tool targets                          | `MAX_TARGETS`, `shared/src/schema/features.ts`                                      |
 | Previews, jobs, timeouts, size search | `server/src/tunables.ts`                                                            |
 | Settings import                       | `SETTINGS_IMPORT_MAX_BYTES`; nodes and depth in `server/src/store/settingsStore.ts` |
+| Module user data file                 | `MODULE_DATA_MAX_BYTES`, `server/src/store/moduleData.ts`                           |

@@ -16,6 +16,8 @@ import { registerRouteModule } from "../api/routeModules.js";
 import { registerExporter } from "../geometry/exporters.js";
 import { registerFeatureKind } from "../geometry/featureKinds.js";
 import type { KernelClient } from "../kernel/client.js";
+import { moduleUserData } from "../store/moduleData.js";
+import type { Storage } from "../store/storage.js";
 
 type Kernel = Pick<KernelClient, "moduleJob">;
 
@@ -95,6 +97,7 @@ async function load(
   module: HostModule,
   own: Dispose[],
   kernel: Kernel,
+  storage: Storage,
 ): Promise<ModuleInfo> {
   let check;
   try {
@@ -114,6 +117,7 @@ async function load(
     await module.server.activate({
       register: registrars(own, id),
       startKernelJob: starter(id, kernel),
+      userData: moduleUserData(storage, id),
     });
   } catch (error) {
     disposeAll(own.splice(0));
@@ -129,12 +133,13 @@ export const listModules = () => loaded;
 export async function loadModules(
   modules: readonly HostModule[],
   kernel: Kernel,
+  storage: Storage,
 ): Promise<Dispose> {
   const disposers: Dispose[] = [];
   const reports: ModuleInfo[] = [];
   for (const module of modules) {
     const own: Dispose[] = [];
-    reports.push(await load(module, own, kernel));
+    reports.push(await load(module, own, kernel, storage));
     disposers.push(() => disposeAll(own));
   }
   loaded = reports;

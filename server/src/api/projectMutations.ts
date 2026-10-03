@@ -138,7 +138,7 @@ function previewStage(context: RouterContext) {
         ? structuredClone(staged.document)
         : await editable(req, res);
       const before = structuredClone(resolvedFeatures(loaded));
-      const { label, document = loaded } = await edit(loaded, req);
+      const { label, document = loaded } = await edit(loaded, req, { user });
       solveEdits(document, before);
       staged = { owner, seq, label: staged?.label ?? label!, document };
     }
@@ -195,7 +195,7 @@ export function createProjectMutations(context: RouterContext) {
           document = loaded,
           after,
           ...extra
-        } = await edit(loaded, req);
+        } = await edit(loaded, req, ctx);
         const saved = label !== undefined && document === loaded;
         if (saved) solveEdits(document, before);
         const evaluation = await evaluateAndSync(document, position);
