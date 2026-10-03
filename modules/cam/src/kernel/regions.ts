@@ -72,7 +72,11 @@ function floors(scope: KernelJobScope, body: any): number[] {
     const plane = own(surface.Plane());
     const reversed =
       face.Orientation_1() === oc.TopAbs_Orientation.TopAbs_REVERSED;
-    const up = own(own(plane.Axis()).Direction()).Z() * (reversed ? -1 : 1);
+    const direct = own(plane.Position()).Direct();
+    const up =
+      own(own(plane.Axis()).Direction()).Z() *
+      (reversed ? -1 : 1) *
+      (direct ? 1 : -1);
     const z = own(plane.Location()).Z();
     if (up < FACING || levels.some((level) => Math.abs(level - z) <= LENGTH))
       continue;
