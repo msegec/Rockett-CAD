@@ -1,0 +1,21 @@
+{
+  "manifestVersion": 1,
+  "id": "rockett.cam",
+  "name": "CAM",
+  "version": "0.1.0",
+  "apiRange": "^0.2",
+  "licence": "UNLICENSED",
+  "author": "Rockett CAD",
+  "contributes": {
+    "workbenches": ["rockett.cam.manufacture"],
+    "routes": ["rockett.cam.document"],
+    "postProcessors": [
+      "rockett.cam.fluidnc",
+      "rockett.cam.grbl",
+      "rockett.cam.grblhal",
+      "rockett.cam.linuxcnc",
+      "rockett.cam.mach",
+      "rockett.cam.marlin"
+    ]
+  }
+}

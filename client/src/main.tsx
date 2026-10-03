@@ -5,6 +5,7 @@ import { api } from "./api";
 import { ConfirmPanel } from "./components/ConfirmPanel";
 import "./features/core";
 import "./commands/design";
+import { clientModules } from "../../modules/index.client";
 import { loadClientModules } from "./modules/host";
 import { useSession } from "./session";
 import { THEME_TOKENS, applyTheme, followAppearance } from "./theme/tokens";
@@ -16,7 +17,7 @@ followAppearance();
 const stopWaiting = useSession.subscribe((session) => {
   if (session.kind !== "signed-in") return;
   stopWaiting();
-  void loadClientModules([], api.modules);
+  void loadClientModules(clientModules, api.modules);
 });
 
 createRoot(document.getElementById("root")!).render(
