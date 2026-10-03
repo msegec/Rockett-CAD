@@ -178,7 +178,6 @@ export class CadViewport {
       cam.lookAt(this.target);
     }
 
-    // lighting: hemisphere + key light attached to camera for stable shading
     const hemi = new THREE.HemisphereLight(
       themeColor("light-sky"),
       themeColor("light-ground"),
@@ -213,6 +212,7 @@ export class CadViewport {
     );
     this.resize();
     window.addEventListener("scroll", this.forgetRect, true);
+    this.layers.mountModuleLayers(this.requestRender);
   }
 
   dispose() {

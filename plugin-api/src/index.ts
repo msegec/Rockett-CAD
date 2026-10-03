@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { Group, Object3D } from "three";
 import type { CadDocument, PathParams, Route, User } from "@rockett/shared";
 
 export type {
@@ -159,11 +160,25 @@ export interface Workbench {
   bar?: ComponentType;
 }
 
+export interface ViewportLayer {
+  readonly group: Group;
+  requestRender(): void;
+  disposeObject(object: Object3D): void;
+  disposeGroup(group: Object3D): void;
+  clearGroup(group: Object3D): void;
+}
+
+export interface Layer {
+  id: string;
+  mount(layer: ViewportLayer): void | Dispose;
+}
+
 export interface ClientRegister {
   command(command: Command): Dispose;
   toolbarGroup(group: ToolbarGroup): Dispose;
   panel(panel: Panel): Dispose;
   workbench(workbench: Workbench): Dispose;
+  layer(layer: Layer): Dispose;
 }
 
 export interface OpenProject {

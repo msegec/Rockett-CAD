@@ -2,11 +2,12 @@ import { createElement, type ComponentType } from "react";
 import type {
   ClientContext,
   Dispose,
+  Layer,
   OpenProject,
   ProjectView,
   Workbench,
 } from "@rockett/plugin-api";
-import type { ModuleInfo } from "@rockett/shared";
+import { REGISTRY_ID, type ModuleInfo } from "@rockett/shared";
 import {
   registerCommand,
   registerToolbarGroup,
@@ -17,6 +18,10 @@ import { PanelBoundary, registerPanel } from "../shell/panels";
 import { registerWorkbench } from "../shell/workbench";
 import { useStore } from "../store";
 import { registerPickProvider } from "../three/pickProviders";
+import { registerLayer } from "../three/sceneLayers";
+
+const messageOf = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
 const bounded =
   (id: string, title: string, Inner: ComponentType): ComponentType =>
@@ -40,6 +45,25 @@ const guardedWorkbench = ({ tree, bar, ...workbench }: Workbench) => ({
   ...(bar && { bar: bounded(workbench.id, workbench.label, bar) }),
 });
 
+const guardedLayer = ({ id, mount }: Layer): Layer => ({
+  id,
+  mount(layer) {
+    try {
+      return mount(layer);
+    } catch (error) {
+      console.error(`[rockett] layer ${id} failed: ${messageOf(error)}`);
+    }
+  },
+});
+
+function registerModuleLayer(moduleId: string, layer: Layer) {
+  if (!layer.id.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(layer.id))
+    throw new Error(
+      `layer ${layer.id} must start with ${moduleId}. and name a valid id`,
+    );
+  return registerLayer(guardedLayer(layer));
+}
+
 let open: OpenProject = { projectId: null, document: null };
 
 const project: ProjectView = {
@@ -59,7 +83,7 @@ const project: ProjectView = {
     }),
 };
 
-function moduleContext(own: Dispose[]) {
+function moduleContext(own: Dispose[], moduleId: string) {
   const track =
     <A extends unknown[]>(register: (...args: A) => Dispose) =>
     (...args: A) => {
@@ -76,6 +100,7 @@ function moduleContext(own: Dispose[]) {
     ),
     selectionKind: track(registerSelectionKind),
     pickProvider: track(registerPickProvider),
+    layer: track((layer: Layer) => registerModuleLayer(moduleId, layer)),
   };
   return {
     register,
@@ -112,13 +137,12 @@ export async function loadClientModules(
     if (!loaded.has(module.manifest.id)) continue;
     const own: Dispose[] = [];
     try {
-      await module.client.activate(moduleContext(own));
+      await module.client.activate(moduleContext(own, module.manifest.id));
       disposers.push(() => disposeAll(own));
     } catch (error) {
       disposeAll(own);
-      const message = error instanceof Error ? error.message : String(error);
       console.error(
-        `[rockett] module ${module.manifest.id} failed: ${message}`,
+        `[rockett] module ${module.manifest.id} failed: ${messageOf(error)}`,
       );
     }
   }

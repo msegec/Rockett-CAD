@@ -1,5 +1,7 @@
 import * as THREE from "three";
-import { clearGroup } from "./dispose";
+import type { Dispose, Layer } from "@rockett/plugin-api";
+import { createRegistry } from "@rockett/shared";
+import { clearGroup, disposeGroup, disposeObject } from "./dispose";
 
 export interface LayerHandle {
   group: THREE.Group;
@@ -7,8 +9,12 @@ export interface LayerHandle {
   dispose(): void;
 }
 
+const moduleLayers = createRegistry<Layer>("scene layer", (l) => l.id);
+export const registerLayer = moduleLayers.register;
+
 export function sceneLayers(parent: THREE.Object3D) {
   const layers = new Map<string, LayerHandle>();
+  let unmountModules: Dispose | undefined;
 
   const addLayer = (id: string): LayerHandle => {
     if (layers.has(id)) {
@@ -31,9 +37,46 @@ export function sceneLayers(parent: THREE.Object3D) {
     return layer;
   };
 
+  const mountModuleLayers = (requestRender: () => void) => {
+    const mounted = new Map<Layer, Dispose>();
+    const attach = ({ id, mount }: Layer): Dispose => {
+      const handle = addLayer(id);
+      const unmount = mount({
+        group: handle.group,
+        requestRender,
+        disposeObject,
+        disposeGroup,
+        clearGroup,
+      });
+      return () => {
+        unmount?.();
+        handle.dispose();
+      };
+    };
+    const sync = () => {
+      const now = moduleLayers.list();
+      for (const [layer, unmount] of mounted) {
+        if (now.includes(layer)) continue;
+        mounted.delete(layer);
+        unmount();
+      }
+      for (const layer of now)
+        if (!mounted.has(layer)) mounted.set(layer, attach(layer));
+      requestRender();
+    };
+    const stop = moduleLayers.subscribe(sync);
+    sync();
+    unmountModules = () => {
+      stop();
+      for (const unmount of [...mounted.values()].toReversed()) unmount();
+      mounted.clear();
+    };
+  };
+
   const dispose = () => {
+    unmountModules?.();
     for (const layer of [...layers.values()].reverse()) layer.dispose();
   };
 
-  return { addLayer, dispose };
+  return { addLayer, mountModuleLayers, dispose };
 }
