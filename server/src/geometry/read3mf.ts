@@ -1,8 +1,10 @@
 import { inflateRawSync } from "node:zlib";
 import type { MeshPart } from "./importers.js";
+import { StoreError } from "../store/jsonStore.js";
 
 const MAX_3MF_EXPANDED = 256 * 1024 * 1024;
 const MAX_3MF_COMPONENTS = 100_000;
+const MESH_PARTS = /(^\[content_types\]\.xml|\.rels|\.model)$/;
 
 const UNITS: Record<string, number> = {
   micron: 0.001,
@@ -17,41 +19,121 @@ const TAG = /<(\/?)([A-Za-z_][\w.:-]*)([^>]*?)(\/?)>/g;
 const ATTR = /([\w.:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 
 const tooLarge = () =>
-  new Error(
+  new StoreError(
     `The 3MF file expands past ${MAX_3MF_EXPANDED / 1024 / 1024} MB, the limit.`,
+    "too_large",
   );
-const invalid = () => new Error("The 3MF file is not a valid zip package.");
+const invalid = () =>
+  new StoreError("The 3MF file is not a valid zip package.");
 
 interface Entry {
+  name: string;
   data: Buffer;
   method: number;
   flags: number;
+  crc: number;
+  size: number;
 }
 
 function zipEntries(zip: Buffer): Map<string, Entry> {
   const end = zip.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
   if (end < 0 || end + 22 > zip.length) throw invalid();
-  const entries = new Map<string, Entry>();
-  let p = zip.readUInt32LE(end + 16);
+  const entries = new Map<string, Entry>(),
+    directory = zip.readUInt32LE(end + 16);
+  let p = directory;
   for (let i = zip.readUInt16LE(end + 10); i > 0; i--) {
     if (p + 46 > end || zip.readUInt32LE(p) !== 0x02014b50) throw invalid();
     const nameLength = zip.readUInt16LE(p + 28),
       local = zip.readUInt32LE(p + 42);
-    if (local + 30 > end || zip.readUInt32LE(local) !== 0x04034b50)
+    if (local + 30 > directory || zip.readUInt32LE(local) !== 0x04034b50)
       throw invalid();
     const start =
-      local + 30 + zip.readUInt16LE(local + 26) + zip.readUInt16LE(local + 28);
-    entries.set(
-      zip.toString("utf8", p + 46, p + 46 + nameLength).toLowerCase(),
-      {
-        data: zip.subarray(start, start + zip.readUInt32LE(p + 20)),
-        method: zip.readUInt16LE(p + 10),
-        flags: zip.readUInt16LE(p + 8),
-      },
-    );
+        local +
+        30 +
+        zip.readUInt16LE(local + 26) +
+        zip.readUInt16LE(local + 28),
+      length = zip.readUInt32LE(p + 20);
+    if (start + length > directory) throw invalid();
+    const name = zip.toString("utf8", p + 46, p + 46 + nameLength);
+    entries.set(name.toLowerCase(), {
+      name,
+      data: zip.subarray(start, start + length),
+      method: zip.readUInt16LE(p + 10),
+      flags: zip.readUInt16LE(p + 8),
+      crc: zip.readUInt32LE(p + 16),
+      size: zip.readUInt32LE(p + 24),
+    });
     p += 46 + nameLength + zip.readUInt16LE(p + 30) + zip.readUInt16LE(p + 32);
   }
   return entries;
+}
+
+function packageOf(bytes: Buffer): Map<string, Entry> {
+  try {
+    return zipEntries(bytes);
+  } catch (error) {
+    if (error instanceof RangeError) throw invalid();
+    throw error;
+  }
+}
+
+function zipOf(entries: Entry[]): Buffer {
+  const parts: Buffer[] = [],
+    directory: Buffer[] = [];
+  let offset = 0;
+  for (const { name, data, method, flags, crc, size } of entries) {
+    const path = Buffer.from(name),
+      local = Buffer.alloc(30),
+      central = Buffer.alloc(46);
+    for (const [header, at] of [
+      [local, 4],
+      [central, 6],
+    ] as const) {
+      header.writeUInt16LE(20, at);
+      header.writeUInt16LE((flags & 1) | 0x800, at + 2);
+      header.writeUInt16LE(method, at + 4);
+      header.writeUInt32LE(crc, at + 10);
+      header.writeUInt32LE(data.length, at + 14);
+      header.writeUInt32LE(size, at + 18);
+      header.writeUInt16LE(path.length, at + 22);
+    }
+    local.writeUInt32LE(0x04034b50, 0);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt32LE(offset, 42);
+    parts.push(local, path, data);
+    directory.push(central, path);
+    offset += local.length + path.length + data.length;
+  }
+  const listing = Buffer.concat(directory),
+    end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(listing.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...parts, listing, end]);
+}
+
+export function slim3mf(bytes: Buffer): Buffer {
+  const entries = packageOf(bytes),
+    kept = [...entries]
+      .filter(([name]) => MESH_PARTS.test(name))
+      .map(([, entry]) => entry);
+  if (kept.reduce((sum, { size }) => sum + size, 0) > MAX_3MF_EXPANDED)
+    throw tooLarge();
+  if (kept.length === entries.size) return bytes;
+  let end = 0,
+    rebuilt = 22;
+  for (const { name, data } of kept.toSorted(
+    (a, b) => a.data.byteOffset - b.data.byteOffset,
+  )) {
+    if (data.byteOffset < end) throw invalid();
+    end = data.byteOffset + data.length;
+    rebuilt += 76 + 2 * Buffer.byteLength(name) + data.length;
+  }
+  if (rebuilt > bytes.length) throw invalid();
+  return zipOf(kept);
 }
 
 function expand({ data, method, flags }: Entry, limit: number): Buffer {
@@ -176,13 +258,7 @@ type Step =
   { path: string; id: string; transform: number[] } | { leave: string };
 
 export function read3mf(bytes: Buffer): MeshPart[] {
-  let zip: Map<string, Entry>;
-  try {
-    zip = zipEntries(bytes);
-  } catch (error) {
-    if (error instanceof RangeError) throw invalid();
-    throw error;
-  }
+  const zip = packageOf(bytes);
   let left = MAX_3MF_EXPANDED;
   const text = (entry: Entry) => {
     const out = expand(entry, left);

@@ -19,7 +19,7 @@ import {
   type Shape,
 } from "./kernel.js";
 import { setExactTriangle } from "./mesh.js";
-import { read3mf } from "./read3mf.js";
+import { read3mf, slim3mf } from "./read3mf.js";
 import { sha256 } from "../store/jsonStore.js";
 import { registerImporter } from "../api/importers.js";
 
@@ -144,7 +144,11 @@ function markBinaryStl(bytes: Buffer) {
 
 const MESH_READERS: Record<
   MeshFormat,
-  { label: string; read(bytes: Buffer): MeshPart[] }
+  {
+    label: string;
+    read(bytes: Buffer): MeshPart[];
+    source?(bytes: Buffer): Buffer;
+  }
 > = {
   stl: {
     label: "STL",
@@ -165,7 +169,7 @@ const MESH_READERS: Record<
       ),
     ],
   },
-  "3mf": { label: "3MF", read: read3mf },
+  "3mf": { label: "3MF", read: read3mf, source: slim3mf },
 };
 
 function attachTriangle(
@@ -360,8 +364,9 @@ function meshImporter(format: MeshFormat) {
     format,
     label: MESH_READERS[format].label,
     extensions: [`.${format}`],
-    read(bytes: Buffer, filename: string): Imported {
-      const blob = sha256(bytes);
+    read(upload: Buffer, filename: string): Imported {
+      const bytes = MESH_READERS[format].source?.(upload) ?? upload,
+        blob = sha256(bytes);
       return {
         features: [
           {

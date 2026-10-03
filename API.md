@@ -356,7 +356,13 @@ Imports and project files stream to disk under `uploads/`. A file over the
 import budget is 413 before it is read: `server/src/api/uploads.ts`. Imported
 STEP and mesh sources live in the project blob store; the feature holds the
 hash in `blob`, and `GET /projects/:id/assets/:assetId` serves any project
-blob, so a `.rockett` file and a browser project carry them as assets.
+blob, so a `.rockett` file and a browser project carry them as assets. A 3MF
+source keeps only its content types, relationship and model parts;
+thumbnails, slicer settings and other parts are dropped before storing. Model
+parts whose declared sizes pass the 3MF package limit are 413. A package is
+400 when its parts overlap, run past the zip directory, or would rebuild
+larger than the upload: `slim3mf` in `server/src/geometry/read3mf.ts`. A
+package that understates its expanded sizes fails as 400 at evaluation.
 
 ## Validation
 
