@@ -18,6 +18,10 @@ const saveCam: Route<"/projects/:id/m/rockett/cam", CamData> & {
 
 export default defineServerModule({
   activate({ register }) {
+    register.kernelJob(
+      "rockett.cam.regions",
+      new URL("./kernel.ts", import.meta.url),
+    );
     register.routeModule({
       id: "rockett.cam.document",
       mount(api) {

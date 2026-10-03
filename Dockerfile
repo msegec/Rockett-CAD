@@ -61,7 +61,7 @@ COPY THIRD-PARTY-NOTICES.md ./
 RUN --mount=type=bind,from=notices,source=/app,target=/build \
   sh /build/scripts/check-notices.sh --collect /app/licences
 
-COPY --from=server /app/server/dist/server.mjs /app/server/dist/kernel-worker.mjs /app/server/dist/blend.wasm ./
+COPY --from=server /app/server/dist/*.mjs /app/server/dist/blend.wasm ./
 COPY --from=client /app/client/dist client/dist
 
 # Non-root user; /data is the single persistent volume.

@@ -21,17 +21,31 @@ import type { Storage } from "../store/storage.js";
 
 type Kernel = Pick<KernelClient, "moduleJob">;
 
-const kernelJobs = createRegistry<{ id: string; entry: URL }>(
+declare const KERNEL_BUNDLES: Readonly<Record<string, string>>;
+
+const kernelJobs = createRegistry<{ id: string; entry: string }>(
   "kernel job",
   (job) => job.id,
 );
+
+function jobEntry(moduleId: string, entry: URL) {
+  if (typeof KERNEL_BUNDLES !== "object") return entry.href;
+  const bundle = Object.hasOwn(KERNEL_BUNDLES, moduleId)
+    ? KERNEL_BUNDLES[moduleId]
+    : undefined;
+  if (bundle === undefined || !entry.pathname.endsWith("/kernel.ts"))
+    throw new Error(
+      `kernel job entry ${entry.href} is not the kernel.ts that ${moduleId} ships`,
+    );
+  return bundle;
+}
 
 function registerKernelJob(moduleId: string, id: string, entry: URL) {
   if (!id.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(id))
     throw new Error(
       `kernel job ${id} must start with ${moduleId}. and name a valid id`,
     );
-  return kernelJobs.register({ id, entry });
+  return kernelJobs.register({ id, entry: jobEntry(moduleId, entry) });
 }
 
 const starter =
@@ -40,7 +54,7 @@ const starter =
     const job = id.startsWith(`${moduleId}.`) ? kernelJobs.get(id) : undefined;
     if (!job)
       throw new Error(`kernel job ${id} is not registered by ${moduleId}`);
-    return kernel.moduleJob(job.entry.href, id, input, {
+    return kernel.moduleJob(job.entry, id, input, {
       onProgress: (...args) => run.onProgress?.(...args),
       shouldStop: () => run.signal?.aborted === true,
     });

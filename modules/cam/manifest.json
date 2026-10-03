@@ -9,6 +9,7 @@
   "contributes": {
     "workbenches": ["rockett.cam.manufacture"],
     "routes": ["rockett.cam.document"],
+    "kernelJobs": ["rockett.cam.regions"],
     "postProcessors": [
       "rockett.cam.fluidnc",
       "rockett.cam.grbl",

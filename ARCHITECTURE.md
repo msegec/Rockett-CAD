@@ -35,7 +35,10 @@ native build. Geometry lives in `server/src/geometry/`; the API reaches it
 only through `KernelClient` (`server/src/kernel/client.ts`).
 `WorkerKernel` runs it in one worker thread so health and requests stay
 responsive during a long regeneration; `ROCKETT_KERNEL=inprocess` runs it on
-the main thread. A worker crash quarantines the running feature, blocks its
+the main thread. A module kernel job runs in the same worker from its
+`modules/<id>/kernel.ts`, which `server/build.sh` bundles as
+`<id>.kernel.mjs` beside `kernel-worker.mjs` (`server/src/modules/host.ts`).
+A worker crash quarantines the running feature, blocks its
 dependents and exports, and restarts with a bounded backoff:
 `server/src/kernel/workerKernel.ts`.
 
