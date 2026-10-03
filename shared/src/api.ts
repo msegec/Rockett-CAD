@@ -8,6 +8,7 @@ import type {
   EdgeRef,
   FaceRef,
   FilletFeature,
+  NamingVersion,
   ShellFeature,
   ProjectMember,
   SketchSolveStatus,
@@ -149,10 +150,19 @@ export interface NamingMapping {
   suggestions: NamingCandidate[];
 }
 
+export interface NamingFailure extends Pick<
+  FeatureStatus,
+  "featureId" | "refs"
+> {
+  namingVersion: NamingVersion;
+  error: string;
+}
+
 export interface NamingUpgradeProposal {
   backup: string;
   revision: number;
   mappings: NamingMapping[];
+  failures?: NamingFailure[];
 }
 
 export interface FeatureStatus {

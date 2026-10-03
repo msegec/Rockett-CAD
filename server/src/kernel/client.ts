@@ -13,6 +13,7 @@ import {
   type MeasureRequest,
   type MeasureResult,
   type NamingDecision,
+  type NamingFailure,
   type NamingMapping,
   type PlaneRef,
   type RefSignature,
@@ -99,6 +100,7 @@ export interface Imported {
 export interface NamingPlan {
   document: CadDocument;
   mappings: NamingMapping[];
+  failures: NamingFailure[];
 }
 
 export interface KernelClient {

@@ -10,11 +10,12 @@ import {
   type Feature,
   type NamingCandidate,
   type NamingDecision,
+  type NamingFailure,
   type NamingMapping,
   type NamingTarget,
   type Vec3,
 } from "@rockett/shared";
-import { dropEngine, engineFor } from "./engine.js";
+import { dropEngine, engineFor, type DocumentEngine } from "./engine.js";
 import type { Sources } from "./importers.js";
 import { faces, getKernel, scoped, type Shape } from "./kernel.js";
 import { computeEdgeNames, instanceName, type NamedBody } from "./naming.js";
@@ -406,11 +407,31 @@ function check(
     );
 }
 
+function failures(
+  engine: DocumentEngine,
+  doc: CadDocument,
+  sources: Sources,
+): NamingFailure[] {
+  const { namingVersion } = doc;
+  return engine
+    .evaluate(doc, doc.features.length, sources)
+    .featureStatuses.flatMap(({ featureId, status, error, refs }) =>
+      status === "error" && error !== undefined
+        ? [{ featureId, namingVersion, error, ...(refs && { refs }) }]
+        : [],
+    );
+}
+
 export function planNamingUpgrade(
   doc: CadDocument,
   sources: Sources,
   accept: NamingDecision[] = [],
-): { document: CadDocument; mappings: NamingMapping[] } {
+): {
+  document: CadDocument;
+  mappings: NamingMapping[];
+  failures: NamingFailure[];
+} {
+  getKernel();
   const scratch = `${doc.id}~naming`;
   const old = engineFor(doc.id);
   const fresh = engineFor(scratch);
@@ -432,7 +453,14 @@ export function planNamingUpgrade(
     const [before, after] = sides();
     moveBodies(document, before, after, decide(after));
     unused();
-    return { document, mappings };
+    return {
+      document,
+      mappings,
+      failures: [
+        ...failures(old, doc, sources),
+        ...failures(fresh, document, sources),
+      ],
+    };
   } finally {
     dropEngine(scratch);
   }

@@ -78,8 +78,15 @@ for (const id of await store.documents.keys()) {
     console.log(`${id} namingVersion ${doc.namingVersion}`);
     if (doc.namingVersion === 2) continue;
     pending++;
-    const { mappings } = planNamingUpgrade(doc, await store.sources(doc));
+    const { mappings, failures } = planNamingUpgrade(
+      doc,
+      await store.sources(doc),
+    );
     for (const mapping of mappings) console.log(line(mapping));
+    for (const f of failures)
+      console.log(
+        `  ${f.featureId} fails under version ${f.namingVersion}: ${f.error}`,
+      );
   } catch (err) {
     pending++;
     console.log(`${id} error ${err.message}`);

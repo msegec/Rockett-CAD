@@ -6,6 +6,7 @@ import type {
   NamingMapping,
   NamingMesh,
   NamingUpgradeProposal,
+  NamingVersion,
 } from "@rockett/shared";
 import type { KernelClient } from "../kernel/client.js";
 import { backupNamespace } from "./jsonStore.js";
@@ -104,7 +105,7 @@ export async function stageNamingUpgrade(
   doc: CadDocument,
   accept?: NamingDecision[],
 ): Promise<NamingUpgradeProposal> {
-  const { backup, document, mappings } = await staged(
+  const { backup, document, mappings, failures } = await staged(
     store,
     kernel,
     doc,
@@ -114,6 +115,7 @@ export async function stageNamingUpgrade(
     backup,
     revision: doc.revision,
     mappings: await withMeshes(store, kernel, document, mappings),
+    failures,
   };
 }
 
@@ -136,12 +138,27 @@ export async function acceptedNamingUpgrade(
   doc: CadDocument,
   accept?: NamingDecision[],
 ) {
-  const plan = await staged(store, kernel, doc, accept);
+  const { failures, ...plan } = await staged(store, kernel, doc, accept);
   const open = plan.mappings.filter((m) => !m.to && m.status !== "missing");
   if (open.length)
     throw new StoreError(
       `${open.length} references have no proven mapping; accept one for each before the upgrade`,
       "conflict",
+    );
+  const failed = (version: NamingVersion) =>
+    new Set(
+      failures
+        .filter((f) => f.namingVersion === version)
+        .map((f) => f.featureId),
+    );
+  const [before, after] = [failed(1), failed(2)];
+  const broken = doc.features.filter(
+    ({ id }) => after.has(id) && !before.has(id),
+  );
+  if (broken.length)
+    throw new StoreError(
+      `${broken.map((f) => f.name).join(", ")} would fail under naming version 2; the project stays on version 1`,
+      "unprocessable",
     );
   return plan;
 }
