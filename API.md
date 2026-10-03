@@ -372,7 +372,8 @@ blob, so a `.rockett` file and a browser project carry them as assets.
 | Import and project file upload, disk  | `ROCKETT_UPLOAD_MAX_MB`, `IMPORT_LIMITS` in `server/src/tunables.ts`                |
 | Import and project file read, heap    | `ROCKETT_IMPORT_BUDGET_MB`, `IMPORT_LIMITS` in `server/src/tunables.ts`             |
 | Mesh import triangles                 | `MAX_MESH_TRIANGLES`, `server/src/geometry/importers.ts`                            |
-| 3MF expanded entry                    | `server/src/geometry/read3mf.ts`                                                    |
+| 3MF expanded package                  | `MAX_3MF_EXPANDED`, `server/src/geometry/read3mf.ts`                                |
+| 3MF component placements              | `MAX_3MF_COMPONENTS`, `server/src/geometry/read3mf.ts`                              |
 | Browser project file                  | `PROJECT_FILE_LIMIT_MB`, `shared/src/projectFile.ts`                                |
 | Thumbnail                             | `THUMBNAIL_LIMITS`, `shared/src/routes.ts`                                          |
 | Reference image                       | `IMAGE_LIMIT_MB`, `server/src/store/projectStore.ts`                                |
