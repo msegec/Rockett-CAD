@@ -1,21 +1,11 @@
-import { defineServerModule, type Route } from "@rockett/plugin-api";
+import { defineServerModule } from "@rockett/plugin-api";
 import {
   CAM_EXTENSION,
   CAM_VERSION,
-  camDataSchema,
   migrateCam,
-  type CamData,
+  saveCam,
 } from "./src/shared/document.js";
 import { mountLibrary } from "./src/server/library.js";
-
-const saveCam: Route<"/projects/:id/m/rockett/cam", CamData> & {
-  readonly body: typeof camDataSchema;
-} = {
-  method: "PUT",
-  path: "/projects/:id/m/rockett/cam",
-  body: camDataSchema,
-  effect: "document",
-};
 
 export default defineServerModule({
   activate({ register, userData }) {

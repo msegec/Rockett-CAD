@@ -1,12 +1,37 @@
 import { defineClientModule } from "@rockett/plugin-api";
+import { SETUP_PANEL, setupDialog } from "./src/client/setupDialog.js";
+import { stockLayer } from "./src/client/stockLayer.js";
+
+const MANUFACTURE = "rockett.cam.manufacture";
+const SETUP_GROUP = "rockett.cam.group.setup";
 
 export default defineClientModule({
-  activate({ register }) {
+  activate(context) {
+    const { register, ui, project } = context;
     register.workbench({
-      id: "rockett.cam.manufacture",
+      id: MANUFACTURE,
       label: "Manufacture",
       panels: [],
       selectionKinds: [],
     });
+    register.toolbarGroup({
+      id: SETUP_GROUP,
+      label: "SETUP",
+      context: MANUFACTURE,
+    });
+    register.command({
+      id: "rockett.cam.setup",
+      label: "Setup",
+      group: SETUP_GROUP,
+      icon: "setup.svg",
+      run: () => ui.openPanel(SETUP_PANEL),
+    });
+    register.panel({
+      id: SETUP_PANEL,
+      title: "Setup",
+      when: (_state, open) => open.includes(SETUP_PANEL),
+      component: setupDialog(context),
+    });
+    register.layer(stockLayer(project));
   },
 });

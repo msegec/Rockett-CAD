@@ -51,6 +51,8 @@ export type Setup = {
   fixtures: Fixture[];
 };
 
+export type StockSetup = Pick<Setup, "bodies" | "stock" | "wcs">;
+
 export type Travel =
   | { status: "unverified" }
   | { status: "within" }
@@ -104,7 +106,11 @@ function apply([x, y, z]: Matrix, p: Xyz): Xyz {
   return [dot(x, p), dot(y, p), dot(z, p)];
 }
 
-function bodiesBox(setup: Setup, matrix: Matrix, boxes: Record<string, Box>) {
+function bodiesBox(
+  setup: StockSetup,
+  matrix: Matrix,
+  boxes: Record<string, Box>,
+) {
   if (!setup.bodies.length) throw new Error("setup has no bodies");
   const min: Xyz = [Infinity, Infinity, Infinity];
   const max: Xyz = [-Infinity, -Infinity, -Infinity];
@@ -151,7 +157,7 @@ function stockAround(stock: Stock, bodies: Box): Box {
 }
 
 export function stockBox(
-  setup: Setup,
+  setup: StockSetup,
   bodyBoxes: Record<string, Box>,
   referencePoint?: Xyz,
 ): Box & { modelToSetup: Placement } {
