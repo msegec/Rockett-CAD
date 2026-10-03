@@ -151,12 +151,12 @@ export interface CommandControl {
   icon?: never;
 }
 
-export interface CommandAction<Ctx> {
-  group?: never;
-  icon?: never;
+export type CommandAction<Ctx> = {
   Control?: never;
   run(ctx: Ctx): unknown;
-}
+} & (
+  { group?: never; icon?: never } | { group: string; icon: `${string}.svg` }
+);
 
 export type Command<Ctx = unknown> = CommandBase<Ctx> &
   Keyed &

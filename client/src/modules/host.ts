@@ -13,6 +13,7 @@ import {
   registerToolbarGroup,
   type Command,
 } from "../commands/registry";
+import { iconOf, registerModuleIcon } from "../icons";
 import { registerSelectionKind } from "../selection/kinds";
 import { PanelBoundary, registerPanel } from "../shell/panels";
 import { registerWorkbench } from "../shell/workbench";
@@ -56,6 +57,28 @@ const guardedLayer = ({ id, mount }: Layer): Layer => ({
   },
 });
 
+const ICON_FILE = /\/icons\/([a-z0-9-]+)\.svg$/;
+
+function registerModuleIcons(own: Dispose[], { manifest, icons }: HostModule) {
+  for (const [path, file] of Object.entries(icons ?? {})) {
+    const name = ICON_FILE.exec(path)?.[1];
+    if (!name) throw new Error(`icon ${path} must be icons/<name>.svg`);
+    own.push(registerModuleIcon(`${manifest.id}/${name}.svg`, file));
+  }
+}
+
+type ModuleCommand = Command & { icon?: `${string}.svg` };
+
+function iconed(moduleId: string, command: ModuleCommand): Command {
+  if (!command.icon) return command;
+  const icon = `${moduleId}/${command.icon}` as const;
+  if (!iconOf(icon))
+    throw new Error(
+      `command ${command.id} icon ${command.icon} is not in ${moduleId} icons/`,
+    );
+  return { ...command, icon };
+}
+
 function registerModuleLayer(moduleId: string, layer: Layer) {
   if (!layer.id.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(layer.id))
     throw new Error(
@@ -92,7 +115,9 @@ function moduleContext(own: Dispose[], moduleId: string) {
       return dispose;
     };
   const register = {
-    command: track((command: Command) => registerCommand(guarded(command))),
+    command: track((command: ModuleCommand) =>
+      registerCommand(guarded(iconed(moduleId, command))),
+    ),
     toolbarGroup: track(registerToolbarGroup),
     panel: track(registerPanel),
     workbench: track((workbench: Workbench) =>
@@ -115,6 +140,7 @@ export interface ModuleContext extends ClientContext {
 export interface HostModule {
   manifest: { id: string };
   client: { activate(context: ModuleContext): void | Promise<void> };
+  icons?: Readonly<Record<string, string>>;
 }
 
 const disposeAll = (disposers: readonly Dispose[]) => {
@@ -137,6 +163,7 @@ export async function loadClientModules(
     if (!loaded.has(module.manifest.id)) continue;
     const own: Dispose[] = [];
     try {
+      registerModuleIcons(own, module);
       await module.client.activate(moduleContext(own, module.manifest.id));
       disposers.push(() => disposeAll(own));
     } catch (error) {

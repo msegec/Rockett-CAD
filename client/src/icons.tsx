@@ -1,20 +1,19 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
+import { createRegistry } from "@rockett/shared";
+
+const ROOT = {
+  xmlns: "http://www.w3.org/2000/svg",
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: "1.5",
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+  "aria-hidden": "true",
+} as const;
 
 function svg(children: ReactNode) {
-  return () => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  );
+  return () => <svg {...ROOT}>{children}</svg>;
 }
 
 export const ICONS = {
@@ -433,3 +432,22 @@ export const ICONS = {
 };
 
 export type IconId = keyof typeof ICONS;
+export type ModuleIconId = `${string}/${string}.svg`;
+
+const moduleIcons = createRegistry<{ id: string; Icon: ComponentType }>(
+  "icon",
+  (icon) => icon.id,
+);
+const coreIcons: Readonly<Record<string, ComponentType>> = ICONS;
+
+export function registerModuleIcon(id: ModuleIconId, file: string) {
+  const inner = /^<svg\b[^>]*>([\s\S]*)<\/svg>$/.exec(file.trim())?.[1];
+  if (inner === undefined) throw new Error(`icon ${id} is not one svg`);
+  return moduleIcons.register({
+    id,
+    Icon: () => <svg {...ROOT} dangerouslySetInnerHTML={{ __html: inner }} />,
+  });
+}
+
+export const iconOf = (id: IconId | ModuleIconId) =>
+  coreIcons[id] ?? moduleIcons.get(id)?.Icon;
