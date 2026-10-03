@@ -1,14 +1,21 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import type { CadDocument } from "@rockett/plugin-api";
+import { toolSchema } from "./tools.js";
 
 export const CAM_EXTENSION = "rockett.cam";
 export const CAM_VERSION = 1;
 
-const entry = Type.Object({ id: Type.String({ minLength: 1 }) });
+export const entry = Type.Object({ id: Type.String({ minLength: 1 }) });
+
+const docTool = Type.Intersect([
+  entry,
+  Type.Partial(toolSchema),
+  Type.Partial(Type.Object({ libraryRef: entry })),
+]);
 
 export const camDataSchema = Type.Object(
-  { setups: Type.Array(entry), tools: Type.Array(entry) },
+  { setups: Type.Array(entry), tools: Type.Array(docTool) },
   { additionalProperties: false },
 );
 

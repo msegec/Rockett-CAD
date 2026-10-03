@@ -1,31 +1,60 @@
-export type Coolant = "off" | "flood" | "mist";
+import { Type, type Static } from "typebox";
 
-export type Tool = {
-  id: string;
-  name: string;
-  diameter: number;
-  fluteLength: number;
-  overallLength: number;
-  shankDiameter: number;
-  flutes: number;
-  centreCutting: boolean;
-} & (
-  | { kind: "flat" | "ball" }
-  | { kind: "bull"; cornerRadius: number }
-  | { kind: "vbit" | "drill" | "chamfer"; tipAngle: number }
-);
+const coolant = Type.Union([
+  Type.Literal("off"),
+  Type.Literal("flood"),
+  Type.Literal("mist"),
+]);
 
-export type Preset = {
-  id: string;
-  name: string;
-  rpm: number;
-  cutFeed: number;
-  plungeFeed: number;
-  rampFeed: number;
-  stepdown: number;
-  stepoverFraction: number;
-  coolant: Coolant;
+export type Coolant = Static<typeof coolant>;
+
+const body = {
+  id: Type.String({ minLength: 1 }),
+  name: Type.String(),
+  diameter: Type.Number(),
+  fluteLength: Type.Number(),
+  overallLength: Type.Number(),
+  shankDiameter: Type.Number(),
+  flutes: Type.Number(),
+  centreCutting: Type.Boolean(),
 };
+
+export const toolSchema = Type.Union([
+  Type.Object({
+    ...body,
+    kind: Type.Union([Type.Literal("flat"), Type.Literal("ball")]),
+  }),
+  Type.Object({
+    ...body,
+    kind: Type.Literal("bull"),
+    cornerRadius: Type.Number(),
+  }),
+  Type.Object({
+    ...body,
+    kind: Type.Union([
+      Type.Literal("vbit"),
+      Type.Literal("drill"),
+      Type.Literal("chamfer"),
+    ]),
+    tipAngle: Type.Number(),
+  }),
+]);
+
+export type Tool = Static<typeof toolSchema>;
+
+export const presetSchema = Type.Object({
+  id: Type.String({ minLength: 1 }),
+  name: Type.String(),
+  rpm: Type.Number(),
+  cutFeed: Type.Number(),
+  plungeFeed: Type.Number(),
+  rampFeed: Type.Number(),
+  stepdown: Type.Number(),
+  stepoverFraction: Type.Number(),
+  coolant,
+});
+
+export type Preset = Static<typeof presetSchema>;
 
 export function validateTool(tool: Tool): string[] {
   const problems: string[] = [];

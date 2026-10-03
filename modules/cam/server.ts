@@ -6,6 +6,7 @@ import {
   migrateCam,
   type CamData,
 } from "./src/shared/document.js";
+import { mountLibrary } from "./src/server/library.js";
 
 const saveCam: Route<"/projects/:id/m/rockett/cam", CamData> & {
   readonly body: typeof camDataSchema;
@@ -17,7 +18,7 @@ const saveCam: Route<"/projects/:id/m/rockett/cam", CamData> & {
 };
 
 export default defineServerModule({
-  activate({ register }) {
+  activate({ register, userData }) {
     register.kernelJob(
       "rockett.cam.regions",
       new URL("./kernel.ts", import.meta.url),
@@ -34,6 +35,7 @@ export default defineServerModule({
           };
           return { label: "Edit CAM data" };
         });
+        mountLibrary(api, userData);
       },
     });
   },
