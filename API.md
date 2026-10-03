@@ -319,7 +319,7 @@ module, in load order:
   `progress` call.
 - After sign-in, `client/src/modules/host.ts` activates the client part of
   each listed module that this route reports `loaded`, with `ClientContext`:
-  `register` and `project`. `register.command`, `toolbarGroup`, `panel` and
+  `register`, `project` and `ui`. `register.command`, `toolbarGroup`, `panel` and
   `workbench` take `plugin-api` types; `selectionKind` and `pickProvider`
   still take core types. Activation is atomic as on the server. A command
   `Control` and a workbench `tree` and `bar` draw inside the panel error
@@ -327,10 +327,21 @@ module, in load order:
 - A workbench's optional `tree` draws in the left dock and `bar` in the
   timeline row, in place of the model tree and timeline. The view toolbar
   group shows at the right end of every workbench.
-- `project.get()` returns `{projectId, document}` for the open project,
-  the same object until either changes; `project.subscribe(listener)` calls
-  the listener on each change and returns its disposer. Both fit
+- `project.get()` returns `{projectId, document, bodies}` for the open
+  project, the same object until the project, document or evaluation
+  changes. `bodies` lists `{id, name, bbox}` for each body of the current
+  evaluation, in model millimetres. `project.subscribe(listener)` calls the
+  listener on each change and returns its disposer. Both fit
   `useSyncExternalStore`.
+- `project.mutate(route, body)` sends a document-edit route of the open
+  project through the same write queue, transaction id and `If-Match` as a
+  core edit, and applies the returned document and history. A route that is
+  not a document edit, or no open project, rejects.
+- `ui` passes the core `DraggablePanel`, `DialogFooter`, `NumField`,
+  `LengthField`, `AngleField`, `SelectField` and `CheckField`, so a module
+  dialog uses the KIT fields. `LengthField` takes millimetres and shows the
+  user's length unit. `ui.openPanel(id)` and `ui.closePanel(id)` open and
+  close a panel through the core panel state.
 
 ## Project file
 
