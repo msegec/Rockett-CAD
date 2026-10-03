@@ -1,5 +1,4 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import type { KernelJobScope } from "@rockett/plugin-api";
 import { arcSweep, type Xy } from "../src/shared/ir.js";
 import { stockBox, type Placement, type Setup } from "../src/shared/setup.js";
 import type {
@@ -7,75 +6,22 @@ import type {
   RegionLoop,
   RegionsInput,
 } from "../src/kernel/regions.js";
-
-type OC = KernelJobScope["oc"];
-type Own = KernelJobScope["own"];
-type Shape = { delete(): void };
+import {
+  SAME,
+  box,
+  brep,
+  cut,
+  cylinder,
+  moduleJob,
+  oc,
+  startKernel,
+  type Own,
+  type Shape,
+} from "./helpers/kernel.js";
 
 const ENTRY = new URL("../src/kernel/regions.ts", import.meta.url).href;
-const SAME: Placement = { rotation: [0, 0, 0, 1], translation: [0, 0, 0] };
-const core = (file: string) =>
-  import(new URL(`../../../server/src/${file}`, import.meta.url).href);
 
-let oc: OC;
-let scoped: <T>(fn: (own: Own) => T) => T;
-let kernel: {
-  moduleJob(entry: string, id: string, input: unknown): Promise<unknown>;
-};
-
-beforeAll(async () => {
-  const [geometry, client] = await Promise.all([
-    core("geometry/kernel.ts"),
-    core("kernel/client.ts"),
-  ]);
-  kernel = await client.InProcessKernel.start({
-    sources: async () => new Map(),
-  });
-  oc = geometry.getKernel();
-  scoped = geometry.scoped;
-}, 120_000);
-
-function brep(make: (own: Own) => Shape): string {
-  const file = `/rockett-cam-regions-${crypto.randomUUID()}.brep`;
-  try {
-    scoped((own) =>
-      oc.BRepTools.Write_3(
-        make(own),
-        file,
-        own(new oc.Message_ProgressRange_1()),
-      ),
-    );
-    return oc.FS.readFile(file, { encoding: "utf8" });
-  } finally {
-    if (oc.FS.analyzePath(file).exists) oc.FS.unlink(file);
-  }
-}
-
-function cut(own: Own, body: Shape, tool: Shape): Shape {
-  const op = own(
-    new oc.BRepAlgoAPI_Cut_3(body, tool, own(new oc.Message_ProgressRange_1())),
-  );
-  return own(op.Shape());
-}
-
-function box(own: Own, at: [number, number, number], size: number[]) {
-  const corner = own(new oc.gp_Pnt_3(...at));
-  return own(
-    own(
-      new oc.BRepPrimAPI_MakeBox_3(corner, size[0], size[1], size[2]),
-    ).Shape(),
-  );
-}
-
-function cylinder(own: Own, at: number[], axis: number[], r: number) {
-  const frame = own(
-    new oc.gp_Ax2_4(
-      own(new oc.gp_Pnt_3(at[0], at[1], at[2])),
-      own(new oc.gp_Dir_5(axis[0], axis[1], axis[2])),
-    ),
-  );
-  return own(own(new oc.BRepPrimAPI_MakeCylinder_3(frame, r, 20)).Shape());
-}
+beforeAll(startKernel, 120_000);
 
 function turned(own: Own, shape: Shape): Shape {
   const trsf = own(new oc.gp_Trsf_1());
@@ -138,11 +84,7 @@ const holeBlock = (own: Own) =>
   );
 
 function regions(input: RegionsInput) {
-  return kernel.moduleJob(
-    ENTRY,
-    "rockett.cam.regions",
-    input,
-  ) as Promise<Regions>;
+  return moduleJob(ENTRY, "rockett.cam.regions", input) as Promise<Regions>;
 }
 
 function signedArea({ start, segments }: RegionLoop): number {

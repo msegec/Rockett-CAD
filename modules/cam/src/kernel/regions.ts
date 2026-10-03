@@ -25,22 +25,26 @@ const FACING = 1 - 1e-9;
 
 const same = (a: Xy, b: Xy) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= LENGTH;
 
-function read({ oc, own }: KernelJobScope, text: string) {
-  const file = `/rockett-cam-regions-${crypto.randomUUID()}.brep`;
+export function read({ oc, own }: KernelJobScope, text: string, label: string) {
+  const file = `/rockett-cam-${label}-${crypto.randomUUID()}.brep`;
   try {
     oc.FS.writeFile(file, text);
     const shape = own(new oc.TopoDS_Shape());
     const range = own(new oc.Message_ProgressRange_1());
     const builder = own(new oc.BRep_Builder());
     if (!oc.BRepTools.Read_2(shape, file, builder, range) || shape.IsNull())
-      throw new Error("regions input is not a readable BREP body");
+      throw new Error(`${label} input is not a readable BREP body`);
     return shape;
   } finally {
     if (oc.FS.analyzePath(file).exists) oc.FS.unlink(file);
   }
 }
 
-function toSetup({ oc, own }: KernelJobScope, shape: any, at: Placement) {
+export function toSetup(
+  { oc, own }: KernelJobScope,
+  shape: any,
+  at: Placement,
+) {
   const trsf = own(new oc.gp_Trsf_1());
   trsf.SetRotation_2(own(new oc.gp_Quaternion_2(...at.rotation)));
   trsf.SetTranslationPart(own(new oc.gp_Vec_4(...at.translation)));
@@ -50,7 +54,7 @@ function toSetup({ oc, own }: KernelJobScope, shape: any, at: Placement) {
   return own(moved.Shape());
 }
 
-function* shapes({ oc, own }: KernelJobScope, shape: any, kind: string) {
+export function* shapes({ oc, own }: KernelJobScope, shape: any, kind: string) {
   const found = own(
     new oc.TopExp_Explorer_2(
       shape,
@@ -180,7 +184,11 @@ function section(scope: KernelJobScope, body: any, z: number): RegionLoop[] {
 
 export default defineKernelJobs({
   "rockett.cam.regions": (input: RegionsInput, scope): Regions => {
-    const body = toSetup(scope, read(scope, input.brep), input.modelToSetup);
+    const body = toSetup(
+      scope,
+      read(scope, input.brep, "regions"),
+      input.modelToSetup,
+    );
     const found = floors(scope, body);
     const sections = input.z.map((z, index) => {
       const loops = section(scope, body, z);
