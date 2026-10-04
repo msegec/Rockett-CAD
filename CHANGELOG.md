@@ -150,6 +150,14 @@ release workflow remain under development.
   backup.
 - Schema 28: sketch ellipses may hold start and end points as elliptical arcs
   and may be projected from model edges; earlier documents load unchanged.
+- Schema 29: Move can turn bodies about an axis and add the moved copy as a
+  new body; earlier documents load unchanged.
+- Schema 30: Chamfer stores its type, equal distance, two distances or
+  distance and angle, with a flip; earlier chamfers stay equal distance.
+- Schema 31: bodies may store a `#rrggbb` colour that wins over an imported
+  one; earlier documents load unchanged.
+- Schema 32: Fillet and Chamfer may pick faces and features as well as edges;
+  earlier edge-only blends load and build unchanged.
 
 ### Known limits
 
