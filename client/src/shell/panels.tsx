@@ -18,6 +18,7 @@ import { DraggablePanel } from "../components/DraggablePanel";
 import { FeatureDialog } from "../components/FeatureDialog";
 import { MeasurePanel } from "../components/MeasurePanel";
 import { SketchOffset } from "../components/SketchOffsetPanel";
+import { SketchMove } from "../components/SketchMovePanel";
 
 export type PanelDef = Panel<CommandContext>;
 
@@ -102,6 +103,15 @@ registerPanel({
   when: (s) =>
     s.active?.id === "design.sketch" && s.active.state.tool === "offset",
   component: SketchOffset,
+});
+registerPanel({
+  id: "sketch.moveCopy",
+  title: "Move/Copy",
+  when: (s) =>
+    s.active?.id === "design.sketch" &&
+    s.active.state.tool === "select" &&
+    s.active.state.moveCopy,
+  component: SketchMove,
 });
 registerPanel({
   id: "inspect.measure",

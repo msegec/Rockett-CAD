@@ -30,12 +30,34 @@ export function SketchOffset() {
   return sketch && <SketchOffsetPanel sketch={sketch} />;
 }
 
-function SketchOffsetPanel({ sketch }: { sketch: SketchState }) {
+export function useSketchPreview(
+  layerName: string,
+  result: PreviewResult | null,
+  editingIds?: readonly string[],
+) {
   const viewport = useContext(ViewportContext);
+  const draft = useStore((s) => s.draftSketch);
+  const evaluation = useStore((s) => s.evaluation);
+  useEffect(() => {
+    const vp = viewport.current;
+    const frame = evaluation?.sketches.find(
+      (s) => s.featureId === draft?.id,
+    )?.frame;
+    if (!vp || !frame || !result || !draft) return;
+    const layer = vp.addLayer(layerName);
+    layer.group.add(offsetPreviewGroup(result, draft, frame, vp, editingIds));
+    vp.requestRender();
+    return () => {
+      layer.dispose();
+      vp.requestRender();
+    };
+  }, [layerName, result, draft, evaluation, editingIds, viewport]);
+}
+
+function SketchOffsetPanel({ sketch }: { sketch: SketchState }) {
   const units = useSetting("units.length");
   const draft = useStore((s) => s.draftSketch);
   const selection = useStore((s) => s.selection);
-  const evaluation = useStore((s) => s.evaluation);
   const busy = useStore((s) => s.busy);
   const setParams = useStore((s) => s.setSketchState);
   const editing = draft?.offsets?.find((o) => o.id === sketch.offsetEditId);
@@ -84,27 +106,7 @@ function SketchOffsetPanel({ sketch }: { sketch: SketchState }) {
       ? findOffsetConnector(draft.entities, ids, openChain.ends, joinTolerance)
       : null;
 
-  useEffect(() => {
-    const vp = viewport.current;
-    const frame = evaluation?.sketches.find(
-      (s) => s.featureId === draft?.id,
-    )?.frame;
-    if (!vp || !frame || !preview.result || !draft) return;
-    const group = offsetPreviewGroup(
-      preview.result,
-      draft,
-      frame,
-      vp,
-      editing?.entityIds,
-    );
-    const layer = vp.addLayer("sketchOffsetPreview");
-    layer.group.add(group);
-    vp.requestRender();
-    return () => {
-      layer.dispose();
-      vp.requestRender();
-    };
-  }, [preview, draft, evaluation, editing, viewport]);
+  useSketchPreview("sketchOffsetPreview", preview.result, editing?.entityIds);
 
   const close = () => useStore.getState().setSketchTool("select");
   const apply = async () => {
@@ -222,11 +224,13 @@ function SketchOffsetPanel({ sketch }: { sketch: SketchState }) {
   );
 }
 
+type PreviewResult = {
+  entities: readonly SketchEntity[];
+  offsetChain?: ReturnType<typeof offsetSketchSelection>["offsetChain"];
+};
+
 function offsetPreviewGroup(
-  result: {
-    entities: readonly SketchEntity[];
-    offsetChain?: ReturnType<typeof offsetSketchSelection>["offsetChain"];
-  },
+  result: PreviewResult,
   draft: SketchFeature,
   frame: PlaneFrame,
   vp: CadViewport,

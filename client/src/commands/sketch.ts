@@ -29,6 +29,7 @@ export interface SketchState {
   offsetDistance: number;
   offsetChain: boolean;
   offsetJoinTolerance: number;
+  moveCopy: boolean;
 }
 
 export function sketchState(sketchId: string, tool: SketchTool): SketchState {
@@ -44,6 +45,7 @@ export function sketchState(sketchId: string, tool: SketchTool): SketchState {
     offsetDistance: 2,
     offsetChain: true,
     offsetJoinTolerance: 0.01,
+    moveCopy: false,
   };
 }
 
@@ -143,8 +145,29 @@ export const sketchCommands: Command[] = [
     enabled: sketching,
     active: (s) =>
       s.active?.id === "design.sketch" && s.active.state.tool === tool.id,
-    run: (s) => s.setSketchTool(tool.id),
+    run: (s) => {
+      s.setSketchState({ moveCopy: false });
+      s.setSketchTool(tool.id);
+    },
   })),
+  {
+    id: "design.sketch.moveCopy",
+    label: "Move",
+    icon: "move",
+    group: "design.sketch.group.sketch",
+    tooltip: "Move/Copy: move, rotate or copy the selected sketch geometry",
+    enabled: sketching,
+    active: (s) =>
+      s.active?.id === "design.sketch" &&
+      s.active.state.tool === "select" &&
+      s.active.state.moveCopy,
+    run: (s) => {
+      if (s.active?.id !== "design.sketch") return;
+      const open = s.active.state.tool === "select" && s.active.state.moveCopy;
+      if (s.active.state.tool !== "select") s.setSketchTool("select");
+      s.setSketchState({ moveCopy: !open });
+    },
+  },
   {
     id: "design.sketch.construction",
     label: "Construction",

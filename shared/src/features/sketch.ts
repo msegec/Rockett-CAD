@@ -7,7 +7,7 @@ import {
   ellipseAxes,
   entityPointIds,
 } from "../sketchCurves.js";
-import { constraintEntityRefs } from "../sketchModify.js";
+import { constraintEntityRefs } from "../sketchTransform.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
 const MIN_OFFSET_MM = 1e-7;

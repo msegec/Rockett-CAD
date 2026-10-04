@@ -40,6 +40,24 @@ change its distance. Offset curves follow their distance and cannot be
 dragged. Offsets made in older projects are plain geometry; recreate them to
 get a badge.
 
+### Move and copy
+
+Select sketch geometry, then click **Move** in the sketch toolbar to open
+Move/Copy. Set the X and Y distances and an Angle. The angle turns the
+selection about its box centre, or about a sketch point you choose with Pick
+point. Tick Copy to keep the original. Yellow previews the result; OK saves it
+as one undo step and Cancel changes nothing.
+
+Constraints inside the selection move with it, and a copy gets its own.
+Constraints to unselected geometry are removed, or left out of the copy, and
+the panel counts them. An angle that is not a multiple of 90 degrees turns
+horizontal and vertical relations into angle dimensions and removes horizontal
+or vertical distances. Moving by an angle also removes an angle dimension set
+by a parameter, since the parameter would turn it back. Fixed, projected and
+offset geometry cannot move, and the panel names it. Copy still copies it as
+plain geometry, without its Fix. Unselected curves keep their ends where they
+were.
+
 ### Regions
 
 Closed shapes fill as regions you can hover, pick and extrude. Curves that

@@ -12,10 +12,8 @@ import {
   entityPointIds,
   sampleArc,
 } from "./sketchCurves.js";
-import {
-  constraintEntityRefs,
-  type SketchModification,
-} from "./sketchModify.js";
+import type { SketchModification } from "./sketchModify.js";
+import { constraintEntityRefs } from "./sketchTransform.js";
 
 type XY = { x: number; y: number };
 type Curve = Exclude<SketchEntity, SketchPoint | SketchEllipse>;

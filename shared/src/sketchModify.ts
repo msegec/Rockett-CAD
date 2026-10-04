@@ -5,6 +5,7 @@ import {
   type SketchPoint,
 } from "./model.js";
 import { ELLIPSE_UNSUPPORTED, entityPointIds, TAU } from "./sketchCurves.js";
+import { constraintEntityRefs } from "./sketchTransform.js";
 
 type XY = { x: number; y: number };
 type Curve = Exclude<SketchEntity, SketchPoint>;
@@ -96,10 +97,6 @@ export interface SketchModification {
   joinedGaps?: { count: number; maxDistance: number };
   offsetChain?: { closed: boolean; endGap: number; ends: [XY, XY] };
 }
-export const constraintEntityRefs = (c: SketchConstraint): string[] =>
-  ["a", "b", "point", "line", "circle", "entity"]
-    .map((k) => (c as unknown as Record<string, unknown>)[k])
-    .filter((x): x is string => typeof x === "string");
 
 export function extendSketch(
   entities: SketchEntity[],
