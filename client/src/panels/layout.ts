@@ -1,5 +1,5 @@
 import type { PanelLayouts } from "@rockett/shared";
-import { panelPlacement } from "../panelPlacement";
+import { panelPlacement, panelSize } from "../panelPlacement";
 
 export type PanelLayout = PanelLayouts[string];
 export type PanelState = PanelLayout[string];
@@ -18,16 +18,14 @@ const EDGES: readonly DockEdge[] = ["left", "right", "bottom"];
 const own = <T>(record: Readonly<Record<string, T>>, id: string) =>
   Object.hasOwn(record, id) ? record[id] : undefined;
 
-const placed = (
-  { x, y }: Point,
-  { width, height }: Size,
-  room: PanelRoom,
-): Floating => ({
-  kind: "floating",
-  ...panelPlacement({ x, y }, { width, height }, room.viewport, room.cube),
-  width,
-  height,
-});
+function placed({ x, y }: Point, size: Size, room: PanelRoom): Floating {
+  const fitted = panelSize(size, room.viewport);
+  return {
+    kind: "floating",
+    ...panelPlacement({ x, y }, fitted, room.viewport, room.cube),
+    ...fitted,
+  };
+}
 
 function dense(layout: PanelLayout): PanelLayout {
   const orders = new Map<string, number>();
@@ -114,7 +112,10 @@ export const resizePanel = (
   update(layout, id, (p) => {
     if (p.kind === "floating") return placed(p, size, room);
     if (p.kind === "docked")
-      return { ...p, size: p.edge === "bottom" ? size.height : size.width };
+      return {
+        ...p,
+        size: Math.max(0, p.edge === "bottom" ? size.height : size.width),
+      };
     return p;
   });
 
@@ -129,6 +130,6 @@ export function dockPanel(
   const without = dense({ ...layout, [id]: { kind: "closed" } });
   return dense({
     ...without,
-    [id]: { kind: "docked", edge, order: at - 0.5, size },
+    [id]: { kind: "docked", edge, order: at - 0.5, size: Math.max(0, size) },
   });
 }
