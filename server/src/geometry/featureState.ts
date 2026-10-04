@@ -63,7 +63,10 @@ export interface ToolResult {
   names: NameMap;
 }
 
-export type FeatureOutcome = Pick<FeatureStatus, "warning" | "targets">;
+export type FeatureOutcome = Pick<
+  FeatureStatus,
+  "warning" | "targets" | "importTree"
+>;
 
 export class NoCorner extends Error {}
 

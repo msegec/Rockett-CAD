@@ -44,9 +44,15 @@ import {
   treeIds,
   treeRange,
 } from "../treeSelection";
+import { importParts, type TreePart } from "../importTree";
 
 type PlaneSelection = Extract<Selection, { kind: "plane" }>;
 type Kind = TreeGroup["kind"];
+
+const PLURAL = {
+  body: "design.tree.bodies",
+  sketch: "design.tree.sketches",
+} as const;
 
 registerCommand(
   menuCommand<{ ref: PlaneRef }>(
@@ -292,12 +298,10 @@ export const ModelTree = memo(function ModelTree() {
     sketches,
     sketchSel,
   );
-  const bodyParts = groupParts(
-    document_.groups,
+  const bodyParts = importParts(
+    groupParts(document_.groups, collapsed, "body", bodies, bodySel),
+    evaluation?.featureStatuses ?? [],
     collapsed,
-    "body",
-    bodies,
-    bodySel,
   );
 
   const shown = (kind: Kind, ids: string[]) =>
@@ -305,34 +309,25 @@ export const ModelTree = memo(function ModelTree() {
   const startRename = setRenaming;
   const rowsMenu = (e: React.MouseEvent, kind: Kind, id: string) => {
     const ids = chosen(kind, id);
-    if (ids.length > 1)
-      openMenu(
-        e,
-        kind === "body" ? "design.tree.bodies" : "design.tree.sketches",
-        {
-          kind,
-          ids,
-          startRename,
-        },
-      );
-    else if (kind === "body")
-      openMenu(e, "design.tree.body", { id, kind, ids, startRename });
-    else openMenu(e, "design.tree.sketch", { id, startRename });
+    const target = { id, kind, ids, startRename };
+    if (ids.length > 1) openMenu(e, PLURAL[kind], target);
+    else if (kind === "body") openMenu(e, "design.tree.body", target);
+    else openMenu(e, "design.tree.sketch", target);
   };
 
   const groupedRows = <T,>(
-    { parts }: { parts: { group: TreeGroup | null; items: T[] }[] },
+    parts: TreePart<T>[],
     selOf: (t: T) => Selection,
     row: (t: T) => ReactNode,
-  ) =>
-    parts.map(({ group, items }) =>
+  ): ReactNode[] =>
+    parts.map(({ group, items, parts: inner }) =>
       group ? (
         <Fragment key={group.id}>
           <div
             className="tree-item"
             onClick={() => toggle(group.id)}
             onContextMenu={(e) =>
-              openMenu(e, "design.tree.groupRow", {
+              openMenu(e, inner ? PLURAL.body : "design.tree.groupRow", {
                 id: group.id,
                 kind: group.kind,
                 ids: group.members,
@@ -361,8 +356,8 @@ export const ModelTree = memo(function ModelTree() {
           </div>
           {!collapsed[group.id] && (
             <div className="tree-children">
-              {items.length > 0 ? (
-                items.map(row)
+              {items.length > 0 || inner ? (
+                [...groupedRows(inner ?? [], selOf, row), ...items.map(row)]
               ) : (
                 <div className="tree-empty">No members</div>
               )}
@@ -530,7 +525,7 @@ export const ModelTree = memo(function ModelTree() {
         section(
           "sketches",
           "Sketches",
-          groupedRows(sketchParts, sketchSel, sketchRow),
+          groupedRows(sketchParts.parts, sketchSel, sketchRow),
         )}
 
       {section(
@@ -539,7 +534,7 @@ export const ModelTree = memo(function ModelTree() {
         bodyParts.parts.length + bodies.length === 1 ? (
           <div className="tree-empty">No bodies yet</div>
         ) : (
-          groupedRows(bodyParts, bodySel, bodyRow)
+          groupedRows(bodyParts.parts, bodySel, bodyRow)
         ),
       )}
 

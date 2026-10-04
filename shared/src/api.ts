@@ -164,6 +164,13 @@ export interface NamingUpgradeProposal {
   failures?: NamingFailure[];
 }
 
+export interface ImportNode {
+  name?: string;
+  path: number[];
+  bodyIds: string[];
+  children: ImportNode[];
+}
+
 export interface FeatureStatus {
   featureId: string;
   status: FeatureRunStatus;
@@ -173,6 +180,7 @@ export interface FeatureStatus {
   targets?: string[];
   refs?: UnresolvedRef[];
   modified?: Record<string, string[]>;
+  importTree?: ImportNode[];
 }
 
 export interface SketchPayload {

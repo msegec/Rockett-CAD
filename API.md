@@ -189,6 +189,13 @@ in the same edit.
 - `BodyPayload.color` is the `#rrggbb` a STEP file gave the body, kept per
   body id through later features (`EvalState.imported`). A held body omits
   it and takes the held mesh's.
+- A STEP `importStep` status carries `importTree`: each assembly and part
+  instance with its name, its `path` of child indices from the file's roots
+  and, for a part, the body ids its solids became. It is derived on every
+  evaluation and never stored. The model tree nests each component's bodies
+  under it by body id, so a renamed body keeps its place, a body in a user
+  group shows only in the group, a body a later feature removed drops out and
+  a component left empty is hidden: `client/src/importTree.ts`.
 - Stored sketch points are the model. A feature add or edit solves a sketch
   once when it adds or changes a constraint its points do not meet, and
   otherwise stores the points as sent. Evaluation re-solves a sketch only when

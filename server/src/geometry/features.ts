@@ -98,6 +98,7 @@ import { V, frameFromPlane, offsetFrame, uvTo3d } from "./frames.js";
 import { geometryNames } from "./signature.js";
 import { curveInfo } from "./tessellate.js";
 import { readImport, readMesh } from "./importers.js";
+import { placeImport } from "./stepImport.js";
 import { type EvalContext } from "./featureKinds.js";
 import {
   buildProfileFace,
@@ -941,15 +942,13 @@ export function evalConstructionPlane(
 export function evalImportStep(
   { state, sources }: EvalContext,
   f: ImportStepFeature,
-): void {
-  const { shape: whole, parts } = readImport(f, sources);
+): FeatureOutcome | void {
+  const read = readImport(f, sources);
   const names =
     namingVersion() === 1
-      ? finalizeNames(whole, new ShapeMap(), f.id)
-      : geometryNames(whole, f.id);
-  const pieces = parts.map(({ shape, label }) => ({ shape, label, names }));
-  for (const [id, { label }] of registerPieces(state, `b:${f.id}`, pieces))
-    if (label) state.imported.set(id, label);
+      ? finalizeNames(read.shape, new ShapeMap(), f.id)
+      : geometryNames(read.shape, f.id);
+  return placeImport(state, `b:${f.id}`, read, names);
 }
 
 export function evalReferenceImage(

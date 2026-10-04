@@ -24,8 +24,7 @@ import {
   type Shape,
 } from "./kernel.js";
 import { setExactTriangle } from "./mesh.js";
-import { readStep } from "./stepImport.js";
-import type { ImportedLabel } from "./featureState.js";
+import { readStep, type Solids } from "./stepImport.js";
 import { read3mf, slim3mf } from "./read3mf.js";
 import { sha256 } from "../store/jsonStore.js";
 import { registerImporter } from "../api/importers.js";
@@ -33,10 +32,6 @@ import { registerImporter } from "../api/importers.js";
 export type Sources = ReadonlyMap<string, Uint8Array>;
 
 type Format = NonNullable<ImportStepFeature["format"]> | "step";
-
-type ImportedSolid = { shape: Shape; label?: ImportedLabel };
-
-type Solids = { shape: Shape; parts: ImportedSolid[] };
 
 type Reader = { label: string; read(data: Uint8Array): Solids | undefined };
 
@@ -159,7 +154,9 @@ const READERS: Record<Format, Reader> = {
     label: "STEP",
     read(data) {
       const read = readStep(data);
-      return read && { shape: compound(read.shapes), parts: read.parts };
+      if (!read) return;
+      const { shapes, parts, tree } = read;
+      return { shape: compound(shapes), parts, tree };
     },
   },
   iges: {
