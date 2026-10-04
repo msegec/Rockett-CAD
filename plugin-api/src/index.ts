@@ -3,6 +3,7 @@ import type { Group, Object3D } from "three";
 import type {
   BodyPayload,
   CadDocument,
+  Health,
   PathParams,
   Route,
   User,
@@ -128,10 +129,25 @@ export interface UserData {
   write(user: User, data: unknown, etag: string | null): Promise<UserDataEntry>;
 }
 
+export interface ModuleFiles {
+  read(name: string): Promise<Uint8Array | null>;
+  write(name: string, data: string | Uint8Array): Promise<void>;
+  remove(name: string): Promise<void>;
+  list(): Promise<string[]>;
+}
+
+export interface ServerBody extends ProjectBody {
+  readonly brep: string;
+  readonly fingerprint: string;
+}
+
 export interface ServerContext {
   readonly register: ServerRegister;
   readonly startKernelJob: StartKernelJob;
   userData(name: string, version: number): UserData;
+  readonly files: ModuleFiles;
+  readonly kernelVersion: Health["kernelVersion"];
+  bodies(projectId: string, user: User): Promise<ServerBody[]>;
 }
 
 export interface Anchored {

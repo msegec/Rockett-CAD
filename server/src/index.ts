@@ -80,6 +80,7 @@ async function main(allowedOrigins: string[], cookie: CookieConfig) {
   );
   const storage = new LocalStorage(DATA_DIR, fs.promises);
   const store = new ProjectStore(storage, validateDocument);
+  const folders = new FolderStore(storage);
   const kernel = await startKernel(store);
   console.log(`[rockett] data dir: ${DATA_DIR}`);
   const { recovered, outdated, failed } = await store.inventory();
@@ -92,7 +93,7 @@ async function main(allowedOrigins: string[], cookie: CookieConfig) {
       `[rockett] ${outdated.length} projects predate schema ${SCHEMA_VERSION} or the project manifest; each is backed up and migrated on its next save`,
     );
 
-  await loadModules(serverModules, kernel, storage);
+  await loadModules(serverModules, kernel, store, folders);
   for (const { id, status, error } of listModules())
     if (error) console.error(`[rockett] module ${id} ${status}: ${error}`);
 
@@ -107,7 +108,7 @@ async function main(allowedOrigins: string[], cookie: CookieConfig) {
   );
   const { app, sweep } = await createApp({
     store,
-    folders: new FolderStore(storage),
+    folders,
     kernel,
     clientDir,
     allowedOrigins,

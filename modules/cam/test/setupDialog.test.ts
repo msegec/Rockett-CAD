@@ -99,10 +99,12 @@ beforeAll(async () => {
   ]);
   const storage = new LocalStorage(dataDir, fs);
   store = new ProjectStore(storage, validateDocument);
+  const folders = new FolderStore(storage);
   unload = await loadModules(
     serverModules,
     new InProcessKernel({ sources: async () => new Map() }),
-    storage,
+    store,
+    folders,
   );
   const users = new UserStore(storage);
   const sessions = await SessionStore.open(storage);
@@ -120,7 +122,7 @@ beforeAll(async () => {
   origin = `http://localhost:${(server.address() as AddressInfo).port}`;
   const { app } = await createApp({
     store,
-    folders: new FolderStore(storage),
+    folders,
     kernel: new InProcessKernel(store),
     allowedOrigins: [origin],
     users,

@@ -288,7 +288,8 @@ module, in load order:
 - A manifest that fails `parseManifest` reports `failed` with whichever of
   its identity fields are strings; the rest are empty.
 - `activate` receives `ServerContext` (`plugin-api/src/index.ts`):
-  `register`, `startKernelJob` and `userData`. `register.routeModule` and
+  `register`, `startKernelJob`, `userData`, `files`, `kernelVersion` and
+  `bodies`. `register.routeModule` and
   `register.kernelJob` take `plugin-api` types; `exporter`, `importer`,
   `featureKind` and `extensionSpec` still take core types. Each call is
   tracked under the module's one disposer.
@@ -310,6 +311,26 @@ module, in load order:
   file over the cap 413 `too_large`, and neither writes. Data saved at a
   higher `version` than the module passes reads as `readOnly`, and a write
   over it is 409. Code: `server/src/store/moduleData.ts`.
+- `files` is the module's own folder, `modules/<moduleId>/` under the data
+  folder, beside and never inside any user's folder. `read(name)` returns
+  the bytes or null, `write(name, data)` writes atomically, `remove(name)`
+  deletes, and `list()` returns every file's name relative to the folder.
+  A name that is absolute, empty or holds `..` is refused before any read
+  or write. Code: `server/src/modules/files.ts`.
+- `kernelVersion` is the `{ occt, commit }` the running kernel reports, the
+  value `bodyFingerprint` hashes, or null while the kernel starts. The
+  naming version is the document's `namingVersion`, already in each body
+  fingerprint.
+- `bodies(projectId, user)` reads the stored document under the same access
+  rule as a project route. A user without view access and a missing project
+  get the same `not_found` rejection, "project not found", which a route
+  answers as 404. It returns `{ id, name, bbox, brep, fingerprint }` for
+  each body of the document's evaluation, in model millimetres. `brep` is
+  the OCCT BREP text of the body, and `fingerprint` is `bodyFingerprint`
+  (CAM-003) over the resolved features with identity placement, no
+  selection and an empty CAM version.
+  Nothing is cached: each call evaluates, writes BREP for every body and
+  hashes the import sources. Code: `server/src/modules/bodies.ts`.
 - `startKernelJob(id, input, { onProgress, signal })` runs one of the
   module's own jobs in the kernel worker and resolves to its result. A job is
   synchronous; one that returns a promise is refused. The job

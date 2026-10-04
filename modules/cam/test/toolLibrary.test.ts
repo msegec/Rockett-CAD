@@ -121,6 +121,14 @@ beforeAll(async () => {
     },
     startKernelJob: async () => null,
     userData,
+    files: {
+      read: async () => null,
+      write: async () => {},
+      remove: async () => {},
+      list: async () => [],
+    },
+    kernelVersion: null,
+    bodies: async () => [],
   };
   await cam.activate(context);
 });

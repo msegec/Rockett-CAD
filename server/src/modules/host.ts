@@ -16,10 +16,13 @@ import { registerRouteModule } from "../api/routeModules.js";
 import { registerExporter } from "../geometry/exporters.js";
 import { registerFeatureKind } from "../geometry/featureKinds.js";
 import type { KernelClient } from "../kernel/client.js";
+import type { FolderStore } from "../store/folderStore.js";
 import { moduleUserData } from "../store/moduleData.js";
-import type { Storage } from "../store/storage.js";
+import type { ProjectStore } from "../store/projectStore.js";
+import { moduleBodies, type BodyKernel } from "./bodies.js";
+import { moduleFiles } from "./files.js";
 
-type Kernel = Pick<KernelClient, "moduleJob">;
+type Kernel = Pick<KernelClient, "moduleJob"> & BodyKernel;
 
 declare const KERNEL_BUNDLES: Readonly<Record<string, string>>;
 
@@ -111,7 +114,8 @@ async function load(
   module: HostModule,
   own: Dispose[],
   kernel: Kernel,
-  storage: Storage,
+  store: ProjectStore,
+  folders: FolderStore,
 ): Promise<ModuleInfo> {
   let check;
   try {
@@ -128,10 +132,16 @@ async function load(
     return { ...info, status: "incompatible", error: check.reason };
   try {
     const { id } = check.manifest;
+    const { storage } = store.documents.options;
     await module.server.activate({
       register: registrars(own, id),
       startKernelJob: starter(id, kernel),
       userData: moduleUserData(storage, id),
+      files: moduleFiles(storage, id),
+      get kernelVersion() {
+        return kernel.version();
+      },
+      bodies: moduleBodies(kernel, store, folders),
     });
   } catch (error) {
     disposeAll(own.splice(0));
@@ -147,13 +157,14 @@ export const listModules = () => loaded;
 export async function loadModules(
   modules: readonly HostModule[],
   kernel: Kernel,
-  storage: Storage,
+  store: ProjectStore,
+  folders: FolderStore,
 ): Promise<Dispose> {
   const disposers: Dispose[] = [];
   const reports: ModuleInfo[] = [];
   for (const module of modules) {
     const own: Dispose[] = [];
-    reports.push(await load(module, own, kernel, storage));
+    reports.push(await load(module, own, kernel, store, folders));
     disposers.push(() => disposeAll(own));
   }
   loaded = reports;

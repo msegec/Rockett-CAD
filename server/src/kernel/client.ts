@@ -66,6 +66,7 @@ interface StateQueries {
   projectFace: { position: number; face: FaceRef };
   sign: { position: number; refs: Array<FaceRef | EdgeRef> };
   sizeLimit: { position: number | undefined; feature: SizedFeature };
+  brep: { bodyIds: readonly string[] };
 }
 
 export type StateQuery<K extends keyof StateQueries = keyof StateQueries> = {
@@ -79,6 +80,7 @@ export interface StateAnswers {
   projectFace: { entities: SketchEntity[]; warning?: string };
   sign: Array<RefSignature | undefined>;
   sizeLimit: SizeLimit;
+  brep: string[];
 }
 
 export interface SignRequest {
@@ -214,7 +216,29 @@ const ANSWERS: {
   sign: (state, { refs }) => signed(state, refs),
   sizeLimit: (state, { position, feature }, doc, resume) =>
     sizeLimit(state, doc, position, feature, resume),
+  brep: (state, { bodyIds }) =>
+    bodyIds.map((id) => {
+      const body = state.bodies.get(id);
+      if (!body) throw new ValidationError(`body ${id} is not in the model`);
+      return brepText(body.shape);
+    }),
 };
+
+function brepText(shape: unknown): string {
+  const k = getKernel();
+  const file = `/rockett-brep-${crypto.randomUUID()}.brep`;
+  try {
+    if (
+      !scoped((own) =>
+        k.BRepTools.Write_3(shape, file, own(new k.Message_ProgressRange_1())),
+      )
+    )
+      throw new Error("the kernel could not write the body as BREP");
+    return k.FS.readFile(file, { encoding: "utf8" });
+  } finally {
+    if (k.FS.analyzePath(file).exists) k.FS.unlink(file);
+  }
+}
 
 function exportBodies(state: EvalState, { bodyIds, hidden }: ExportJob) {
   const blocked = [...state.blocked].filter((id) =>
