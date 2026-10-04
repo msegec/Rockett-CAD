@@ -57,7 +57,8 @@ function decodeAsset(name: string, base64: string | undefined): Buffer {
 }
 
 export const downloadProjectFile =
-  (store: ProjectStore) => async (req: Request, res: Response) => {
+  (store: ProjectStore) =>
+  async (req: Request, res: Response, ctx: { user: User }) => {
     const document = await store.load(String(req.params.id));
     const assets: Record<string, string> = {};
     for (const name of referencedAssets(document))
@@ -67,6 +68,7 @@ export const downloadProjectFile =
       version: PROJECT_FILE_VERSION,
       document,
       assets,
+      view: await store.view(document.id, ctx.user.id),
     };
     res.setHeader("Content-Disposition", attachment(document.name, "rockett"));
     res.json(file);
@@ -118,7 +120,7 @@ export const uploadProjectFile = (
     const { doc, shown } = splitView(file.document);
     const document = migrate(documentMigrations, doc, pending);
     validateDocument(document);
-    const view = withShown(emptyView(), shown);
+    const view = withShown({ ...emptyView(), ...file.view }, shown);
     const referenced = referencedAssets(document);
     for (const name of Object.keys(file.assets))
       if (!referenced.has(name) && !pending.used.has(name))

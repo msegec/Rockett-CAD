@@ -1,9 +1,11 @@
 import {
   createEmptyDocument,
   formatSize,
+  parse,
   PROJECT_FILE_FORMAT,
   PROJECT_FILE_LIMIT_MB,
   PROJECT_FILE_VERSION,
+  projectView,
   referencedAssets,
   type CadDocument,
   type ProjectFile,
@@ -290,13 +292,14 @@ function toBase64(bytes: Uint8Array): string {
 const base64Size = (bytes: number) => 4 * Math.ceil(bytes / 3);
 
 export function projectFileSize(
-  r: Pick<BrowserProject, "document" | "assets">,
+  r: Pick<BrowserProject, "document" | "assets" | "view">,
 ): number {
   const envelope: ProjectFile = {
     format: PROJECT_FILE_FORMAT,
     version: PROJECT_FILE_VERSION,
     document: r.document,
     assets: Object.fromEntries(Object.keys(r.assets).map((n) => [n, ""])),
+    ...(r.view && { view: r.view }),
   };
   return Object.values(r.assets).reduce(
     (sum, blob) => sum + base64Size(blob.size),
@@ -305,7 +308,7 @@ export function projectFileSize(
 }
 
 export const fitsWithImage = (
-  r: Pick<BrowserProject, "document" | "assets">,
+  r: Pick<BrowserProject, "document" | "assets" | "view">,
   imageBytes: number,
 ) =>
   projectFileSize(r) + base64Size(imageBytes) + IMAGE_FEATURE_BYTES <=
@@ -320,6 +323,7 @@ export async function toProjectFile(r: BrowserProject): Promise<ProjectFile> {
     version: PROJECT_FILE_VERSION,
     document: r.document,
     assets,
+    ...(r.view && { view: r.view }),
   };
 }
 
@@ -330,7 +334,11 @@ export function fromProjectFile(file: ProjectFile): BrowserProject {
       new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))]),
     ]),
   );
-  return record(newKey(), 1, file.document, assets, null);
+  const view =
+    file.view === undefined
+      ? null
+      : { camera: null, ...parse(projectView, file.view, "view") };
+  return record(newKey(), 1, file.document, assets, view);
 }
 
 export async function downloadBrowserProject(r: BrowserProject) {

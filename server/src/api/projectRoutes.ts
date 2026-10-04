@@ -128,11 +128,13 @@ function projectDocumentRoutes(context: ApiRoutes) {
   on(
     ROUTES.duplicateProject,
     wrap(async (req, res, ctx) => {
+      const view = await store.view(req.params.id, ctx.user.id);
       const copy = await store.duplicate(
         req.params.id,
         req.body.name ? req.body.name.slice(0, NAME_LENGTH) : undefined,
         ctx.user.id,
       );
+      await store.setView(copy.id, ctx.user.id, view);
       res.json({ document: copy });
     }),
   );

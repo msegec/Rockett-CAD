@@ -464,6 +464,13 @@ stored project with a newer schema is listed as `tooNew`, and an invalid one
 is 422 on load: `server/src/store/projectStore.ts`, which also owns temporary
 projects.
 
+Version 2 adds an optional `view`, the `PUT /projects/:id/view` body.
+Download writes the requesting user's view; upload stores it as the
+uploader's, and a browser project keeps it in its record. A `view` that fails
+that schema is 400 like a bad document. A file without one, such as any
+version 1 file, takes its view from the document's old visibility flags as
+before. Duplicate copies only the requesting user's view.
+
 Imports and project files stream to disk under `uploads/`. A file over the
 import budget is 413 before it is read: `server/src/api/uploads.ts`. Imported
 STEP and mesh sources live in the project blob store; the feature holds the
