@@ -1,6 +1,7 @@
 import type { Move, Section, Xyz } from "../shared/ir.js";
 import type { Box, Setup } from "../shared/setup.js";
 import type { Preset, Tool } from "../shared/tools.js";
+import { depthLevels, steps } from "./geometry.js";
 
 export type FacingInput = {
   operationId: string;
@@ -10,12 +11,6 @@ export type FacingInput = {
   tool: Tool;
   preset: Preset;
 };
-
-const EPSILON = 1e-9;
-
-function steps(length: number, step: number): number {
-  return Math.max(1, Math.ceil(length / step - EPSILON));
-}
 
 function rows({ stock, tool, preset }: FacingInput): number[] {
   const radius = tool.diameter / 2;
@@ -28,17 +23,6 @@ function rows({ stock, tool, preset }: FacingInput): number[] {
   return Array.from(
     { length: count },
     (_, k) => from - radius + (k + 1) * stepover,
-  );
-}
-
-function levels({ stock, modelTop, preset }: FacingInput): number[] {
-  const top = stock.max[2];
-  if (!(top > modelTop))
-    throw new RangeError("stock top must be above the model top");
-  if (!(preset.stepdown > 0)) throw new RangeError("stepdown must be above 0");
-  const count = steps(top - modelTop, preset.stepdown);
-  return Array.from({ length: count }, (_, i) =>
-    i + 1 < count ? top - (i + 1) * preset.stepdown : modelTop,
   );
 }
 
@@ -55,7 +39,8 @@ export function facing(input: FacingInput): Section {
   ];
   let side = 0;
   let at = start;
-  for (const [level, z] of levels(input).entries()) {
+  const levels = depthLevels(top, input.modelTop, preset.stepdown);
+  for (const [level, z] of levels.entries()) {
     for (let row = 0; row < ys.length; row++) {
       const y = ys[level % 2 ? ys.length - 1 - row : row]!;
       const x = ends[side]!;

@@ -90,7 +90,7 @@ function floors(scope: KernelJobScope, body: any): number[] {
   return levels;
 }
 
-function edge(scope: KernelJobScope, shape: any, z: number): Edge {
+export function edge(scope: KernelJobScope, shape: any, z: number): Edge {
   const { oc, own } = scope;
   const curve = own(new oc.BRepAdaptor_Curve_2(own(oc.TopoDS.Edge_1(shape))));
   const xy = (t: number): Xy => {
@@ -138,7 +138,7 @@ function reverse({ from, segment }: Edge): Edge {
   };
 }
 
-function chain(edges: Edge[], z: number): RegionLoop[] {
+export function chain(edges: Edge[], z: number): RegionLoop[] {
   const left = [...edges];
   const loops: RegionLoop[] = [];
   while (left.length) {

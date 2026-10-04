@@ -10,6 +10,25 @@ import {
 export type Loop = { x: number; y: number }[];
 
 const UNITS_PER_MM = 10_000;
+const EPSILON = 1e-9;
+
+export function steps(length: number, step: number): number {
+  return Math.max(1, Math.ceil(length / step - EPSILON));
+}
+
+export function depthLevels(
+  top: number,
+  bottom: number,
+  stepdown: number,
+): number[] {
+  if (!(top > bottom))
+    throw new RangeError("stock top must be above the cut depth");
+  if (!(stepdown > 0)) throw new RangeError("stepdown must be above 0");
+  const count = steps(top - bottom, stepdown);
+  return Array.from({ length: count }, (_, i) =>
+    i + 1 < count ? top - (i + 1) * stepdown : bottom,
+  );
+}
 
 function toClipper(loops: Loop[]): Paths64 {
   return loops.map((loop) =>
