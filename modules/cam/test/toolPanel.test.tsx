@@ -1,6 +1,7 @@
 import { act, createElement as h, Fragment } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { MachineProfile } from "../src/shared/machine.js";
 import type { Tool } from "../src/shared/tools.js";
 
 const load = (path: string) => import(path);
@@ -8,17 +9,32 @@ const load = (path: string) => import(path);
 const client = (file: string) => load(`../../../client/src/${file}`);
 
 const TOOLS = "/api/m/rockett/cam/tools";
+const MACHINES = "/api/m/rockett/cam/machines";
 
 let stored: { data: Tool[]; etag: string } | null;
 let puts: { data: Tool[]; etag: string | null }[];
 let failLoad: boolean;
+let machines: { data: MachineProfile[]; etag: string } | null;
+let machinePuts: { data: MachineProfile[]; etag: string | null }[];
 let host: HTMLElement;
 let root: Root;
 let unload = () => {};
 let runCommand: (id: string) => unknown;
 
+function serveMachines(method: string, init: RequestInit) {
+  if (method === "GET")
+    return Response.json(
+      machines && { version: 1, ...machines, readOnly: false },
+    );
+  const body = JSON.parse(String(init.body));
+  machinePuts.push(body);
+  machines = { data: body.data, etag: `m${machinePuts.length}` };
+  return Response.json({ version: 1, ...machines, readOnly: false });
+}
+
 function serve(url: RequestInfo | URL, init: RequestInit = {}) {
   const method = init.method ?? "GET";
+  if (String(url) === MACHINES) return serveMachines(method, init);
   if (String(url) !== TOOLS) throw new Error(`${method} ${url}`);
   if (method === "GET" && failLoad)
     return Response.json({ error: "disk unavailable" }, { status: 500 });
@@ -39,6 +55,8 @@ beforeEach(async () => {
   stored = null;
   puts = [];
   failLoad = false;
+  machines = null;
+  machinePuts = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: RequestInfo | URL, init?: RequestInit) =>
@@ -161,6 +179,7 @@ it("a diameter entered in inch is stored in mm", async () => {
   const library = await openLibrary();
   expect(library.querySelector(".tree-header")?.textContent).toBe("Tools");
   expect(library.textContent).toContain("No tools yet.");
+  expect(library.querySelector('[role="alert"]')).toBeNull();
 
   await click(library, "Add tool");
   const form = panelTitled("Tool 1")!;
@@ -232,4 +251,29 @@ it("says why the tools did not load", async () => {
     /^Tools did not load: .+\.$/,
   );
   expect(button(library, "Add tool")).toBeUndefined();
+});
+
+it("adds and saves a machine through the panel", async () => {
+  const library = await openLibrary();
+  expect(library.textContent).toContain("No machines yet.");
+
+  await click(library, "Add machine");
+  const form = panelTitled("Machine 1")!;
+  await choose(form, "Firmware", "grblhal");
+  await type(form, "X max (in)", "10");
+  await click(form, "OK");
+
+  expect(puts).toEqual([]);
+  expect(machinePuts).toHaveLength(1);
+  expect(machinePuts[0]!.etag).toBeNull();
+  expect(machinePuts[0]!.data).toHaveLength(1);
+  expect(machinePuts[0]!.data[0]!.xMax).toBeCloseTo(254, 9);
+  expect(machinePuts[0]!.data[0]).toMatchObject({
+    name: "Machine 1",
+    firmware: "grblhal",
+    post: "grblhal",
+    toolChange: "perFile",
+  });
+  expect(panelTitled("Machine 1")).toBeUndefined();
+  expect(rows()).toEqual(["Machine 1"]);
 });

@@ -13,6 +13,11 @@ import {
   migrateCam,
 } from "../shared/document.js";
 import {
+  machineSchema,
+  validateMachine,
+  type MachineProfile,
+} from "../shared/machine.js";
+import {
   presetSchema,
   toolSchema,
   validatePreset,
@@ -75,6 +80,13 @@ export function mountLibrary(
     "preset",
     presetSchema,
     validatePreset,
+  );
+  list<MachineProfile>(
+    api,
+    userData("machines", 1),
+    "machine",
+    machineSchema,
+    validateMachine,
   );
   api.projectMutation(useTool, async (doc, req, { user }) => {
     const cam = migrateCam(doc.extensions[CAM_EXTENSION]);

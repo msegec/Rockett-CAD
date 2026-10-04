@@ -1,15 +1,39 @@
-import { createElement as h, Fragment, useEffect, useState } from "react";
+import {
+  createElement as h,
+  Fragment,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import type {
   ClientContext,
   NumberFieldProps,
   UserDataEntry,
 } from "@rockett/plugin-api";
+import {
+  machineSchema,
+  newMachine,
+  validateMachine,
+  withFirmware,
+  type MachineProfile,
+} from "../shared/machine.js";
 import { validateTool, type Tool } from "../shared/tools.js";
+import { schemaFields } from "./schemaForm.js";
 
 export const TOOL_PANEL = "rockett.cam.library.panel";
 
+type Ui = ClientContext["ui"];
+type Item = { id: string; name: string };
+type Library<T> = { items: T[]; etag: string | null };
 type Kind = Tool["kind"];
-type Library = { tools: Tool[]; etag: string | null };
+
+type Section<T extends Item> = {
+  noun: string;
+  title: string;
+  create(count: number): T;
+  problems(item: T): string[];
+  fields(ui: Ui, item: T, edit: (item: T) => void): ReactNode[];
+};
 type LengthKey = "diameter" | "fluteLength" | "overallLength" | "shankDiameter";
 
 const KINDS: [Kind, string][] = [
@@ -53,16 +77,16 @@ function withKind(tool: Tool, kind: Kind): Tool {
   return { ...rest, kind, tipAngle: tipAngle ?? TIP_ANGLE };
 }
 
-const saved = (tools: Tool[], tool: Tool) =>
-  tools.some((t) => t.id === tool.id)
-    ? tools.map((t) => (t.id === tool.id ? tool : t))
-    : [...tools, tool];
+const saved = <T extends Item>(items: T[], item: T) =>
+  items.some((t) => t.id === item.id)
+    ? items.map((t) => (t.id === item.id ? item : t))
+    : [...items, item];
 
-function libraryOf(entry: UserDataEntry | null): Library {
+function libraryOf<T>(entry: UserDataEntry | null): Library<T> {
   if (entry?.readOnly)
     throw new Error("it was saved by a newer version of Rockett");
   return {
-    tools: (entry?.data as Tool[] | undefined) ?? [],
+    items: (entry?.data as T[] | undefined) ?? [],
     etag: entry?.etag ?? null,
   };
 }
@@ -70,11 +94,7 @@ function libraryOf(entry: UserDataEntry | null): Library {
 const reason = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
-function toolFields(
-  ui: ClientContext["ui"],
-  tool: Tool,
-  edit: (tool: Tool) => void,
-) {
+function toolFields(ui: Ui, tool: Tool, edit: (tool: Tool) => void) {
   const length = (
     key: LengthKey,
     label: string,
@@ -144,114 +164,190 @@ const button = (
     text,
   );
 
-function toolList(
-  library: Library | null,
-  loading: boolean,
-  pending: boolean,
-  edit: (tool: Tool) => void,
-  remove: (tool: Tool) => void,
-) {
-  const rows = library?.tools.map((tool) =>
-    h(
-      "div",
-      { key: tool.id, className: "tree-item", role: "listitem" },
-      h("span", null, tool.name),
-      button("Edit", `Edit ${tool.name}`, pending, () => edit(tool)),
-      button("Delete", `Delete ${tool.name}`, pending, () => remove(tool)),
+export const machineFields = (
+  ui: Ui,
+  machine: MachineProfile,
+  edit: (machine: MachineProfile) => void,
+) =>
+  schemaFields(ui, machineSchema, machine, (next) =>
+    edit(
+      next.firmware === machine.firmware
+        ? next
+        : withFirmware(next, next.firmware),
     ),
   );
-  const state = !library
-    ? loading && h("div", { className: "tree-empty" }, "Loading tools...")
-    : !rows?.length && h("div", { className: "tree-empty" }, "No tools yet.");
-  return h(
-    "div",
-    { className: "tree-section" },
-    h("div", { className: "tree-header" }, "Tools"),
+
+const TOOLS: Section<Tool> = {
+  noun: "tool",
+  title: "Tools",
+  create: newTool,
+  problems: validateTool,
+  fields: toolFields,
+};
+
+const MACHINES: Section<MachineProfile> = {
+  noun: "machine",
+  title: "Machines",
+  create: newMachine,
+  problems: validateMachine,
+  fields: machineFields,
+};
+
+function useSection<T extends Item>(
+  { ui, request }: ClientContext,
+  section: Section<T>,
+) {
+  const [library, setLibrary] = useState<Library<T> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<T | null>(null);
+  const [pending, setPending] = useState(false);
+  const path = `${section.noun}s`;
+  useEffect(() => {
+    request<UserDataEntry | null>("GET", path)
+      .then(libraryOf<T>)
+      .then(setLibrary, (e) =>
+        setError(`${section.title} did not load: ${reason(e)}.`),
+      );
+  }, []);
+  const write = (items: T[]) => {
+    setPending(true);
+    return request<UserDataEntry>("PUT", path, {
+      data: items,
+      etag: library!.etag,
+    })
+      .then(libraryOf<T>)
+      .then(
+        (next) => {
+          setLibrary(next);
+          setError(null);
+          setEditing(null);
+        },
+        (e) => setError(`${section.title} did not save: ${reason(e)}.`),
+      )
+      .finally(() => setPending(false));
+  };
+  const remove = async (item: T) => {
+    if (
+      await ui.confirm(
+        `Delete ${item.name} from your library? Projects that use it keep their copy.`,
+      )
+    )
+      await write(library!.items.filter((t) => t.id !== item.id));
+  };
+  return {
+    section,
+    library,
+    error,
+    editing,
+    pending,
+    setEditing,
+    write,
+    remove,
+  };
+}
+
+type State<T extends Item> = ReturnType<typeof useSection<T>>;
+
+const banner = (error: string | null) =>
+  error && h("div", { className: "error-banner", role: "alert" }, error);
+
+function sectionForm<T extends Item>(ui: Ui, state: State<T>) {
+  const { section, library, editing, pending } = state;
+  if (!library || !editing) return null;
+  return h(ui.DraggablePanel, {
+    title: editing.name,
+    children: h(
+      Fragment,
+      null,
+      h(
+        "div",
+        { className: "dialog-body" },
+        banner(state.error),
+        section.fields(ui, editing, state.setEditing),
+      ),
+      h(ui.DialogFooter, {
+        onOk: () => void state.write(saved(library.items, editing)),
+        onCancel: () => state.setEditing(null),
+        pending,
+        okDisabled: section.problems(editing).length > 0,
+      }),
+    ),
+  });
+}
+
+function sectionList<T extends Item>(state: State<T>) {
+  const { section, library, error, pending } = state;
+  const plural = section.title.toLowerCase();
+  const rows = library?.items.map((item) =>
     h(
       "div",
-      { className: "tree-children", role: "list", "aria-label": "Tools" },
-      state,
-      rows,
+      { key: item.id, className: "tree-item", role: "listitem" },
+      h("span", null, item.name),
+      button("Edit", `Edit ${item.name}`, pending, () =>
+        state.setEditing(item),
+      ),
+      button(
+        "Delete",
+        `Delete ${item.name}`,
+        pending,
+        () => void state.remove(item),
+      ),
     ),
+  );
+  const empty = !library
+    ? !error && h("div", { className: "tree-empty" }, `Loading ${plural}...`)
+    : !rows?.length &&
+      h("div", { className: "tree-empty" }, `No ${plural} yet.`);
+  const add = `Add ${section.noun}`;
+  return h(
+    Fragment,
+    { key: section.noun },
+    banner(error),
+    h(
+      "div",
+      { className: "tree-section" },
+      h("div", { className: "tree-header" }, section.title),
+      h(
+        "div",
+        {
+          className: "tree-children",
+          role: "list",
+          "aria-label": section.title,
+        },
+        empty,
+        rows,
+      ),
+    ),
+    library &&
+      button(add, add, pending, () =>
+        state.setEditing(section.create(library.items.length)),
+      ),
   );
 }
 
-export function toolPanel({ ui, request }: ClientContext) {
+export function toolPanel(context: ClientContext) {
+  const { ui } = context;
   const close = () => ui.closePanel(TOOL_PANEL);
   return function ToolPanel() {
-    const [library, setLibrary] = useState<Library | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [editing, setEditing] = useState<Tool | null>(null);
-    const [pending, setPending] = useState(false);
-    useEffect(() => {
-      request<UserDataEntry | null>("GET", "tools")
-        .then(libraryOf)
-        .then(setLibrary, (e) => setError(`Tools did not load: ${reason(e)}.`));
-    }, []);
-    const write = (tools: Tool[]) => {
-      setPending(true);
-      return request<UserDataEntry>("PUT", "tools", {
-        data: tools,
-        etag: library!.etag,
-      })
-        .then(libraryOf)
-        .then(
-          (next) => {
-            setLibrary(next);
-            setError(null);
-            setEditing(null);
-          },
-          (e) => setError(`Tools did not save: ${reason(e)}.`),
-        )
-        .finally(() => setPending(false));
-    };
-    const remove = async (tool: Tool) => {
-      if (
-        await ui.confirm(
-          `Delete ${tool.name} from your library? Projects that use it keep their copy.`,
-        )
-      )
-        await write(library!.tools.filter((t) => t.id !== tool.id));
-    };
-    const banner =
-      error && h("div", { className: "error-banner", role: "alert" }, error);
-    if (library && editing)
-      return h(ui.DraggablePanel, {
-        title: editing.name,
+    const tools = useSection(context, TOOLS);
+    const machines = useSection(context, MACHINES);
+    return (
+      sectionForm(ui, tools) ??
+      sectionForm(ui, machines) ??
+      h(ui.DraggablePanel, {
+        title: "Library",
         children: h(
           Fragment,
           null,
           h(
             "div",
             { className: "dialog-body" },
-            banner,
-            toolFields(ui, editing, setEditing),
+            sectionList(tools),
+            sectionList(machines),
           ),
-          h(ui.DialogFooter, {
-            onOk: () => void write(saved(library.tools, editing)),
-            onCancel: () => setEditing(null),
-            pending,
-            okDisabled: validateTool(editing).length > 0,
-          }),
+          h(ui.DialogFooter, { onCancel: close, cancelLabel: "Close" }),
         ),
-      });
-    return h(ui.DraggablePanel, {
-      title: "Library",
-      children: h(
-        Fragment,
-        null,
-        h(
-          "div",
-          { className: "dialog-body" },
-          banner,
-          toolList(library, !error, pending, setEditing, remove),
-          library &&
-            button("Add tool", "Add tool", pending, () =>
-              setEditing(newTool(library.tools.length)),
-            ),
-        ),
-        h(ui.DialogFooter, { onCancel: close, cancelLabel: "Close" }),
-      ),
-    });
+      })
+    );
   };
 }
