@@ -155,6 +155,35 @@ describe("estimateTime", () => {
     expect(byAcceleration(zig.sections[0]!)).toBe(true);
   });
 
+  it("times a finish move at profile 3 as 60% acceleration on a machine with profiles", () => {
+    const profiled = { ...machine, accelerationProfiles: true };
+    const alone = (moves: Move[], extra: Partial<Section>) => {
+      const { spindle: _spindle, ...still } = section(moves, extra);
+      return { sections: [still] };
+    };
+    const cut = [start, feed([100, 0, 0])];
+    const time = (extra: Partial<Section>, on: MachineProfile = profiled) =>
+      estimateTime(alone(cut, extra), on).seconds;
+    const at60 = estimateTime(alone(cut, { pass: "finish" }), {
+      ...machine,
+      accelX: 60,
+      accelY: 60,
+      accelZ: 30,
+    }).seconds;
+    expect(time({ pass: "finish" })).toBe(at60);
+    expect(Math.abs(at60 - trapezoid(100, 20, 60))).toBeLessThan(1e-9);
+    expect(Math.abs(time({ pass: "finish", profile: 5 }) - 6)).toBeLessThan(
+      1e-9,
+    );
+    expect(time({ pass: "finish", profile: 1 })).toBe(time({ pass: "rough" }));
+    expect(Math.abs(time({ pass: "rough" }) - 5.2)).toBeLessThan(1e-6);
+    expect(time({ pass: "finish" }, machine)).toBe(time({ pass: "rough" }));
+    const rapid = alone([start, { kind: "rapid", to: [100, 0, 0] }], {
+      pass: "finish",
+    });
+    expect(estimateTime(rapid, profiled)).toEqual(estimateTime(rapid, machine));
+  });
+
   it("refuses a machine without its acceleration limits", () => {
     const { accelY: _y, junctionDeviation: _j, ...bare } = machine;
     expect(() => seconds([start, feed([1, 0, 0])], bare)).toThrow(

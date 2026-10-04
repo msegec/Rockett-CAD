@@ -346,10 +346,10 @@ async function mounted(r: Awaited<ReturnType<typeof rig>>) {
   };
 }
 
-const project = (data: CamData) =>
+const project = (data: CamData, version = 1) =>
   ({
     extensions: {
-      [CAM_EXTENSION]: { version: 1, data: structuredClone(data) },
+      [CAM_EXTENSION]: { version, data: structuredClone(data) },
     },
   }) as unknown as CadDocument;
 
@@ -426,7 +426,7 @@ describe("POST /projects/:id/m/rockett/cam/generate", () => {
     expect(generated(doc).programSha256).toBe(proof.programSha256);
   });
 
-  it("reads and saves a v1 project from before operations unchanged", async () => {
+  it("reads a v1 project from before operations and saves it as v2", async () => {
     const r = await rig();
     const route = await mounted(r);
     const { safeHeight: _s, clearance: _c, ...setup } = request.setup;
@@ -442,7 +442,7 @@ describe("POST /projects/:id/m/rockett/cam/generate", () => {
     );
     expect(data(doc)).toEqual(before);
     await route.save(doc, data(doc));
-    expect(doc.extensions).toEqual(project(before).extensions);
+    expect(doc.extensions).toEqual(project(before, 2).extensions);
     expect(r.jobs).toEqual([]);
   });
 });

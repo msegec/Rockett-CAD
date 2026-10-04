@@ -5,7 +5,7 @@ import type { Program } from "./ir.js";
 import { presetSchema, toolSchema } from "./tools.js";
 
 export const CAM_EXTENSION = "rockett.cam";
-export const CAM_VERSION = 1;
+export const CAM_VERSION = 2;
 
 export const entry = Type.Object({ id: Type.String({ minLength: 1 }) });
 
@@ -228,7 +228,7 @@ export function migrateCam(
       status: "kept",
       reason: `CAM data version ${version} is newer than this module reads (${CAM_VERSION})`,
     };
-  if (version === CAM_VERSION && isCamData(data))
+  if ((version === 1 || version === CAM_VERSION) && isCamData(data))
     return { status: "ready", data };
   return { status: "kept", reason: `CAM data version ${version} is not valid` };
 }

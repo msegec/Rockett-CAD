@@ -9,12 +9,16 @@ import {
   generateRoute,
   type CamData,
 } from "../src/shared/document.js";
+import { formatProgram } from "../src/post/format.js";
+import { normalise } from "../src/post/normalise.js";
 import { validateProgram, type Program } from "../src/shared/ir.js";
 import type { Box } from "../src/shared/setup.js";
+import type { Preset } from "../src/shared/tools.js";
 import { contour } from "../src/toolpath/contour.js";
 import { facing } from "../src/toolpath/facing.js";
 import { chorded } from "../src/toolpath/geometry.js";
 import { pocket } from "../src/toolpath/pocket.js";
+import { lines, loadPost } from "./goldens.js";
 import { box, brep, cut, oc, scoped, startKernel } from "./helpers/kernel.js";
 
 const ENTRY = new URL("../kernel.ts", import.meta.url).href;
@@ -167,7 +171,7 @@ const preset = {
   coolant: "off" as const,
 };
 
-type Change = { preset?: Partial<typeof preset>; pocket?: object };
+type Change = { preset?: Partial<Preset>; pocket?: object };
 
 function data({ preset: change, pocket: pocketChange }: Change = {}): CamData {
   return {
@@ -267,6 +271,40 @@ describe("contour and pocket through rockett.cam.generate", () => {
       expect(program.sections.map((s) => s.operationId)).toEqual([id]);
       expect(program.sections[0]!.moves.length).toBeGreaterThan(10);
     }
+  }, 120_000);
+
+  it("emits G187 P4 before the finish pass of a preset with profile 4", async () => {
+    const generate = await route();
+    const post = loadPost("grblhal");
+    const nc = (program: Program) =>
+      lines(
+        formatProgram(normalise(program, post, { units: "mm" }), post, {
+          accelerationProfiles: true,
+        }),
+      );
+    const run = async (id: string, profile?: number) =>
+      (
+        await generate(
+          data(profile === undefined ? {} : { preset: { profile } }),
+          id,
+        )
+      ).program;
+    const plain = await run("contour");
+    const four = await run("contour", 4);
+    expect(JSON.stringify(await run("contour", 3))).toBe(JSON.stringify(plain));
+    expect(Object.hasOwn(plain.sections[0]!, "profile")).toBe(false);
+    expect(
+      Object.hasOwn((await run("pocket", 4)).sections[0]!, "profile"),
+    ).toBe(false);
+    expect(four.sections[0]!.profile).toBe(4);
+    const out = nc(four);
+    const at = out.indexOf("G187 P4");
+    expect(out[at - 1]).toMatch(/^(G0 )?Z/);
+    expect(out[at + 1]).toMatch(/^G1 Z-/);
+    expect(out).not.toContain("G187 P3");
+    expect(out.map((line) => line.replace("G187 P4", "G187 P3"))).toEqual(
+      nc(plain),
+    );
   }, 120_000);
 
   it("refuses a stepover fraction of 0.01, naming its limit", async () => {

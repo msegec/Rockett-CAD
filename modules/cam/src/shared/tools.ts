@@ -80,6 +80,7 @@ export const presetSchema = Type.Object({
   stepdown: Type.Number(),
   stepoverFraction: Type.Number(),
   coolant,
+  profile: Type.Optional(Type.Integer({ minimum: 1, maximum: 5 })),
 });
 
 export type Preset = Static<typeof presetSchema>;

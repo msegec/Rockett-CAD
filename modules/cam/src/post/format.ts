@@ -1,8 +1,8 @@
 import {
   endOf,
+  profileOf,
   type Move,
   type Plane,
-  type Section,
   type Xyz,
 } from "../shared/ir.js";
 import type { Coolant } from "../shared/tools.js";
@@ -47,7 +47,6 @@ const COOLANT: Record<Coolant, TemplateName> = {
   flood: "coolantFlood",
   mist: "coolantMist",
 };
-const PROFILES: Record<Section["pass"], number> = { rough: 1, finish: 3 };
 export const NUMBER = /^([A-Z])-?\d+(?:\.(\d+))?$/;
 
 function number(value: number, format: NumberFormat): string {
@@ -216,13 +215,6 @@ function arcVars(move: Extract<Move, { kind: "arc" }>, at: Xyz): Vars {
   return vars;
 }
 
-function profileOf(move: Move, pass: Section["pass"]) {
-  if (move.kind === "rapid" || move.kind === "cycle") return PROFILES.rough;
-  return move.kind === "feed" || move.kind === "arc"
-    ? PROFILES[pass]
-    : undefined;
-}
-
 type Power = ((percent: number | undefined) => number) | undefined;
 
 export function powerRefusal(percent: number): string | undefined {
@@ -337,7 +329,7 @@ export function formatProgram(
         });
       out.emit(COOLANT[section.coolant]);
       for (const move of section.moves) {
-        if (accelerate) out.accelerate(profileOf(move, section.pass));
+        if (accelerate) out.accelerate(profileOf(move, section));
         writeMove(out, move, at, power);
         at = endOf(move, at);
       }

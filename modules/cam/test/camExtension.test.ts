@@ -6,6 +6,24 @@ const data = {
   tools: [{ id: "t1", diameter: 6 }],
 };
 
+const presetTool = (extra: object = {}) => ({
+  id: "t1",
+  presets: [
+    {
+      id: "p1",
+      name: "Finish",
+      rpm: 18000,
+      cutFeed: 1000,
+      plungeFeed: 300,
+      rampFeed: 500,
+      stepdown: 1,
+      stepoverFraction: 0.4,
+      coolant: "off",
+      ...extra,
+    },
+  ],
+});
+
 describe("CAM data validator", () => {
   it("accepts empty and filled v1 data", () => {
     expect(isCamData({ setups: [], tools: [] })).toBe(true);
@@ -22,11 +40,22 @@ describe("CAM data validator", () => {
   ])("refuses %s", (_name, value) => {
     expect(isCamData(value)).toBe(false);
   });
+
+  it("bounds a preset's acceleration profile to the integers 1 to 5", () => {
+    const withProfile = (profile: unknown) => ({
+      setups: [],
+      tools: [presetTool({ profile })],
+    });
+    for (const profile of [1, 3, 5])
+      expect(isCamData(withProfile(profile))).toBe(true);
+    for (const profile of [0, 6, 2.5, "4"])
+      expect(isCamData(withProfile(profile))).toBe(false);
+  });
 });
 
 describe("CAM migration hook", () => {
-  it("reads a project saved before CAM as empty v1 data", () => {
-    expect(CAM_VERSION).toBe(1);
+  it("reads a project saved before CAM as empty data", () => {
+    expect(CAM_VERSION).toBe(2);
     expect(migrateCam(undefined)).toEqual({
       status: "ready",
       data: { setups: [], tools: [] },
@@ -46,13 +75,20 @@ describe("CAM migration hook", () => {
     expect(migrateCam({ version: 1, data })).toEqual({ status: "ready", data });
   });
 
+  it("reads a v1 preset saved before profile unchanged, with no profile filled", () => {
+    const before = { version: 1, data: { setups: [], tools: [presetTool()] } };
+    const stored = structuredClone(before);
+    expect(migrateCam(stored)).toEqual({ status: "ready", data: before.data });
+    expect(stored).toEqual(before);
+  });
+
   it("keeps newer data unchanged and read only", () => {
-    const stored = { version: 2, data: { future: true } };
+    const stored = { version: 3, data: { future: true } };
     expect(migrateCam(stored)).toEqual({
       status: "kept",
-      reason: "CAM data version 2 is newer than this module reads (1)",
+      reason: "CAM data version 3 is newer than this module reads (2)",
     });
-    expect(stored).toEqual({ version: 2, data: { future: true } });
+    expect(stored).toEqual({ version: 3, data: { future: true } });
   });
 
   it.each([

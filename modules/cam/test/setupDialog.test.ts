@@ -168,12 +168,12 @@ describe("setup dialog save", () => {
       clearance: 3,
     });
     expect((await load(doc.id)).extensions[CAM_EXTENSION]).toEqual({
-      version: 1,
+      version: 2,
       data: { setups: [setup], tools: [] },
     });
   });
 
-  it("loads a v1 document saved before setup fields unchanged and keeps it on save", async () => {
+  it("loads a v1 document saved before setup fields unchanged and keeps it as v2 on save", async () => {
     const doc = await project(preSetupData);
     const loaded = await load(doc.id);
     expect(migrateCam(loaded.extensions[CAM_EXTENSION])).toEqual({
@@ -187,7 +187,7 @@ describe("setup dialog save", () => {
     await saveSetup(view, setup);
     expect(await historyLength(doc.id)).toBe(before + 1);
     expect((await load(doc.id)).extensions[CAM_EXTENSION]).toEqual({
-      version: 1,
+      version: 2,
       data: { ...preSetupData, setups: [...preSetupData.setups, setup] },
     });
   });

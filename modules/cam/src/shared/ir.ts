@@ -40,6 +40,7 @@ export type Section = {
   operationId: string;
   toolId: string;
   pass: "rough" | "finish";
+  profile?: number;
   spindle?: { rpm: number; dir: "cw" | "ccw" };
   coolant: Coolant;
   moves: Move[];
@@ -55,6 +56,8 @@ export type Program = {
 };
 
 export type ProgramStats = { cutLength: number; seconds: number };
+
+export const FINISH_PROFILE = 3;
 
 const ARC_TOLERANCE = 1e-4;
 const TAU = 2 * Math.PI;
@@ -100,6 +103,15 @@ export function arcStep(radius: number, tolerance: number): number {
 function arcLength(from: Xyz, arc: Arc): number {
   const rise = inPlane(arc.to, arc.plane)[2] - inPlane(from, arc.plane)[2];
   return Math.hypot(radii(from, arc)[0] * arcSweep(from, arc), rise);
+}
+
+export function profileOf(
+  move: Move,
+  { pass, profile }: Pick<Section, "pass" | "profile">,
+): number | undefined {
+  if (move.kind === "rapid" || move.kind === "cycle") return 1;
+  if (move.kind !== "feed" && move.kind !== "arc") return undefined;
+  return pass === "finish" ? (profile ?? FINISH_PROFILE) : 1;
 }
 
 export function endOf(move: Move, at: Xyz | undefined): Xyz | undefined {

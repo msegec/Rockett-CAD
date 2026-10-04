@@ -1,6 +1,7 @@
 import { expandArc } from "../post/normalise.js";
 import {
   endOf,
+  profileOf,
   type Move,
   type Program,
   type Section,
@@ -29,6 +30,8 @@ const byAxis = (max: Xyz, unit: Xyz) =>
 
 const sameSpindle = (a: Section["spindle"], b: Section["spindle"]) =>
   a?.rpm === b?.rpm && a?.dir === b?.dir;
+
+const share = (profile: number) => (6 - profile) / 5;
 
 export const byAcceleration = ({ motion, cruise }: SectionTime) =>
   motion - cruise > cruise;
@@ -97,6 +100,7 @@ function blockOf(
   section: number,
   [from, to]: [Xyz, Xyz],
   feed: number | undefined,
+  scale: number,
   previous: Previous,
 ) {
   const delta = to.map((v, i) => v - from[i]!) as Xyz;
@@ -109,14 +113,14 @@ function blockOf(
     ? Math.min(
         speed ** 2,
         previous.speed ** 2,
-        junction(limits, previous.unit, unit),
+        junction(limits, previous.unit, unit) * scale,
       )
     : 0;
   const block: Block = {
     section,
     length,
     speed,
-    accel: byAxis(limits.accel, unit),
+    accel: byAxis(limits.accel, unit) * scale,
     entry,
   };
   return { block, unit };
@@ -127,6 +131,7 @@ export function estimateTime(
   machine: MachineProfile,
 ): CycleTime {
   const limits = limitsOf(machine);
+  const profiles = machine.accelerationProfiles === true;
   const times = program.sections.map(() => ({
     seconds: 0,
     motion: 0,
@@ -140,8 +145,9 @@ export function estimateTime(
     run = [];
     previous = undefined;
   };
-  const line = (section: number, to: Xyz, feed?: number) => {
-    const made = at && blockOf(limits, section, [at, to], feed, previous);
+  const line = (section: number, to: Xyz, scale: number, feed?: number) => {
+    const made =
+      at && blockOf(limits, section, [at, to], feed, scale, previous);
     if (!made) return;
     run.push(made.block);
     previous = { unit: made.unit, speed: made.block.speed };
@@ -149,11 +155,14 @@ export function estimateTime(
   const move = (section: number, item: Move) => {
     if (item.kind === "cycle")
       throw new Error("drill cycles are not timed yet");
-    if (item.kind === "rapid") line(section, item.to);
-    if (item.kind === "feed") line(section, item.to, item.feed);
+    const scale = profiles
+      ? share(profileOf(item, program.sections[section]!) ?? 1)
+      : 1;
+    if (item.kind === "rapid") line(section, item.to, scale);
+    if (item.kind === "feed") line(section, item.to, scale, item.feed);
     if (item.kind === "arc" && at)
       for (const piece of expandArc(at, item, ARC_TOLERANCE)) {
-        line(section, piece.to, piece.feed);
+        line(section, piece.to, scale, piece.feed);
         at = piece.to;
       }
     if (item.kind === "dwell" || item.kind === "stop") stop();

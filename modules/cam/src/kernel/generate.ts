@@ -1,5 +1,5 @@
 import { defineKernelJobs, type KernelJobScope } from "@rockett/plugin-api";
-import type { Program, Section } from "../shared/ir.js";
+import { FINISH_PROFILE, type Program, type Section } from "../shared/ir.js";
 import { isOperation, type OperationType } from "../shared/operations.js";
 import {
   contourParams,
@@ -183,12 +183,19 @@ const GENERATORS: Readonly<Record<OperationType, Generator>> = {
   },
 };
 
+function profiled(sections: Section[], { profile }: Preset): Section[] {
+  if (profile === undefined || profile === FINISH_PROFILE) return sections;
+  return sections.map((section) =>
+    section.pass === "finish" ? { ...section, profile } : section,
+  );
+}
+
 function generate(input: GenerateInput, scope: KernelJobScope): Program {
   const { setup, tool } = input;
   const { type } = input.operation;
   if (!isOperation(type)) throw new Error(`operation ${type} is unknown`);
   scope.progress(0, 1, type);
-  const sections = GENERATORS[type](input, scope);
+  const sections = profiled(GENERATORS[type](input, scope), input.preset);
   checkMoves(
     `operation ${input.operation.id}`,
     sections.reduce((sum, { moves }) => sum + moves.length, 0),
