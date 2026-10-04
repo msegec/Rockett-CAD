@@ -83,6 +83,7 @@ function imageBlobs(doc: CadDocument): string[] {
 export class ProjectStore {
   readonly documents: JsonStore<CadDocument, PendingBlobs>;
   private views: ViewStore;
+  private heldViews = new Map<string, Map<string, ProjectView>>();
   private users: UserStore;
   private manifests: ManifestStore;
   readonly uploads: Uploads;
@@ -128,6 +129,7 @@ export class ProjectStore {
           if (
             copier &&
             (shown.hidden.bodies.length || shown.hidden.features.length) &&
+            !(await this.isTemporary(id)) &&
             !(await this.views.legacy(id)) &&
             !(await this.views.read(copier, id))
           )
@@ -259,12 +261,27 @@ export class ProjectStore {
 
   async view(id: string, userId: string): Promise<ProjectView> {
     await this.exists(id);
+    if (await this.isTemporary(id))
+      return this.heldViews.get(id)?.get(userId) ?? emptyView();
     const own = await this.views.read(userId, id);
     if (own) return own;
     if (userId !== (await this.copier(id))) return emptyView();
     const copy = (await this.views.legacy(id)) ?? (await this.documentView(id));
     await this.views.write(userId, id, copy);
     return copy;
+  }
+
+  private holdView(
+    userId: string,
+    id: string,
+    view: ProjectViewBody,
+  ): ProjectView {
+    const held: ProjectView = JSON.parse(
+      this.views.encode(userId, id, view)[1],
+    );
+    const users = this.heldViews.get(id) ?? new Map<string, ProjectView>();
+    this.heldViews.set(id, users.set(userId, held));
+    return held;
   }
 
   async setView(
@@ -274,11 +291,13 @@ export class ProjectStore {
     expected?: string,
   ): Promise<ProjectView> {
     await this.exists(id);
-    if (
-      expected !== undefined &&
-      !sameTag(expected, await this.view(id, userId))
-    )
+    const temporary = await this.isTemporary(id);
+    const current = temporary
+      ? this.heldViews.get(id)?.get(userId)
+      : await this.view(id, userId);
+    if (expected !== undefined && current && !sameTag(expected, current))
       throw new StoreError("This view changed in another session.", "conflict");
+    if (temporary) return this.holdView(userId, id, view);
     return this.views.write(userId, id, view);
   }
 
@@ -377,6 +396,7 @@ export class ProjectStore {
 
   async remove(id: string): Promise<void> {
     await this.documents.remove(id);
+    this.heldViews.delete(id);
     await this.views.remove(id);
   }
 
@@ -411,7 +431,8 @@ export class ProjectStore {
       const imported = { ...doc, id };
       await this.add(imported, actor);
       const copier = await this.copier(id);
-      if (copier) await this.views.write(copier, id, view);
+      if (copier && temporary) this.holdView(copier, id, view);
+      else if (copier) await this.views.write(copier, id, view);
       return imported;
     } catch (error) {
       await this.remove(id);

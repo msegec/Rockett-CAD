@@ -49,8 +49,9 @@ document edit except a project rename goes through `mutateProject` in
 `server/src/api/revision.ts`. Undo is server history, separate
 from the timeline (FEATURE_TIMELINE.md). Hidden items and the camera are
 per-user view state, outside the document and undo:
-`server/src/store/viewStore.ts`. API.md owns the routes, revisions and
-history contracts.
+`server/src/store/viewStore.ts`. A browser project keeps its view in its
+browser record, and its temporary copy holds it in server memory. API.md owns
+the routes, revisions and history contracts.
 
 **Storage.** `server/src/store/` owns persistence. Writes are atomic
 (`server/src/store/storage.ts`). A migration backs up the whole project

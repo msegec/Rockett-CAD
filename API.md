@@ -56,7 +56,7 @@ nothing else is: `server/src/api/routes.ts`.
 | `POST /projects/:id/upgrade-naming`, `/commit`                                    | `server/src/api/routes.ts`         |
 | `POST /projects/:id/maintenance/gc`                                               | `server/src/api/routes.ts`         |
 | `GET`, `PUT /projects/:id/thumbnail`                                              | `server/src/api/routes.ts`         |
-| `GET`, `PUT /projects/:id/view`                                                   | `server/src/api/routes.ts`         |
+| `GET`, `PUT /projects/:id/view`                                                   | `server/src/api/documentRoutes.ts` |
 | `POST /projects/:id/tangent-edges`                                                | `server/src/api/routes.ts`         |
 | `POST /projects/:id/size-limit`                                                   | `server/src/api/routes.ts`         |
 | `POST /projects/:id/measure`                                                      | `server/src/api/measureRoutes.ts`  |
@@ -225,7 +225,11 @@ Each user has their own view of a project (`projectView` in
 `shared/src/routes.ts`), with its own `ETag`; a stale `If-Match` is 409.
 Saving a view never edits the document, evaluates or raises the revision.
 Visibility lives only in the view: a document edit carrying `visible` is 400.
-Code: `server/src/store/viewStore.ts`.
+Code: `server/src/store/viewStore.ts`. A temporary project's views stay in
+server memory, never on disk, and go when it is removed
+(`server/src/store/projectStore.ts`). A server restart drops them: the view
+reads as empty, and a view PUT for that user skips the `If-Match` check, so
+the browser's next view change or reopen sends the record's view back.
 
 ## Settings layers
 
