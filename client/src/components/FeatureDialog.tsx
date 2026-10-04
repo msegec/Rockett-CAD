@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CadDocument, Feature } from "@rockett/shared";
-import { featurePatch, useStore } from "../store";
+import { useStore } from "../store";
+import { featurePatch } from "../previewSession";
 import {
   takesAxis,
   featureParams,

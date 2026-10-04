@@ -27,15 +27,17 @@ import {
 import { sketchEdits, type SketchEdits } from "./sketchEdits";
 
 import {
-  selectionBeforeCommand,
-  selectionKey,
-  type Selection,
-} from "./selection/kinds";
+  featurePatch,
+  previewSession,
+  type PreviewActions,
+} from "./previewSession";
+export { dialogFeatureId, previewedFeature } from "./previewSession";
+import { selectionKey, type Selection } from "./selection/kinds";
 export { selectionKey, type Selection } from "./selection/kinds";
 
 export type { SketchTool } from "./commands/sketch";
 
-export interface State extends SketchActions, SketchEdits {
+export interface State extends SketchActions, SketchEdits, PreviewActions {
   projectId: string | null;
   access: OpenedProject["access"] | null;
   document: CadDocument | null;
@@ -74,14 +76,10 @@ export interface State extends SketchActions, SketchEdits {
   setHover: (s: Selection | null) => void;
 
   clearActive: () => void;
-  cancelDialog: () => void;
   setPickInput: (key: string) => void;
 
   addFeature: (feature: Feature) => Promise<void>;
   updateFeature: (fid: string, patch: Partial<Feature>) => Promise<void>;
-  updateFeaturePreview: (fid: string, patch: Partial<Feature>) => Promise<void>;
-  previewNewFeature: (feature: Feature) => Promise<void>;
-  cancelPreview: () => Promise<void>;
   deleteFeature: (fid: string) => Promise<void>;
   suppressFeature: (fid: string, suppressed: boolean) => Promise<void>;
   renameFeature: (fid: string, name: string) => Promise<void>;
@@ -94,141 +92,8 @@ export interface State extends SketchActions, SketchEdits {
 
 export const isIdle = (s: Pick<State, "active">) => !s.active;
 
-export function featurePatch(feature: Feature): Partial<Feature> {
-  const { id: _id, suppressed: _suppressed, ...patch } = feature as any;
-  if (!patch.name) delete patch.name;
-  return patch;
-}
-
-interface Session {
-  tx: string;
-  fid: string;
-  fresh: boolean;
-  staged: number;
-}
-
-const preview: {
-  seq: number;
-  pending: { fid: string; patch: Partial<Feature> } | null;
-  inFlight: Promise<void> | null;
-  session: Session | null;
-  error: string | null;
-} = {
-  seq: 0,
-  pending: null,
-  inFlight: null,
-  session: null,
-  error: null,
-};
-
-function take(fresh: boolean, fid?: string): Session | null {
-  const session = preview.session;
-  if (!session || session.fresh !== fresh || (fid && session.fid !== fid))
-    return null;
-  preview.session = null;
-  return session;
-}
-
-function committing(
-  id: string,
-  session: Session,
-  patch: Partial<Feature>,
-  plain: (tx: string) => Promise<MutationResponse>,
-): () => Promise<MutationResponse> {
-  let step: "stage" | "commit" | "plain" = "stage";
-  return async () => {
-    if (session.staged === 0) step = "plain";
-    try {
-      if (step === "stage") {
-        const seq = session.staged + 1;
-        await api.updateFeature(
-          id,
-          session.fid,
-          patch,
-          undefined,
-          session.tx,
-          seq,
-        );
-        session.staged = seq;
-        step = "commit";
-      }
-      if (step === "commit") return await api.commitPreview(id, session.tx);
-    } catch (e: any) {
-      if (e?.status !== 404 && e?.status !== 409) throw e;
-      step = "plain";
-      if (e.status === 409) throw e;
-    }
-    return plain(session.tx);
-  };
-}
-
-export function dialogFeatureId(active: Active | null): string | undefined {
-  if (active?.id === "design.feature")
-    return (
-      active.state.editFeatureId ??
-      (preview.session?.fresh ? preview.session.fid : undefined)
-    );
-}
-
-export function previewedFeature(s: {
-  active: Active | null;
-  document: CadDocument | null;
-}): Feature | undefined {
-  const id = dialogFeatureId(s.active);
-  return s.document?.features.find((f) => f.id === id);
-}
-
-async function sendPreviews(): Promise<void> {
-  while (preview.pending) {
-    const { fid, patch } = preview.pending;
-    preview.pending = null;
-    const seq = preview.seq;
-    const { document, recovery } = useStore.getState();
-    const session = preview.session;
-    if (!document || recovery || !session) break;
-    try {
-      const m = await inTurn(() =>
-        session.fresh && session.staged === 0
-          ? api.addFeature(
-              document.id,
-              { ...patch, id: fid } as Feature,
-              session.tx,
-              1,
-            )
-          : api.updateFeature(
-              document.id,
-              fid,
-              session.fresh ? featurePatch(patch as Feature) : patch,
-              undefined,
-              session.tx,
-              session.staged + 1,
-            ),
-      );
-      session.staged++;
-      if (seq !== preview.seq) continue;
-      const after = await previewBase.bodiesAfter(m.document, fid);
-      if (seq !== preview.seq) continue;
-      previewBase.landAfter(fid, after);
-      useStore.setState((s) => ({
-        document: m.document,
-        evaluation: m.evaluation,
-        history: m.history ?? s.history,
-        error: s.error === preview.error ? null : s.error,
-      }));
-    } catch (e: any) {
-      if (lost(e)) break;
-      if (seq === preview.seq) {
-        preview.error = e.message;
-        useStore.setState({ error: e.message });
-      }
-    }
-  }
-  preview.inFlight = null;
-}
-
 let writing = 0;
 let unsent: Array<(tx: string) => Promise<MutationResponse>> = [];
-let abandoned: string[] = [];
 
 function saveState(s: State): Pick<State, "saveState"> {
   return {
@@ -308,17 +173,13 @@ const kept = (id: string, e: Error): Promise<void> =>
 function lost(e: unknown): Recovery | null {
   const recovery = recoveryFor(e);
   if (recovery) {
-    endPreviews();
+    session.end();
     useStore.setState({ recovery, saveState: "unsaved" });
   }
   return recovery;
 }
 
-function endPreviews(): Promise<void> | null {
-  preview.seq++;
-  preview.pending = null;
-  return preview.inFlight;
-}
+const session = previewSession(() => useStore, { inTurn, lost, landed });
 
 export function followPath(): Promise<void> | void {
   const id = projectIdFromPath(window.location.pathname);
@@ -328,22 +189,6 @@ export function followPath(): Promise<void> | void {
     return;
   }
   if (id !== s.projectId) return s.openProject(id);
-}
-
-async function saveDialog(
-  id: string,
-  session: Session | null,
-  patch: Partial<Feature>,
-  plain: (tx: string) => Promise<MutationResponse>,
-): Promise<void> {
-  const { mutate } = useStore.getState();
-  try {
-    await mutate(session ? committing(id, session, patch, plain) : plain);
-  } catch (e) {
-    if (!useStore.getState().recovery) preview.session ??= session;
-    else if (session?.staged) abandoned.push(session.tx);
-    throw e;
-  }
 }
 
 async function moveHistory(
@@ -426,7 +271,8 @@ export const useStore = create<State>((set, get) => ({
         savedAt: null,
         busy: false,
       });
-      [unsent, abandoned] = [[], []];
+      unsent = [];
+      session.forget();
       showPath(path);
       void loadHistory(document);
     } catch (e: any) {
@@ -440,7 +286,8 @@ export const useStore = create<State>((set, get) => ({
     cameraSave.flushCameraSave();
     void get().cancelPreview();
     api.forgetJob?.();
-    [unsent, abandoned] = [[], []];
+    unsent = [];
+    session.forget();
     api.forgetMeshes();
     set({
       recovery: null,
@@ -465,7 +312,7 @@ export const useStore = create<State>((set, get) => ({
   async mutate(fn) {
     if (!get().document) return;
     set({ busy: true });
-    await endPreviews();
+    await session.end();
     const tx = crypto.randomUUID();
     return inTurn(async () => {
       const { document, recovery } = get();
@@ -492,13 +339,11 @@ export const useStore = create<State>((set, get) => ({
   async recover(choice) {
     const { document, recovery } = get();
     if (!document || !recovery) return;
-    endPreviews();
-    preview.session = null;
+    const abortAbandoned = session.recovering(document.id);
     set({ busy: true, error: null });
     const reloaded = await inTurn(async () => {
       try {
-        for (const tx of abandoned.splice(0))
-          await api.abortPreview(document.id, tx).catch(() => null);
+        await abortAbandoned();
         await reload(document.id);
         return true;
       } catch (e: any) {
@@ -513,60 +358,6 @@ export const useStore = create<State>((set, get) => ({
       await get()
         .mutate(fn)
         .catch(() => {});
-  },
-
-  async updateFeaturePreview(fid, patch) {
-    const { document, evaluation, recovery } = get();
-    if (!document || recovery) return;
-    previewBase.holdBase(fid, evaluation);
-    preview.session ??= {
-      tx: crypto.randomUUID(),
-      fid,
-      fresh: false,
-      staged: 0,
-    };
-    preview.seq++;
-    const { targets: _replaced, ...queued }: Record<string, unknown> =
-      preview.pending?.fid === fid ? preview.pending.patch : {};
-    preview.pending = { fid, patch: { ...queued, ...patch } };
-    preview.inFlight ??= sendPreviews();
-    return preview.inFlight;
-  },
-
-  async previewNewFeature(feature) {
-    if (!get().document) return;
-    preview.session ??= {
-      tx: crypto.randomUUID(),
-      fid: feature.id,
-      fresh: true,
-      staged: 0,
-    };
-    return get().updateFeaturePreview(preview.session.fid, feature);
-  },
-
-  async cancelPreview() {
-    const { document, recovery } = get();
-    const settling = endPreviews();
-    const session = preview.session;
-    preview.session = null;
-    previewBase.dropBase();
-    if (!document || !session || recovery) return;
-    const current = () => get().projectId === document.id;
-    set({ busy: true });
-    try {
-      await settling;
-      const m =
-        session.staged > 0
-          ? await inTurn(() => api.abortPreview(document.id, session.tx))
-          : null;
-      if (current())
-        set({
-          ...(m && landed(m)),
-          busy: false,
-        });
-    } catch (e: any) {
-      if (current()) set({ error: lost(e) ? null : e.message, busy: false });
-    }
   },
 
   undo: () => moveHistory(get().history?.canUndo, api.undo),
@@ -603,21 +394,17 @@ export const useStore = create<State>((set, get) => ({
   clearActive() {
     set({ pickInput: null, active: null });
   },
-  cancelDialog() {
-    const before = selectionBeforeCommand(get());
-    get().clearActive();
-    set({ selection: before });
-  },
   setPickInput: (key) => set({ pickInput: key }),
 
   ...sketchActions(set, get),
   ...sketchEdits(set, get),
+  ...session.actions,
 
   async addFeature(feature) {
     const { document } = get();
     if (!document) return;
     const plain = (tx: string) => api.addFeature(document.id, feature, tx);
-    await saveDialog(document.id, take(true), featurePatch(feature), plain);
+    await session.saveNew(document.id, featurePatch(feature), plain);
   },
 
   async updateFeature(fid, patch) {
@@ -631,7 +418,7 @@ export const useStore = create<State>((set, get) => ({
         sketchEditingPosition(document, get().active),
         tx,
       );
-    await saveDialog(document.id, take(false, fid), patch, plain);
+    await session.saveEdit(document.id, fid, patch, plain);
   },
 
   async deleteFeature(fid) {
