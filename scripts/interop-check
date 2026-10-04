@@ -145,6 +145,23 @@ def threemf(path):
     reader.SetStrictModeActive(True)
     reader.ReadFromFile(path)
     warnings = [str(reader.GetWarning(i)) for i in range(reader.GetWarningCount())]
+    groups = {}
+    found = model.GetBaseMaterialGroups()
+    while found.MoveNext():
+        group = found.GetCurrentBaseMaterialGroup()
+        groups[group.GetUniqueResourceID()] = group
+    def rgba(c):
+        return "#%02X%02X%02X%02X" % (c.Red, c.Green, c.Blue, c.Alpha)
+    def material(mesh):
+        uid, pid, has = mesh.GetObjectLevelProperty()
+        if not has:
+            return {}
+        group = groups.get(uid)
+        ids = group.GetAllPropertyIDs() if group else []
+        if pid not in ids:
+            return {"pid": None, "pindex": None, "displaycolor": None}
+        return {"pid": group.GetModelResourceID(), "pindex": ids.index(pid),
+                "displaycolor": rgba(group.GetDisplayColor(pid))}
     objects = []
     meshes = model.GetMeshObjects()
     while meshes.MoveNext():
@@ -154,11 +171,16 @@ def threemf(path):
             "vertices": mesh.GetVertexCount(),
             "triangles": mesh.GetTriangleCount(),
             "manifold": mesh.IsManifoldAndOriented(),
+            **material(mesh),
         })
     return {
-        "ok": not warnings and bool(objects) and all(o["manifold"] for o in objects),
+        "ok": not warnings and bool(objects) and all(o["manifold"] for o in objects)
+              and all(o.get("pid", 0) is not None for o in objects),
         "unit": lib3mf.ModelUnit(model.GetUnit()).name,
         "buildItems": model.GetBuildItems().Count(),
+        "basematerials": [{"id": g.GetModelResourceID(),
+                           "displaycolors": [rgba(g.GetDisplayColor(i)) for i in g.GetAllPropertyIDs()]}
+                          for g in groups.values()],
         "objects": objects,
         "warnings": warnings,
     }

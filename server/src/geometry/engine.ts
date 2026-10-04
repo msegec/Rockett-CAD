@@ -27,6 +27,7 @@ import "./kinds.js";
 import type { Sources } from "./importers.js";
 import { movePayload, tessellateBody } from "./tessellate.js";
 import { withNamingVersion, type NamedBody } from "./naming.js";
+import { bodyLabel } from "./featureState.js";
 import { modifiedFaces } from "./modified.js";
 import { cancellable, release, shapeHash, type Shape } from "./kernel.js";
 import { heapBytes, lruEngines } from "./engineCache.js";
@@ -343,11 +344,9 @@ class DocumentEngine {
       let js = 0;
       for (const bytes of this.held.values()) js += bytes.byteLength;
       for (const body of state.bodies.values()) {
-        const seed = state.imported.get(body.bodyId);
-        const meta = doc.bodyMeta[body.bodyId];
-        const { name = body.bodyId, color } = { ...seed, ...meta };
-        const { payload, bytes } = this.tessellated(body, name);
-        bodies.push({ ...payload, name, ...(color && { color }) });
+        const label = bodyLabel(state, doc, body.bodyId);
+        const { payload, bytes } = this.tessellated(body, label.name);
+        bodies.push({ ...payload, ...label });
         js += bytes;
       }
 

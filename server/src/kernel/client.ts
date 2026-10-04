@@ -37,6 +37,7 @@ import {
 } from "../geometry/kernel.js";
 import { measure } from "../geometry/measure.js";
 import { resolvePlaneFrame, type EvalState } from "../geometry/features.js";
+import { bodyLabel } from "../geometry/featureState.js";
 import {
   computeEdgeNames,
   faceNamesOf,
@@ -307,7 +308,7 @@ const SOURCES: Record<
     state: EvalState,
     job: ExportJob,
     quality: number,
-  ) => Omit<ExportContext, "doc" | "options">
+  ) => Omit<ExportContext, "doc" | "colorOf" | "options">
 > = {
   bodies: exportBodies,
   sketch: exportSketch,
@@ -401,14 +402,12 @@ export class InProcessKernel implements KernelClient {
     const exporter = exporterFor(job.format);
     const state = await this.stateAt(doc);
     const quality = Math.min(Math.max(job.quality ?? EXPORT_QUALITY, 0.001), 1);
+    const source = SOURCES[sourceFor([exporter.source].flat(), job)];
     return {
       data: exporter.write({
         doc,
-        ...SOURCES[sourceFor([exporter.source].flat(), job)](
-          state,
-          job,
-          quality,
-        ),
+        ...source(state, job, quality),
+        colorOf: (bodyId) => bodyLabel(state, doc, bodyId).color,
         options: { quality },
       }),
       mime: exporter.mime,

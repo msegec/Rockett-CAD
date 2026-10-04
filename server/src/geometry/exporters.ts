@@ -125,12 +125,19 @@ function weld({ positions: P, indices }: Mesh): Mesh {
 
 /** 3MF: one <object> per body, names preserved, units = millimeter. */
 export function write3mf(
-  bodies: { body: NamedBody; name: string }[],
+  bodies: { body: NamedBody; name: string; color?: string | undefined }[],
   quality = EXPORT_QUALITY,
 ): Buffer {
-  const objectsXml: string[] = [];
+  const colors = [
+    ...new Set(bodies.flatMap(({ color }) => color?.toUpperCase() ?? [])),
+  ];
+  const materials = bodies.length + 1;
+  const bases = colors.map((c) => `<base name="${c}" displaycolor="${c}"/>`);
+  const objectsXml = colors.length
+    ? [`<basematerials id="${materials}">${bases.join("")}</basematerials>`]
+    : [];
   const itemsXml: string[] = [];
-  bodies.forEach(({ body, name }, i) => {
+  bodies.forEach(({ body, name, color }, i) => {
     const mesh = weld(exportMesh(body, quality));
     const id = i + 1;
     const verts: string[] = [];
@@ -145,8 +152,10 @@ export function write3mf(
         `<triangle v1="${mesh.indices[t]}" v2="${mesh.indices[t + 1]}" v3="${mesh.indices[t + 2]}"/>`,
       );
     }
+    const pindex = colors.indexOf(color?.toUpperCase() ?? "");
+    const paint = color ? ` pid="${materials}" pindex="${pindex}"` : "";
     objectsXml.push(
-      `<object id="${id}" name="${xmlEscape(name)}" type="model"><mesh><vertices>${verts.join("")}</vertices><triangles>${tris.join("")}</triangles></mesh></object>`,
+      `<object id="${id}" name="${xmlEscape(name)}"${paint} type="model"><mesh><vertices>${verts.join("")}</vertices><triangles>${tris.join("")}</triangles></mesh></object>`,
     );
     itemsXml.push(`<item objectid="${id}"/>`);
   });
@@ -186,6 +195,7 @@ export function write3mf(
 export interface ExportContext extends Drawing {
   doc: CadDocument;
   bodies: NamedBody[];
+  colorOf(bodyId: string): string | undefined;
   options: { quality: number };
 }
 
@@ -225,9 +235,13 @@ registerExporter({
   ext: "3mf",
   mime: "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
   source: "bodies",
-  write: ({ doc, bodies, options }) =>
+  write: ({ doc, bodies, colorOf, options }) =>
     write3mf(
-      bodies.map((body) => ({ body, name: bodyName(doc, body.bodyId) })),
+      bodies.map((body) => ({
+        body,
+        name: bodyName(doc, body.bodyId),
+        color: colorOf(body.bodyId),
+      })),
       options.quality,
     ),
 });

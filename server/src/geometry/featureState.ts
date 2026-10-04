@@ -1,5 +1,6 @@
 import {
   derivedBodyId,
+  type CadDocument,
   type FeatureStatus,
   type PlaneFrame,
   type PlaneRef,
@@ -56,6 +57,11 @@ export interface EvalState {
   imported: Map<string, ImportedLabel>;
   blocked: ReadonlySet<string>;
   hidden?: ReadonlySet<string>;
+}
+
+export function bodyLabel(s: EvalState, doc: CadDocument, id: string) {
+  const { name = id, color } = { ...s.imported.get(id), ...doc.bodyMeta[id] };
+  return { name, ...(color && { color }) };
 }
 
 export interface ToolResult {
