@@ -1,14 +1,17 @@
 import { createHash } from "node:crypto";
+import { promises } from "node:fs";
 import {
-  meshPayload,
+  meshBinary,
   type BodyPayload,
   type EvaluateResult,
   type MeshedBody,
   type MeshedEvaluation,
 } from "@rockett/shared";
+import { LocalStorage } from "../store/storage.js";
 
 const MESH_LIMITS = {
   bytes: 256 * 1024 * 1024,
+  disk: 1024 * 1024 * 1024,
   projects: 4096,
   indexed: 65536,
   recent: 4096,
@@ -17,15 +20,114 @@ const MESH_LIMITS = {
 type Entry = { hash: string; data: Buffer };
 type Project = { revision?: number; hashes: Set<string>; recent: Set<string> };
 
+const CACHE_FILE = /^[0-9a-f]{64}\.rkm(\.[0-9a-f-]+\.tmp)?$/;
+
+const sha256 = (data: Uint8Array) =>
+  createHash("sha256").update(data).digest("hex");
+
+const reported = (error: unknown) =>
+  console.error(`[rockett] mesh disk cache: ${String(error)}`);
+
+class MeshDisk {
+  private readonly storage: LocalStorage;
+  private readonly files = new Map<string, number>();
+  private readonly pending = new Map<string, Promise<unknown>>();
+  private readonly ready: Promise<unknown>;
+  private size = 0;
+  private freeing = 0;
+  private off = false;
+
+  constructor(
+    dir: string,
+    private readonly limit: number,
+  ) {
+    this.storage = new LocalStorage(dir, promises);
+    this.ready = this.storage
+      .list("")
+      .then((names) =>
+        Promise.all(
+          names
+            .filter((name) => CACHE_FILE.test(name))
+            .map((name) => this.storage.remove(name)),
+        ),
+      )
+      .catch((error) => this.disable(error));
+  }
+
+  private disable(error: unknown) {
+    if (!this.off) reported(error);
+    this.off = true;
+  }
+
+  private queue<T>(hash: string, work: (file: string) => Promise<T>) {
+    const run = (this.pending.get(hash) ?? this.ready).then(() =>
+      work(`${hash}.rkm`),
+    );
+    const settled = run.catch(() => undefined);
+    this.pending.set(hash, settled);
+    void settled.then(() => {
+      if (this.pending.get(hash) === settled) this.pending.delete(hash);
+    });
+    return run;
+  }
+
+  private forget(hash: string) {
+    const bytes = this.files.get(hash);
+    if (bytes === undefined) return;
+    this.files.delete(hash);
+    this.freeing += bytes;
+    this.queue(hash, (file) => this.storage.remove(file))
+      .then(() => (this.size -= bytes), reported)
+      .finally(() => (this.freeing -= bytes));
+  }
+
+  put({ hash, data }: Entry) {
+    if (this.off || this.files.has(hash) || data.length > this.limit) return;
+    const fits = () => this.size - this.freeing + data.length <= this.limit;
+    for (const old of this.files.keys()) {
+      if (fits()) break;
+      this.forget(old);
+    }
+    if (!fits()) return;
+    this.files.set(hash, data.length);
+    this.size += data.length;
+    this.queue(hash, (file) => this.storage.writeAtomic(file, data)).catch(
+      (error) => {
+        this.disable(error);
+        this.forget(hash);
+      },
+    );
+  }
+
+  async get(hash: string): Promise<Buffer | undefined> {
+    if (!this.files.has(hash)) return;
+    try {
+      const data = await this.queue(hash, async (file) =>
+        this.files.has(hash) ? this.storage.read(file) : undefined,
+      );
+      if (!data) return;
+      if (sha256(data) !== hash) throw new Error(`${hash} is corrupt`);
+      if (this.files.delete(hash)) this.files.set(hash, data.length);
+      return data;
+    } catch (error) {
+      reported(error);
+      this.forget(hash);
+    }
+  }
+}
+
 export class MeshCache {
   private readonly entries = new Map<string, Entry>();
   private readonly projects = new Map<string, Project>();
   private readonly limits: typeof MESH_LIMITS;
+  private readonly disk: MeshDisk | undefined;
   private size = 0;
   private indexed = 0;
 
-  constructor(limits: Partial<typeof MESH_LIMITS> = {}) {
+  constructor(limits: Partial<typeof MESH_LIMITS> = {}, dir?: string) {
     this.limits = { ...MESH_LIMITS, ...limits };
+    this.disk =
+      dir === undefined ? undefined : new MeshDisk(dir, this.limits.disk);
   }
 
   private encoded(body: MeshedBody): Entry {
@@ -35,19 +137,24 @@ export class MeshCache {
       this.entries.set(body.meshKey, hit);
       return hit;
     }
-    const data = Buffer.from(JSON.stringify(meshPayload(body)));
-    const entry = {
-      hash: createHash("sha256").update(data).digest("hex"),
-      data,
-    };
-    if (data.length <= this.limits.bytes) {
-      this.entries.set(body.meshKey, entry);
-      this.size += data.length;
-      for (const [key, old] of this.entries) {
-        if (this.size <= this.limits.bytes) break;
-        this.entries.delete(key);
-        this.size -= old.data.length;
-      }
+    const binary = meshBinary(body);
+    const data = Buffer.from(
+      binary.buffer,
+      binary.byteOffset,
+      binary.byteLength,
+    );
+    const entry = { hash: sha256(data), data };
+    if (data.length > this.limits.bytes) {
+      this.disk?.put(entry);
+      return entry;
+    }
+    this.entries.set(body.meshKey, entry);
+    this.size += data.length;
+    for (const [key, old] of this.entries) {
+      if (this.size <= this.limits.bytes) break;
+      this.entries.delete(key);
+      this.size -= old.data.length;
+      this.disk?.put(old);
     }
     return entry;
   }
@@ -109,7 +216,11 @@ export class MeshCache {
     return project?.revision === revision && !project.hashes.has(hash);
   }
 
-  get(projectId: string, revision: number, hash: string): Buffer | undefined {
+  async get(
+    projectId: string,
+    revision: number,
+    hash: string,
+  ): Promise<Buffer | undefined> {
     const project = this.projects.get(projectId);
     const known =
       project?.recent.has(hash) ||
@@ -121,6 +232,7 @@ export class MeshCache {
       this.entries.set(key, entry);
       return entry.data;
     }
+    return this.disk?.get(hash);
   }
 
   materialize(body: MeshedBody): Buffer {

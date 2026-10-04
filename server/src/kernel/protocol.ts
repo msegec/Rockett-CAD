@@ -1,6 +1,7 @@
 import {
-  decodeMesh,
-  encodeMesh,
+  lazyMesh,
+  meshBinary,
+  meshHead,
   ValidationError,
   type ApiErrorCode,
   type BodyPayload,
@@ -8,9 +9,7 @@ import {
   type EvaluateResult,
   type Formats,
   type Health,
-  type MeshedBody,
   type MeshedEvaluation,
-  type MeshPayload,
 } from "@rockett/shared";
 import { StoreError } from "../store/projectStore.js";
 import type { Sources } from "../geometry/importers.js";
@@ -149,60 +148,16 @@ export function owned(bytes: Uint8Array): ArrayBuffer {
 }
 
 export function meshesToWire(evaluation: MeshedEvaluation): WireEvaluation {
-  const bodies = evaluation.bodies.map(
-    ({ positions, normals, indices, faces, edges, vertices, ...body }) => ({
-      ...body,
-      binary: owned(
-        encodeMesh({ positions, normals, indices, faces, edges, vertices }),
-      ),
-    }),
-  );
+  const bodies = evaluation.bodies.map((body) => ({
+    ...meshHead(body),
+    binary: meshBinary(body).slice().buffer,
+  }));
   return { ...evaluation, bodies };
 }
 
-function numbers(view: ArrayLike<number>): number[] {
-  const out: number[] = [];
-  for (let i = 0; i < view.length; i++) out.push(view[i]!);
-  return out;
-}
-
-const MESH_FIELDS = [
-  "positions",
-  "normals",
-  "indices",
-  "faces",
-  "edges",
-  "vertices",
-] as const satisfies (keyof MeshPayload)[];
-
-function lazyMesh({ binary, ...body }: WireBody): MeshedBody {
-  let mesh: MeshPayload | undefined;
-  const read = () => {
-    if (mesh) return mesh;
-    const decoded = decodeMesh(new Uint8Array(binary));
-    return (mesh = {
-      positions: numbers(decoded.positions),
-      normals: numbers(decoded.normals),
-      indices: numbers(decoded.indices),
-      faces: decoded.faces,
-      edges: decoded.edges.map((edge) => ({
-        ...edge,
-        polyline: numbers(edge.polyline),
-      })),
-      vertices: decoded.vertices,
-    });
-  };
-  return Object.defineProperties(
-    body,
-    Object.fromEntries(
-      MESH_FIELDS.map((key) => [
-        key,
-        { enumerable: true, get: () => read()[key] },
-      ]),
-    ),
-  ) as MeshedBody;
-}
-
 export function meshesFromWire(evaluation: WireEvaluation): MeshedEvaluation {
-  return { ...evaluation, bodies: evaluation.bodies.map(lazyMesh) };
+  const bodies = evaluation.bodies.map(({ binary, ...body }) =>
+    lazyMesh(body, new Uint8Array(binary)),
+  );
+  return { ...evaluation, bodies };
 }

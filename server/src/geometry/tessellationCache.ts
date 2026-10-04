@@ -1,11 +1,18 @@
-import type { MeshedBody } from "@rockett/shared";
+import {
+  lazyMesh,
+  meshBinary,
+  meshHead,
+  type BodyPayload,
+  type MeshedBody,
+} from "@rockett/shared";
 import type { NamedBody } from "./naming.js";
 import type { TriangleMesh } from "./meshBody.js";
 import { shapeHash, type Shape } from "./kernel.js";
 
 export interface Tessellation {
   source: Shape | TriangleMesh;
-  payload: MeshedBody;
+  head: BodyPayload;
+  binary: Uint8Array;
   bytes: number;
 }
 
@@ -47,10 +54,13 @@ export function forget(body: NamedBody): void {
 export function store(body: NamedBody, payload: MeshedBody): Tessellation {
   const key = cacheKey(body);
   evict(key);
+  const head = meshHead(payload);
+  const binary = meshBinary(payload);
   const entry = {
     source: sourceOf(body),
-    payload,
-    bytes: payloadBytes(payload),
+    head,
+    binary,
+    bytes: binary.byteLength + payloadBytes(head),
   };
   tessCache.entries.set(key, entry);
   tessCache.bytes += entry.bytes;
@@ -59,6 +69,14 @@ export function store(body: NamedBody, payload: MeshedBody): Tessellation {
     evict(old);
   }
   return entry;
+}
+
+export type Decoded = Map<Tessellation, MeshedBody>;
+
+export function sourceMesh(entry: Tessellation, memo: Decoded): MeshedBody {
+  const mesh = memo.get(entry) ?? lazyMesh({ ...entry.head }, entry.binary);
+  memo.set(entry, mesh);
+  return mesh;
 }
 
 export function cached(body: NamedBody): Tessellation | undefined {

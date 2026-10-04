@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import {
-  meshPayload,
+  meshPayloadOf,
   pathFor,
   ROUTES,
   type BodyPayload,
@@ -110,16 +110,15 @@ export class MeshRegistry {
     this.active++;
     this.fetching.add(key);
     const path = pathFor(ROUTES.mesh, { id: scope.id, hash });
-    request<MeshPayload>(ROUTES.mesh.method, path, {
+    request(ROUTES.mesh.method, path, {
       signal: scope.stop.signal,
       unwatched: true,
+      response: "blob",
     })
-      .then((mesh) => {
+      .then(({ blob }) => blob.arrayBuffer())
+      .then((bytes) => {
         if (scope !== this.scope) return;
-        const shape = meshPayload(mesh);
-        if (!Object.values(shape).every((v) => typeof v === "object" && v))
-          throw new Error(`Mesh ${hash} is malformed`);
-        this.keep(key, shape);
+        this.keep(key, meshPayloadOf(new Uint8Array(bytes)));
         this.version++;
         for (const listener of this.listeners) listener();
       })

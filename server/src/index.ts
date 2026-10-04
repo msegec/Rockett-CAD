@@ -31,6 +31,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = Number(process.env.ROCKETT_PORT || DEFAULT_PORT);
 const DATA_DIR = process.env.DATA_DIR || path.resolve(here, "../../data");
+const MESH_CACHE_DIR =
+  process.env.ROCKETT_MESH_CACHE_DIR || path.join(DATA_DIR, "mesh-cache");
 
 async function run() {
   if (process.argv[2] === "reset-password") {
@@ -115,6 +117,7 @@ async function main(allowedOrigins: string[], cookie: CookieConfig) {
     users: new UserStore(storage),
     sessions: await SessionStore.open(storage),
     cookie,
+    meshDir: MESH_CACHE_DIR,
   });
   if (clientDir) {
     console.log(`[rockett] serving client from ${clientDir}`);

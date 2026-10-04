@@ -39,6 +39,7 @@ export function createApiRouter(
   users?: UserStore,
   notices?: NoticeStore,
   friends?: FriendStore,
+  meshDir?: string,
 ): Router {
   const context = createRouterContext(
     store,
@@ -49,6 +50,7 @@ export function createApiRouter(
     users,
     notices,
     friends,
+    meshDir,
   );
   const api = { ...context, ...createProjectMutations(context) };
   const { router, on, wrap } = api;

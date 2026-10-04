@@ -1,4 +1,10 @@
-import type { EdgeInfo, FaceInfo, VertexInfo } from "./api.js";
+import type {
+  EdgeInfo,
+  FaceInfo,
+  MeshedBody,
+  MeshPayload,
+  VertexInfo,
+} from "./api.js";
 
 const MAGIC = "RKM1";
 const PREFIX_BYTES = 8;
@@ -32,7 +38,7 @@ interface MeshHeader {
   vertices: VertexInfo[];
 }
 
-export function encodeMesh(mesh: MeshSource): Uint8Array {
+export function encodeMesh(mesh: MeshSource): Uint8Array<ArrayBuffer> {
   let polylineCount = 0;
   const edges = mesh.edges.map(({ polyline, ...edge }) => {
     const entry = { ...edge, offset: polylineCount, count: polyline.length };
@@ -126,4 +132,70 @@ export function decodeMesh(bytes: Uint8Array): BodyMesh {
     edges,
     vertices: header.vertices,
   };
+}
+
+const MESH_FIELDS = [
+  "positions",
+  "normals",
+  "indices",
+  "faces",
+  "edges",
+  "vertices",
+] as const satisfies (keyof MeshPayload)[];
+
+const binaries = new WeakMap<object, Uint8Array>();
+
+function numbers(view: ArrayLike<number>): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < view.length; i++) out.push(view[i]!);
+  return out;
+}
+
+export function meshPayloadOf(bytes: Uint8Array): MeshPayload {
+  const mesh = decodeMesh(bytes);
+  return {
+    positions: numbers(mesh.positions),
+    normals: numbers(mesh.normals),
+    indices: numbers(mesh.indices),
+    faces: mesh.faces,
+    edges: mesh.edges.map((edge) => ({
+      ...edge,
+      polyline: numbers(edge.polyline),
+    })),
+    vertices: mesh.vertices,
+  };
+}
+
+export function lazyMesh<T extends object>(
+  head: T,
+  binary: Uint8Array,
+): T & MeshPayload {
+  let mesh: MeshPayload | undefined;
+  const read = () => (mesh ??= meshPayloadOf(binary));
+  const body = Object.defineProperties(
+    head,
+    Object.fromEntries(
+      MESH_FIELDS.map((key) => [
+        key,
+        { enumerable: true, get: () => read()[key] },
+      ]),
+    ),
+  ) as T & MeshPayload;
+  binaries.set(body, binary);
+  return body;
+}
+
+export function meshBinary(body: MeshSource): Uint8Array {
+  return binaries.get(body) ?? encodeMesh(body);
+}
+
+export function meshHead<T extends MeshedBody>(
+  body: T,
+): Omit<T, keyof MeshPayload> {
+  const fields: readonly string[] = MESH_FIELDS;
+  return Object.fromEntries(
+    Object.keys(body)
+      .filter((key) => !fields.includes(key))
+      .map((key) => [key, body[key as keyof T]]),
+  ) as Omit<T, keyof MeshPayload>;
 }

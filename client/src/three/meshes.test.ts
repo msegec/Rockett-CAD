@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { Feature, MeshPayload } from "@rockett/shared";
+import { encodeMesh, type Feature, type MeshPayload } from "@rockett/shared";
 import { watchProject } from "../api";
 import { previewTints } from "../livePreview";
 import { fillGhost } from "./ghostGeometry";
@@ -60,7 +60,7 @@ afterEach(() => {
 });
 
 const serve = (n: number, mesh = shape(n)) =>
-  replies.set(hashOf(n), () => Response.json(mesh));
+  replies.set(hashOf(n), () => new Response(encodeMesh(mesh)));
 
 it("fetches each hash once and announces its arrival", async () => {
   serve(1);

@@ -208,10 +208,10 @@ in the same edit.
   a projected source moves: `editedEntities` in `shared/src/solver.ts`.
 - `?position=N` evaluates the first N features without moving the saved
   marker: `evaluationPosition` in `server/src/api/routes.ts`.
-- The mesh route sends a `MeshPayload` as JSON bytes for a hash in the
+- The mesh route sends a `shared/src/meshFormat.ts` mesh for a hash in the
   project's current evaluation, or among its latest 4096 preview and
-  rolled-back hashes while their bytes stay cached; any other hash is a 404:
-  `server/src/kernel/meshCache.ts`.
+  rolled-back hashes while cached in memory or on disk; any other hash is a
+  404: `server/src/kernel/meshCache.ts`.
 - JSON responses from `GZIP_FROM_BYTES` up are gzipped when accepted:
   `server/src/api/gzipJson.ts`.
 - Requests for one project run in order; projects run independently:

@@ -1,4 +1,4 @@
-import { resolveDocumentParameters } from "@rockett/shared";
+import { lazyMesh, resolveDocumentParameters } from "@rockett/shared";
 import type {
   CadDocument,
   ConstructionPlanePayload,
@@ -37,9 +37,10 @@ import {
   forget,
   payloadBytes,
   sourceOf,
+  sourceMesh,
   store,
   tessCache,
-  type Tessellation,
+  type Decoded,
 } from "./tessellationCache.js";
 import {
   BlockedFeature,
@@ -288,12 +289,13 @@ class DocumentEngine {
       );
 
       const bodies: MeshedBody[] = [];
+      const memo: Decoded = new Map();
       let js = 0;
       for (const bytes of this.held.values()) js += bytes.byteLength;
       for (const body of state.bodies.values()) {
         const label = bodyLabel(state, doc, body.bodyId);
-        const { payload, bytes } = this.tessellated(body, label.name);
-        bodies.push({ ...payload, ...label });
+        const { head, binary, bytes } = this.tessellated(body, label, memo);
+        bodies.push(lazyMesh({ ...head, ...label }, binary));
         js += bytes;
       }
 
@@ -432,16 +434,16 @@ class DocumentEngine {
     return { state, statuses, features: doc.features };
   }
 
-  private tessellated(body: StateBody, name: string): Tessellation {
+  private tessellated(body: StateBody, label: { name: string }, memo: Decoded) {
     return (
       cached(body) ??
-      store(body, this.moved(body) ?? tessellateBody(body, { name }))
+      store(body, this.moved(body, memo) ?? tessellateBody(body, label))
     );
   }
 
-  private moved({ bodyId, copyOf }: StateBody): MeshedBody | undefined {
-    const source = copyOf && cached(copyOf.source)?.payload;
-    return source && movePayload(source, bodyId, copyOf);
+  private moved({ bodyId, copyOf }: StateBody, memo: Decoded) {
+    const source = copyOf && cached(copyOf.source);
+    return source && movePayload(sourceMesh(source, memo), bodyId, copyOf);
   }
 
   visibleTargets(

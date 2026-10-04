@@ -21,7 +21,7 @@ export function meshRoute(
     )
       return missing();
     const doc = await store.load(projectId);
-    let bytes = cache.get(doc.id, doc.revision, hash);
+    let bytes = await cache.get(doc.id, doc.revision, hash);
     if (!bytes && cache.rejects(doc.id, doc.revision, hash)) return missing();
     if (!bytes) {
       const result = await evaluate(doc);
@@ -29,7 +29,7 @@ export function meshRoute(
       const at = bodies.findIndex((item) => item.mesh?.hash === hash);
       if (at >= 0)
         bytes =
-          cache.get(doc.id, doc.revision, hash) ??
+          (await cache.get(doc.id, doc.revision, hash)) ??
           cache.materialize(result.bodies[at]!);
     }
     if (!bytes) return missing();

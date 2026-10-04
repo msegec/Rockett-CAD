@@ -96,10 +96,8 @@ function synchronisedEvaluation(
       }
     }
     if (metaChanged)
-      evaluation.bodies = evaluation.bodies.map((body) => ({
-        ...body,
-        name: doc.bodyMeta[body.bodyId]!.name,
-      }));
+      for (const body of evaluation.bodies)
+        body.name = doc.bodyMeta[body.bodyId]!.name;
     return evaluation;
   };
 }
@@ -113,12 +111,13 @@ export function createRouterContext(
   users?: UserStore,
   notices?: NoticeStore,
   friends?: FriendStore,
+  meshDir?: string,
 ) {
   const { uploadBytes, importBytes } = { ...IMPORT_LIMITS, ...limits };
   const router = Router();
   const history = new HistoryStore(store.documents.options.storage, store);
   const previews = new Previews();
-  const meshCache = new MeshCache();
+  const meshCache = new MeshCache({}, meshDir);
   const jobs = createJobRoutes(store, kernel, fail);
   router.use(json({ limit: JSON_BODY_LIMIT_BYTES }));
   router.param("id", projectAccessGuard(store, folders));

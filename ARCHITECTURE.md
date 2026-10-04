@@ -110,8 +110,10 @@ router checks project access first (`server/src/api/projectAccess.ts`).
 - Regeneration is incremental, cached per feature.
 - Engines, tessellations and encoded meshes sit in bounded LRU caches.
   Engines evict by measured bytes against `ENGINE_CACHE` in
-  `server/src/tunables.ts`, a share of the host memory limit; the mesh limit
-  is in `server/src/kernel/meshCache.ts`.
+  `server/src/tunables.ts`, a share of the host memory limit. Tessellations
+  and served meshes hold the `shared/src/meshFormat.ts` binary; served meshes
+  evicted from memory spill to a bounded disk store. The memory and disk mesh
+  limits are in `server/src/kernel/meshCache.ts`.
 - Viewport work never calls the kernel.
 - The viewport rebuilds a body's geometry only when its mesh hash changes. A
   body sent without its mesh is fetched by hash, at most 6 at once, aborted

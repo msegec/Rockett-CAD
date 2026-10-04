@@ -84,17 +84,6 @@ export interface MeshPayload {
   vertices: VertexInfo[];
 }
 
-export function meshPayload({
-  positions,
-  normals,
-  indices,
-  faces,
-  edges,
-  vertices,
-}: MeshPayload): MeshPayload {
-  return { positions, normals, indices, faces, edges, vertices };
-}
-
 export interface BodyPayload {
   bodyId: string;
   name: string;

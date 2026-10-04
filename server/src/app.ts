@@ -144,6 +144,7 @@ export interface AppDeps {
   setupToken?: string;
   access?: AccessIdentity;
   trustProxy?: TrustProxy;
+  meshDir?: string;
 }
 
 export async function createApp({
@@ -158,6 +159,7 @@ export async function createApp({
   setupToken = process.env.ROCKETT_SETUP_TOKEN,
   access,
   trustProxy = trustProxyConfig(process.env.ROCKETT_TRUST_PROXY),
+  meshDir,
 }: AppDeps): Promise<{ app: Express; sweep: () => Promise<void> }> {
   await store.uploads.empty();
   const app = express();
@@ -199,6 +201,7 @@ export async function createApp({
       users,
       notices,
       friends,
+      meshDir,
     ),
   );
   app.use("/api", (_req, res) => {
