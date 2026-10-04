@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { Layer, OpenProject, ProjectView } from "@rockett/plugin-api";
 import { stockBox, type Placement, type StockSetup } from "../shared/setup.js";
 import { bodyBoxes, camRead } from "./setup.js";
+import type { Simulation, ToolpathPreview } from "./toolpaths.js";
 
 export const STOCK_LAYER = "rockett.cam.stock";
 
@@ -9,7 +10,7 @@ const STOCK_TOKEN = "border";
 const AXIS_TOKENS = ["axis-x", "axis-y", "axis-z"] as const;
 const TRIAD_FRACTION = 0.25;
 
-export function themed<M extends THREE.LineBasicMaterial>(
+export function themed<M extends THREE.Material & { color: THREE.Color }>(
   material: M,
   token: string,
 ): M {
@@ -84,19 +85,68 @@ function drawn(open: OpenProject) {
   );
 }
 
-export const stockLayer = (project: ProjectView): Layer => ({
+function surfaceObject({
+  map: { min, cellMm, columns, rows, heights },
+  modelToSetup,
+}: Extract<Simulation, { status: "done" }>) {
+  const positions = new Float32Array(heights.length * 3);
+  heights.forEach((z, c) => {
+    positions[3 * c] = min[0] + ((c % columns) + 0.5) * cellMm;
+    positions[3 * c + 1] = min[1] + (Math.floor(c / columns) + 0.5) * cellMm;
+    positions[3 * c + 2] = z;
+  });
+  const index: number[] = [];
+  for (let j = 0; j + 1 < rows; j++)
+    for (let i = 0; i + 1 < columns; i++) {
+      const a = j * columns + i;
+      const b = a + columns;
+      index.push(a, a + 1, b + 1, a, b + 1, b);
+    }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geometry.setIndex(index);
+  geometry.computeVertexNormals();
+  const material = themed(
+    new THREE.MeshStandardMaterial({ side: THREE.DoubleSide }),
+    STOCK_TOKEN,
+  );
+  return placeInModel(new THREE.Mesh(geometry, material), modelToSetup);
+}
+
+export const stockLayer = (
+  project: ProjectView,
+  preview: ToolpathPreview,
+): Layer => ({
   id: STOCK_LAYER,
   mount({ group, requestRender, clearGroup }) {
-    const draw = () => {
-      clearGroup(group);
+    const boxes = new THREE.Group();
+    const surface = new THREE.Group();
+    group.add(boxes, surface);
+    let shown: Simulation | undefined;
+    const drawBoxes = () => {
+      clearGroup(boxes);
       try {
-        for (const object of drawn(project.get())) group.add(object);
+        for (const object of drawn(project.get())) boxes.add(object);
       } catch (error) {
         console.error(`[rockett] ${STOCK_LAYER}: ${String(error)}`);
       }
       requestRender();
     };
-    draw();
-    return project.subscribe(draw);
+    const drawSurface = () => {
+      const { simulation } = preview.get();
+      if (simulation === shown) return;
+      shown = simulation;
+      clearGroup(surface);
+      if (simulation.status === "done") surface.add(surfaceObject(simulation));
+      requestRender();
+    };
+    drawBoxes();
+    drawSurface();
+    const stopBoxes = project.subscribe(drawBoxes);
+    const stopSurface = preview.subscribe(drawSurface);
+    return () => {
+      stopBoxes();
+      stopSurface();
+    };
   },
 });

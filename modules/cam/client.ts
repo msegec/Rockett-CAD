@@ -55,7 +55,7 @@ export default defineClientModule({
       when: (_state, open) => open.includes(TOOL_PANEL),
       component: toolPanel(context),
     });
-    register.layer(stockLayer(project));
+    register.layer(stockLayer(project, preview));
     register.layer(toolpathLayer(preview));
   },
 });
