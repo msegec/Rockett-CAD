@@ -44,10 +44,16 @@ export interface StateBody extends NamedBody {
   copyOf?: { source: NamedBody; offset: Vec3; prefix: string };
 }
 
+export interface ImportedLabel {
+  name?: string;
+  color?: string;
+}
+
 export interface EvalState {
   bodies: Map<string, StateBody>;
   sketches: Map<string, EvaluatedSketch>;
   planes: Map<string, { frame: PlaneFrame; size: number }>;
+  imported: Map<string, ImportedLabel>;
   blocked: ReadonlySet<string>;
   hidden?: ReadonlySet<string>;
 }
@@ -61,7 +67,7 @@ export type FeatureOutcome = Pick<FeatureStatus, "warning" | "targets">;
 
 export class NoCorner extends Error {}
 
-export type StateMap = "bodies" | "sketches" | "planes";
+export type StateMap = "bodies" | "sketches" | "planes" | "imported";
 export type ReadMap = StateMap | "sources";
 
 export class Recorder {
@@ -148,6 +154,7 @@ export function cloneState(state: EvalState): EvalState {
     bodies: copy(state.bodies),
     sketches: copy(state.sketches),
     planes: copy(state.planes),
+    imported: copy(state.imported),
     blocked: state.blocked,
   };
 }
@@ -157,6 +164,7 @@ export function emptyState(): EvalState {
     bodies: new Map(),
     sketches: new Map(),
     planes: new Map(),
+    imported: new Map(),
     blocked: new Set(),
   };
 }
@@ -220,12 +228,12 @@ export function registerSolids(
     );
 }
 
-export function registerPieces(
+export function registerPieces<T extends BodyPiece>(
   state: EvalState,
   bodyId: string,
-  pieces: BodyPiece[],
+  pieces: T[],
   madeBy?: string,
-): void {
+): Array<[string, T]> {
   const ordered = orderBodyPieces(bodyId, pieces);
   let n = 2;
   const extraId = (i: number) => {
@@ -233,9 +241,14 @@ export function registerPieces(
     while (state.bodies.has(derivedBodyId(madeBy, n))) n++;
     return derivedBodyId(madeBy, n);
   };
-  ordered.forEach(({ shape, names }, i) => {
+  return ordered.map((piece, i) => {
     const id = i === 0 ? bodyId : extraId(i);
-    state.bodies.set(id, { bodyId: id, shape, names });
+    state.bodies.set(id, {
+      bodyId: id,
+      shape: piece.shape,
+      names: piece.names,
+    });
+    return [id, piece];
   });
 }
 

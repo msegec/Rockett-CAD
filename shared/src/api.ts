@@ -78,6 +78,7 @@ export interface VertexInfo {
 export interface BodyPayload {
   bodyId: string;
   name: string;
+  color?: string;
   meshKey: string;
   mesh?: { hash: string; bytes: number };
   positions: number[];

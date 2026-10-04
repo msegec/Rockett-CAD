@@ -78,7 +78,12 @@ and `compareNames` in `shared/src/topoRefs.ts`.
 - Mirror, pattern and Move copies are `b:{featureId}:{n}`, fixed length at
   any depth. The first `splitBody` piece keeps its id.
 - A fresh process gives the same ids and names.
-- Display names live in `document.bodyMeta`. Visibility lives in the user
+- Display names live in `document.bodyMeta`, set once when a body first
+  appears: a STEP body takes its instance or product name, made unique with
+  ` (2)`, ` (3)`, with control characters removed and capped at 200
+  characters; any other body, or a STEP name that is empty or OCCT's default
+  `Open CASCADE STEP translator {version} {n}`, takes `BodyN` from
+  `counters.body`. Visibility lives in the user
   view; see [API.md](API.md), View state. `document.groups` never reaches
   evaluation.
 

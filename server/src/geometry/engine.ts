@@ -1,4 +1,4 @@
-import { bodyName, resolveDocumentParameters } from "@rockett/shared";
+import { resolveDocumentParameters } from "@rockett/shared";
 import type {
   BodyPayload,
   CadDocument,
@@ -191,9 +191,7 @@ function evaluateStep(
   } catch (err: any) {
     releaseSnapshots([{ state: next }], snapshots);
     if (shouldStop?.()) return;
-    next.bodies = new Map(state.bodies);
-    next.sketches = new Map(state.sketches);
-    next.planes = new Map(state.planes);
+    Object.assign(next, cloneState(state));
     if (err instanceof BlockedFeature)
       next.blocked = new Set([...state.blocked, ...err.bodies]);
     return { status: failedStatus(err, state, feature) };
@@ -345,9 +343,10 @@ class DocumentEngine {
       let js = 0;
       for (const bytes of this.held.values()) js += bytes.byteLength;
       for (const body of state.bodies.values()) {
-        const name = bodyName(doc, body.bodyId);
+        const { name: seed, color } = state.imported.get(body.bodyId) ?? {};
+        const name = doc.bodyMeta[body.bodyId]?.name ?? seed ?? body.bodyId;
         const { payload, bytes } = this.tessellated(body, name);
-        bodies.push({ ...payload, name });
+        bodies.push({ ...payload, name, ...(color && { color }) });
         js += bytes;
       }
 

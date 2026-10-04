@@ -942,15 +942,14 @@ export function evalImportStep(
   { state, sources }: EvalContext,
   f: ImportStepFeature,
 ): void {
-  const shape = readImport(f, sources);
-  registerBodySolids(
-    state,
-    `b:${f.id}`,
-    shape,
+  const { shape: whole, parts } = readImport(f, sources);
+  const names =
     namingVersion() === 1
-      ? finalizeNames(shape, new ShapeMap(), f.id)
-      : geometryNames(shape, f.id),
-  );
+      ? finalizeNames(whole, new ShapeMap(), f.id)
+      : geometryNames(whole, f.id);
+  const pieces = parts.map(({ shape, label }) => ({ shape, label, names }));
+  for (const [id, { label }] of registerPieces(state, `b:${f.id}`, pieces))
+    if (label) state.imported.set(id, label);
 }
 
 export function evalReferenceImage(

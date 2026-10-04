@@ -1,7 +1,9 @@
 import { Router, json, type RequestHandler } from "express";
 import {
   DOCUMENT_EDITS,
+  NAME_LENGTH,
   ROUTES,
+  type BodyPayload,
   type CadDocument,
   type EvaluateResult,
   type Method,
@@ -67,6 +69,20 @@ function projectReply(history: HistoryStore, meshCache: MeshCache) {
   };
 }
 
+function seededName(doc: CadDocument, { bodyId, name }: BodyPayload) {
+  const base = name === bodyId ? "" : name;
+  if (!base) {
+    const n = (doc.counters["body"] ?? 0) + 1;
+    doc.counters["body"] = n;
+    return `Body${n}`;
+  }
+  const taken = new Set(Object.values(doc.bodyMeta).map((meta) => meta.name));
+  let free = base;
+  for (let n = 2; taken.has(free); n++)
+    free = `${base.slice(0, NAME_LENGTH - `${n}`.length - 3)} (${n})`;
+  return free;
+}
+
 function synchronisedEvaluation(
   evaluate: ReturnType<typeof createJobRoutes>["evaluate"],
 ) {
@@ -75,9 +91,7 @@ function synchronisedEvaluation(
     let metaChanged = pruneGroups(doc, evaluation, position);
     for (const body of evaluation.bodies) {
       if (!doc.bodyMeta[body.bodyId]) {
-        const n = (doc.counters["body"] ?? 0) + 1;
-        doc.counters["body"] = n;
-        doc.bodyMeta[body.bodyId] = { name: `Body${n}` };
+        doc.bodyMeta[body.bodyId] = { name: seededName(doc, body) };
         metaChanged = true;
       }
     }

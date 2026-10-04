@@ -22,7 +22,7 @@ export interface Deps {
   hidden?: ReadonlySet<string>;
 }
 
-const STATE_MAPS: StateMap[] = ["bodies", "sketches", "planes"];
+const STATE_MAPS: StateMap[] = ["bodies", "sketches", "planes", "imported"];
 const READ_MAPS: ReadMap[] = [...STATE_MAPS, "sources"];
 
 const inputsOf = (
@@ -32,6 +32,7 @@ const inputsOf = (
   bodies: state.bodies,
   sketches: state.sketches,
   planes: state.planes,
+  imported: state.imported,
   sources,
 });
 
@@ -127,6 +128,7 @@ function recording(state: EvalState, recorder: Recorder) {
     bodies: new RecordedMap(recorder, "bodies", state.bodies),
     sketches: new RecordedMap(recorder, "sketches", state.sketches),
     planes: new RecordedMap(recorder, "planes", state.planes),
+    imported: new RecordedMap(recorder, "imported", state.imported),
   };
 }
 

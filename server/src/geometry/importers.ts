@@ -24,6 +24,8 @@ import {
   type Shape,
 } from "./kernel.js";
 import { setExactTriangle } from "./mesh.js";
+import { readStep } from "./stepImport.js";
+import type { ImportedLabel } from "./featureState.js";
 import { read3mf, slim3mf } from "./read3mf.js";
 import { sha256 } from "../store/jsonStore.js";
 import { registerImporter } from "../api/importers.js";
@@ -32,11 +34,11 @@ export type Sources = ReadonlyMap<string, Uint8Array>;
 
 type Format = NonNullable<ImportStepFeature["format"]> | "step";
 
-interface Reader {
-  label: string;
-  extension: string;
-  read(file: string): Shape | undefined;
-}
+type ImportedSolid = { shape: Shape; label?: ImportedLabel };
+
+type Solids = { shape: Shape; parts: ImportedSolid[] };
+
+type Reader = { label: string; read(data: Uint8Array): Solids | undefined };
 
 function translate(reader: any, file: string): Shape | undefined {
   const k = getKernel();
@@ -56,8 +58,6 @@ function solidsOf(sewn: Shape): Shape {
   return acquire(
     scoped((own) => {
       const builder = own(new k.BRep_Builder());
-      const compound = own(new k.TopoDS_Compound());
-      builder.MakeCompound(compound);
       const shells = [...explore(sewn, "shell")].map((shell) =>
         own(k.TopoDS.Shell_1(shell)),
       );
@@ -71,13 +71,12 @@ function solidsOf(sewn: Shape): Shape {
         builder.Add(shell, own(loose.Current()));
         shells.push(shell);
       }
-      for (const shell of shells) {
-        const make = own(new k.BRepBuilderAPI_MakeSolid_3(shell));
-        const solid = own(make.Solid());
+      const made = shells.map((shell) => {
+        const solid = own(own(new k.BRepBuilderAPI_MakeSolid_3(shell)).Solid());
         if (volumeOf(solid) < 0) solid.Reverse();
-        builder.Add(compound, solid);
-      }
-      return own.keep(compound);
+        return solid;
+      });
+      return own.keep(own(compound(made)));
     }),
   );
 }
@@ -120,11 +119,10 @@ function sewFaces(shape: Shape | undefined, label: string): Shape | undefined {
       sewing.Perform(progress());
       const open = sewing.NbFreeEdges();
       if (open === 0) return own.keep(solidsOf(own(sewing.SewedShape())));
-      const builder = own(new k.BRep_Builder());
-      const gap = own(new k.TopoDS_Compound());
-      builder.MakeCompound(gap);
-      for (let i = 1; i <= open; i++) builder.Add(gap, own(sewing.FreeEdge(i)));
-      const { min, max } = bboxOf(gap, false);
+      const free = Array.from({ length: open }, (_, i) =>
+        own(sewing.FreeEdge(i + 1)),
+      );
+      const { min, max } = bboxOf(own(compound(free)), false);
       throw new Error(
         `The ${label} faces do not close into a solid: ${open} open edge${open === 1 ? "" : "s"} from ${pointText(min)} to ${pointText(max)} mm.`,
       );
@@ -132,25 +130,50 @@ function sewFaces(shape: Shape | undefined, label: string): Shape | undefined {
   );
 }
 
+function compound(shapes: Shape[]): Shape {
+  const k = getKernel();
+  return acquire(
+    scoped((own) => {
+      const builder = own(new k.BRep_Builder());
+      const result = own(new k.TopoDS_Compound());
+      builder.MakeCompound(result);
+      for (const shape of shapes) builder.Add(result, shape);
+      return own.keep(result);
+    }),
+  );
+}
+
+function fromFile(
+  extension: string,
+  read: (file: string) => Shape | undefined,
+) {
+  return (data: Uint8Array): Solids | undefined => {
+    const shape = withFile(data, extension, read);
+    if (!shape || shape.IsNull()) return;
+    return { shape, parts: solids(shape).map((solid) => ({ shape: solid })) };
+  };
+}
+
 const READERS: Record<Format, Reader> = {
   step: {
     label: "STEP",
-    extension: "step",
-    read: (file) => translate(new (getKernel().STEPControl_Reader_1)(), file),
+    read(data) {
+      const read = readStep(data);
+      return read && { shape: compound(read.shapes), parts: read.parts };
+    },
   },
   iges: {
     label: "IGES",
-    extension: "igs",
-    read: (file) =>
+    read: fromFile("igs", (file) =>
       sewFaces(
         translate(new (getKernel().IGESControl_Reader_1)(), file),
         "IGES",
       ),
+    ),
   },
   brep: {
     label: "BREP",
-    extension: "brep",
-    read(file) {
+    read: fromFile("brep", (file) => {
       const k = getKernel();
       const result = scoped((own) => {
         const shape = own(new k.TopoDS_Shape());
@@ -160,7 +183,7 @@ const READERS: Record<Format, Reader> = {
         return undefined;
       });
       return result && acquire(result);
-    },
+    }),
   },
 };
 
@@ -195,18 +218,18 @@ function sourceOf(
 export function readImport(
   feature: ImportStepFeature,
   sources: Sources,
-): Shape {
+): Solids {
   const reader = READERS[feature.format ?? "step"],
     data = sourceOf(sources, feature, reader.label);
-  return acquire(
-    scoped((own) => {
-      const shape = withFile(data, reader.extension, reader.read);
-      if (shape) own(shape);
-      if (shape && !shape.IsNull() && solids(shape).length > 0)
-        return own.keep(shape);
+  const read = scoped((own) => {
+    const found = reader.read(data);
+    if (!found?.parts.length)
       throw new Error(`No solid found in the ${reader.label} file.`);
-    }),
-  );
+    for (const { shape } of [found, ...found.parts]) own.keep(shape);
+    return found;
+  });
+  for (const { shape } of [read, ...read.parts]) acquire(shape);
+  return read;
 }
 
 export const MAX_MESH_TRIANGLES = 200_000;
@@ -371,8 +394,7 @@ export function readMesh(
   shape: Shape;
   warning?: string;
 } {
-  const k = getKernel(),
-    { label, read } = MESH_READERS[feature.format],
+  const { label, read } = MESH_READERS[feature.format],
     parts = read(Buffer.from(sourceOf(sources, feature, label))).filter(
       (part) => part.triangles.length > 0,
     ),
@@ -383,15 +405,9 @@ export function readMesh(
       `The ${label} mesh has ${triangles.toLocaleString("en-US")} triangles; the limit is ${MAX_MESH_TRIANGLES.toLocaleString("en-US")}.`,
     );
   const result = scoped((own) => {
-    const builder = own(new k.BRep_Builder());
-    const sewn = own(new k.TopoDS_Compound());
-    let openEdges = 0;
-    builder.MakeCompound(sewn);
-    for (const part of parts) {
-      const partShape = sewTriangles(part);
-      builder.Add(sewn, partShape.shape);
-      openEdges += partShape.openEdges;
-    }
+    const pieces = parts.map(sewTriangles);
+    const sewn = own(compound(pieces.map((piece) => piece.shape)));
+    const openEdges = pieces.reduce((sum, piece) => sum + piece.openEdges, 0);
     if (openEdges > 0)
       return {
         shape: own.keep(sewn),
@@ -430,7 +446,7 @@ function importer(format: Format, extensions: string[]) {
           blob,
         };
       try {
-        scoped((own) => own(readImport(feature, sources)));
+        scoped(() => readImport(feature, sources));
       } catch (error) {
         throw new ValidationError((error as Error).message);
       }

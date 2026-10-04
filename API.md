@@ -186,6 +186,9 @@ in the same edit.
 - Mutations answer `WireMutationResponse` (`shared/src/routes.ts`).
 - A request may send `held` (`HeldMeshes`); a body whose `meshKey` is held
   comes back as `HeldBodyPayload`: `server/src/api/heldMeshes.ts`.
+- `BodyPayload.color` is the `#rrggbb` a STEP file gave the body, kept per
+  body id through later features (`EvalState.imported`). A held body omits
+  it and takes the held mesh's.
 - Stored sketch points are the model. A feature add or edit solves a sketch
   once when it adds or changes a constraint its points do not meet, and
   otherwise stores the points as sent. Evaluation re-solves a sketch only when
