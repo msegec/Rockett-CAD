@@ -32,6 +32,7 @@
     "G91.1",
     "G94",
     "G99",
+    "G187",
     "M0",
     "M1",
     "M3",
@@ -129,6 +130,7 @@
     "dwell": ["G4 P{seconds}"],
     "stop": ["M0"],
     "optionalStop": ["M1"],
+    "accelerationProfile": ["G187 P{profile}"],
     "comment": "; {text}"
   },
   "toolChangeDefault": false

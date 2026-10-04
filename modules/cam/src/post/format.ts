@@ -1,4 +1,10 @@
-import { endOf, type Move, type Plane, type Xyz } from "../shared/ir.js";
+import {
+  endOf,
+  type Move,
+  type Plane,
+  type Section,
+  type Xyz,
+} from "../shared/ir.js";
 import type { Coolant } from "../shared/tools.js";
 import type { NormalisedProgram } from "./normalise.js";
 import {
@@ -15,7 +21,11 @@ import {
   type Token,
 } from "./schema.js";
 
-export type FormatOptions = { maxBytes?: number; laserPowerMax?: number };
+export type FormatOptions = {
+  maxBytes?: number;
+  laserPowerMax?: number;
+  accelerationProfiles?: boolean;
+};
 
 type Vars = Record<string, number | string | undefined>;
 
@@ -37,6 +47,7 @@ const COOLANT: Record<Coolant, TemplateName> = {
   flood: "coolantFlood",
   mist: "coolantMist",
 };
+const PROFILES: Record<Section["pass"], number> = { rough: 1, finish: 3 };
 const NUMBER = /^([A-Z])-?\d+(?:\.(\d+))?$/;
 
 function number(value: number, format: NumberFormat): string {
@@ -61,6 +72,7 @@ class Writer {
   private readonly letters: Set<string>;
   private readonly words: Set<string>;
   private readonly comments: { open: string; close: string };
+  private profile: number | undefined;
 
   constructor(
     private readonly post: Post,
@@ -69,7 +81,7 @@ class Writer {
     this.templates = Object.fromEntries(
       TEMPLATE_NAMES.map((name) => [
         name,
-        post.templates[name].map((line) =>
+        (post.templates[name] ?? []).map((line) =>
           line.split(" ").map((text) => token(text)!),
         ),
       ]),
@@ -129,6 +141,12 @@ class Writer {
 
   laser() {
     this.write(this.laserOn, {}, [], false);
+  }
+
+  accelerate(profile: number | undefined) {
+    if (profile === undefined || profile === this.profile) return;
+    this.emit("accelerationProfile", { profile });
+    this.profile = profile;
   }
 
   private write(
@@ -193,6 +211,13 @@ function arcVars(move: Extract<Move, { kind: "arc" }>, at: Xyz): Vars {
       vars[name] = move.centre[n]! - at[n]!;
   });
   return vars;
+}
+
+function profileOf(move: Move, pass: Section["pass"]) {
+  if (move.kind === "rapid" || move.kind === "cycle") return PROFILES.rough;
+  return move.kind === "feed" || move.kind === "arc"
+    ? PROFILES[pass]
+    : undefined;
 }
 
 type Power = ((percent: number | undefined) => number) | undefined;
@@ -280,6 +305,9 @@ export function formatProgram(
   const budget = { bytes: 0, max: options.maxBytes ?? MAX_BYTES };
   return program.files.map((file) => {
     const out = new Writer(post, budget);
+    const accelerate =
+      options.accelerationProfiles === true &&
+      out.hasTemplate("accelerationProfile");
     if (power && post.laser) out.comment(post.laser.note);
     out.emit("header", { units: UNITS[program.units], offset });
     let tool: string | undefined;
@@ -306,6 +334,7 @@ export function formatProgram(
         });
       out.emit(COOLANT[section.coolant]);
       for (const move of section.moves) {
+        if (accelerate) out.accelerate(profileOf(move, section.pass));
         writeMove(out, move, at, power);
         at = endOf(move, at);
       }

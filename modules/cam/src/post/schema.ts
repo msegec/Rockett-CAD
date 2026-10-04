@@ -10,6 +10,7 @@ type Spec = {
   needs: string[];
   may?: string[];
   unless?: keyof Capabilities | "always";
+  optional?: true;
 };
 
 export const AXES = new Set(["x", "y", "z"]);
@@ -40,6 +41,7 @@ const TEMPLATES = {
   dwell: { needs: ["seconds"] },
   stop: { needs: [] },
   optionalStop: { needs: [] },
+  accelerationProfile: { needs: ["profile"], optional: true },
 } satisfies Record<string, Spec>;
 
 export type TemplateName = keyof typeof TEMPLATES;
@@ -55,7 +57,10 @@ export type Post = {
   modal: (string | string[])[];
   workOffsets: string[];
   laser?: { note: string; on: string[] };
-  templates: Record<TemplateName, string[]> & { comment: string };
+  templates: Record<Exclude<TemplateName, "accelerationProfile">, string[]> & {
+    accelerationProfile?: string[];
+    comment: string;
+  };
 };
 
 export type Token =
@@ -223,10 +228,12 @@ function tokenProblems(post: Post, name: TemplateName, found: Token): string {
 function template(post: Post, name: TemplateName): string[] {
   const path = `templates.${name}`;
   const lines = post.templates[name];
+  const spec: Spec = TEMPLATES[name];
+  if (lines === undefined && spec.optional) return [];
   if (!isStrings(lines)) return [`${path}: must be a list of lines`];
-  const { unless }: Spec = TEMPLATES[name];
+  const { unless } = spec;
   const needs = [
-    ...TEMPLATES[name].needs.filter(
+    ...spec.needs.filter(
       (need) => post.capabilities.arcs !== "xy" || !PLANE_ONLY.has(need),
     ),
     ...(post.laser !== undefined && POWERED.has(name) ? ["power"] : []),
