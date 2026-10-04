@@ -83,24 +83,45 @@ export const sketchCommand = {
   run: (s) => s.finishSketch(),
 } satisfies Command;
 
-export const sketchTools: { id: SketchTool; label: string; keys: string[] }[] =
-  [
-    { id: "select", label: "Select", keys: ["V"] },
-    { id: "line", label: "Line", keys: ["L"] },
-    { id: "rect", label: "Rect", keys: ["R"] },
-    { id: "centerRect", label: "C-Rect", keys: [] },
-    { id: "circle", label: "Circle", keys: ["C"] },
-    { id: "arc3", label: "Arc", keys: [] },
-    { id: "ellipse", label: "Ellipse", keys: [] },
-    { id: "polygon", label: "Polygon", keys: [] },
-    { id: "slot", label: "Slot", keys: [] },
-    { id: "point", label: "Point", keys: ["P"] },
-    { id: "dimension", label: "Dimension", keys: ["D"] },
-    { id: "project", label: "Project", keys: [] },
-    { id: "trim", label: "Trim", keys: ["T"] },
-    { id: "extend", label: "Extend", keys: [] },
-    { id: "offset", label: "Offset", keys: [] },
-  ];
+export const ANGLE_LOCK_KEY = "A";
+export const lineShortcuts = [
+  { key: "Shift", label: "hold to snap the angle to your snap angles" },
+  { key: ANGLE_LOCK_KEY, label: "lock or unlock the angle" },
+];
+
+export const sketchTools: {
+  id: SketchTool;
+  label: string;
+  keys: string[];
+  description?: string;
+}[] = [
+  { id: "select", label: "Select", keys: ["V"] },
+  {
+    id: "line",
+    label: "Line",
+    keys: ["L"],
+    description: `${lineShortcuts.map((x) => `${x.key}: ${x.label}`).join(". ")}. A line within 4° of a right angle to a line it starts from snaps to exactly 90° and gets a perpendicular constraint; move further off or type an angle for anything else.`,
+  },
+  { id: "rect", label: "Rect", keys: ["R"] },
+  { id: "centerRect", label: "C-Rect", keys: [] },
+  { id: "circle", label: "Circle", keys: ["C"] },
+  { id: "arc3", label: "Arc", keys: [] },
+  { id: "ellipse", label: "Ellipse", keys: [] },
+  { id: "polygon", label: "Polygon", keys: [] },
+  { id: "slot", label: "Slot", keys: [] },
+  { id: "point", label: "Point", keys: ["P"] },
+  {
+    id: "dimension",
+    label: "Dimension",
+    keys: ["D"],
+    description:
+      "Double-click a curve to edit its size. Drag a dimension label to move it. Dimensioning something that already has a dimension edits the existing one; the ✕ beside the value, or Delete on an empty box, removes it.",
+  },
+  { id: "project", label: "Project", keys: [] },
+  { id: "trim", label: "Trim", keys: ["T"] },
+  { id: "extend", label: "Extend", keys: [] },
+  { id: "offset", label: "Offset", keys: [] },
+];
 
 export const sketchGroups: ToolbarGroup[] = [
   {
@@ -148,6 +169,7 @@ export const sketchCommands: Command[] = [
     group: "design.sketch.group.sketch",
     keys: tool.keys,
     keyContext: "design.sketch",
+    ...(tool.description && { description: tool.description }),
     enabled: sketching,
     active: (s) =>
       s.active?.id === "design.sketch" && s.active.state.tool === tool.id,
@@ -181,6 +203,8 @@ export const sketchCommands: Command[] = [
     icon: "construction",
     group: "design.sketch.group.sketch",
     tooltip: "Toggle construction geometry",
+    description:
+      "Applies to whatever tool you draw with next: lines, rectangles, circles, arcs, polygons, slots.",
     keys: ["X"],
     keyContext: "design.sketch",
     enabled: sketching,
@@ -209,10 +233,4 @@ export const sketchCommands: Command[] = [
     primary: true,
     run: (s) => s.finishSketch(),
   },
-];
-
-export const ANGLE_LOCK_KEY = "A";
-export const lineShortcuts = [
-  { key: "Shift", label: "hold to snap the angle to your snap angles" },
-  { key: ANGLE_LOCK_KEY, label: "lock or unlock the angle" },
 ];

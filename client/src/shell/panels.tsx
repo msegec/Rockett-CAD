@@ -13,7 +13,7 @@ import type { CommandContext } from "../commands/registry";
 import { useStore } from "../store";
 import { ExportPanel } from "../components/ExportPanel";
 import { HistoryPanel } from "../components/HistoryPanel";
-import { ControlsHelp } from "../components/ControlsHelp";
+import { ShortcutSheet } from "../components/ShortcutSheet";
 import { DraggablePanel } from "../components/DraggablePanel";
 import { FeatureDialog } from "../components/FeatureDialog";
 import { MeasurePanel } from "../components/MeasurePanel";
@@ -123,7 +123,7 @@ registerPanel({
   id: HELP_PANEL,
   title: "Keyboard & mouse controls",
   when: (_, open) => open.includes(HELP_PANEL),
-  component: () => <ControlsHelp onClose={() => togglePanel(HELP_PANEL)} />,
+  component: () => <ShortcutSheet onClose={() => togglePanel(HELP_PANEL)} />,
 });
 registerPanel({
   id: HISTORY_PANEL,

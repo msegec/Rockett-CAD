@@ -858,16 +858,23 @@ button:focus-visible,
 .controls-help .dialog-body {
   flex: 1;
 }
-.shortcut-help {
+.shortcut-sheet {
   line-height: 1.5;
   columns: 17em;
   column-gap: 24px;
 }
-.shortcut-help p {
+.shortcut-sheet p,
+.shortcut-sheet table {
   margin: 0 0 8px;
   break-inside: avoid;
 }
-.shortcut-help .help-heading {
+.shortcut-sheet th {
+  text-align: left;
+  padding-right: 8px;
+  font-weight: normal;
+  color: var(--text-dim);
+}
+.shortcut-sheet .help-heading {
   break-after: avoid;
 }
 kbd {

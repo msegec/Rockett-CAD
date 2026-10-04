@@ -20,6 +20,7 @@ export type CommandContext = ReturnType<typeof useStore.getState> & {
 
 interface CommandBase extends Base<CommandContext> {
   interaction?: ActiveCommand;
+  description?: string;
 }
 
 interface CommandButton {

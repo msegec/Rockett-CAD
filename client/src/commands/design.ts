@@ -141,6 +141,11 @@ const DIALOG_KEYS: Partial<Record<FeatureType, string>> = {
   move: "M",
 };
 
+const DIALOG_DESCRIPTIONS: Partial<Record<FeatureType, string>> = {
+  extrude:
+    "Shift + click picks a face instead of a profile. Start offset begins the extrusion on a plane that far along the sketch or face normal (Fusion's Start → Offset); the arrow and ghost move with it. Distance is signed: type a negative value, or drag the arrow into the part, to go the other way; a typed negative switches Join to Cut and the preview turns red.",
+};
+
 const DIALOGS: Array<
   [FeatureType & IconId, string, string, (typeof GROUPS)[number][0]]
 > = [
@@ -179,12 +184,14 @@ const DIALOGS: Array<
 
 for (const [type, label, tooltip, group] of DIALOGS) {
   const key = DIALOG_KEYS[type];
+  const description = DIALOG_DESCRIPTIONS[type];
   registerCommand({
     id: `design.${type}`,
     label,
     icon: type,
     group: `design.group.${group}`,
     tooltip,
+    ...(description && { description }),
     ...(key ? { keys: [key], keyContext: "design" } : {}),
     enabled: idle,
     run: () => openDialog(type),
@@ -252,6 +259,7 @@ registerCommand({
 registerCommand({
   id: "design.cancel",
   label: "Cancel",
+  description: "Ends the drawing tool.",
   keys: ["Escape"],
   keyContext: "global",
   enabled: (s) =>

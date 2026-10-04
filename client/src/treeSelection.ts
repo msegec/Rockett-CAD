@@ -146,6 +146,8 @@ export function registerGroupRecipient(
 export const groupSelectionCommand = {
   id: "design.tree.group",
   label: "Group selected rows",
+  description:
+    "In the model tree, Ctrl or ⌘ + click adds or removes a body or sketch and Shift + click selects a range; right-click a selected row to act on all of them.",
   keys: ["Ctrl+G"],
   keyContext: "design",
   enabled: (s) =>
