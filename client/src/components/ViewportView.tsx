@@ -29,11 +29,9 @@ import type { LayerHandle } from "../three/sceneLayers";
 import { worldToClient } from "../three/screen";
 import { syncReferenceImages } from "../three/referenceImages";
 import { syncConstructionPlanes } from "../constructionPlaneView";
-import {
-  hoverPiece,
-  renderSketches,
-  type SketchRenderInput,
-} from "../three/sketchRender";
+import { renderSketches, styleSketches } from "../three/sketchRender";
+import { hoverPiece } from "../three/sketchStyle";
+import { sketchRenderInputs } from "../sketchInputs";
 import { ExtrudeGizmo } from "../three/ExtrudeGizmo";
 import { themeColor } from "../theme/tokens";
 import { SKETCH_APPEARANCE } from "../tunables";
@@ -47,7 +45,6 @@ import { FeatureGizmos } from "../three/featureGizmos";
 import { GizmoSlot } from "../three/gizmoSlot";
 import { clearToolPreview, updateToolPreview } from "../three/toolPreview";
 import { listenWheel } from "../three/wheel";
-import { isProfileUsed, sketchUsage } from "../sketchUsage";
 import { extrudeGhosts } from "../extrudeReach";
 import { previewBodies, useStore, isIdle, type Selection } from "../store";
 import { loadPreviewBase, previewScene, usePreviewBase } from "../previewBase";
@@ -374,56 +371,20 @@ export function ViewportView({
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp || !evaluation || !document_) return;
-
-    // A sketch stays visible after a feature uses it, so its other regions can
-    // still be extruded or cut. Used regions shade faintly but stay pickable
-    // (the body over them may be hidden); free ones shade normally.
-    const usage = sketchUsage(document_, evaluation.sketches);
-    const hiddenSketches = new Set(hiddenFeatures);
-
     const editingId =
       active?.id === "design.sketch" ? active.state.sketchId : null;
-    const needProfiles =
-      !!activeFeature && takes(activeFeature.type, "profile");
-    // Fusion-style select-then-command: in idle, unused sketch regions shade
-    // and are selectable before any tool is chosen.
-    const idleProfiles = idle;
-
-    const inputs: SketchRenderInput[] = [];
-    for (const sk of evaluation.sketches) {
-      const isActive = sk.featureId === editingId;
-      if (isActive && draftSketch) {
-        inputs.push({
-          sketchId: sk.featureId,
-          frame: sk.frame,
-          entities: draftSketch.entities,
-          showProfiles: true,
-          active: true,
-        });
-        continue;
-      }
-      if (hiddenSketches.has(sk.featureId)) continue;
-      const usedHere = new Set(
-        sk.profiles
-          .filter((p) => isProfileUsed(usage, sk.featureId, p.id))
-          .map((p) => p.id),
-      );
-      const used = usedHere.size > 0;
-      inputs.push({
-        sketchId: sk.featureId,
-        frame: sk.frame,
-        entities: sk.entities,
-        showProfiles: !!needProfiles || idleProfiles,
-        profiles: sk.profiles,
-        usedProfileIds: usedHere,
-        active: false,
-        // used sketches draw dimmer; hide the sketch (eye) to get at body
-        // edges underneath its curves
-        dim: used,
-        lit: sk.featureId === peeked,
-      });
-    }
-    renderSketches(vp, inputs, selection, hover);
+    const inputs = sketchRenderInputs({
+      document: document_,
+      sketches: evaluation.sketches,
+      hidden: hiddenFeatures,
+      editingId,
+      draft: draftSketch,
+      showProfiles:
+        (!!activeFeature && takes(activeFeature.type, "profile")) || idle,
+      peeked,
+    });
+    const shown = useStore.getState();
+    renderSketches(vp, inputs, shown.selection, shown.hover);
 
     // dimension labels for the active sketch
     const labels: DimLabel[] = [];
@@ -475,26 +436,28 @@ export function ViewportView({
     updateDimLeaders();
     // force label layer re-render
     setLabelTick((t) => t + 1);
-
-    // highlights for solid topology
-    vp.clearHighlights();
-    for (const s of selection) vp.addHighlight(s, "select");
-    if (hover) vp.addHighlight(hover, "hover");
-    if (peeked) vp.addHighlights(peekHighlight(evaluation, peeked), "hover");
   }, [
     evaluation,
     document_,
     hiddenFeatures,
     active,
     activeFeature,
-    selection,
     idle,
-    hover,
     peeked,
     draftSketch,
     held,
     units,
   ]);
+
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp || !evaluation || !document_) return;
+    styleSketches(vp, selection, hover);
+    vp.clearHighlights();
+    for (const s of selection) vp.addHighlight(s, "select");
+    if (hover) vp.addHighlight(hover, "hover");
+    if (peeked) vp.addHighlights(peekHighlight(evaluation, peeked), "hover");
+  }, [evaluation, document_, held, selection, hover, peeked]);
 
   useEffect(() => {
     const vp = viewportRef.current;
