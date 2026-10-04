@@ -18,6 +18,7 @@ import {
   type Shape,
 } from "./kernel.js";
 import { ShapeMap } from "./shapeMap.js";
+import type { TriangleMesh } from "./meshBody.js";
 
 export class NameMap extends ShapeMap<string> {
   constructor(readonly version: NamingVersion) {
@@ -45,6 +46,7 @@ export interface NamedBody {
   bodyId: string;
   shape: Shape;
   names: NameMap;
+  mesh?: TriangleMesh;
 }
 
 export function byPosition(a: Vec3, b: Vec3): number {
@@ -59,7 +61,7 @@ export function cell(pos: Vec3): Vec3 {
   ];
 }
 
-function sortByPosition<T>(
+export function sortByPosition<T>(
   items: T[],
   positionOf: (item: T) => Vec3,
   version: NamingVersion,

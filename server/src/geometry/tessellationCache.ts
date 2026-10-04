@@ -1,9 +1,10 @@
 import type { MeshedBody } from "@rockett/shared";
 import type { NamedBody } from "./naming.js";
+import type { TriangleMesh } from "./meshBody.js";
 import { shapeHash, type Shape } from "./kernel.js";
 
 export interface Tessellation {
-  shape: Shape;
+  source: Shape | TriangleMesh;
   payload: MeshedBody;
   bytes: number;
 }
@@ -25,8 +26,10 @@ export function payloadBytes(value: unknown): number {
   return bytes;
 }
 
+export const sourceOf = (body: NamedBody) => body.mesh ?? body.shape;
+
 export function cacheKey(body: NamedBody): string {
-  return `${body.bodyId}:${shapeHash(body.shape)}`;
+  return `${body.bodyId}:${body.mesh?.key ?? shapeHash(body.shape)}`;
 }
 
 export function evict(key: string): void {
@@ -36,10 +39,19 @@ export function evict(key: string): void {
   tessCache.bytes -= entry.bytes;
 }
 
+export function forget(body: NamedBody): void {
+  const key = cacheKey(body);
+  if (tessCache.entries.get(key)?.source === sourceOf(body)) evict(key);
+}
+
 export function store(body: NamedBody, payload: MeshedBody): Tessellation {
   const key = cacheKey(body);
   evict(key);
-  const entry = { shape: body.shape, payload, bytes: payloadBytes(payload) };
+  const entry = {
+    source: sourceOf(body),
+    payload,
+    bytes: payloadBytes(payload),
+  };
   tessCache.entries.set(key, entry);
   tessCache.bytes += entry.bytes;
   for (const old of tessCache.entries.keys()) {
@@ -53,11 +65,14 @@ export function cached(body: NamedBody): Tessellation | undefined {
   const key = cacheKey(body);
   const entry = tessCache.entries.get(key);
   if (!entry) return undefined;
-  if (entry.shape.isDeleted()) {
+  if (!body.mesh && entry.source.isDeleted()) {
     evict(key);
     return undefined;
   }
-  if (body.shape.isDeleted() || !entry.shape.IsSame(body.shape))
+  if (
+    !body.mesh &&
+    (body.shape.isDeleted() || !entry.source.IsSame(body.shape))
+  )
     return undefined;
   tessCache.entries.delete(key);
   tessCache.entries.set(key, entry);

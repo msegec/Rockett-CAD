@@ -2,6 +2,7 @@ import { compareNames, LINEAR_TOL, type Vec3 } from "@rockett/shared";
 import { areaOf, faceCentroid, faces, scoped, type Shape } from "./kernel.js";
 import { V } from "./frames.js";
 import type { StateBody } from "./features.js";
+import { namesOf } from "./meshBody.js";
 
 interface Measure {
   area: number;
@@ -15,7 +16,7 @@ interface Prior {
 
 const base = (name: string) => name.replace(/(?:~\??\d+)+$/, "");
 
-const bases = (body: StateBody) => new Set([...body.names.values()].map(base));
+const bases = (body: StateBody) => new Set([...namesOf(body)].map(base));
 
 const shares = (body: StateBody, keys: ReadonlySet<string>) =>
   [...bases(body)].some((key) => keys.has(key));

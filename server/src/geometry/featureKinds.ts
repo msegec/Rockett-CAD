@@ -8,6 +8,7 @@ import {
 import { scoped } from "./kernel.js";
 import { type ShapeMap, trackShapeMaps } from "./shapeMap.js";
 import type { Sources } from "./importers.js";
+import { heldParts } from "./meshBody.js";
 
 export interface EvalContext {
   state: EvalState;
@@ -57,12 +58,13 @@ export function evaluateFeature(
             feature,
           ),
         );
-        for (const body of unrecorded(state.bodies)) own.keep(body.shape);
+        for (const body of unrecorded(state.bodies))
+          if (!body.mesh) own.keep(body.shape);
         completed = true;
         return outcome;
       } finally {
         const held = new Set<ShapeMap<unknown>>(
-          [...unrecorded(state.bodies)].map((body) => body.names),
+          [...unrecorded(state.bodies)].flatMap(heldParts).map((p) => p.names),
         );
         for (const map of made) {
           const cleanup = own({ delete: () => map.release() });

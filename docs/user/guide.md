@@ -233,9 +233,10 @@ Start a project with **New project from STEP**, or use **Insert → Import
 STEP**. It accepts STEP, IGES and BREP files up to 10 MB with solid bodies,
 without their sketches or feature history.
 
-It also accepts STL, OBJ and 3MF meshes of up to 200,000 triangles. A closed
+It also accepts STL, OBJ and 3MF meshes of up to 500,000 triangles. A closed
 mesh becomes a solid; an open one becomes a shell with a warning. Meshes are
-not parametric.
+not parametric. A closed mesh shows its triangles as faces, without pickable
+edges or vertices, until a feature works on it.
 
 ### Export
 

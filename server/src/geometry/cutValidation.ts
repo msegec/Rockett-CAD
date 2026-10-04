@@ -1,8 +1,9 @@
 import { planarInteriorPoints } from "./planeBoundary.js";
-import { LINEAR_TOL } from "@rockett/shared";
+import { LINEAR_TOL, type Vec3 } from "@rockett/shared";
 import {
   acquire,
   areaOf,
+  bboxOf,
   faces,
   getKernel,
   listToArray,
@@ -14,6 +15,8 @@ import {
   volumeOf,
   type Shape,
 } from "./kernel.js";
+import { compound } from "./importers.js";
+import { V } from "./frames.js";
 
 export const TOOL_OUTSIDE =
   "cut left the body inside out: the kernel kept faces of the cut outside the body; the previous body has been kept";
@@ -60,15 +63,77 @@ function interiorPoint(face: Shape): Shape | null {
   return result && acquire(result);
 }
 
-function outside(solid: Shape, face: Shape): boolean {
+interface Surroundings {
+  faces: Shape[];
+  boxes: { min: Vec3; max: Vec3 }[];
+}
+
+function reach(p: Vec3, { min, max }: Surroundings["boxes"][number]) {
+  const gap = [0, 1, 2].map((i) =>
+    Math.max(min[i]! - p[i]!, 0, p[i]! - max[i]!),
+  );
+  const far = [0, 1, 2].map((i) =>
+    Math.max(Math.abs(p[i]! - min[i]!), Math.abs(p[i]! - max[i]!)),
+  );
+  return { gap: V.norm(gap as Vec3), far: V.norm(far as Vec3) };
+}
+
+function sideOf(
+  { faces: all, boxes }: Surroundings,
+  at: any,
+  tolerance: number,
+): boolean | undefined {
+  const k = getKernel();
+  const p: Vec3 = [at.X(), at.Y(), at.Z()];
+  const reaches = boxes.map((box) => reach(p, box));
+  const bound = reaches.reduce((low, { far }) => Math.min(low, far), Infinity);
+  const near = all.filter((_, i) => reaches[i]!.gap <= bound);
+  return scoped((own) => {
+    const vertex = own(own(new k.BRepBuilderAPI_MakeVertex(at)).Vertex());
+    const dist = own(
+      new k.BRepExtrema_DistShapeShape_2(
+        own(compound(near)),
+        vertex,
+        k.Extrema_ExtFlag.Extrema_ExtFlag_MIN,
+        k.Extrema_ExtAlgo.Extrema_ExtAlgo_Grad,
+        progress(),
+      ),
+    );
+    if (!dist.IsDone()) return undefined;
+    const d = dist.Value();
+    if (d <= tolerance) return false;
+    for (let n = 1; n <= dist.NbSolution(); n++) {
+      const support = own(dist.SupportOnShape1(n));
+      if (support.ShapeType() !== k.TopAbs_ShapeEnum.TopAbs_FACE) continue;
+      const plane = planarFacePlane(own(k.TopoDS.Face_1(support)));
+      const q = own(dist.PointOnShape1(n));
+      const along =
+        plane && V.dot(V.sub(p, [q.X(), q.Y(), q.Z()]), plane.normal);
+      if (along && Math.abs(along) >= d - LINEAR_TOL) return along > 0;
+    }
+    return undefined;
+  });
+}
+
+function outside(
+  solid: Shape,
+  face: Shape,
+  surroundings: () => Surroundings,
+): boolean {
   const k = getKernel();
   return scoped((own) => {
     const points = planarFacePlane(face)
       ? planarInteriorPoints(face, own)
       : [interiorPoint(face)];
+    const tolerance = Math.max(
+      LINEAR_TOL,
+      k.BRep_Tool.MaxTolerance(face, k.TopAbs_ShapeEnum.TopAbs_VERTEX),
+    );
     return points.some((at) => {
       if (!at) return false;
       own(at);
+      const side = sideOf(surroundings(), at, tolerance);
+      if (side !== undefined) return side;
       const vertex = own(own(new k.BRepBuilderAPI_MakeVertex(at)).Vertex());
       const dist = own(
         new k.BRepExtrema_DistShapeShape_2(
@@ -80,10 +145,6 @@ function outside(solid: Shape, face: Shape): boolean {
         ),
       );
       if (!dist.IsDone()) throw new Error("cut check failed");
-      const tolerance = Math.max(
-        LINEAR_TOL,
-        k.BRep_Tool.MaxTolerance(face, k.TopAbs_ShapeEnum.TopAbs_VERTEX),
-      );
       return !dist.InnerSolution() && dist.Value() > tolerance;
     });
   });
@@ -91,8 +152,14 @@ function outside(solid: Shape, face: Shape): boolean {
 
 function leavesToolOutside(op: any, tool: Shape, body: Shape): boolean {
   const k = getKernel();
-  return scoped((own) =>
-    faces(tool)
+  return scoped((own) => {
+    let known: Surroundings | undefined;
+    const surroundings = () => {
+      if (known) return known;
+      const all = scoped((inner) => faces(body).map(inner.keep)).map(own);
+      return (known = { faces: all, boxes: all.map((f) => bboxOf(f)) });
+    };
+    return faces(tool)
       .map(own)
       .filter((face) => !op.IsDeleted(face))
       .flatMap((face) => {
@@ -101,8 +168,8 @@ function leavesToolOutside(op: any, tool: Shape, body: Shape): boolean {
           ? pieces.map((piece) => own(k.TopoDS.Face_1(piece)))
           : [face];
       })
-      .some((face) => outside(body, face)),
-  );
+      .some((face) => outside(body, face, surroundings));
+  });
 }
 
 function vertexMean(shape: Shape): [number, number, number] {

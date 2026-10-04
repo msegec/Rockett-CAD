@@ -53,7 +53,11 @@ export function blendEdges(state: EvalState, f: Picks): EdgeRef[] {
   }
   for (const id of f.features ?? []) {
     const made = [...state.bodies.values()]
-      .filter((body) => faceNamesOf(body).some((face) => faceMadeBy(id, face)))
+      .filter((body) =>
+        (body.mesh?.names ?? faceNamesOf(body)).some((face) =>
+          faceMadeBy(id, face),
+        ),
+      )
       .flatMap((body) => {
         const names = [...sharpOf(body)]
           .filter(([face]) => faceMadeBy(id, face))

@@ -6,6 +6,7 @@ import {
   transformOp,
   type Shape,
 } from "./kernel.js";
+import { compound } from "./importers.js";
 
 export interface FaceMesh {
   face: Shape;
@@ -79,9 +80,12 @@ export function meshShape(
   const k = getKernel();
   return scoped((own) => {
     const faces = facesOf(shape).map(own);
-    if (!faces.every(isExact))
+    const missing = faces.filter((face) => !isExact(face));
+    const meshed =
+      missing.length < faces.length ? own(compound(missing)) : shape;
+    if (missing.length > 0)
       own(
-        new k.BRepMesh_IncrementalMesh_2(shape, linear, false, angular, false),
+        new k.BRepMesh_IncrementalMesh_2(meshed, linear, false, angular, false),
       );
     return faces.flatMap((face) => {
       const mesh = k.meshFace(face);

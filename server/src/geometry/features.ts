@@ -18,6 +18,7 @@ import {
   type ToolFeature,
 } from "./boolean.js";
 import { finishJoin, warned } from "./booleanNaming.js";
+import { boundsOf } from "./meshBody.js";
 /**
  * Feature evaluators — each timeline feature type maps to a function that
  * transforms the evaluation state using the OCCT kernel.
@@ -59,7 +60,6 @@ import {
 } from "@rockett/shared";
 import {
   acquire,
-  bboxOf,
   diagonal,
   dir,
   edges as edgesOf,
@@ -931,7 +931,7 @@ export function evalConstructionPlane(
   // display size heuristic: cover existing model bbox
   let size = 40;
   for (const body of state.bodies.values()) {
-    size = Math.max(size, diagonal(bboxOf(body.shape)) * 0.75);
+    size = Math.max(size, diagonal(boundsOf(body)) * 0.75);
   }
   state.planes.set(f.id, { frame, size });
 }

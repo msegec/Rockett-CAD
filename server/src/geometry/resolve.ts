@@ -18,6 +18,7 @@ import { faces, scoped, type Shape } from "./kernel.js";
 import { computeEdgeNames, namingVersion, type NamedBody } from "./naming.js";
 import type { EvalState, FeatureOutcome } from "./features.js";
 import { edgeSignature, faceSignature } from "./signature.js";
+import { namesOf } from "./meshBody.js";
 
 type Ref = FaceRef | EdgeRef;
 type Kind = Ref["kind"];
@@ -147,7 +148,7 @@ function suggestions(
     .filter(
       (other) =>
         other.bodyId !== ref.bodyId &&
-        [...other.names.values()].some((face) =>
+        [...namesOf(other)].some((face) =>
           parts.some((part) => within(untie(face), part)),
         ),
     )
@@ -168,9 +169,7 @@ function renumbered(
   const family = stem(nameOf(ref));
   const parts = new Set(faceParts(kind, family));
   return [...bodies.values()]
-    .filter((body) =>
-      [...body.names.values()].some((face) => parts.has(stem(face))),
-    )
+    .filter((body) => [...namesOf(body)].some((face) => parts.has(stem(face))))
     .flatMap((body) =>
       [...topology.of(body, kind)]
         .filter(

@@ -240,8 +240,6 @@ body.
   fallback and qualifies. A refused, partial or unqualified result keeps the
   previous body and names the size and the reason.
 - Tangent chains: `server/src/geometry/tangentEdges.ts`.
-- Mesh imports cap at `MAX_MESH_TRIANGLES` in
-  `server/src/geometry/importers.ts`.
 
 ## Move
 
@@ -516,8 +514,16 @@ the global origin, so a sketch rides its face. Construction plane methods:
 `server/src/geometry/tessellate.ts` and `server/src/geometry/mesh.ts`. Every
 face triangle range, edge polyline and vertex carries its persistent name, so
 selection is topology, never a triangle index. The viewport and STL export
-both mesh through `meshShape`. Export formats:
-`server/src/geometry/exporters.ts`.
+both mesh through `meshShape`, which meshes only faces without an exact
+triangle. Export formats: `server/src/geometry/exporters.ts`.
+
+Under naming version 2, a closed single-part mesh import stays a mesh body
+(`server/src/geometry/meshBody.ts`). It draws from its triangles, one face
+per triangle named `x{n}` as version 2 names unnamed faces, with no edges or
+vertices, and sews into a solid only when a feature reads its shape. The
+solid keeps each triangle's name. Version 1 documents and open or
+multi-part meshes sew on import. An import over 500,000 triangles is
+refused before any meshing, and the import read budget bounds file bytes.
 
 ## Naming upgrade
 

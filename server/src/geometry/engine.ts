@@ -29,13 +29,14 @@ import { movePayload, tessellateBody } from "./tessellate.js";
 import { withNamingVersion } from "./naming.js";
 import { bodyLabel } from "./featureState.js";
 import { modifiedFaces } from "./modified.js";
+import { heldParts } from "./meshBody.js";
 import { cancellable, release } from "./kernel.js";
 import { heapBytes, lruEngines } from "./engineCache.js";
 import {
-  cacheKey,
   cached,
-  evict,
+  forget,
   payloadBytes,
+  sourceOf,
   store,
   tessCache,
   type Tessellation,
@@ -103,22 +104,21 @@ function releaseSnapshots(
   retained: Pick<Snapshot, "state">[],
 ): void {
   const kept = snapshotBodies(retained);
-  const keptShapes = new Set(kept.map((b) => b.shape));
-  const keptNames = new Set(kept.map((b) => b.names));
+  const keptSources = new Set(kept.map(sourceOf));
+  const keptParts = kept.flatMap(heldParts);
+  const keptShapes = new Set(keptParts.map((part) => part.shape));
+  const keptNames = new Set(keptParts.map((part) => part.names));
   const dropped = snapshotBodies(discarded);
-  const freed = dropped.filter((b) => !keptShapes.has(b.shape));
-  for (const body of freed) {
-    const key = cacheKey(body);
-    if (tessCache.entries.get(key)?.shape === body.shape) evict(key);
-  }
-  const names = [...new Set(dropped.map((b) => b.names))].filter(
-    (bodyNames) => !keptNames.has(bodyNames),
-  );
+  const freed = dropped.filter((b) => !keptSources.has(sourceOf(b)));
+  freed.forEach(forget);
+  const names = new Set(dropped.flatMap(heldParts).map((part) => part.names));
+  const shapes = freed.flatMap(heldParts).map((part) => part.shape);
   release([
-    ...names
+    ...[...names]
+      .filter((bodyNames) => !keptNames.has(bodyNames))
       .toReversed()
       .map((bodyNames) => ({ delete: () => bodyNames.release() })),
-    ...new Set(freed.map((b) => b.shape)),
+    ...new Set(shapes.filter((shape) => !keptShapes.has(shape))),
   ]);
 }
 

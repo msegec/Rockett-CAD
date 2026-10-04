@@ -27,6 +27,7 @@ import {
   type Shape,
 } from "./kernel.js";
 import { meshShape, type FaceMesh } from "./mesh.js";
+import { drawnTriangles } from "./meshBody.js";
 import {
   computeEdgeNames,
   computeVertexNames,
@@ -95,6 +96,18 @@ export function tessellateBody(
   meta: { name: string },
   opts: TessellationOptions = {},
 ): MeshedBody {
+  const mesh = body.mesh
+    ? drawnTriangles(body.mesh)
+    : tessellateShape(body, opts);
+  return {
+    bodyId: body.bodyId,
+    name: meta.name,
+    meshKey: createHash("sha256").update(JSON.stringify(mesh)).digest("hex"),
+    ...mesh,
+  };
+}
+
+function tessellateShape(body: NamedBody, opts: TessellationOptions) {
   return scoped(() => {
     const k = getKernel();
     const positions: number[] = [];
@@ -133,7 +146,7 @@ export function tessellateBody(
       vertexInfos.push({ name, position: [p.X(), p.Y(), p.Z()] });
     }
 
-    const mesh = {
+    return {
       positions,
       normals,
       indices,
@@ -141,12 +154,6 @@ export function tessellateBody(
       edges: edgeInfos,
       vertices: vertexInfos,
       bbox,
-    };
-    return {
-      bodyId: body.bodyId,
-      name: meta.name,
-      meshKey: createHash("sha256").update(JSON.stringify(mesh)).digest("hex"),
-      ...mesh,
     };
   });
 }
