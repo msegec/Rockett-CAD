@@ -44,6 +44,52 @@ function picked(open: OpenProject, selection: Selection) {
   return { setup, operations, name: named.name ?? named.id };
 }
 
+type Chosen = NonNullable<ReturnType<typeof picked>>;
+
+const readPrograms = (project: ProjectView, { setup, operations }: Chosen) =>
+  Promise.allSettled(
+    operations.map(async ({ id }) => {
+      const read = await project.read(programRoute, {
+        setupId: setup.id,
+        operationId: id,
+      });
+      if ("reason" in read) throw new Error(read.reason);
+      return programToSegments(read.program);
+    }),
+  );
+
+function drawable(
+  open: OpenProject,
+  { setup, name }: Chosen,
+  reads: PromiseSettledResult<Segments>[],
+): Partial<Preview> {
+  try {
+    const { bodies, stock, wcs } = setup;
+    if (!bodies || !stock || !wcs)
+      throw new Error(`setup ${setup.id} needs bodies, stock and WCS`);
+    const { modelToSetup } = stockBox({ bodies, stock, wcs }, bodyBoxes(open));
+    const paths = reads.flatMap((read) =>
+      read.status === "fulfilled"
+        ? [{ segments: read.value, modelToSetup }]
+        : [],
+    );
+    const failed = reads.find((read) => read.status === "rejected");
+    const moves = paths.reduce(
+      (n, path) => n + path.segments.moveEnds.length,
+      0,
+    );
+    return {
+      name,
+      paths,
+      moves,
+      shown: moves,
+      reason: !paths.length && failed ? reason(failed.reason) : null,
+    };
+  } catch (error) {
+    return { ...NOTHING, name, reason: reason(error) };
+  }
+}
+
 export function toolpathPreview(project: ProjectView) {
   const listeners = new Set<() => void>();
   let state: Preview = { selection: null, ...NOTHING };
@@ -68,46 +114,8 @@ export function toolpathPreview(project: ProjectView) {
     loaded = key;
     const ticket = ++tickets;
     if (!chosen) return set(NOTHING);
-    const { setup, operations, name } = chosen;
-    const reads = await Promise.allSettled(
-      operations.map(async ({ id }) => {
-        const read = await project.read(programRoute, {
-          setupId: setup.id,
-          operationId: id,
-        });
-        if ("reason" in read) throw new Error(read.reason);
-        return programToSegments(read.program);
-      }),
-    );
-    if (ticket !== tickets) return;
-    try {
-      const { bodies, stock, wcs } = setup;
-      if (!bodies || !stock || !wcs)
-        throw new Error(`setup ${setup.id} needs bodies, stock and WCS`);
-      const { modelToSetup } = stockBox(
-        { bodies, stock, wcs },
-        bodyBoxes(open),
-      );
-      const paths = reads.flatMap((read) =>
-        read.status === "fulfilled"
-          ? [{ segments: read.value, modelToSetup }]
-          : [],
-      );
-      const failed = reads.find((read) => read.status === "rejected");
-      const moves = paths.reduce(
-        (n, path) => n + path.segments.moveEnds.length,
-        0,
-      );
-      set({
-        name,
-        paths,
-        moves,
-        shown: moves,
-        reason: !paths.length && failed ? reason(failed.reason) : null,
-      });
-    } catch (error) {
-      set({ ...NOTHING, name, reason: reason(error) });
-    }
+    const reads = await readPrograms(project, chosen);
+    if (ticket === tickets) set(drawable(open, chosen, reads));
   }
 
   return {
