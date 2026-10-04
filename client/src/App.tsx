@@ -7,7 +7,7 @@ import { Toolbar } from "./components/Toolbar";
 import { WorkbenchSwitcher } from "./shell/WorkbenchSwitcher";
 import { useCurrentWorkbench } from "./shell/workbench";
 import { activeCommand } from "./commands/active";
-import { installKeymap } from "./commands/keymap";
+import { installKeymap, tooltipOf, useKeymap } from "./commands/keymap";
 import { registerCommand } from "./commands/registry";
 import { ModelTree } from "./components/ModelTree";
 import { Timeline } from "./components/Timeline";
@@ -150,13 +150,17 @@ export function UndoRedoButtons() {
   const canRedo = useStore((s) => s.history?.canRedo ?? false);
   const undoLabel = useStore((s) => s.history?.undoLabel);
   const redoLabel = useStore((s) => s.history?.redoLabel);
+  useKeymap();
   const busy = useStore((s) => s.busy);
   return (
     <span className="undo-redo">
       <button
         className="icon-btn"
         disabled={!canUndo || busy}
-        title={`${withLabel("Undo", undoLabel)} (Ctrl+Z)`}
+        title={tooltipOf({
+          id: "design.undo",
+          label: withLabel("Undo", undoLabel),
+        })}
         aria-label="Undo"
         onClick={() => void useStore.getState().undo()}
       >
@@ -165,7 +169,10 @@ export function UndoRedoButtons() {
       <button
         className="icon-btn"
         disabled={!canRedo || busy}
-        title={`${withLabel("Redo", redoLabel)} (Ctrl+Y)`}
+        title={tooltipOf({
+          id: "design.redo",
+          label: withLabel("Redo", redoLabel),
+        })}
         aria-label="Redo"
         onClick={() => void useStore.getState().redo()}
       >
@@ -294,6 +301,7 @@ function Workspace({
   const error = useStore((s) => s.error);
   const setError = useStore((s) => s.setError);
   const active = useStore((s) => s.active);
+  useKeymap();
   const banner = active && activeCommand()?.banner;
 
   useEffect(() => installKeymap(viewportRef), [viewportRef]);
@@ -339,12 +347,13 @@ function Workspace({
   );
 }
 
-function WorkspaceTopbar({ onUsers }: { onUsers: () => void }) {
+export function WorkspaceTopbar({ onUsers }: { onUsers: () => void }) {
   const showHelp = usePanelOpen(HELP_PANEL);
   const showHistory = usePanelOpen(HISTORY_PANEL);
   const showParameters = usePanelOpen(PARAMETERS_PANEL);
   const busy = useStore((s) => s.busy);
   const projectName = useStore((s) => s.document?.name ?? "");
+  useKeymap();
   return (
     <div className="top-bar">
       <button
@@ -379,7 +388,10 @@ function WorkspaceTopbar({ onUsers }: { onUsers: () => void }) {
       </button>
       <button
         className="icon-btn"
-        title="Keyboard and mouse controls (?)"
+        title={tooltipOf({
+          id: "design.help",
+          label: "Keyboard and mouse controls",
+        })}
         aria-expanded={showHelp}
         onClick={() => togglePanel(HELP_PANEL)}
       >

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useStore } from "../store";
-import { sketchHints } from "../commands/sketch";
+import { sketchHint } from "../commands/sketch";
+import { chordFor, useKeymap } from "../commands/keymap";
 import { activeCommand } from "../commands/active";
 import { TIMING_MS } from "../tunables";
 import { SketchStatus } from "./SketchStatus";
@@ -12,6 +13,7 @@ export function ViewportHud() {
   const jobStartedAt = useStore((s) => s.jobStartedAt);
   const cancelJob = useStore((s) => s.cancelJob);
   const [showJob, setShowJob] = useState(false);
+  useKeymap();
 
   useEffect(() => {
     setShowJob(false);
@@ -26,7 +28,7 @@ export function ViewportHud() {
 
   let hint = active ? (activeCommand()?.hint ?? "") : "";
   if (active?.id === "design.sketch") {
-    hint = sketchHints[active.state.tool];
+    hint = sketchHint(active.state.tool, chordFor("design.cancel"));
   }
 
   return (

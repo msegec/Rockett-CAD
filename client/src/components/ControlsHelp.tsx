@@ -2,8 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import { DraggablePanel } from "./DraggablePanel";
 import { DialogFooter } from "./form/DialogFooter";
 import { lineShortcuts } from "../commands/sketch";
-import { keyBindings } from "../commands/keymap";
-import { useRegistrations } from "../commands/registry";
+import { chordFor, keyBindings, useKeymap } from "../commands/keymap";
 
 let lastSize: { width: string; height: string } | null = null;
 
@@ -21,8 +20,58 @@ function Bindings({ context }: { context: string }) {
   );
 }
 
+function Chord({ id, children }: { id: string; children: string }) {
+  const chord = chordFor(id);
+  return (
+    <>
+      {children}
+      {chord && (
+        <>
+          {" ("}
+          <kbd>{chord}</kbd>)
+        </>
+      )}
+    </>
+  );
+}
+
+function LineHelp() {
+  return (
+    <p>
+      Line:{" "}
+      {lineShortcuts.map((x, i) => (
+        <span key={x.key}>
+          {i > 0 && " · "}
+          <kbd>{x.key}</kbd> {x.label}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+function ViewportHelp() {
+  return (
+    <>
+      <p className="help-heading">
+        <b>Viewport</b>
+      </p>
+      <p>Drag the ViewCube to orbit; click a face for a standard view.</p>
+      <p>
+        Middle-drag or two-finger scroll pans; right-drag or Shift+middle-drag
+        orbits. Wheel or pinch zooms to the cursor.
+      </p>
+      <p>
+        In the model tree, <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + click adds or
+        removes a body or sketch and <kbd>Shift</kbd> + click selects a range;
+        right-click a selected row to act on all of them.{" "}
+        <Chord id="design.tree.group">Group the selected rows</Chord>.
+      </p>
+    </>
+  );
+}
+
 export function ControlsHelp({ onClose }: { onClose: () => void }) {
-  useRegistrations();
+  useKeymap();
   const body = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const panel = body.current!.parentElement!;
@@ -36,21 +85,7 @@ export function ControlsHelp({ onClose }: { onClose: () => void }) {
     <DraggablePanel title="Keyboard & mouse controls" className="controls-help">
       <div className="dialog-body" ref={body}>
         <div className="shortcut-help">
-          <p className="help-heading">
-            <b>Viewport</b>
-          </p>
-          <p>Drag the ViewCube to orbit; click a face for a standard view.</p>
-          <p>
-            Middle-drag or two-finger scroll pans; right-drag or
-            Shift+middle-drag orbits. Wheel or pinch zooms to the cursor.
-          </p>
-          <p>
-            In the model tree, <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + click adds or
-            removes a body or sketch and <kbd>Shift</kbd> + click selects a
-            range; right-click a selected row to act on all of them.{" "}
-            <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>G</kbd> groups the selected
-            rows.
-          </p>
+          <ViewportHelp />
           <p className="help-heading">
             <b>Modelling</b>
           </p>
@@ -61,8 +96,9 @@ export function ControlsHelp({ onClose }: { onClose: () => void }) {
           </p>
           <Bindings context="design.sketch" />
           <p>
-            <kbd>X</kbd> Construction (applies to whatever tool you draw with
-            next: lines, rectangles, circles, arcs, polygons, slots)
+            <Chord id="design.sketch.construction">Construction</Chord> applies
+            to whatever tool you draw with next: lines, rectangles, circles,
+            arcs, polygons, slots.
           </p>
           <p>
             Double-click a curve to edit its size. Drag a dimension label to
@@ -73,21 +109,14 @@ export function ControlsHelp({ onClose }: { onClose: () => void }) {
           <p>
             <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + click adds/removes selections,
             including profiles. In Extrude, <kbd>Shift</kbd> + click picks a
-            face instead of a profile. <kbd>Esc</kbd> ends the drawing tool.
+            face instead of a profile. <Chord id="design.cancel">Cancel</Chord>{" "}
+            ends the drawing tool.
           </p>
           <p>
             While drawing, type a size to lock it, <kbd>Tab</kbd> to move
             between sizes, <kbd>Enter</kbd> to place the shape.
           </p>
-          <p>
-            Line:{" "}
-            {lineShortcuts.map((x, i) => (
-              <span key={x.key}>
-                {i > 0 && " · "}
-                <kbd>{x.key}</kbd> {x.label}
-              </span>
-            ))}
-          </p>
+          <LineHelp />
           <p>
             A line within 4° of a right angle to a line it starts from snaps to
             exactly 90° (and gets a perpendicular constraint); move further off
@@ -115,7 +144,10 @@ export function ControlsHelp({ onClose }: { onClose: () => void }) {
             model without it and pick regions to add or remove.
           </p>
           <p>
-            <kbd>Delete</kbd> removes selected sketch geometry.
+            <Chord id="design.sketch.delete">
+              Delete selected sketch geometry
+            </Chord>
+            .
           </p>
         </div>
       </div>

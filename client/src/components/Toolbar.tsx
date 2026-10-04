@@ -3,12 +3,11 @@ import { ViewportContext } from "../viewportRef";
 import { useStore } from "../store";
 import { useWorkbench } from "../shell/workbench";
 import "../commands/design";
+import { tooltipOf, useKeymap } from "../commands/keymap";
 import {
   runCommand,
   toolbarFor,
   toolbarGroups,
-  tooltipOf,
-  useRegistrations,
   type CommandContext,
   type ToolbarCommand,
   type ToolbarGroup,
@@ -20,7 +19,7 @@ export function Toolbar() {
   const active = useStore((s) => s.active);
   const workbench = useWorkbench((s) => s.current);
   useStore((s) => s.busy);
-  useRegistrations();
+  useKeymap();
 
   const viewport = useContext(ViewportContext);
   const context =

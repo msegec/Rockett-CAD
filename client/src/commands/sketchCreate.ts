@@ -3,6 +3,7 @@ import { isPlanarFace } from "./featureCommand";
 import { useStore, type Selection } from "../store";
 import { alignCameraToActiveSketch, type ViewportRef } from "../viewportRef";
 import { exitActive, type ActiveCommand } from "./active";
+import { chordText } from "./keymap";
 
 function planeFor(selection: Selection | null): PlaneRef | undefined {
   if (selection?.kind === "plane") return selection.ref;
@@ -47,6 +48,11 @@ export const sketchCreateCommand = {
   onClick: (selection, _event, viewport) => pick(selection, viewport),
   onContextMenu() {},
   hint: "Select a plane or planar face to sketch on",
-  banner: "Select a plane or planar face for the sketch (Esc to cancel)",
+  get banner() {
+    return `Select a plane or planar face for the sketch${chordText(
+      "design.cancel",
+      (chord) => ` (${chord} to cancel)`,
+    )}`;
+  },
   keyContext: "design.sketch.create",
 } satisfies ActiveCommand;

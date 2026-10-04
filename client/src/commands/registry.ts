@@ -69,16 +69,6 @@ export function runCommand(id: string, viewport?: ViewportRef): unknown {
   return command.run(ctx);
 }
 
-export function tooltipOf(command: {
-  label: string;
-  tooltip?: string | undefined;
-  keys?: readonly string[] | undefined;
-}): string {
-  const text = command.tooltip ?? command.label;
-  const key = command.keys?.[0];
-  return key ? `${text} (${key})` : text;
-}
-
 function placed<T extends Anchored>(items: readonly T[]): T[] {
   const out = items.filter((i) => !i.after && !i.before);
   let rest = items.filter((i) => i.after || i.before);

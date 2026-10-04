@@ -51,7 +51,7 @@ export function sketchState(sketchId: string, tool: SketchTool): SketchState {
 
 export const sketchHints: Record<SketchTool, string> = {
   select: "Drag points to adjust · click to select",
-  line: "Click points to chain lines · double-click / Esc to end",
+  line: "Click points to chain lines · double-click to end",
   rect: "Click two corners",
   centerRect: "Click centre, then a corner",
   circle: "Click centre, then a point on the circle",
@@ -64,12 +64,18 @@ export const sketchHints: Record<SketchTool, string> = {
     "Click an entity or two points · Ctrl-click a line, then a line or point · right-click a dimension to change its kind",
   project:
     "Click a model edge to create a linked purple reference · source must precede this sketch",
-  trim: "Click a section between intersections, or drag across sections, to remove · Esc cancels",
-  extend:
-    "Click near the endpoint to extend to the next boundary · Esc cancels",
+  trim: "Click a section between intersections, or drag across sections, to remove",
+  extend: "Click near the endpoint to extend to the next boundary",
   offset:
     "Ctrl-click to add/remove curves · select a connected chain · preview then Create offset",
 };
+
+const CANCELLED = new Set<SketchTool>(["line", "trim", "extend"]);
+
+export const sketchHint = (tool: SketchTool, cancel: string | undefined) =>
+  cancel && CANCELLED.has(tool)
+    ? `${sketchHints[tool]} · ${cancel} cancels`
+    : sketchHints[tool];
 
 export const sketchCommand = {
   id: "design.sketch",

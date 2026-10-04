@@ -1,13 +1,15 @@
 import { createRegistry } from "@rockett/shared";
 import { activeCommand } from "./active";
 import type { ViewportRef } from "../viewportRef";
-import { getSetting } from "../settings";
+import { getSetting, useSetting } from "../settings";
 import { useStore } from "../store";
 import { useWorkbench } from "../shell/workbench";
 import {
   commands,
   runCommand,
   runnable,
+  useRegistrations,
+  type Command,
   type CommandContext,
 } from "./registry";
 
@@ -73,6 +75,32 @@ const MODIFIERS: Readonly<Record<string, string>> = {
   shift: "Shift",
 };
 const ORDER = ["Ctrl", "Alt", "Shift"];
+const KEY_NAMES = new Map(
+  [
+    "Escape",
+    "Enter",
+    "Tab",
+    "Backspace",
+    "Delete",
+    "Insert",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown",
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    "ContextMenu",
+  ].map((name) => [name.toLowerCase(), name]),
+);
+
+function keyName(key: string): string {
+  if (key.length === 1) return key.toUpperCase();
+  return (
+    KEY_NAMES.get(key.toLowerCase()) ?? key[0]!.toUpperCase() + key.slice(1)
+  );
+}
 
 export function normalizeChord(chord: string): string {
   const parts = chord.split("+");
@@ -85,9 +113,7 @@ export function normalizeChord(chord: string): string {
     ...ORDER.filter((mod) => named.includes(mod)),
     ...new Set(named.filter((mod) => !ORDER.includes(mod))),
   ];
-  const name =
-    key.length === 1 ? key.toUpperCase() : key[0]!.toUpperCase() + key.slice(1);
-  return [...mods, name].join("+");
+  return [...mods, keyName(key)].join("+");
 }
 
 type Keyable = { id: string; keys?: readonly string[]; keyContext?: string };
@@ -147,11 +173,49 @@ export function resolveKeymap<C extends Keyable>(
   const bindings = declared.map((b) =>
     b.override ? b : { ...b, chords: b.chords.filter((c) => !taken(b, c)) },
   );
-  return { bindings, conflicts: conflictsOf(declared) };
+  let conflicts: KeyConflict[] | undefined;
+  return {
+    bindings,
+    get conflicts() {
+      return (conflicts ??= conflictsOf(declared));
+    },
+  };
 }
 
-export const activeKeymap = () =>
-  resolveKeymap(commands(), getSetting("keys.overrides"));
+let cached: {
+  list: readonly Command[];
+  overrides: Readonly<Record<string, readonly string[]>>;
+  keymap: ReturnType<typeof resolveKeymap<Command>>;
+} | null = null;
+
+export function activeKeymap() {
+  const list = commands();
+  const overrides = getSetting("keys.overrides");
+  if (cached?.list !== list || cached.overrides !== overrides)
+    cached = { list, overrides, keymap: resolveKeymap(list, overrides) };
+  return cached.keymap;
+}
+
+export function useKeymap(): void {
+  useRegistrations();
+  useSetting("keys.overrides");
+}
+
+export const chordFor = (id: string): string | undefined =>
+  activeKeymap().bindings.find((b) => b.command.id === id)?.chords[0];
+
+export function chordText(id: string, format: (chord: string) => string) {
+  const chord = chordFor(id);
+  return chord ? format(chord) : "";
+}
+
+export const tooltipOf = (command: {
+  id: string;
+  label: string;
+  tooltip?: string | undefined;
+}): string =>
+  (command.tooltip ?? command.label) +
+  chordText(command.id, (chord) => ` (${chord})`);
 
 export function keyBindings(context: string) {
   return activeKeymap()

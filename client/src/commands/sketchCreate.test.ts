@@ -92,7 +92,7 @@ it("owns plane picking through the registered active command", async () => {
     "Select a plane or planar face to sketch on",
   );
   expect(activeCommand()?.banner).toBe(
-    "Select a plane or planar face for the sketch (Esc to cancel)",
+    "Select a plane or planar face for the sketch (Escape to cancel)",
   );
   expect(start).not.toHaveBeenCalled();
 });

@@ -1,4 +1,5 @@
 import type { Command, CommandContext } from "./registry";
+import { tooltipOf } from "./keymap";
 import { deleteSketchSelection } from "./sketch";
 import {
   CONSTRAINTS,
@@ -35,7 +36,12 @@ export const constraintCommands: Command[] = [
     label: "Delete",
     icon: "delete",
     group: "design.sketch.group.constrain",
-    tooltip: "Delete selected (Del)",
+    get tooltip() {
+      return tooltipOf({
+        id: "design.sketch.delete",
+        label: "Delete selected",
+      });
+    },
     run: deleteSketchSelection,
   },
 ];
