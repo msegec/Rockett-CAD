@@ -7,6 +7,7 @@ import {
 import {
   createRegistry,
   moduleEnabledSetting,
+  moduleHostSettings,
   parseManifest,
   REGISTRY_ID,
   registerExtensionSpec,
@@ -116,9 +117,11 @@ const disposeAll = (disposers: readonly Dispose[]) => {
 };
 
 function enabled(moduleId: string, app: LayerValues) {
-  const setting = moduleEnabledSetting(moduleId);
-  if (!SETTINGS.has(setting.key)) registerSettings([setting]);
-  return resolveSettings({ app }).values[setting.key]?.value !== false;
+  registerSettings(
+    moduleHostSettings(moduleId).filter(({ key }) => !SETTINGS.has(key)),
+  );
+  const { key } = moduleEnabledSetting(moduleId);
+  return resolveSettings({ app }).values[key]?.value !== false;
 }
 
 async function load(

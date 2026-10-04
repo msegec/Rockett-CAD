@@ -294,6 +294,10 @@ module, in load order:
 - `disabled` means the app setting `plugin.<moduleId>.enabled` is `false`.
   Only an admin can set it (`PATCH /settings`). The host reads it at startup,
   so a change applies on the next start.
+- The user setting `plugin.<moduleId>.hidden` (`PATCH /me/settings`) hides
+  the module's client UI for that user only. Its status stays `loaded`.
+- Both host settings belong to the host. A manifest that lists either in
+  `contributes.settings` fails `parseManifest`.
 - `server/src/modules/host.ts` loads every module before the router mounts
   route modules. A module that throws during activation keeps none of its
   registrations; the others still load.

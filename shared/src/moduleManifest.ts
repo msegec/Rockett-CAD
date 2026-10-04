@@ -3,7 +3,7 @@ import { CORE_NAMESPACES } from "./featureSpec.js";
 import { REGISTRY_ID } from "./registry.js";
 import { NAME_LENGTH } from "./schema/coreFeatures.js";
 import { parse, ValidationError } from "./schema/validation.js";
-import { SETTING_KEY } from "./settings.js";
+import { moduleHostSettings, SETTING_KEY } from "./settings.js";
 
 const API_RANGE = /^\^(\d+)\.(\d+)$/;
 const HOST_VERSION = /^(\d+)\.(\d+)\.\d+$/;
@@ -64,6 +64,12 @@ function contributionError(
   const prefix = point === "settings" ? `plugin.${id}.` : `${id}.`;
   const valid = point === "settings" ? SETTING_KEY : REGISTRY_ID;
   const entries = contributes[point] ?? [];
+  if (point === "settings") {
+    const owned = new Set<string>(moduleHostSettings(id).map(({ key }) => key));
+    const reserved = entries.findIndex((entry) => owned.has(entry));
+    if (reserved >= 0)
+      return `contributes.settings.${reserved} ${entries[reserved]} is a host setting, so a module cannot define it`;
+  }
   const index = entries.findIndex(
     (entry) => !entry.startsWith(prefix) || !valid.test(entry),
   );

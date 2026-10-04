@@ -328,6 +328,21 @@ export const moduleEnabledSetting = (moduleId: string) =>
     schema: Type.Boolean(),
   });
 
+export const moduleHiddenSetting = (moduleId: string) =>
+  defineSetting({
+    key: `plugin.${moduleId}.hidden`,
+    label: "Hidden",
+    scopes: ["user"],
+    section: `plugin:${moduleId}`,
+    default: false,
+    schema: Type.Boolean(),
+  });
+
+export const moduleHostSettings = (moduleId: string) => [
+  moduleEnabledSetting(moduleId),
+  moduleHiddenSetting(moduleId),
+];
+
 export const PANEL_MIN_PX = 160;
 
 export const UI_TREE_WIDTH = defineSetting({

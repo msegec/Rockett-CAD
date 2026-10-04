@@ -12,7 +12,11 @@ import type {
 } from "@rockett/plugin-api";
 import {
   DOCUMENT_EDITS,
+  moduleHiddenSetting,
+  moduleHostSettings,
   REGISTRY_ID,
+  registerSettings,
+  SETTINGS,
   type ModuleInfo,
   type Route,
 } from "@rockett/shared";
@@ -38,7 +42,7 @@ import {
   TextAreaField,
   TextField,
 } from "../components/form/fields";
-import { useSetting } from "../settings";
+import { getSetting, subscribe, useSetting } from "../settings";
 import {
   closePanel,
   openPanel,
@@ -198,6 +202,37 @@ const moduleRequest =
     return request(method, prefix + path, { body });
   };
 
+type Shown = { show: () => Dispose; hide: Dispose | null };
+
+function hideable(own: Dispose[], moduleId: string) {
+  const { key } = moduleHiddenSetting(moduleId);
+  const entries = new Set<Shown>();
+  own.push(
+    subscribe(key, (hidden) => {
+      for (const entry of entries) {
+        if (hidden !== true) entry.hide ??= entry.show();
+        else if (entry.hide) {
+          entry.hide();
+          entry.hide = null;
+        }
+      }
+    }),
+  );
+  return <T>(register: (item: T) => Dispose) =>
+    (item: T): Dispose => {
+      const entry: Shown = { show: () => register(item), hide: null };
+      if (getSetting(key) !== true) entry.hide = entry.show();
+      entries.add(entry);
+      const dispose = () => {
+        entries.delete(entry);
+        entry.hide?.();
+        entry.hide = null;
+      };
+      own.push(dispose);
+      return dispose;
+    };
+}
+
 function moduleContext(own: Dispose[], moduleId: string) {
   const track =
     <A extends unknown[]>(register: (...args: A) => Dispose) =>
@@ -206,15 +241,14 @@ function moduleContext(own: Dispose[], moduleId: string) {
       own.push(dispose);
       return dispose;
     };
+  const shown = hideable(own, moduleId);
+  const command = shown(registerCommand);
+  const workbench = shown(registerWorkbench);
   const register = {
-    command: track((command: ModuleCommand) =>
-      registerCommand(guarded(iconed(moduleId, command))),
-    ),
-    toolbarGroup: track(registerToolbarGroup),
-    panel: track(registerPanel),
-    workbench: track((workbench: Workbench) =>
-      registerWorkbench(guardedWorkbench(workbench)),
-    ),
+    command: (item: ModuleCommand) => command(guarded(iconed(moduleId, item))),
+    toolbarGroup: shown(registerToolbarGroup),
+    panel: shown(registerPanel),
+    workbench: (item: Workbench) => workbench(guardedWorkbench(item)),
     selectionKind: track(registerSelectionKind),
     pickProvider: track(registerPickProvider),
     layer: track((layer: Layer) => registerModuleLayer(moduleId, layer)),
@@ -245,6 +279,10 @@ export async function loadClientModules(
   modules: readonly HostModule[],
   report: () => Promise<readonly ModuleInfo[]>,
 ): Promise<Dispose> {
+  for (const { manifest } of modules)
+    registerSettings(
+      moduleHostSettings(manifest.id).filter(({ key }) => !SETTINGS.has(key)),
+    );
   const reports = await report().catch((error: Error) => {
     useStore.getState().setError(error.message);
     return [];

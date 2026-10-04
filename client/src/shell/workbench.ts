@@ -11,6 +11,10 @@ export const useWorkbench = create(() => ({
   current: "design",
   switching: false,
 }));
+workbenches.subscribe(() => {
+  if (!workbenches.get(useWorkbench.getState().current))
+    useWorkbench.setState({ current: "design" });
+});
 export const useWorkbenches = () =>
   useSyncExternalStore(
     workbenches.subscribe,
