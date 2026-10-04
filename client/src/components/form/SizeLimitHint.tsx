@@ -68,6 +68,10 @@ function sizePicks(draft: Feature | null): string | null {
             draft.faces,
             draft.features,
             draft.tangentChain,
+            draft.type === "fillet" && [
+              draft.betweenFaces,
+              draft.betweenFeatures,
+            ],
           ])
         : null;
     case "extrude":

@@ -1,4 +1,4 @@
-import type { ChamferType } from "@rockett/shared";
+import type { ChamferType, FilletType } from "@rockett/shared";
 import {
   AngleField,
   CheckField,
@@ -8,27 +8,32 @@ import {
 import { useSetting } from "../settings";
 import type { NumericInput } from "./registry";
 
-const TYPE_LABELS: Record<ChamferType, string> = {
+type BlendType = ChamferType | FilletType;
+
+const TYPE_LABELS: Record<BlendType, string> = {
   equalDistance: "Equal distance",
   twoDistances: "Two distances",
   distanceAngle: "Distance and angle",
+  variableRadius: "Variable radius",
 };
 
-export type BlendSize<T extends ChamferType> = {
+export type BlendSize<T extends BlendType> = {
   type: T;
   size: number;
   distance2?: number;
+  endRadius?: number;
   angle?: number;
   flip?: boolean;
 };
 
 type SecondSizes = {
   distance2?: NumericInput;
+  endRadius?: NumericInput;
   angle?: NumericInput;
   flip?: boolean;
 };
 
-export function BlendSizeFields<T extends ChamferType>({
+export function BlendSizeFields<T extends BlendType>({
   types,
   size,
   label,
@@ -55,7 +60,13 @@ export function BlendSizeFields<T extends ChamferType>({
         onChange={onType}
       />
       <LengthField
-        label={size.distance2 === undefined ? label : "Distance 1"}
+        label={
+          size.distance2 !== undefined
+            ? "Distance 1"
+            : size.endRadius !== undefined
+              ? "Start radius"
+              : label
+        }
         units={units}
         autoFocus
         value={size.size}
@@ -69,6 +80,15 @@ export function BlendSizeFields<T extends ChamferType>({
           value={size.distance2}
           onChange={(v) => setParams({ distance2: v })}
           bind="/distance2"
+        />
+      )}
+      {size.endRadius !== undefined && (
+        <LengthField
+          label="End radius"
+          units={units}
+          value={size.endRadius}
+          onChange={(v) => setParams({ endRadius: v })}
+          bind="/endRadius"
         />
       )}
       {size.angle !== undefined && (

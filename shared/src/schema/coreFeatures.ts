@@ -6,7 +6,7 @@ import {
   REF_SIGNATURE_TYPES,
   SHELL_DIRECTIONS,
 } from "../model.js";
-import { ownsExactly } from "./chamferFields.js";
+import { ownedFields } from "./chamferFields.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
 export const MAX_DIM = 100_000;
@@ -370,6 +370,7 @@ const picks = {
   faces: profileFaces,
   features: Type.Optional(Type.Array(id)),
 };
+const rule = { betweenFaces: profileFaces, betweenFeatures: picks.features };
 const picked = <T extends TSchema>(schema: T) =>
   Type.Refine(
     schema,
@@ -382,22 +383,22 @@ const blend = <const T extends string, P extends TProperties>(
   properties: P,
 ) => picked(feature(type, { tangentChain: flag, ...picks, ...properties }));
 
-const fillet = Type.Refine(
+const filletSet = Type.Object({ ...picks, ...rule, radius: positive });
+const fillet = ownedFields(
+  "fillet",
   blend("fillet", {
     filletType: Type.Enum([...FILLET_TYPES]),
     radius: positive,
     distance2: Type.Optional(positive),
+    endRadius: Type.Optional(positive),
     flip: flag,
-    sets: Type.Optional(
-      Type.Array(picked(Type.Object({ ...picks, radius: positive }))),
-    ),
+    ...rule,
+    sets: Type.Optional(Type.Array(picked(filletSet))),
   }),
-  ownsExactly("fillet"),
-  () =>
-    "needs a second distance and a flip exactly for two distances, and several sets only for equal distance",
 );
 
-const chamfer = Type.Refine(
+const chamfer = ownedFields(
+  "chamfer",
   blend("chamfer", {
     chamferType: Type.Enum([...CHAMFER_TYPES]),
     distance: positive,
@@ -411,9 +412,6 @@ const chamfer = Type.Refine(
     ),
     flip: flag,
   }),
-  ownsExactly("chamfer"),
-  () =>
-    "needs a second distance and a flip exactly for two distances, and an angle and a flip exactly for distance and angle",
 );
 
 const shell = Type.Refine(

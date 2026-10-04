@@ -17,10 +17,12 @@ import {
   blendPicks,
   featureParams,
   setFeatureParams,
+  type PickInput,
 } from "../commands/featureCommand";
 import { useStore, type Selection } from "../store";
 import { boundText } from "../components/form/expressionField";
-import { keptRefs, num, storedFeature } from "./inputs";
+import { faceRefs, keptRefs, num, storedFeature } from "./inputs";
+import { refsOf } from "../selection/kinds";
 import {
   blendHint,
   blendSelection,
@@ -45,9 +47,10 @@ export type FilletParams = InputParams<
     | "tangentChain"
     | "filletType"
     | "distance2"
+    | "endRadius"
     | "flip"
     | "sets"
-  > & { activeSet: number }
+  > & { activeSet: number; between: Selection[] }
 >;
 
 const handle = {
@@ -60,14 +63,41 @@ const handle = {
 function sizes(params: FilletParams) {
   const filletType = params.filletType ?? "equalDistance";
   const radius = num(params, handle.param, handle.fallback);
-  return filletType === "equalDistance"
-    ? { filletType, radius }
-    : {
-        filletType,
-        radius,
-        distance2: num(params, "distance2", radius),
-        flip: params.flip ?? false,
-      };
+  if (filletType === "equalDistance") return { filletType, radius };
+  if (filletType === "variableRadius")
+    return { filletType, radius, endRadius: num(params, "endRadius", radius) };
+  return {
+    filletType,
+    radius,
+    distance2: num(params, "distance2", radius),
+    flip: params.flip ?? false,
+  };
+}
+
+const between = {
+  key: "between",
+  providers: ["design.face", "design.feature"],
+  optional: true,
+  param: {
+    read: (s) => featureParams(s).between ?? [],
+    write: (next) => setFeatureParams({ between: next }),
+  },
+} satisfies PickInput;
+
+const ruleSelection = (set: FilletSet) =>
+  blendSelection({
+    edges: [],
+    faces: set.betweenFaces ?? [],
+    features: set.betweenFeatures ?? [],
+  });
+
+function rule(params: FilletParams) {
+  const picks = params.between ?? [];
+  const stored = storedFeature(params.id);
+  return {
+    ...keptRefs("betweenFaces", faceRefs(picks), stored),
+    ...keptRefs("betweenFeatures", refsOf(picks, "feature"), stored),
+  };
 }
 
 const radiusPath = (set: number) =>
@@ -79,6 +109,7 @@ function liveSets(params: FilletParams, selection: Selection[]): FilletSet[] {
   const picks = blendSources(params.id, selection);
   const live = {
     ...("error" in picks ? { edges: [] } : picks),
+    ...rule(params),
     radius: sizes(params).radius,
   };
   const sets = params.sets?.length ? params.sets : [live];
@@ -91,7 +122,12 @@ function showSet(
   active: number,
 ) {
   const set = sets[active]!;
-  setParams({ sets, activeSet: active, radius: set.radius });
+  setParams({
+    sets,
+    activeSet: active,
+    radius: set.radius,
+    between: ruleSelection(set),
+  });
   useStore.getState().setSelection(blendSelection(set));
 }
 
@@ -123,7 +159,7 @@ function FilletSets({ params, setParams }: FeatureFormProps<FilletParams>) {
           onChange={(v) => showSet(setParams, sets(), Number(v))}
         />
       )}
-      {params.filletType !== "twoDistances" && (
+      {sizes(params).filletType === "equalDistance" && (
         <button
           type="button"
           className="btn"
@@ -154,6 +190,11 @@ function FilletForm({ params, setParams }: FeatureFormProps<FilletParams>) {
     <>
       <FilletSets params={params} setParams={setParams} />
       <SelInfo label="Edges" input="edges" hint={blendHint} />
+      <SelInfo
+        label="Between"
+        input="between"
+        hint="optional: faces or a feature the edges meet"
+      />
       <TangentChainField params={params} setParams={setParams} />
       <BlendSizeFields
         key={active}
@@ -176,7 +217,7 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
   icon: "◠",
   title: "Fillet",
   group: "modify",
-  picks: [blendPicks],
+  picks: [blendPicks, between],
   Form: FilletForm,
   build: (params, selection) => {
     const sets = liveSets(params, selection);
@@ -186,8 +227,10 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
     if (empty >= 0)
       return { error: `Select an edge, face or feature in set ${empty + 1}` };
     const [first, ...more] = sets;
-    if (more.length > 0 && params.filletType === "twoDistances")
-      return { error: "Two distances take one set: remove the other sets" };
+    if (more.length > 0 && sizes(params).filletType !== "equalDistance")
+      return {
+        error: "Only equal distance takes several sets: remove the other sets",
+      };
     const base: FilletFeature = {
       id: params.id ?? newId("fillet"),
       type: "fillet",
@@ -209,7 +252,9 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
       filletType: f.filletType,
       radius: f.radius,
       distance2: f.distance2,
+      endRadius: f.endRadius,
       flip: f.flip,
+      between: ruleSelection(f),
       tangentChain: f.tangentChain ?? false,
       ...(f.sets?.length && { sets: filletSets(f), activeSet: 0 }),
     },

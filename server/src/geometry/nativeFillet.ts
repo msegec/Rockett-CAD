@@ -28,7 +28,15 @@ export function rejectEmptyFilletContours(
 type Sized = { edge: Shape; name: string; radius?: number }[];
 
 const radiusOf = (f: FilletFeature, source: Sized) =>
-  [...new Set(source.map(({ radius }) => radius ?? f.radius))].join(" and ");
+  f.endRadius === undefined
+    ? [...new Set(source.map(({ radius }) => radius ?? f.radius))].join(" and ")
+    : `${f.radius} to ${f.endRadius}`;
+
+function addEdge(op: any, f: FilletFeature, edge: Shape, radius?: number) {
+  if (op.Contour(edge)) return;
+  if (f.endRadius === undefined) op.Add_2(radius ?? f.radius, edge);
+  else op.Add_3(f.radius, f.endRadius, edge);
+}
 
 export function nativeFillet(
   body: NamedBody,
@@ -46,9 +54,7 @@ export function nativeFillet(
   );
   let result: Shape | undefined;
   {
-    for (const { edge, radius } of sourceEdges) {
-      if (!op.Contour(edge)) op.Add_2(radius ?? f.radius, edge);
-    }
+    for (const { edge, radius } of sourceEdges) addEdge(op, f, edge, radius);
     rejectEmptyFilletContours(op, sourceEdges);
     op.Build(progress());
     const spilled = op.IsDone() ? spilledEnds(op) : new Set<number>();
@@ -101,9 +107,7 @@ function filletClipped(
         k.ChFi3d_FilletShape.ChFi3d_Rational,
       ),
     );
-    kept.forEach(({ edge }, i) => {
-      if (!op.Contour(edge)) op.Add_2(sourceEdges[i]!.radius ?? f.radius, edge);
-    });
+    kept.forEach(({ edge }, i) => addEdge(op, f, edge, sourceEdges[i]!.radius));
     op.Build(progress());
     if (!op.IsDone()) return null;
     const filleted = own(op.Shape());

@@ -19,6 +19,7 @@ describe("typed Fillet inputs", () => {
   it.each([
     ["equalDistance", ["Type", "Radius (mm)"]],
     ["twoDistances", ["Type", "Distance 1 (mm)", "Distance 2 (mm)", "Flip"]],
+    ["variableRadius", ["Type", "Start radius (mm)", "End radius (mm)"]],
   ] as const)("shows the %s fields", (filletType, labels) => {
     const host = document.createElement("div");
     host.innerHTML = renderToStaticMarkup(
@@ -120,7 +121,9 @@ describe("Fillet sets", () => {
         ...params,
         filletType: "twoDistances",
       }).build(selection),
-    ).toEqual({ error: "Two distances take one set: remove the other sets" });
+    ).toEqual({
+      error: "Only equal distance takes several sets: remove the other sets",
+    });
   });
 
   it("shows Set and Remove set only for several sets, and Add set only for equal distance", () => {
@@ -133,5 +136,61 @@ describe("Fillet sets", () => {
       "Radius (mm)",
     ]);
     expect(labels({ filletType: "twoDistances" })).not.toContain("Add set");
+    expect(labels({ filletType: "variableRadius" })).not.toContain("Add set");
+  });
+});
+
+const face = (faceName: string) => ({
+  kind: "face" as const,
+  bodyId: "body-input",
+  faceName,
+});
+
+describe("Rule and variable fillets", () => {
+  const ruled: FilletFeature = {
+    ...original,
+    edges: [],
+    faces: [face("sides")],
+    betweenFaces: [face("top")],
+    betweenFeatures: ["boss"],
+  };
+
+  it("a prefilled rule fillet builds back, and Between picks become its rule", () => {
+    const { params, selection } = fillet.prefill!(ruled);
+    expect(params.between).toEqual([
+      { kind: "face", bodyId: "body-input", faceName: "top" },
+      { kind: "feature", featureId: "boss" },
+    ]);
+    expect(createFeatureInputs(fillet, params).build(selection)).toEqual(ruled);
+    expect(
+      createFeatureInputs(fillet, {
+        ...fillet.prefill!(original).params,
+        between: [{ kind: "face", bodyId: "body-input", faceName: "top" }],
+      }).build([{ kind: "face", bodyId: "body-input", faceName: "sides" }]),
+    ).toEqual({
+      ...original,
+      edges: [],
+      faces: [face("sides")],
+      betweenFaces: [face("top")],
+    });
+  });
+
+  it("a variable fillet builds back and drops its end radius for another type", () => {
+    const variable: FilletFeature = {
+      ...original,
+      filletType: "variableRadius",
+      radius: 1,
+      endRadius: 3,
+    };
+    const { params, selection } = fillet.prefill!(variable);
+    expect(createFeatureInputs(fillet, params).build(selection)).toEqual(
+      variable,
+    );
+    expect(
+      createFeatureInputs(fillet, {
+        ...params,
+        filletType: "equalDistance",
+      }).build(selection),
+    ).toEqual({ ...original, radius: 1 });
   });
 });

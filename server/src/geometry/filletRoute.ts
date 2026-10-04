@@ -138,6 +138,7 @@ export function moduleFillet(
   byName: Map<string, Shape>,
   refs: EdgeRef[],
 ): ToolResult | null {
+  if (f.filletType === "variableRadius") return null;
   const second = f.filletType === "twoDistances" ? f.distance2 : undefined;
   if (second !== undefined && Math.abs(second - f.radius) > LINEAR_TOL)
     return twoDistanceFillet(

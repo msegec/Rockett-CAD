@@ -330,6 +330,39 @@ body.
   draft with the active set first, so the search sizes that set's radius on
   its edges while the others keep theirs.
 
+## Rule fillet
+
+`blendEdges` in `server/src/geometry/blendEdges.ts`.
+
+- Schema 35 adds optional `betweenFaces` and `betweenFeatures` to a fillet
+  and to each set: Fusion's Rule fillet, Between faces/features. Fusion's
+  All edges is the plain face and feature pick.
+- With either one holding an entry, the set's face and feature picks round
+  only the sharp edges between one of their faces and one of the between
+  faces, a feature's between faces being those it made. Picked edges still
+  round as picked. A rule with no face or feature pick to start from errors,
+  "a rule fillet needs a face or a feature to round from", and a rule that
+  finds no such edge errors, "Fillet found no sharp edges between the picked
+  faces". An earlier document migrates unchanged.
+- Between picks resolve, sign and repair like the set's own picks, under
+  `/betweenFaces` and `/betweenFeatures` of their set.
+
+## Variable radius
+
+`nativeFillet` in `server/src/geometry/nativeFillet.ts`.
+
+- Schema 35 adds `filletType` `variableRadius` with `endRadius`. `radius`
+  holds at the start of each edge's curve, or of the tangent chain it grows,
+  and `endRadius` at its end, varying linearly between: OCCT's two-radius
+  edge, `BRepFilletAPI_MakeFillet::Add(R1, R2, E)`. Swapping the two values
+  reverses it. It takes one set and no size hint.
+- It builds only through OCCT, never through the blend module, so its
+  surfaces are OCCT's approximations, not KERN-020's. Follow-ups: a straight
+  edge between two planes has an exact cone as its variable fillet, which the
+  module route could build as it builds the two-distance strip; radii at
+  more than two points need OCCT's radius-at-parameter form
+  (`Add(UandR, E)`) and a points model.
+
 ## Chamfer
 
 `evalChamfer` in `server/src/geometry/blend.ts`.

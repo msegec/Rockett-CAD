@@ -162,6 +162,9 @@ release workflow remain under development.
   flip; earlier fillets stay equal distance and build unchanged.
 - Schema 34: Fillet may hold more selection sets, each with its own radius;
   earlier fillets load as one set and build unchanged.
+- Schema 35: Fillet may round only the edges between two face or feature
+  picks, and may vary its radius from a start to an end radius; earlier
+  fillets load and build unchanged.
 
 ### Known limits
 

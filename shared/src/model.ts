@@ -73,7 +73,11 @@ export const CHAMFER_TYPES = [
   "distanceAngle",
 ] as const;
 export type ChamferType = (typeof CHAMFER_TYPES)[number];
-export const FILLET_TYPES = ["equalDistance", "twoDistances"] as const;
+export const FILLET_TYPES = [
+  "equalDistance",
+  "twoDistances",
+  "variableRadius",
+] as const;
 export type FilletType = (typeof FILLET_TYPES)[number];
 export type OriginAxis = (typeof ORIGIN_AXES)[number];
 
@@ -233,7 +237,6 @@ export interface SketchFeature extends FeatureBase {
   plane: PlaneRef;
   entities: SketchEntity[];
   constraints: SketchConstraint[];
-  /** Editable offset operations, in creation order. */
   offsets?: SketchOffset[];
 }
 
@@ -267,7 +270,6 @@ export interface ExtrudeFeature extends ToolFeatureBase {
    * negative value is typed, Fusion-style). Never zero.
    */
   distance: number;
-  /** Second-side distance for twoSided extrudes (magnitude). */
   distance2?: number;
   /**
    * Start offset in mm along the profile / face normal (Fusion "Start →
@@ -291,7 +293,6 @@ export interface RevolveFeature extends ToolFeatureBase {
 export interface SweepFeature extends ToolFeatureBase {
   type: "sweep";
   profiles: ProfileRef[];
-  /** Path: open chain of sketch entities in the given sketch. */
   pathSketchId: string;
   operation: BooleanOperation;
 }
@@ -307,13 +308,16 @@ export interface FilletFeature extends BlendFeatureBase {
   filletType: FilletType;
   radius: number;
   distance2?: number;
+  endRadius?: number;
   flip?: boolean;
+  betweenFaces?: FaceRef[];
+  betweenFeatures?: string[];
   sets?: FilletSet[];
 }
 
 export type FilletSet = Pick<
   FilletFeature,
-  "edges" | "faces" | "features" | "radius"
+  "edges" | "faces" | "features" | "betweenFaces" | "betweenFeatures" | "radius"
 >;
 
 export interface ChamferFeature extends BlendFeatureBase {
@@ -354,7 +358,6 @@ export interface MirrorFeature extends FeatureBase {
   type: "mirror";
   bodies: string[];
   plane: PlaneRef;
-  /** Join the mirrored result into the source body. */
   combine: boolean;
 }
 
@@ -396,9 +399,7 @@ export interface ConstructionPlaneFeature extends FeatureBase {
 export interface ReferenceImageFeature extends FeatureBase {
   type: "referenceImage";
   plane: PlaneRef;
-  /** Asset id in project assets store. */
   assetId: string;
-  /** Original filename, for display. */
   fileName: string;
   /** Placement on the plane, in sketch (u,v) coordinates. */
   transform: {
@@ -409,7 +410,6 @@ export interface ReferenceImageFeature extends FeatureBase {
     scale: number;
   };
   opacity: number; // 0..1
-  /** Natural image size in pixels (for aspect + calibration). */
   width: number;
   height: number;
 }

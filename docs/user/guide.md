@@ -161,7 +161,17 @@ run of collinear edges is refused.
 **Add set** starts another selection set with its own radius, as Fusion's
 **+** does, and **Set** chooses which set your picks, the radius, the size
 hint and the drag arrow act on. **Remove set** drops the chosen set. Every
-set builds in one fillet. Two distances take one set.
+set builds in one fillet. Two distances and Variable radius take one set.
+
+**Between** narrows a fillet of faces or features to the edges where they
+meet the faces or features picked under it, as Fusion's Rule fillet
+**Between faces/features** does. Click **Between**, then those faces or
+features. Picked edges still round as picked. Faces alone round every sharp
+edge they bound, as Fusion's **All edges** does.
+
+Fillet's **Type** also offers **Variable radius**: the round changes evenly
+from **Start radius** at one end of each edge, or tangent chain, to **End
+radius** at the other. Swap the two values to reverse it.
 
 A fillet that meets two earlier fillets can fail. This is a current
 limitation. Fillet the vertical edges before the top edges to avoid it.
