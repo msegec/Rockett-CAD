@@ -117,6 +117,7 @@ it.each(["line", "rect", "circle"] as const)(
         pointer("pointerdown", new THREE.Vector3(0, 0, 0));
         pointer("pointerup", new THREE.Vector3(0, 0, 0));
         pointer("pointermove", new THREE.Vector3(10, 5, 0));
+        vi.advanceTimersToNextFrame();
       });
       const active = () => host.querySelector(".dim-field.active")!;
       expect(active()).not.toBeNull();

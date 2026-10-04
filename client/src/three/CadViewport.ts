@@ -26,6 +26,7 @@ import {
   type PickResult,
 } from "./pickProviders";
 import { clientRay } from "./screen";
+import { bodiesNearRay } from "./pickLookup";
 import { boxPick, type BoxMode, type ClientBox } from "./boxPick";
 import { BodyLayer } from "./bodyObjects";
 import type { LayerBody } from "./meshes";
@@ -152,6 +153,13 @@ export class CadViewport {
   });
   readonly requestRender = this.frames.requestRender;
   readonly onRender = this.frames.onRender;
+  private hover: (() => void) | null = null;
+  private hovers = frameScheduler(() => {
+    const run = this.hover;
+    this.hover = null;
+    run?.();
+    return false;
+  });
 
   originPlanesVisible = true;
 
@@ -217,6 +225,7 @@ export class CadViewport {
     this.stopPickTolerance();
     this.stopGhostOpacity();
     this.frames.dispose();
+    this.hovers.dispose();
     window.removeEventListener("scroll", this.forgetRect, true);
     this.layers.dispose();
     this.bodyLayer.dispose();
@@ -358,12 +367,14 @@ export class CadViewport {
   }
 
   orbit(dx: number, dy: number, pivot = this.target) {
+    this.hover = null;
     if (getSetting("view.orbit") === "turntable")
       this.orbitTurntable(dx, dy, pivot);
     else this.orbitTrackball(dx, dy, pivot);
   }
 
   pan(dx: number, dy: number) {
+    this.hover = null;
     const scale = this.worldPerPixel();
     const cam = this.camera as THREE.Camera;
     const right = new THREE.Vector3();
@@ -411,6 +422,11 @@ export class CadViewport {
     const [x, y] = this.pendingPan ?? [0, 0];
     this.pendingPan = [x + dx, y + dy];
     this.requestRender();
+  }
+
+  queueHover(run: () => void) {
+    this.hover = run;
+    this.hovers.requestRender();
   }
 
   private applyQueuedInput() {
@@ -633,32 +649,7 @@ export class CadViewport {
   }
 
   setBodyTints(tints: ReadonlyMap<string, PreviewTint>) {
-    for (const [id, b] of this.bodies) {
-      const tint = tints.get(id);
-      const geom = b.mesh.geometry;
-      geom.clearGroups();
-      if (!tint) {
-        b.mesh.material = b.material;
-        b.tint?.dispose();
-        b.tint = null;
-        continue;
-      }
-      b.tint ??= b.material.clone();
-      b.tint.userData.themeToken = tint.tint;
-      b.tint.color.set(themeColor(tint.tint));
-      let at = 0;
-      for (const { start, count } of tint.ranges.toSorted(
-        (x, y) => x.start - y.start,
-      )) {
-        if (start > at) geom.addGroup(at, start - at, 0);
-        geom.addGroup(start, count, 1);
-        at = start + count;
-      }
-      const end = geom.index?.count ?? 0;
-      if (end > at) geom.addGroup(at, end - at, 0);
-      b.mesh.material = [b.material, b.tint];
-    }
-    this.requestRender();
+    this.bodyLayer.tint(tints);
   }
 
   setPreviewGhosts(ghosts: readonly PreviewGhost[]) {
@@ -708,12 +699,15 @@ export class CadViewport {
     depth = 0,
   ): PickResult | null {
     this.rayFromClient(clientX, clientY);
-    const { line } = pickThresholds(this.worldPerPixel(), this.pickTolerancePx);
+    const { line, point } = pickThresholds(
+      this.worldPerPixel(),
+      this.pickTolerancePx,
+    );
     return pickWithProviders(
       this.raycaster,
       line,
       {
-        bodies: this.bodies,
+        bodies: bodiesNearRay(this.bodies, this.raycaster.ray, point),
         originRoot: this.originRoot,
         originPlaneMeshes: this.originPlaneMeshes,
         originAxisLines: this.originAxisLines,

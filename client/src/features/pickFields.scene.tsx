@@ -211,7 +211,7 @@ export async function clickAt(world: P, init: PointerEventInit = {}) {
 
 export async function hoverAt(world: P) {
   await act(async () => pointer("pointermove", new THREE.Vector3(...world)));
-  await wait(0);
+  await act(async () => vi.advanceTimersToNextFrame());
 }
 
 export async function clickTree(text: string) {

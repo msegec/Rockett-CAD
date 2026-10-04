@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import type { MeshPayload } from "@rockett/shared";
+import type { PreviewTint } from "../livePreview";
+import { themeColor } from "../theme/tokens";
 import { disposeAll, disposeGroup } from "./dispose";
 import { BodyMaterials } from "./materials";
 import type { PickBody } from "./pickProviders";
@@ -132,6 +134,35 @@ export class BodyLayer {
     this.dimmed = ids;
     for (const built of this.bodies.values())
       this.paint(built, built.payload.color);
+    this.changed();
+  }
+
+  tint(tints: ReadonlyMap<string, PreviewTint>) {
+    for (const [id, b] of this.bodies) {
+      const tint = tints.get(id);
+      const geom = b.mesh.geometry;
+      geom.clearGroups();
+      if (!tint) {
+        b.mesh.material = b.material;
+        b.tint?.dispose();
+        b.tint = null;
+        continue;
+      }
+      b.tint ??= b.material.clone();
+      b.tint.userData.themeToken = tint.tint;
+      b.tint.color.set(themeColor(tint.tint));
+      let at = 0;
+      for (const { start, count } of tint.ranges.toSorted(
+        (x, y) => x.start - y.start,
+      )) {
+        if (start > at) geom.addGroup(at, start - at, 0);
+        geom.addGroup(start, count, 1);
+        at = start + count;
+      }
+      const end = geom.index?.count ?? 0;
+      if (end > at) geom.addGroup(at, end - at, 0);
+      b.mesh.material = [b.material, b.tint];
+    }
     this.changed();
   }
 

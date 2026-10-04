@@ -617,7 +617,7 @@ export function ViewportView({
       } else if (button === 0) {
         if (!drag.move(e)) handlePrimaryDrag(e);
       } else {
-        handleHover(e);
+        vp.queueHover(() => handleHover(e));
       }
       lastX = e.clientX;
       lastY = e.clientY;
@@ -635,13 +635,13 @@ export function ViewportView({
         button = -1;
         return;
       }
-      const wasOrbit = orbiting,
-        wasPan = panning;
+      const viewMoved = orbiting || panning;
       orbiting = panning = false;
       const b = button;
       button = -1;
-      if (wasOrbit || wasPan) {
+      if (viewMoved) {
         if (b === 2 && !dragMoved) handleContextClick(e);
+        else vp.queueHover(() => handleHover(e));
         return;
       }
       if (b === 0) drag.up(e, dragMoved, handlePrimaryUp);

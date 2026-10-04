@@ -28,7 +28,7 @@ client/src/sketchEdits.ts sketchEdits 166
 client/src/sketchTools.ts 1041
 client/src/store.ts 502
 client/src/store.ts useStore 260
-client/src/three/CadViewport.ts 789
+client/src/three/CadViewport.ts 783
 client/src/three/ViewCube.ts constructor 83
 client/src/three/revolveGhost.ts buildRevolveGhost 99
 client/src/three/toolPreview.ts updateToolPreview 147
