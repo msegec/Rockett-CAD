@@ -45,9 +45,9 @@ dependents and exports, and restarts with a bounded backoff:
 **Server owns the document.** Clients send feature-level edits; the server
 validates, evaluates, saves and returns the document with the model. Every
 document edit except a project rename goes through `mutateProject` in
-`server/src/api/routes.ts`. A stale revision gets 409 and writes nothing:
-`server/src/api/revision.ts`. Undo is server history, separate
-from the timeline (FEATURE_TIMELINE.md). Hidden items and the camera are
+`server/src/api/projectMutations.ts`. A stale revision gets 409 and writes
+nothing: `server/src/api/revision.ts`. Undo is server history, separate from
+the timeline (FEATURE_TIMELINE.md). Hidden items and the camera are
 per-user view state, outside the document and undo:
 `server/src/store/viewStore.ts`. A browser project keeps its view in its
 browser record, and its temporary copy holds it in server memory. API.md owns
@@ -72,6 +72,13 @@ Regeneration engine, has the detail.
 **Units.** Stored geometry is millimetres. The `units.length` setting in
 `shared/src/settings.ts` owns the display unit; `shared/src/units.ts` owns
 conversion and parsing (`shared/test/units.test.ts`).
+
+**Registries.** Feature specs, kinds and UIs, commands and toolbar groups,
+hold keys, menu items, panels, workbenches, selection kinds, pick providers,
+scene layers, importers, exporters and route modules each register through
+`createRegistry` (`shared/src/registry.ts`), and each registration returns a
+disposer. Core registers through the same calls a module uses. API.md,
+Extension points and Modules, owns the module contract.
 
 **Dialog form kit.** `client/src/components/form/` holds every dialog field
 and the one OK and Cancel footer. No other component renders a raw number

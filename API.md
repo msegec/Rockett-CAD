@@ -1,13 +1,19 @@
 # REST API
 
 Base path `/api`, JSON unless noted. The route tables own method, path, body
-schema and the request and response types (the `route<Req, Res>` generics):
+schema, effect and the request and response types (the `route<Req, Res>`
+generics):
 
-- `ROUTES`, `AUTH_ROUTES` and `DOCUMENT_EDITS` in `shared/src/routes.ts`;
+- `ROUTES` and `AUTH_ROUTES` in `shared/src/routes.ts`;
 - settings entries in `shared/src/settingsRoutes.ts`;
 - tangent edges and reference signing in `shared/src/refRepairRoutes.ts`;
 - `FRIEND_ROUTES` in `shared/src/friends.ts`, `NOTICE_ROUTES` in
   `shared/src/notices.ts`.
+
+A route's `effect` is `document` for a document edit or `viewer` for a write
+a view-only member may make; `DOCUMENT_EDITS` and `VIEWER_WRITES` in
+`shared/src/routeContract.ts` read it, and route modules declare it the same
+way.
 
 Wire types live in `shared/src/api.ts` and `shared/src/model.ts`. The client
 builds paths with `pathFor` and sends every call through `request` in
@@ -30,10 +36,10 @@ nothing else is: `server/src/api/routes.ts`.
 | `GET`, `PATCH /settings`                                                          | `server/src/api/settingsRoutes.ts` |
 | `GET`, `PATCH /me/settings`, `POST /me/settings/import`                           | `server/src/api/settingsRoutes.ts` |
 | `GET`, `PATCH /projects/:id/settings`                                             | `server/src/api/settingsRoutes.ts` |
-| `GET /health`                                                                     | `server/src/api/routes.ts`         |
-| `GET /formats`                                                                    | `server/src/api/routes.ts`         |
+| `GET /health`                                                                     | `server/src/api/systemRoutes.ts`   |
+| `GET /formats`                                                                    | `server/src/api/systemRoutes.ts`   |
 | `GET /modules`                                                                    | `server/src/api/routes.ts`         |
-| `GET`, `POST /projects`                                                           | `server/src/api/routes.ts`         |
+| `GET`, `POST /projects`                                                           | `server/src/api/projectRoutes.ts`  |
 | `GET`, `DELETE /projects/:id`                                                     | `server/src/api/projectRoutes.ts`  |
 | `POST /projects/:id/duplicate`, `/rename`                                         | `server/src/api/projectRoutes.ts`  |
 | `GET`, `PUT /projects/:id/members`                                                | `server/src/api/projectMembers.ts` |
@@ -43,25 +49,25 @@ nothing else is: `server/src/api/routes.ts`.
 | `POST /projects/:id/evaluate`                                                     | `server/src/api/geometryRoutes.ts` |
 | `GET /projects/:id/meshes/:hash`                                                  | `server/src/api/meshRoute.ts`      |
 | `GET /jobs/:jobId/events`, `DELETE /jobs/:jobId`                                  | `server/src/api/jobRoutes.ts`      |
-| `POST /projects/:id/features`                                                     | `server/src/api/routes.ts`         |
-| `PUT`, `DELETE /projects/:id/features/:fid`                                       | `server/src/api/routes.ts`         |
-| `POST /projects/:id/features/:fid/project`, `/signature`                          | `server/src/api/routes.ts`         |
-| `POST /projects/:id/timeline`                                                     | `server/src/api/routes.ts`         |
-| `POST /projects/:id/undo`, `/redo`                                                | `server/src/api/routes.ts`         |
-| `POST /projects/:id/previews/:tx/commit`, `DELETE /projects/:id/previews/:tx`     | `server/src/api/routes.ts`         |
+| `POST /projects/:id/features`                                                     | `server/src/api/featureRoutes.ts`  |
+| `PUT`, `DELETE /projects/:id/features/:fid`                                       | `server/src/api/featureRoutes.ts`  |
+| `POST /projects/:id/features/:fid/project`, `/signature`                          | `server/src/api/featureRoutes.ts`  |
+| `POST /projects/:id/timeline`                                                     | `server/src/api/featureRoutes.ts`  |
+| `POST /projects/:id/undo`, `/redo`                                                | `server/src/api/previewRoutes.ts`  |
+| `POST /projects/:id/previews/:tx/commit`, `DELETE /projects/:id/previews/:tx`     | `server/src/api/previewRoutes.ts`  |
 | `GET /projects/:id/history`, `POST /projects/:id/checkpoints`, `/history/restore` | `server/src/api/historyRoutes.ts`  |
 | `DELETE /projects/:id/checkpoints`                                                | `server/src/api/historyRoutes.ts`  |
-| `PUT /projects/:id/bodies/:bodyId`                                                | `server/src/api/routes.ts`         |
-| `PUT /projects/:id/groups`                                                        | `server/src/api/routes.ts`         |
-| `POST /projects/:id/upgrade-naming`, `/commit`                                    | `server/src/api/routes.ts`         |
-| `POST /projects/:id/maintenance/gc`                                               | `server/src/api/routes.ts`         |
-| `GET`, `PUT /projects/:id/thumbnail`                                              | `server/src/api/routes.ts`         |
+| `PUT /projects/:id/bodies/:bodyId`                                                | `server/src/api/bodyRoutes.ts`     |
+| `PUT /projects/:id/groups`                                                        | `server/src/api/bodyRoutes.ts`     |
+| `POST /projects/:id/upgrade-naming`, `/commit`                                    | `server/src/api/documentRoutes.ts` |
+| `POST /projects/:id/maintenance/gc`                                               | `server/src/api/documentRoutes.ts` |
+| `GET`, `PUT /projects/:id/thumbnail`                                              | `server/src/api/documentRoutes.ts` |
 | `GET`, `PUT /projects/:id/view`                                                   | `server/src/api/documentRoutes.ts` |
-| `POST /projects/:id/tangent-edges`                                                | `server/src/api/routes.ts`         |
+| `POST /projects/:id/tangent-edges`                                                | `server/src/api/geometryRoutes.ts` |
 | `POST /projects/:id/size-limit`                                                   | `server/src/api/geometryRoutes.ts` |
 | `POST /projects/:id/measure`                                                      | `server/src/api/measureRoutes.ts`  |
-| `POST /projects/:id/export`                                                       | `server/src/api/routes.ts`         |
-| `POST /projects/:id/assets`, `GET /projects/:id/assets/:assetId`                  | `server/src/api/routes.ts`         |
+| `POST /projects/:id/export`                                                       | `server/src/api/geometryRoutes.ts` |
+| `POST /projects/:id/assets`, `GET /projects/:id/assets/:assetId`                  | `server/src/api/geometryRoutes.ts` |
 | `/folders` and below, `PUT /projects/:id/folder`                                  | `server/src/api/folderRoutes.ts`   |
 
 ## Errors
@@ -106,7 +112,7 @@ notice routes.
   `toPublicUser` in `server/src/auth/userStore.ts`.
 - User routes and blob collection are admin only. Project members routes need
   the owner or an admin. Anyone without project access gets 404, not 403. A
-  `view` member may only read, plus the routes in `VIEWER_WRITES`
+  `view` member may only read, plus the `viewer` effect routes
   (`server/src/api/projectAccess.ts`).
 - Folder members inherit their role on the folder's projects: `folderRole`
   in `server/src/api/projectAccess.ts`.
@@ -114,8 +120,8 @@ notice routes.
 ## Document revisions
 
 A project's `ETag` is `"<revision>"`, equal to `document.revision`; every
-save raises it by one. Every route in `DOCUMENT_EDITS`, and every route
-module mutation, needs `If-Match: "<revision>"`, checked inside the project
+save raises it by one. Every `document` effect route, route module mutations
+included, needs `If-Match: "<revision>"`, checked inside the project
 queue: missing is 428, malformed is 400, stale is 409, and none writes:
 `server/src/api/revision.ts`. Other writes (view, thumbnail, checkpoints,
 folders, members, settings, assets, export `retain`) take no revision.
@@ -163,7 +169,7 @@ an old hash is 404.
 A feature add or edit with `X-Rockett-Preview` (`PREVIEW_HEADER`) and
 `X-Rockett-Tx` stages the edit in memory for that user and session instead of
 saving it. Only the preview commit route saves it. A restart drops open
-previews: `Previews` in `server/src/api/routes.ts`.
+previews: `Previews` in `server/src/store/historyStore.ts`.
 
 Parameter and expression associations update together through
 `PUT /projects/:id/parameters` with `parameters` and `parameterBindings`.
@@ -389,7 +395,7 @@ module, in load order:
 - After sign-in, `client/src/modules/host.ts` activates the client part of
   each listed module that this route reports `loaded`, with `ClientContext`:
   `register`, `project`, `ui` and `request`. `register.command`,
-  `toolbarGroup`, `panel` and `workbench` take `plugin-api` types;
+  `toolbarGroup`, `panel`, `workbench` and `layer` take `plugin-api` types;
   `selectionKind` and `pickProvider` still take core types. Activation is atomic as on the server. A command
   `Control` and a workbench `tree` and `bar` draw inside the panel error
   boundary.
