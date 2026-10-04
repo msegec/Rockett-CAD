@@ -1,6 +1,7 @@
 import {
   nextFeatureName,
   ROUTES,
+  SIZE_KEYS,
   ValidationError,
   type ExportRequest,
   type SizedFeature,
@@ -59,9 +60,14 @@ export function sizeLimitRoute(context: ApiRoutes) {
     wrap(async (req, res) => {
       const feature = req.body?.feature as SizedFeature;
       record(feature, "feature");
-      if (!["fillet", "chamfer", "shell"].includes(feature.type))
+      if (
+        typeof feature.type !== "string" ||
+        !Object.hasOwn(SIZE_KEYS, feature.type) ||
+        (feature.type === "extrude" && feature.operation !== "cut") ||
+        (feature.type === "offsetFace" && feature.distance >= 0)
+      )
         throw new ValidationError(
-          "size limits cover fillet, chamfer and shell",
+          "size limits cover fillet, chamfer, shell, cut extrude, linear pattern and inward offset face",
         );
       const doc = await store.load(req.params.id);
       knownKeys(feature, feature.type);

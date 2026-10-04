@@ -342,6 +342,10 @@ export function lengthOf(shape: Shape): number {
   });
 }
 
+export function diagonal({ min, max }: ReturnType<typeof bboxOf>): number {
+  return Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+}
+
 export function bboxOf(
   shape: Shape,
   useShapeTolerance = true,

@@ -13,6 +13,7 @@ import {
 import {
   acquire,
   bboxOf,
+  diagonal,
   getKernel,
   kernelCall,
   planarFacePlane,
@@ -390,13 +391,7 @@ export function evalSplitBody(state: EvalState, f: SplitBodyFeature): void {
   const frame = resolvePlaneFrame(state, f.tool);
   const k = getKernel();
   kernelCall("splitBody", () => {
-    const bbox = bboxOf(body.shape);
-    const diag =
-      Math.hypot(
-        bbox.max[0] - bbox.min[0],
-        bbox.max[1] - bbox.min[1],
-        bbox.max[2] - bbox.min[2],
-      ) + 10;
+    const diag = diagonal(bboxOf(body.shape)) + 10;
     const toolFace = splitPlaneFace(frame, diag, acquire);
     const splitter = acquire(new k.BRepAlgoAPI_Splitter_1());
     splitter.SetArguments(shapeList([body.shape]));

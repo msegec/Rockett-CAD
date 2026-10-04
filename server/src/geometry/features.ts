@@ -64,6 +64,7 @@ import {
 import {
   acquire,
   bboxOf,
+  diagonal,
   dir,
   edges as edgesOf,
   faces as facesOf,
@@ -989,15 +990,7 @@ export function evalConstructionPlane(
   // display size heuristic: cover existing model bbox
   let size = 40;
   for (const body of state.bodies.values()) {
-    const bb = bboxOf(body.shape);
-    size = Math.max(
-      size,
-      Math.hypot(
-        bb.max[0] - bb.min[0],
-        bb.max[1] - bb.min[1],
-        bb.max[2] - bb.min[2],
-      ) * 0.75,
-    );
+    size = Math.max(size, diagonal(bboxOf(body.shape)) * 0.75);
   }
   state.planes.set(f.id, { frame, size });
 }

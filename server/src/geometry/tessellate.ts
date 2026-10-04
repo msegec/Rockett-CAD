@@ -20,6 +20,7 @@ import {
 import {
   acquire,
   bboxOf,
+  diagonal,
   getKernel,
   lengthOf,
   scoped,
@@ -248,13 +249,8 @@ function movedCurve(
   };
 }
 
-function viewportDeflection({ min, max }: ReturnType<typeof bboxOf>): number {
-  const diagonal = Math.hypot(
-    max[0] - min[0],
-    max[1] - min[1],
-    max[2] - min[2],
-  );
-  return Math.min(0.5, Math.max(0.005, 0.0005 * diagonal));
+function viewportDeflection(box: ReturnType<typeof bboxOf>): number {
+  return Math.min(0.5, Math.max(0.005, 0.0005 * diagonal(box)));
 }
 
 const SURFACE_TYPES = [

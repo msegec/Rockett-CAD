@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createEmptyDocument, type ShellFeature } from "@rockett/shared";
+import {
+  createEmptyDocument,
+  SIZE_KEYS,
+  type LinearPatternFeature,
+  type ShellFeature,
+} from "@rockett/shared";
 import { TIMING_MS, TRIAL_BUDGET } from "../tunables.js";
 import { trialBuild } from "./engine.js";
 import { emptyState, NoCorner } from "./features.js";
@@ -11,6 +16,7 @@ vi.mock("./kernel.js", async (original) => ({
   ...(await original<typeof import("./kernel.js")>()),
   volumeOf: (shape: { volume?: number }) => shape.volume ?? 4,
   areaOf: () => 1,
+  bboxOf: () => ({ min: [0, 0, 0], max: [3, 4, 0] }),
 }));
 
 const feature: ShellFeature = {
@@ -38,10 +44,11 @@ function state() {
 
 function accept(check: (size: number, trial: number) => boolean) {
   vi.mocked(trialBuild).mockImplementation((_state, sized) => {
-    if (sized.type !== "shell") throw new Error("expected shell trial");
-    const passed = check(sized.thickness, trials.length + 1);
-    trials.push({ size: sized.thickness, passed });
+    const size = Reflect.get(sized, SIZE_KEYS[sized.type as "shell"]);
+    const passed = check(size, trials.length + 1);
+    trials.push({ size, passed });
     if (!passed) throw new Error("size does not fit");
+    return true;
   });
 }
 
@@ -159,4 +166,39 @@ it("a closed shell refuses a chosen body that is gone without a trial", async ()
     sizeLimit(state(), doc, undefined, { ...feature, body: "gone" }),
   ).rejects.toThrow("no body to shell");
   expect(trialBuild).not.toHaveBeenCalled();
+});
+
+const pattern: LinearPatternFeature = {
+  id: "pattern",
+  name: "Pattern",
+  type: "linearPattern",
+  suppressed: false,
+  bodies: ["body"],
+  direction: { kind: "axis", axis: "X" },
+  count: 3,
+  spacing: -1,
+  combine: false,
+};
+
+it("a least-size input searches down from its estimate and keeps the typed side", async () => {
+  accept((size) => size <= -2);
+  const found = await sizeLimit(state(), doc, undefined, pattern);
+  expect(trials[0]!.size).toBe(-5);
+  expect(found.kind).toBe("upTo");
+  if (found.kind !== "upTo") throw new Error("missing bracket");
+  expect(found.size).toBe(-trials.findLast((trial) => trial.passed)!.size);
+  expect(found.size).toBeGreaterThanOrEqual(2);
+  expect(found.size / 1.25).toBeLessThan(2);
+  expect(
+    Math.max(...trials.filter((t) => !t.passed).map((t) => -t.size)),
+  ).toBeGreaterThanOrEqual(found.size / 1.25);
+});
+
+it("a least-size input that fails everywhere reports its largest failure", async () => {
+  accept(() => false);
+  expect(await sizeLimit(state(), doc, undefined, pattern)).toEqual({
+    kind: "stopped",
+    below: 5 * 4 ** (TRIAL_BUDGET.sizeLimitBuilds - 1),
+    builds: TRIAL_BUDGET.sizeLimitBuilds,
+  });
 });

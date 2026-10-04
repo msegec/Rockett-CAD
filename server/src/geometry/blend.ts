@@ -16,6 +16,7 @@ import {
 } from "@rockett/shared";
 import {
   bboxOf,
+  diagonal,
   acquire,
   edgeCentroid,
   edges as edgesOf,
@@ -181,12 +182,7 @@ function chamferByEnvelope(
       tr.SetTranslation_1(own(vec(-n[0] * t, -n[1] * t, -n[2] * t)));
       return own(own(transformOp(shape, tr)).Shape());
     };
-    const bb = bboxOf(body.shape);
-    const diag = Math.hypot(
-      bb.max[0] - bb.min[0],
-      bb.max[1] - bb.min[1],
-      bb.max[2] - bb.min[2],
-    );
+    const diag = diagonal(bboxOf(body.shape));
 
     for (const cap of caps) {
       const n = cap.plane.normal;

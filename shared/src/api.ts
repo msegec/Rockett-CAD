@@ -4,12 +4,10 @@
 
 import type {
   CadDocument,
-  ChamferFeature,
   EdgeRef,
   FaceRef,
-  FilletFeature,
+  Feature,
   NamingVersion,
-  ShellFeature,
   ProjectMember,
   SketchSolveStatus,
   SketchEntity,
@@ -350,7 +348,16 @@ export interface ModuleInfo {
   error: string | null;
 }
 
-export type SizedFeature = FilletFeature | ChamferFeature | ShellFeature;
+export const SIZE_KEYS = {
+  fillet: "radius",
+  chamfer: "distance",
+  shell: "thickness",
+  extrude: "distance",
+  linearPattern: "spacing",
+  offsetFace: "distance",
+} as const;
+
+export type SizedFeature = Extract<Feature, { type: keyof typeof SIZE_KEYS }>;
 
 export interface SizeLimitRequest {
   feature: SizedFeature;
@@ -363,6 +370,7 @@ export type SizeLimit = { builds: number } & (
   | { kind: "stopped"; below: number }
   | { kind: "stopped"; size: number }
   | { kind: "slow" }
+  | { kind: "untouched" }
 );
 
 export interface ExportRequest {

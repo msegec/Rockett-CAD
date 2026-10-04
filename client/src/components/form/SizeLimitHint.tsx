@@ -11,42 +11,83 @@ import { PREVIEW_DEBOUNCE_MS } from "../../livePreview";
 import { dialogFeatureId, useStore } from "../../store";
 import { useSetting } from "../../settings";
 
-const SIZE_SCOPE = {
-  fillet: "on these edges",
-  chamfer: "on these edges",
-  shell: "for this body",
+const UP_TO = { works: "Works up to", untried: "smaller" };
+const FROM = { untried: "larger", scope: "" };
+const SIZE_TEXT: Record<
+  SizedFeature["type"],
+  { works: string; scope: string; untried: string }
+> = {
+  fillet: { ...UP_TO, scope: " on these edges" },
+  chamfer: { ...UP_TO, scope: " on these edges" },
+  shell: { ...UP_TO, scope: " for this body" },
+  offsetFace: { ...UP_TO, scope: " inward on these faces" },
+  extrude: { ...FROM, works: "Cuts through all from" },
+  linearPattern: { ...FROM, works: "Copies stay apart from" },
 };
 
 function sizeText(
   limit: SizeLimit,
   feature: SizedFeature,
   units: Units,
-): string {
+): string | null {
+  const { works, scope, untried } = SIZE_TEXT[feature.type];
   switch (limit.kind) {
     case "upTo":
-      return `Works up to about ${formatLength(limit.size, units)} ${SIZE_SCOPE[feature.type]}`;
+      return `${works} about ${formatLength(limit.size, units)}${scope}`;
     case "smooth":
       return "No corner: the faces meet flat or smoothly";
     case "none":
       return `Fails at every size tried, down to ${formatLength(limit.below, units)}`;
     case "stopped":
       if ("size" in limit)
-        return `Works up to about ${formatLength(limit.size, units)}, stopped early`;
-      return `Stopped early: fails at ${formatLength(limit.below, units)}, smaller sizes not checked`;
+        return `${works} about ${formatLength(limit.size, units)}, stopped early`;
+      return `Stopped early: fails at ${formatLength(limit.below, units)}, ${untried} sizes not checked`;
     case "slow":
       return "Too slow to find the usable size";
+    case "untouched":
+      return null;
   }
 }
 
 function sizePicks(draft: Feature | null): string | null {
-  if (draft?.type === "shell")
-    return draft.openFaces.length || draft.body !== undefined
-      ? JSON.stringify([draft.openFaces, draft.body])
-      : null;
-  if (draft?.type !== "fillet" && draft?.type !== "chamfer") return null;
-  return draft.edges.length
-    ? JSON.stringify([draft.edges, draft.tangentChain])
-    : null;
+  switch (draft?.type) {
+    case "shell":
+      return draft.openFaces.length || draft.body !== undefined
+        ? JSON.stringify([draft.openFaces, draft.body])
+        : null;
+    case "fillet":
+    case "chamfer":
+      return draft.edges.length
+        ? JSON.stringify([draft.edges, draft.tangentChain])
+        : null;
+    case "extrude":
+      return draft.operation === "cut" &&
+        (draft.profiles.length || draft.faces?.length)
+        ? JSON.stringify([
+            draft.profiles,
+            draft.faces,
+            draft.targets,
+            draft.direction,
+            draft.distance < 0,
+            draft.startOffset,
+          ])
+        : null;
+    case "linearPattern":
+      return draft.bodies.length
+        ? JSON.stringify([
+            draft.bodies,
+            draft.direction,
+            draft.count,
+            draft.spacing < 0,
+          ])
+        : null;
+    case "offsetFace":
+      return draft.faces.length && draft.distance < 0
+        ? JSON.stringify(draft.faces)
+        : null;
+    default:
+      return null;
+  }
 }
 
 function sizePosition(id: string): number {
@@ -84,13 +125,11 @@ export function SizeLimitHint({ draft }: { draft: Feature | null }) {
     };
   }, [projectId, key]);
   if (!key) return null;
-  return (
-    <div className="field-hint">
-      {hint?.key === key
-        ? typeof hint.result === "string"
-          ? hint.result
-          : sizeText(hint.result, draft as SizedFeature, units)
-        : "Checking the usable size"}
-    </div>
-  );
+  const text =
+    hint?.key !== key
+      ? "Checking the usable size"
+      : typeof hint.result === "string"
+        ? hint.result
+        : sizeText(hint.result, draft as SizedFeature, units);
+  return text && <div className="field-hint">{text}</div>;
 }

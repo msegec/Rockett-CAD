@@ -58,7 +58,7 @@ nothing else is: `server/src/api/routes.ts`.
 | `GET`, `PUT /projects/:id/thumbnail`                                              | `server/src/api/routes.ts`         |
 | `GET`, `PUT /projects/:id/view`                                                   | `server/src/api/documentRoutes.ts` |
 | `POST /projects/:id/tangent-edges`                                                | `server/src/api/routes.ts`         |
-| `POST /projects/:id/size-limit`                                                   | `server/src/api/routes.ts`         |
+| `POST /projects/:id/size-limit`                                                   | `server/src/api/geometryRoutes.ts` |
 | `POST /projects/:id/measure`                                                      | `server/src/api/measureRoutes.ts`  |
 | `POST /projects/:id/export`                                                       | `server/src/api/routes.ts`         |
 | `POST /projects/:id/assets`, `GET /projects/:id/assets/:assetId`                  | `server/src/api/routes.ts`         |
