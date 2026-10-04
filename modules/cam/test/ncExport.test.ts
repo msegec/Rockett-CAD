@@ -353,6 +353,25 @@ describe("GET /projects/:id/m/rockett/cam/nc", () => {
     expect(lines.filter((line) => /\bM3\b/.test(line))).toEqual([]);
   });
 
+  it("switches grblHAL acceleration profiles around finishing only when the machine has them", async () => {
+    const grblhal = loadPost("grblhal");
+    const exported = async (machine: MachineProfile) => {
+      const route = await mounted({ machine });
+      const doc = project(setup("s1", "Setup 1"));
+      await route.generate(doc);
+      const out = await route.nc(doc, "s1", {
+        postId: "grblhal",
+        toolChange: "m6",
+      });
+      if (!("nc" in out)) throw new Error(JSON.stringify(out));
+      return headed(out.nc).body;
+    };
+    expect(await exported({ ...mill, accelerationProfiles: true })).toBe(
+      golden(grblhal, "contour-accel", 1)[0],
+    );
+    expect(await exported(mill)).toBe(golden(grblhal, "contour", 1)[0]);
+  });
+
   it("refuses an unknown machine, post, tool change or setup with a reason", async () => {
     const route = await mounted();
     const doc = project(setup("s1", "Setup 1"));

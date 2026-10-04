@@ -118,9 +118,10 @@ const fingerprint = (target: Target, setupId: string, made: Made[]) =>
 
 function formatOptions(machine: MachineProfile): FormatOptions {
   const max = machine.laserPowerMax;
+  const accelerationProfiles = machine.accelerationProfiles === true;
   return machineKind(machine) === "laser" && max !== undefined
-    ? { laserPowerMax: max }
-    : {};
+    ? { laserPowerMax: max, accelerationProfiles }
+    : { accelerationProfiles };
 }
 
 async function posted(
