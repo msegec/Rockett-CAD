@@ -87,28 +87,38 @@ function edited(fields: Entry[], draft: SketchConstraint[]) {
   return { constraints, links };
 }
 
+export async function updateOfferingDriven(constraints: SketchConstraint[]) {
+  const s = useStore.getState();
+  const entities = s.draftSketch?.entities;
+  if (!entities) return null;
+  let first: SketchConstraint | null = null;
+  let next = constraints;
+  for (let left = constraints.length; left >= 0; left--) {
+    const refused = s.updateDraftSketch(entities, next);
+    first ??= refused;
+    if (
+      !refused ||
+      !("value" in refused) ||
+      !(await confirm(
+        `${useStore.getState().error} Add it as a driven dimension instead?`,
+      ))
+    )
+      return first;
+    useStore.setState({ error: null });
+    next = next.map((c) =>
+      c.id === refused.id ? { ...refused, driven: true } : c,
+    );
+  }
+  return first;
+}
+
 async function commitFields(fields: Entry[]) {
   const s = useStore.getState();
   const draft = s.draftSketch;
   if (!draft) return;
   const { constraints, links } = edited(fields, draft.constraints);
   if (constraints === draft.constraints) return;
-  const refused = s.updateDraftSketch(draft.entities, constraints);
-  if (
-    refused &&
-    "value" in refused &&
-    (await confirm(
-      `${useStore.getState().error} Add it as a driven dimension instead?`,
-    ))
-  ) {
-    useStore.setState({ error: null });
-    s.updateDraftSketch(
-      draft.entities,
-      constraints.map((c) =>
-        c.id === refused.id ? { ...refused, driven: true } : c,
-      ),
-    );
-  }
+  await updateOfferingDriven(constraints);
   await s.commitDraftSketch(links);
 }
 

@@ -336,3 +336,86 @@ describe("connected components", () => {
     expect(parse(FEATURE_SCHEMAS.sketch, sketch)).toBe(sketch);
   });
 });
+
+const add = (
+  sketch: { entities: SketchEntity[]; constraints: SketchConstraint[] },
+  c: SketchConstraint,
+) =>
+  editedEntities(sketch.constraints, {
+    entities: sketch.entities,
+    constraints: [...sketch.constraints, c],
+  });
+const width = (side: string): SketchConstraint => ({
+  id: `w${side}`,
+  type: "length",
+  line: side,
+  value: 10,
+});
+
+describe("redundant constraints (CUST-082)", () => {
+  const crossing = (rise: number) => ({
+    entities: [
+      pt("a", 0, 0),
+      pt("b", 100, 0),
+      pt("c", 0, -rise),
+      pt("d", 100, rise),
+      pt("p", 50, 0),
+      { id: "l1", kind: "line", p1: "a", p2: "b" },
+      { id: "l2", kind: "line", p1: "c", p2: "d" },
+    ] as SketchEntity[],
+    constraints: [
+      ...["a", "b", "c", "d"].map((point): SketchConstraint => ({
+        id: `f${point}`,
+        type: "fix",
+        point,
+      })),
+      { id: "on1", type: "pointOnLine", point: "p", line: "l1" },
+    ] as SketchConstraint[],
+  });
+  const onSecond: SketchConstraint = {
+    id: "on2",
+    type: "pointOnLine",
+    point: "p",
+    line: "l2",
+  };
+
+  it("refuses a second horizontal on a horizontal line", () => {
+    expect(() =>
+      add(
+        { entities: squares(2, 0), constraints: squareConstraints(2) },
+        { id: "h", type: "horizontal", line: "1:l0" },
+      ),
+    ).toThrow("Horizontal would over-constrain the sketch.");
+  });
+
+  it("refuses a point on a line it already lies on through a collinear line", () => {
+    expect(() => add(crossing(0), onSecond)).toThrow(
+      "Point on line would over-constrain the sketch.",
+    );
+  });
+
+  it("accepts a point on a line crossing at a shallow angle", () => {
+    expect(() => add(crossing(0.05), onSecond)).not.toThrow();
+  });
+
+  it("does not judge an existing redundant dimension again when only its label moves", () => {
+    const fixed: SketchConstraint[] = [
+      ...squareConstraints(1),
+      { id: "f", type: "fix", point: "0:0" },
+      width("0:l0"),
+      width("0:l1"),
+    ];
+    expect(() =>
+      editedEntities([...fixed, width("0:l2")], {
+        entities: squares(1, 0),
+        constraints: [...fixed, { ...width("0:l2"), labelOffset: [1, 2] }],
+      }),
+    ).not.toThrow();
+    expect(() =>
+      editedEntities(fixed, {
+        entities: squares(1, 0),
+        constraints: [...fixed, width("0:l2")],
+      }),
+    ).toThrow("Length 10 mm would over-constrain the sketch.");
+  });
+});

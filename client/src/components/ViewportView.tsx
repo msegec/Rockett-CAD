@@ -78,6 +78,7 @@ import { peekHighlight, usePeekedFeature } from "../timelinePeek";
 import { ViewportHud } from "./ViewportHud";
 import {
   DimensionEdit,
+  updateOfferingDriven,
   type DimEdit,
   type DimEditField,
 } from "./DimensionEdit";
@@ -1550,7 +1551,7 @@ export function ViewportView({
     const draft = s.draftSketch;
     if (!draft) return;
 
-    s.updateDraftSketch(
+    s.inferDraftSketch(
       [...draft.entities, ...created.entities],
       [...draft.constraints, ...created.constraints],
     );
@@ -1778,7 +1779,7 @@ export function ViewportView({
           entityId,
           uv,
         );
-        s.updateDraftSketch(result.entities, result.constraints);
+        s.inferDraftSketch(result.entities, result.constraints);
         await s.commitDraftSketch();
         useStore.getState().setSketchTool("select");
         if (result.removedConstraints)
@@ -1924,11 +1925,6 @@ export function ViewportView({
     }
   }
 
-  /**
-   * Double-click on a sketch curve: edit its size. Opens the entity's
-   * dimension editor, creating the dimension at the current value first if
-   * the entity isn't dimensioned yet.
-   */
   async function openDimensionEditor(
     entityId: string,
     e: { clientX: number; clientY: number },
@@ -1945,8 +1941,9 @@ export function ViewportView({
         draft.entities,
         draft.constraints,
       );
-      s.updateDraftSketch(draft.entities, dims.constraints);
+      const refused = await updateOfferingDriven(dims.constraints);
       await s.commitDraftSketch();
+      if (refused) return;
       const labels = dimFieldsFor("line", units) ?? [];
       const fields: DimEditField[] = [];
       for (const [i, id] of [dims.lengthId, dims.angleId].entries()) {
@@ -2180,8 +2177,9 @@ export function ViewportView({
     const s = useStore.getState();
     const draft = s.draftSketch;
     if (!draft) return;
-    s.updateDraftSketch(draft.entities, edit(draft.constraints));
+    const refused = await updateOfferingDriven(edit(draft.constraints));
     await s.commitDraftSketch();
+    if (refused) return;
     const angle = placed.type === "angle" || placed.type === "lineAngle";
     const measured = tools.measureDimension(placed, draft.entities);
     const value = angle ? round3(measured) : roundedLength(measured, units);

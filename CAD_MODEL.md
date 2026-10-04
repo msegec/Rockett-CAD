@@ -297,6 +297,12 @@ input bound, not a tolerance.
   `shared/test/ellipticalArc.test.ts`.
 - The solver skips a dimension with `driven: true`. The field is optional, so
   sketches saved without it load unchanged with no schema step.
+- `shared/src/solver.ts` minimises constraint residuals with
+  Levenberg-Marquardt on a numeric Jacobian, the same code in the browser
+  and on the server; degrees of freedom are variables minus Jacobian rank. A
+  newly driving constraint whose rows raise no rank in their component is
+  redundant and refused by name (`shared/src/solverRank.ts`); tools and trim
+  drop such a relation they inferred.
 
 ## Frame conventions
 

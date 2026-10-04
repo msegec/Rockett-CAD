@@ -115,6 +115,10 @@ export interface SketchActions {
     entities: SketchEntity[],
     constraints: SketchConstraint[],
   ) => SketchConstraint | null;
+  inferDraftSketch: (
+    entities: SketchEntity[],
+    constraints: SketchConstraint[],
+  ) => void;
   solveDraft: (drag?: { pointId: string; x: number; y: number }) => void;
   commitDraftSketch: (links?: SketchLinks) => Promise<void>;
   finishSketch: () => Promise<void>;
@@ -241,6 +245,17 @@ export function sketchActions(
         if (!(e instanceof OverConstrainedError)) throw e;
         set({ error: e.message });
         return e.constraint;
+      }
+    },
+
+    inferDraftSketch(entities, constraints) {
+      const had = new Set(get().draftSketch?.constraints.map((c) => c.id));
+      let next = constraints;
+      for (let left = constraints.length; left >= 0; left--) {
+        const refused = get().updateDraftSketch(entities, next);
+        if (!refused || "value" in refused || had.has(refused.id)) return;
+        set({ error: null });
+        next = next.filter((c) => c !== refused);
       }
     },
 

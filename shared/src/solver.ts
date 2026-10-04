@@ -1,18 +1,3 @@
-/**
- * Parametric sketch constraint solver.
- *
- * Approach: every constraint contributes one or more residual functions
- * r_i(x) where x is the vector of free sketch variables (point coordinates
- * and circle radii). We minimise Σ r_i² with Levenberg–Marquardt using a
- * numeric Jacobian. Constraint satisfaction ⇔ all residuals ≈ 0.
- *
- * Degrees of freedom are reported from the rank of the Jacobian at the
- * solution: dof = numVars − rank(J).
- *
- * This module is dependency-free and runs identically in the browser
- * (interactive dragging) and on the server (authoritative regeneration).
- */
-
 import type {
   SketchArc,
   SketchCircle,
@@ -40,6 +25,7 @@ import {
   type Block,
   type Residual,
 } from "./leastSquares.js";
+import { driving, firstRedundant } from "./solverRank.js";
 
 export interface SolveInput {
   entities: SketchEntity[];
@@ -63,6 +49,7 @@ interface Problem {
   x0: Float64Array;
   residuals: Residual[];
   deps: number[][];
+  starts: number[];
   refs: Set<string>;
   hardCount: number;
   varsOf: (id: string) => number[];
@@ -153,6 +140,7 @@ function buildProblem(input: SolveInput): Problem {
   const { pointVarIndex, radiusVarIndex } = space;
   const residuals: Residual[] = [];
   const deps: number[][] = [];
+  const starts: number[] = [];
   const refs = new Set<string>();
   const touched = new Set<string>();
   const settle = (into?: Set<string>) => {
@@ -234,7 +222,8 @@ function buildProblem(input: SolveInput): Problem {
   }
 
   for (const c of input.constraints) {
-    if ("driven" in c && c.driven) continue;
+    starts.push(residuals.length);
+    if (!driving(c)) continue;
     switch (c.type) {
       case "fix":
         break; // handled via variable pinning
@@ -457,6 +446,7 @@ function buildProblem(input: SolveInput): Problem {
     x0: Float64Array.from(space.vars),
     residuals,
     deps,
+    starts,
     refs: touched,
     hardCount,
     varsOf,
@@ -624,9 +614,18 @@ export function editedEntities(
       entities: after.entities,
       constraints: added,
     });
-    if (holds(probe)) return after.entities;
-    const solved = solveTouching(after, probe.refs);
-    if (solved.converged) return solved.entities;
+    const solved = holds(probe) ? null : solveTouching(after, probe.refs);
+    if (!solved || solved.converged) {
+      const entities = solved?.entities ?? after.entities;
+      const redundant = firstRedundant(
+        before,
+        after.constraints,
+        (constraints) => buildProblem({ entities, constraints }),
+        CONFLICT_TOL,
+      );
+      if (redundant) throw new OverConstrainedError(redundant);
+      return entities;
+    }
     const kept = after.constraints.filter((c) => !isNew(c));
     if (converges(after.entities, kept, probe.refs))
       throw new OverConstrainedError(

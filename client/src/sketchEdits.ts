@@ -133,7 +133,7 @@ export function sketchEdits(
         draftSketch.constraints,
         targets,
       );
-      get().updateDraftSketch(result.entities, result.constraints);
+      get().inferDraftSketch(result.entities, result.constraints);
       try {
         await get().commitDraftSketch();
       } catch (e) {
