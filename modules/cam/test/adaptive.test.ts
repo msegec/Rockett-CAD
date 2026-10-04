@@ -128,7 +128,6 @@ type Fixture = {
   boundary: Loop;
   radius: number;
   size: Xy;
-  boxes: { min: Xy; max: Xy; round: number }[];
   levels: number[];
 };
 
@@ -137,7 +136,6 @@ const wide: Fixture = {
   boundary: base.boundary,
   radius: r,
   size: [W, H],
-  boxes: [{ min: [0, 0], max: [W, H], round: R }],
   levels: [-3, -6],
 };
 
@@ -146,11 +144,6 @@ const narrow: Fixture = {
   boundary: dumbbell.boundary!,
   radius: 3,
   size: [50, 20],
-  boxes: [
-    { min: [0, 0], max: [20, 20], round: 0 },
-    { min: [20, 8], max: [30, 12], round: 0 },
-    { min: [30, 0], max: [50, 20], round: 0 },
-  ],
   levels: [-3],
 };
 
@@ -200,22 +193,40 @@ function samples(from: Xyz, move: Move, step: number): Sample[] {
 }
 
 const CELL = 0.05;
-const SLACK = (CELL * Math.SQRT2) / 2;
+const DIAGONAL = CELL * Math.SQRT2;
+const SLACK = DIAGONAL / 2;
 
-function inPocket({ boxes }: Fixture, x: number, y: number) {
-  return boxes.some(({ min, max, round }) => {
-    const dx = Math.abs(x - (min[0] + max[0]) / 2) - (max[0] - min[0]) / 2;
-    const dy = Math.abs(y - (min[1] + max[1]) / 2) - (max[1] - min[1]) / 2;
-    return (
-      Math.hypot(Math.max(dx + round, 0), Math.max(dy + round, 0)) <=
-      round + SLACK
-    );
-  });
+const reachOf = ({ boundary, radius }: Fixture) =>
+  offsetLoops(offsetLoops([boundary], -(radius + WALL)), radius);
+
+function fill(grid: Uint8Array, nx: number, j: number, x0: number, x1: number) {
+  const i0 = Math.max(0, Math.ceil(x0 / CELL - 0.5));
+  const i1 = Math.min(nx - 1, Math.floor(x1 / CELL - 0.5));
+  if (i1 >= i0) grid.fill(1, j * nx + i0, j * nx + i1 + 1);
+}
+
+function raster(loops: Loop[], nx: number, ny: number) {
+  const grid = new Uint8Array(nx * ny);
+  for (let j = 0; j < ny; j++) {
+    const y = (j + 0.5) * CELL;
+    const xs: number[] = [];
+    for (const loop of loops)
+      for (const [k, a] of loop.entries()) {
+        const b = loop[(k + 1) % loop.length]!;
+        if (a.y > y !== b.y > y)
+          xs.push(a.x + ((y - a.y) * (b.x - a.x)) / (b.y - a.y));
+      }
+    xs.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < xs.length; k += 2)
+      fill(grid, nx, j, xs[k]!, xs[k + 1]!);
+  }
+  return grid;
 }
 
 function engagement(fixture: Fixture) {
   const { radius, size } = fixture;
   const [nx, ny] = [Math.round(size[0] / CELL), Math.round(size[1] / CELL)];
+  const material = raster(offsetLoops(reachOf(fixture), -DIAGONAL), nx, ny);
   const stamp = (cleared: Uint8Array, [px, py]: Xy) => {
     const reach = radius - SLACK;
     const j0 = Math.max(0, Math.ceil((py - reach) / CELL - 0.5));
@@ -224,9 +235,7 @@ function engagement(fixture: Fixture) {
       const half = Math.sqrt(
         Math.max(0, reach ** 2 - ((j + 0.5) * CELL - py) ** 2),
       );
-      const i0 = Math.max(0, Math.ceil((px - half) / CELL - 0.5));
-      const i1 = Math.min(nx - 1, Math.floor((px + half) / CELL - 0.5));
-      if (i1 >= i0) cleared.fill(1, j * nx + i0, j * nx + i1 + 1);
+      fill(cleared, nx, j, px - half, px + half);
     }
   };
   const engaged = (cleared: Uint8Array, { at, heading }: Sample) => {
@@ -238,7 +247,7 @@ function engagement(fixture: Fixture) {
       const y = at[1] + radius * Math.sin(angle);
       const [i, j] = [Math.floor(x / CELL), Math.floor(y / CELL)];
       const inside = i >= 0 && j >= 0 && i < nx && j < ny;
-      if (inPocket(fixture, x, y) && !(inside && cleared[j * nx + i])) count++;
+      if (inside && material[j * nx + i] && !cleared[j * nx + i]) count++;
     }
     return count / 2;
   };
@@ -340,11 +349,9 @@ describe("adaptive", () => {
 
   it("engages at most 65 degrees outside the helix laps at a 60 degree maximum and clears the tool-radius region", () => {
     expect(engagement(wide)).toBeLessThanOrEqual(65);
-    for (const { section: cutSection, boundary, radius, levels } of fixtures) {
-      const reach = offsetLoops(
-        offsetLoops([boundary], -(radius + WALL)),
-        radius,
-      );
+    for (const fixture of fixtures) {
+      const { section: cutSection, radius, levels } = fixture;
+      const reach = reachOf(fixture);
       const trip = travel(cutSection.moves);
       for (const z of levels) {
         const cleared = swept(trip, z, radius);
@@ -356,12 +363,9 @@ describe("adaptive", () => {
     }
   });
 
-  it.fails(
-    "engages more than 65 degrees in the dumbbell's square corners",
-    () => {
-      expect(engagement(narrow)).toBeLessThanOrEqual(65);
-    },
-  );
+  it("engages at most 65 degrees in the dumbbell's square corners and neck", () => {
+    expect(engagement(narrow)).toBeLessThanOrEqual(65);
+  });
 
   it("matches the golden IR for a 24 by 18 mm pocket at a 90 degree maximum", () => {
     const golden = JSON.parse(
