@@ -343,6 +343,15 @@ export const moduleHostSettings = (moduleId: string) => [
   moduleHiddenSetting(moduleId),
 ];
 
+const sectionNames = new Map<string, string>();
+
+export function nameSection(section: SettingSection, name: string) {
+  sectionNames.set(section, name);
+  return () => void sectionNames.delete(section);
+}
+
+export const sectionName = (section: string) => sectionNames.get(section);
+
 export const PANEL_MIN_PX = 160;
 
 export const UI_TREE_WIDTH = defineSetting({

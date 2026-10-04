@@ -14,6 +14,7 @@ import {
   DOCUMENT_EDITS,
   moduleHiddenSetting,
   moduleHostSettings,
+  nameSection,
   REGISTRY_ID,
   registerSettings,
   SETTINGS,
@@ -266,7 +267,7 @@ export interface ModuleContext extends ClientContext {
 }
 
 export interface HostModule {
-  manifest: { id: string };
+  manifest: { id: string; name: string };
   client: { activate(context: ModuleContext): void | Promise<void> };
   icons?: Readonly<Record<string, string>>;
 }
@@ -295,6 +296,9 @@ export async function loadClientModules(
     if (!loaded.has(module.manifest.id)) continue;
     const own: Dispose[] = [];
     try {
+      own.push(
+        nameSection(`plugin:${module.manifest.id}`, module.manifest.name),
+      );
       registerModuleIcons(own, module);
       await module.client.activate(moduleContext(own, module.manifest.id));
       disposers.push(() => disposeAll(own));

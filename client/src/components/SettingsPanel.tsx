@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   SETTINGS,
   resolveSettings,
+  sectionName,
   validateSettingValue,
   type SettingDefinition,
   type SettingScope,
@@ -27,6 +28,8 @@ import { confirm } from "./ConfirmPanel";
 const scopes: SettingScope[] = ["app", "user", "project"];
 
 function label(section: string): string {
+  const name = sectionName(section);
+  if (name) return name;
   return section.startsWith("plugin:")
     ? section.slice(7).replace(/^./, (first) => first.toUpperCase())
     : section.replace(/^./, (first) => first.toUpperCase());
