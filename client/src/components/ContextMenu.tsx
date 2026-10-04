@@ -1,6 +1,20 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { ContextMenuItem } from "@rockett/plugin-api";
 import { pushKeyContext } from "../commands/keymap";
+import {
+  menuItems,
+  useMenuRegistrations,
+  type MenuTargets,
+  type Surface,
+} from "../commands/menus";
+import { useStore } from "../store";
+import { ViewportContext } from "../viewportRef";
 
 export type MenuItem = ContextMenuItem;
 
@@ -69,6 +83,24 @@ export function ContextMenu({
       ))}
     </div>
   );
+}
+
+export function SurfaceMenu<S extends Surface>({
+  surface,
+  target,
+  ...at
+}: {
+  x: number;
+  y: number;
+  up?: boolean;
+  surface: S;
+  target: MenuTargets[S];
+  onClose: () => void;
+}) {
+  useMenuRegistrations();
+  useStore();
+  const items = menuItems(surface, target, useContext(ViewportContext));
+  return items.length > 0 ? <ContextMenu {...at} items={items} /> : null;
 }
 
 export function MenuButton({

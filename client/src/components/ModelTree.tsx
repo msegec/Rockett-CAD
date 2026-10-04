@@ -1,11 +1,4 @@
-import {
-  planeMenu,
-  sketchOn,
-  toggleFeature,
-  constructionMenu,
-  canvasMenu,
-  deleteItem,
-} from "./treeFeatureMenus";
+import { sketchOn, toggleFeature } from "./treeFeatureMenus";
 import {
   Fragment,
   memo,
@@ -16,25 +9,30 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Feature, TreeGroup } from "@rockett/shared";
+import type { Feature, PlaneRef, TreeGroup } from "@rockett/shared";
 import { ORIGIN_AXES, UNITS_LENGTH } from "@rockett/shared";
-import { moveBodies } from "../commands/treeMove";
 import { activeCommand } from "../commands/active";
 import "../commands/design";
 import { installKeymap } from "../commands/keymap";
-import { runCommand } from "../commands/registry";
+import {
+  menuCommand,
+  menuItems,
+  anyShown,
+  showHide,
+  type MenuTargets,
+  type Surface,
+} from "../commands/menus";
+import { registerCommand } from "../commands/registry";
 import { useStore, selectionKey, type Selection } from "../store";
 import {
   ViewportContext,
   alignCameraToActiveSketch as alignToSketch,
 } from "../viewportRef";
 import { openFeatureEditor } from "./Timeline";
-import { ContextMenu, type MenuItem } from "./ContextMenu";
+import { SurfaceMenu } from "./ContextMenu";
 import { RenameInput } from "./RenameInput";
 import { pickLabel } from "./form/fields";
 import {
-  deleteFeatures,
-  groupItems,
   registerGroupRecipient,
   groupParts,
   selectSketchRegions,
@@ -42,15 +40,28 @@ import {
   bodySel,
   renameGroup,
   setBodiesVisible,
-  setFeaturesVisible,
   treeClick,
   treeIds,
   treeRange,
-  ungroup,
 } from "../treeSelection";
 
 type PlaneSelection = Extract<Selection, { kind: "plane" }>;
 type Kind = TreeGroup["kind"];
+
+registerCommand(
+  menuCommand<{ ref: PlaneRef }>(
+    "design.menu.sketchOnPlane",
+    "Create sketch",
+    (s) => sketchOn(s.target.ref, s.viewport),
+  ),
+);
+registerCommand(
+  menuCommand<{ feature: Feature }>(
+    "design.menu.toggleFeature",
+    "Show / Hide",
+    ({ target }) => toggleFeature(target.feature),
+  ),
+);
 
 type BodyActions = {
   click: (e: React.MouseEvent, bodyId: string) => void;
@@ -109,11 +120,6 @@ const BodyRow = memo(function BodyRow({
 });
 
 function useTreeGrouping(setRenaming: (id: string) => void) {
-  const startGroup = async (kind: Kind, ids: string[]) => {
-    const group = await groupItems(kind, ids);
-    if (group) setRenaming(group.id);
-  };
-
   useEffect(() => {
     const uninstall = installKeymap();
     const unregister = registerGroupRecipient(setRenaming);
@@ -122,8 +128,6 @@ function useTreeGrouping(setRenaming: (id: string) => void) {
       uninstall();
     };
   }, []);
-
-  return startGroup;
 }
 
 export const ModelTree = memo(function ModelTree() {
@@ -141,7 +145,8 @@ export const ModelTree = memo(function ModelTree() {
   const [treeMenu, setTreeMenu] = useState<{
     x: number;
     y: number;
-    items: MenuItem[];
+    surface: Surface;
+    target: MenuTargets[Surface];
   } | null>(null);
   const latest = useRef<BodyActions | null>(null);
   const bodyActions = useMemo(
@@ -155,12 +160,17 @@ export const ModelTree = memo(function ModelTree() {
     }),
     [],
   );
-  const startGroup = useTreeGrouping(setRenaming);
+  useTreeGrouping(setRenaming);
 
   if (!document_) return null;
-  const openMenu = (e: React.MouseEvent, items: MenuItem[]) => {
+  const openMenu = <S extends Surface>(
+    e: React.MouseEvent,
+    surface: S,
+    target: MenuTargets[S],
+  ) => {
     e.preventDefault();
-    if (items.length > 0) setTreeMenu({ x: e.clientX, y: e.clientY, items });
+    if (menuItems(surface, target, viewport).length > 0)
+      setTreeMenu({ x: e.clientX, y: e.clientY, surface, target });
   };
   const toggle = (key: string) =>
     setCollapsed({ ...collapsed, [key]: !collapsed[key] });
@@ -240,7 +250,9 @@ export const ModelTree = memo(function ModelTree() {
         }
         pick(e, sel, origins);
       }}
-      onContextMenu={(e) => openMenu(e, planeMenu(sel.ref, viewport))}
+      onContextMenu={(e) =>
+        openMenu(e, "design.tree.originPlane", { ref: sel.ref })
+      }
     >
       <span className="tree-icon">▱</span>
       {sel.label}
@@ -289,94 +301,24 @@ export const ModelTree = memo(function ModelTree() {
   );
 
   const shown = (kind: Kind, ids: string[]) =>
-    kind === "body"
-      ? bodies.some(
-          (b) => ids.includes(b.bodyId) && !hiddenBodies.has(b.bodyId),
-        )
-      : sketches.some((f) => ids.includes(f.id) && !hiddenFeatures.has(f.id));
-  const showHide = (kind: Kind, ids: string[]) => {
-    const visible = !shown(kind, ids);
-    void (kind === "body"
-      ? setBodiesVisible(Object.fromEntries(ids.map((id) => [id, visible])))
-      : setFeaturesVisible(ids, visible));
-  };
-  const groupItem = (kind: Kind, ids: string[]): MenuItem => ({
-    label: "Group",
-    action: () => void startGroup(kind, ids),
-  });
-
-  const sketchMenu = (f: Feature): MenuItem[] => {
-    const ids = chosen("sketch", f.id);
+    anyShown({ document: document_, evaluation, view }, kind, ids);
+  const startRename = setRenaming;
+  const rowsMenu = (e: React.MouseEvent, kind: Kind, id: string) => {
+    const ids = chosen(kind, id);
     if (ids.length > 1)
-      return [
-        { label: "Show / Hide", action: () => showHide("sketch", ids) },
-        groupItem("sketch", ids),
+      openMenu(
+        e,
+        kind === "body" ? "design.tree.bodies" : "design.tree.sketches",
         {
-          label: "Delete",
-          danger: true,
-          action: () => void deleteFeatures(ids),
+          kind,
+          ids,
+          startRename,
         },
-      ];
-    return [
-      {
-        label: "Edit sketch",
-        action: () =>
-          void useStore
-            .getState()
-            .editSketch(f.id)
-            .then(() => alignToSketch(viewport)),
-      },
-      {
-        label: "Extrude regions…",
-        action: () => {
-          runCommand("design.extrude");
-          selectSketchRegions(f.id);
-        },
-      },
-      {
-        label: "Revolve regions…",
-        action: () => {
-          runCommand("design.revolve");
-          selectSketchRegions(f.id);
-        },
-      },
-      { label: "Rename", action: () => setRenaming(f.id) },
-      deleteItem(f.id),
-    ];
-  };
-
-  const bodyMenu = (bodyId: string): MenuItem[] => {
-    const ids = chosen("body", bodyId);
-    const visibility = (visible: (id: string) => boolean) =>
-      void setBodiesVisible(
-        Object.fromEntries(bodies.map((x) => [x.bodyId, visible(x.bodyId)])),
       );
-    return [
-      {
-        label: "Move…",
-        action: () => moveBodies(ids),
-      },
-      ids.length > 1
-        ? groupItem("body", ids)
-        : { label: "Rename", action: () => setRenaming(bodyId) },
-      { label: "Show / Hide", action: () => showHide("body", ids) },
-      {
-        label: "Isolate",
-        action: () => visibility((id) => ids.includes(id)),
-      },
-      { label: "Show all bodies", action: () => visibility(() => true) },
-    ];
+    else if (kind === "body")
+      openMenu(e, "design.tree.body", { id, kind, ids, startRename });
+    else openMenu(e, "design.tree.sketch", { id, startRename });
   };
-
-  const groupMenu = (g: TreeGroup, members: Selection[]): MenuItem[] => [
-    { label: "Rename", action: () => setRenaming(g.id) },
-    { label: "Show / Hide all", action: () => showHide(g.kind, g.members) },
-    {
-      label: "Select members",
-      action: () => useStore.getState().setSelection(members),
-    },
-    { label: "Ungroup", action: () => void ungroup(g.id) },
-  ];
 
   const groupedRows = <T,>(
     { parts }: { parts: { group: TreeGroup | null; items: T[] }[] },
@@ -390,7 +332,13 @@ export const ModelTree = memo(function ModelTree() {
             className="tree-item"
             onClick={() => toggle(group.id)}
             onContextMenu={(e) =>
-              openMenu(e, groupMenu(group, items.map(selOf)))
+              openMenu(e, "design.tree.groupRow", {
+                id: group.id,
+                kind: group.kind,
+                ids: group.members,
+                members: items.map(selOf),
+                startRename,
+              })
             }
           >
             <span className="tree-caret">
@@ -444,7 +392,7 @@ export const ModelTree = memo(function ModelTree() {
             .editSketch(f.id)
             .then(() => alignToSketch(viewport));
         }}
-        onContextMenu={(e) => openMenu(e, sketchMenu(f))}
+        onContextMenu={(e) => rowsMenu(e, "sketch", f.id)}
         title="Click to select regions · double-click to edit"
       >
         <span
@@ -469,7 +417,7 @@ export const ModelTree = memo(function ModelTree() {
 
   latest.current = {
     click: (e, bodyId) => pick(e, bodySel({ bodyId }), bodyParts.order),
-    menu: (e, bodyId) => openMenu(e, bodyMenu(bodyId)),
+    menu: (e, bodyId) => rowsMenu(e, "body", bodyId),
     rename: (bodyId) => setRenaming(bodyId),
     show: (bodyId, visible) => void setBodiesVisible({ [bodyId]: visible }),
     commit: (bodyId, name) => {
@@ -528,7 +476,13 @@ export const ModelTree = memo(function ModelTree() {
               className={`tree-item ${selKeys.has(selectionKey(planeSels[i]!)) ? "selected" : ""}`}
               onClick={(e) => pick(e, planeSels[i]!, planeSels)}
               onDoubleClick={() => openFeatureEditor(f, viewport)}
-              onContextMenu={(e) => openMenu(e, constructionMenu(f, viewport))}
+              onContextMenu={(e) =>
+                openMenu(e, "design.tree.constructionPlane", {
+                  id: f.id,
+                  feature: f,
+                  ref: { kind: "construction", featureId: f.id },
+                })
+              }
             >
               <span
                 className="tree-icon eye"
@@ -554,7 +508,9 @@ export const ModelTree = memo(function ModelTree() {
               key={f.id}
               className="tree-item"
               onDoubleClick={() => openFeatureEditor(f, viewport)}
-              onContextMenu={(e) => openMenu(e, canvasMenu(f, viewport))}
+              onContextMenu={(e) =>
+                openMenu(e, "design.tree.canvas", { id: f.id, feature: f })
+              }
             >
               <span
                 className="tree-icon eye"
@@ -588,12 +544,7 @@ export const ModelTree = memo(function ModelTree() {
       )}
 
       {treeMenu && (
-        <ContextMenu
-          x={treeMenu.x}
-          y={treeMenu.y}
-          items={treeMenu.items}
-          onClose={() => setTreeMenu(null)}
-        />
+        <SurfaceMenu {...treeMenu} onClose={() => setTreeMenu(null)} />
       )}
     </div>
   );

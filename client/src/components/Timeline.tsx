@@ -14,17 +14,25 @@ import {
 } from "@rockett/shared";
 import { openInDialog } from "../commands/featureCommand";
 import { activeCommand } from "../commands/active";
+import { menuCommand } from "../commands/menus";
+import { registerCommand } from "../commands/registry";
 import { featureUI } from "../features/registry";
 import { useStore, isIdle, selectionKey, type Selection } from "../store";
 import { sketchEditingPosition } from "../sketchEditing";
 import { useTimelinePeek } from "../timelinePeek";
 import { featureBodies } from "../treeSelection";
 import { HorizontalScroll } from "./HorizontalScroll";
-import { ContextMenu } from "./ContextMenu";
+import { SurfaceMenu } from "./ContextMenu";
 import { refNotes, useNamingUpgradePanel } from "./RefRepair";
 import { QuickEdit, quickValues } from "./QuickEdit";
 
 const typeIcon = (type: string) => featureUI(type)?.icon ?? "•";
+
+registerCommand(
+  menuCommand<{ feature: Feature }>("design.menu.editFeature", "Edit", (s) =>
+    openFeatureEditor(s.target.feature, s.viewport),
+  ),
+);
 
 export function chipTitle(
   f: Feature,
@@ -130,7 +138,6 @@ export function Timeline() {
   const document_ = useStore((s) => s.document);
   const evaluation = useStore((s) => s.evaluation);
   const active = useStore((s) => s.active);
-  const idle = useStore(isIdle);
   const selection = useStore((s) => s.selection);
   const busy = useStore((s) => s.busy);
   const rollTimeline = useStore((s) => s.rollTimeline);
@@ -255,39 +262,23 @@ export function Timeline() {
         })}
       </HorizontalScroll>
       {menu && (
-        <ContextMenu
+        <SurfaceMenu
           x={menu.x}
           y={menu.y}
           up
           onClose={() => setMenu(null)}
-          items={[
-            {
-              label: "Edit",
-              action: () => void openFeatureEditor(menu.feature, viewport),
-            },
-            ...(idle && quickValues(menu.feature).length > 0
-              ? [{ label: "Quick edit", action: () => setQuick(menu) }]
-              : []),
-            {
-              label: "Rename",
-              action: () =>
-                setRenaming({ id: menu.feature.id, value: menu.feature.name }),
-            },
-            {
-              label: menu.feature.suppressed ? "Unsuppress" : "Suppress",
-              action: () =>
-                void useStore
-                  .getState()
-                  .suppressFeature(menu.feature.id, !menu.feature.suppressed),
-            },
-            {
-              label: "Delete",
-              danger: true,
-              action: () =>
-                void useStore.getState().deleteFeature(menu.feature.id),
-            },
-            ...upgrade.items(menu.x, menu.y),
-          ]}
+          surface="design.timeline.chip"
+          target={{
+            id: menu.feature.id,
+            feature: menu.feature,
+            startRename: () =>
+              setRenaming({ id: menu.feature.id, value: menu.feature.name }),
+            quickEdit:
+              quickValues(menu.feature).length > 0
+                ? () => setQuick(menu)
+                : undefined,
+            upgradeNaming: upgrade.items(menu.x, menu.y)[0]?.action,
+          }}
         />
       )}
       {upgrade.panel}
