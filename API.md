@@ -251,6 +251,12 @@ key grammar, so removed plugin values survive:
 - Export refuses a body blocked by an unresolved reference (`namingVersion` 2)
   with 422 `unprocessable`, and an id that is not a body with 400.
   Measure answers 400 for a body or name the live evaluation lacks.
+- Measure takes face and body refs, up to `MEASURE_MAX_REFS`
+  (`shared/src/api.ts`), and edge or vertex refs only when it has at most two
+  refs; either breach answers 400 saying so. `items` holds one entry per ref,
+  in request order: faces carry exact area and bodies exact volume
+  (`BRepGProp`). Distance and angle come only for exactly two refs. A
+  duplicate ref is resolved once per request.
 - Writers: `server/src/geometry/exporters.ts`, `server/src/geometry/xde.ts`
   (STEP), `server/src/geometry/dxf.ts`.
 

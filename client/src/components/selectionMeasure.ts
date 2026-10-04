@@ -1,11 +1,13 @@
 import {
   formatAngle,
   formatLength,
+  MEASURE_MAX_REFS,
+  UNIT_TO_MM,
   type BodyPayload,
   type CadDocument,
+  type MeasureRequest,
   type MeasureResult,
   type SketchEntity,
-  type TopoRef,
   type Units,
 } from "@rockett/shared";
 import { useEffect, useState } from "react";
@@ -86,6 +88,48 @@ function sketchPair(selection: Selection[], scene: Scene): Pair | undefined {
   return { distance: dimension.value };
 }
 
+type ExactRef = MeasureRequest["refs"][number];
+
+const exact = (pick: Selection): pick is ExactRef =>
+  measurable(pick) || pick.kind === "body";
+
+function exactRefs(selection: Selection[]): ExactRef[] | null {
+  const refs = selection.filter(exact);
+  if (selection.length === 2 && refs.length === 2) return refs;
+  const summed = refs.filter((r) => r.kind === "face" || r.kind === "body");
+  return summed.length > 0 ? summed : null;
+}
+
+function formatPower(mm: number, units: Units, power: 2 | 3): string {
+  return `${formatLength(mm / UNIT_TO_MM[units] ** (power - 1), units)}${power === 2 ? "²" : "³"}`;
+}
+
+function total(
+  label: string,
+  values: number[],
+  format: (value: number) => string,
+): string[] {
+  if (values.length === 0) return [];
+  const sum = values.reduce((a, v) => a + v, 0);
+  return [
+    `${values.length > 1 ? `Total ${label.toLowerCase()}` : label} ${format(sum)}`,
+  ];
+}
+
+function exactLines(
+  result: MeasureResult,
+  pair: boolean,
+  units: Units,
+): string[] {
+  const values = (key: "area" | "volume") =>
+    result.items.flatMap((item) => item[key] ?? []);
+  return [
+    ...total("Area", values("area"), (v) => formatPower(v, units, 2)),
+    ...total("Volume", values("volume"), (v) => formatPower(v, units, 3)),
+    ...(pair ? pairLines(result, units) : []),
+  ];
+}
+
 function pairLines(pair: Pair, units: Units): string[] {
   return [
     ...(pair.distance === undefined
@@ -97,9 +141,9 @@ function pairLines(pair: Pair, units: Units): string[] {
   ];
 }
 
-function useExactPair(
+function useExactMeasure(
   projectId: string | null,
-  refs: TopoRef[] | null,
+  refs: ExactRef[] | null,
   document: CadDocument | null,
   bodies: BodyPayload[],
 ): Outcome | "pending" | null {
@@ -154,33 +198,36 @@ export function useSelectionMeasures(): string[] {
         ? draft.entities
         : evaluation?.sketches.find((s) => s.featureId === id)?.entities,
   };
-  const refs =
-    selection.length === 2 &&
-    selection.every(measurable) &&
-    bodies === evaluation?.bodies &&
-    active?.id !== "inspect.measure"
-      ? selection
+  const wanted =
+    bodies === evaluation?.bodies && active?.id !== "inspect.measure"
+      ? exactRefs(selection)
       : null;
-  const exact = useExactPair(projectId, refs, document, bodies);
+  const over = (wanted?.length ?? 0) > MEASURE_MAX_REFS;
+  const refs = over ? null : wanted;
+  const measured = useExactMeasure(projectId, refs, document, bodies);
 
-  const lines: string[] = [];
-  const lengths = selection.flatMap((pick) => lengthOf(pick, scene) ?? []);
-  if (lengths.length > 0)
-    lines.push(
-      `${lengths.length > 1 ? "Total length" : "Length"} ${formatLength(
-        lengths.reduce((sum, v) => sum + v, 0),
-        units,
-      )}`,
-    );
+  const lines = total(
+    "Length",
+    selection.flatMap((pick) => lengthOf(pick, scene) ?? []),
+    (v) => formatLength(v, units),
+  );
   const size = sizeOf(selection, scene);
   if (size)
     lines.push(
       `Size ${size.map((v, i) => `${"XYZ"[i]} ${formatLength(v, units)}`).join(", ")}`,
     );
-  if (exact === "pending") lines.push("Measuring");
-  else if (exact && "error" in exact)
-    lines.push(`Measure failed: ${exact.error}`);
-  else if (exact) lines.push(...pairLines(exact.result, units));
+  if (over) lines.push(`Area and volume take up to ${MEASURE_MAX_REFS} picks`);
+  else if (measured === "pending") lines.push("Measuring");
+  else if (measured && "error" in measured)
+    lines.push(`Measure failed: ${measured.error}`);
+  else if (measured)
+    lines.push(
+      ...exactLines(
+        measured.result,
+        selection.length === 2 && refs?.length === 2,
+        units,
+      ),
+    );
   else if (selection.length === 2) {
     const pair = sketchPair(selection, scene);
     if (pair) lines.push(...pairLines(pair, units));

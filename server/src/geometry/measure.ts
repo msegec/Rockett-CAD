@@ -12,12 +12,18 @@ import {
   acquire,
   scoped,
   areaOf,
+  faces,
   getKernel,
   lengthOf,
   progress,
+  volumeOf,
   type Shape,
 } from "./kernel.js";
-import { computeEdgeNames, computeVertexNames, findFace } from "./naming.js";
+import {
+  computeEdgeNames,
+  computeVertexNames,
+  type NamedBody,
+} from "./naming.js";
 import type { EvalState } from "./features.js";
 
 interface Resolved {
@@ -26,15 +32,46 @@ interface Resolved {
   info: MeasureResult["items"][number];
 }
 
+type Ref = MeasureRequest["refs"][number];
+
+const refKey = (r: Ref) =>
+  [
+    r.kind,
+    r.bodyId,
+    r.kind === "body"
+      ? ""
+      : r.kind === "face"
+        ? r.faceName
+        : r.kind === "edge"
+          ? r.edgeName
+          : r.vertexName,
+  ].join("\0");
+
+function faceIndex(body: NamedBody): Map<string, Shape> {
+  const index = new Map<string, Shape>();
+  for (const face of faces(body.shape)) {
+    const name = body.names.get(face);
+    if (name !== undefined && !index.has(name)) index.set(name, face);
+  }
+  return index;
+}
+
 function resolveRef(
   state: EvalState,
-  ref: MeasureRequest["refs"][number],
+  ref: Ref,
+  facesOf: (body: NamedBody) => Map<string, Shape>,
 ): Resolved {
   const k = getKernel();
   const body = state.bodies.get(ref.bodyId);
   if (!body) throw new ValidationError(`body ${ref.bodyId} not found`);
+  if (ref.kind === "body")
+    return {
+      kind: "body",
+      shape: body.shape,
+      info: { kind: "body", volume: volumeOf(body.shape) },
+    };
   if (ref.kind === "face") {
-    const face = findFace(body, ref.faceName);
+    const face = facesOf(body).get(ref.faceName);
     if (!face) throw new ValidationError(`face ${ref.faceName} not found`);
     const info: Resolved["info"] = { kind: "face", area: areaOf(face) };
     const surf = acquire(new k.BRepAdaptor_Surface_2(face, false));
@@ -103,8 +140,24 @@ function edgeDirection(shape: Shape): Vec3 | null {
 export function measure(state: EvalState, req: MeasureRequest): MeasureResult {
   return scoped(() => {
     const k = getKernel();
-    const refs = req.refs.slice(0, 2);
-    const resolved = refs.map((r) => resolveRef(state, r));
+    if (
+      req.refs.length > 2 &&
+      req.refs.some((r) => r.kind === "edge" || r.kind === "vertex")
+    )
+      throw new ValidationError("edge and vertex refs need at most 2 refs");
+    const indexes = new Map<string, Map<string, Shape>>();
+    const facesOf = (body: NamedBody) => {
+      let index = indexes.get(body.bodyId);
+      if (!index) indexes.set(body.bodyId, (index = faceIndex(body)));
+      return index;
+    };
+    const memo = new Map<string, Resolved>();
+    const resolved = req.refs.map((r) => {
+      const key = refKey(r);
+      let found = memo.get(key);
+      if (!found) memo.set(key, (found = resolveRef(state, r, facesOf)));
+      return found;
+    });
     const result: MeasureResult = { items: resolved.map((r) => r.info) };
 
     if (resolved.length === 2) {

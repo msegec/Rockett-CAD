@@ -282,8 +282,11 @@ export interface FolderTree {
   placement: Record<string, string>;
 }
 
+export const MEASURE_MAX_REFS = 1000;
+
 export interface MeasureRequest {
   refs: Array<
+    | { kind: "body"; bodyId: string }
     | { kind: "face"; bodyId: string; faceName: string }
     | { kind: "edge"; bodyId: string; edgeName: string }
     | { kind: "vertex"; bodyId: string; vertexName: string }
@@ -302,6 +305,7 @@ export interface MeasureResult {
     kind: string;
     length?: number;
     area?: number;
+    volume?: number;
     radius?: number;
     diameter?: number;
     position?: Vec3;

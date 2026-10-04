@@ -37,9 +37,10 @@ import type {
 import type { ProjectMember } from "./model.js";
 import { settingsRoutes } from "./settingsRoutes.js";
 import { refRepairRoutes } from "./refRepairRoutes.js";
-import { VIEW_VERSION } from "./api.js";
+import { MEASURE_MAX_REFS, VIEW_VERSION } from "./api.js";
 import { VIEW_PROJECTION } from "./settings.js";
 import { edgeRef, faceRef, groupsSchema, vec3 } from "./schema/features.js";
+import { bodyIdSchema } from "./schema/coreFeatures.js";
 import { namingUpgradeBody } from "./schema/documents.js";
 import { parameterStateSchema } from "./schema/parameters.js";
 import { CHECKPOINT_ROUTES, snapshotHash } from "./schema/history.js";
@@ -194,14 +195,12 @@ export const AUTH_ROUTES = {
 
 const name = Type.Object({ name: Type.Optional(Type.String()) });
 
-const topoRef = Type.Union([
+const text = Type.String();
+const measureRef = Type.Union([
+  Type.Object({ kind: Type.Literal("body"), bodyId: bodyIdSchema }),
   faceRef,
   edgeRef,
-  Type.Object({
-    kind: Type.Literal("vertex"),
-    bodyId: Type.String(),
-    vertexName: Type.String(),
-  }),
+  Type.Object({ kind: Type.Literal("vertex"), bodyId: text, vertexName: text }),
 ]);
 
 const viewIds = Type.Array(Type.String({ minLength: 1 }));
@@ -466,7 +465,7 @@ export const ROUTES = {
     "POST",
     "/projects/:id/measure",
     Type.Object({
-      refs: Type.Array(topoRef, { minItems: 1, maxItems: 2 }),
+      refs: Type.Array(measureRef, { minItems: 1, maxItems: MEASURE_MAX_REFS }),
     }),
     "viewer",
   ),
