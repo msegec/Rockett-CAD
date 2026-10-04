@@ -1,5 +1,4 @@
 client/src/api.ts 645
-client/src/components/ControlsHelp.tsx ControlsHelp 82
 client/src/components/DraggablePanel.tsx DraggablePanel 125
 client/src/components/FeatureDialog.tsx DialogBody 104
 client/src/components/ModelTree.tsx 546
