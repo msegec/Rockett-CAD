@@ -218,6 +218,10 @@ not parametric.
 Export writes binary STL or multi-body 3MF, with named bodies and a
 tessellation quality control.
 
+Export DXF writes a 2D outline as DXF R12. Right-click a sketch in the model
+tree, or a planar face in the viewport, and choose Export DXF. The file takes
+the sketch or body name. A curved face does not offer it.
+
 ### Saving
 
 Every change saves automatically, with the full parametric history in a

@@ -26,6 +26,7 @@ import {
 } from "../treeSelection";
 import { alignCameraToActiveSketch, type ViewportRef } from "../viewportRef";
 import "./design";
+import { canExportDxf } from "./export";
 import { featureCommand } from "./featureCommand";
 import { moveBodies } from "./treeMove";
 import {
@@ -375,6 +376,7 @@ place("design.tree.sketch", [
   "design.menu.editSketch",
   "design.menu.extrudeRegions",
   "design.menu.revolveRegions",
+  { command: "design.menu.exportDxf", when: canExportDxf },
   "design.menu.rename",
   { command: "design.menu.deleteFeature", danger: true },
 ]);
@@ -465,6 +467,7 @@ place("design.viewport.face", [
   { command: "design.menu.extrudeFace", when: planar },
   { command: "design.menu.pressPull", when: planar },
   { command: "design.menu.shellFace", when: planar },
+  { command: "design.menu.exportDxf", when: canExportDxf },
   "design.menu.hideBody",
   "design.menu.measure",
 ]);
