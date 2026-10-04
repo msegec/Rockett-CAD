@@ -465,6 +465,16 @@ input bound, not a tolerance.
   newly driving constraint whose rows raise no rank in their component is
   redundant and refused by name (`shared/src/solverRank.ts`); tools and trim
   drop such a relation they inferred.
+- `shared/src/bspline.ts` holds B-spline data as the kernel's
+  `Geom_BSplineCurve` does: degree, poles, optional weights, distinct knots,
+  multiplicities and an optional periodic flag. `bsplineProblem` refuses what
+  the kernel refuses, and an open spline must be clamped. A periodic curve
+  repeats over its knot span, `last - first`, with its poles in the kernel's
+  order. `dxfSplines` in `shared/src/importDxf.ts` reads SPLINE records
+  into that form; a closed SPLINE whose last `degree` poles repeat its first
+  becomes periodic. Fit-point-only, unclamped open and malformed records are
+  skipped with a reason. `importDxf` still counts every SPLINE as skipped:
+  `shared/test/spline.test.ts`.
 
 ## Frame conventions
 

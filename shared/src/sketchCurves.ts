@@ -247,7 +247,7 @@ function along(c: Round | Ellipse): (t: number) => XY {
   };
 }
 
-function least(f: (t: number) => number, lo: number, hi: number): number {
+export function least(f: (t: number) => number, lo: number, hi: number) {
   for (let i = 0; i < 60; i++) {
     const [m1, m2] = [hi - GOLDEN * (hi - lo), lo + GOLDEN * (hi - lo)];
     if (f(m1) < f(m2)) hi = m2;

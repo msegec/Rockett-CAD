@@ -55,6 +55,7 @@ export * from "./sketchOffsets.js";
 export * from "./sketchTransform.js";
 export * from "./importDxf.js";
 export * from "./importSvg.js";
+export * from "./bspline.js";
 export type { SketchImport } from "./sketchBuilder.js";
 export * from "./meshFormat.js";
 export * from "./tolerance.js";

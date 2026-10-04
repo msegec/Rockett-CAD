@@ -4,6 +4,7 @@ import {
   type SketchImport,
   type XY,
 } from "./sketchBuilder.js";
+import { bsplineFromFlat, type BSpline } from "./bspline.js";
 import { TAU } from "./sketchCurves.js";
 import { LINEAR_TOL } from "./tolerance.js";
 
@@ -26,15 +27,21 @@ const MM_PER_INSUNIT = [
   1e-3, 100, 1e4, 1e5,
 ];
 
-export function importDxf(text: string): SketchImport {
+function readEntities(text: string) {
   if (text.startsWith("AutoCAD Binary DXF"))
     throw new Error(
       "Binary DXF is not supported. Save the drawing as ASCII DXF.",
     );
   const sections = readSections(readPairs(text));
-  const scale = unitScale(sections.get("HEADER") ?? []);
+  return {
+    scale: unitScale(sections.get("HEADER") ?? []),
+    records: splitRecords(sections.get("ENTITIES") ?? []),
+  };
+}
+
+export function importDxf(text: string): SketchImport {
+  const { scale, records } = readEntities(text);
   const sketch = sketchBuilder(scale);
-  const records = splitRecords(sections.get("ENTITIES") ?? []);
   let skipped = 0;
   for (let i = 0; i < records.length; i++) {
     const record = records[i]!;
@@ -46,6 +53,52 @@ export function importDxf(text: string): SketchImport {
     } else if (!addEntity(sketch, record)) skipped++;
   }
   return { entities: sketch.entities, skipped };
+}
+
+export function dxfSplines(text: string): {
+  splines: BSpline[];
+  skipped: string[];
+} {
+  const { scale, records } = readEntities(text);
+  const splines: BSpline[] = [];
+  const skipped: string[] = [];
+  for (const record of records.filter((r) => r.type === "SPLINE")) {
+    const spline = splineOf(record, scale);
+    if (typeof spline === "string") skipped.push(spline);
+    else splines.push(spline);
+  }
+  return { splines, skipped };
+}
+
+function splineOf(record: DxfRecord, scale: number): BSpline | string {
+  const values = (code: number) =>
+    record.pairs.filter(([c]) => c === code).map(([, v]) => Number(v));
+  const [knots, weights, xs, ys] = [
+    values(40),
+    values(41),
+    values(10),
+    values(20),
+  ];
+  if (xs.length === 0)
+    return values(11).length > 0
+      ? "fit points only: the control points are not stored"
+      : "no control points";
+  if (ys.length !== xs.length) return "control points need x and y";
+  for (const [code, name, found] of [
+    [72, "knots", knots.length],
+    [73, "control points", xs.length],
+  ] as const) {
+    const declared = num(record, code, found);
+    if (declared !== found)
+      return `declares ${declared} ${name} but has ${found}`;
+  }
+  const poles = xs.map((x, i): XY => [x * scale, ys[i]! * scale]);
+  return bsplineFromFlat(
+    num(record, 71),
+    poles,
+    weights.length > 0 ? weights : undefined,
+    knots,
+  );
 }
 
 function readPairs(text: string): Pair[] {
