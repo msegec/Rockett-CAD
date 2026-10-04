@@ -1,6 +1,7 @@
 export * from "./model.js";
 export * from "./solver.js";
 export * from "./profiles.js";
+export { faceRegions } from "./faceRegions.js";
 export {
   arcAngles,
   curveSamples,

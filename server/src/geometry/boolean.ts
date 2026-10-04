@@ -14,6 +14,7 @@ import {
   acquire,
   bboxOf,
   diagonal,
+  faces as facesOf,
   getKernel,
   kernelCall,
   planarFacePlane,
@@ -453,38 +454,15 @@ export function subtractSketchRegionsFromFace(
   face: Shape,
   sketches: Iterable<SketchOnPlane>,
 ): { face: Shape; edgeEntity: ShapeMap<string> } {
-  const noop = { face, edgeEntity: new ShapeMap<string>() };
-  try {
-    const prepared = interiorSketchRegions(face, sketches);
-    if (!prepared || prepared.regions.length === 0) return noop;
-    const { faceT, regions } = prepared;
-    const k = getKernel();
-    return kernelCall("face region subtraction", () => {
-      const comp = sketchRegionCompound(regions);
-      const op = cutOperation(faceT, comp);
-      op.Build(progress());
-      if (!op.IsDone()) {
-        return noop;
-      }
-      const result = acquire(op.Shape());
-      const ex = acquire(
-        new k.TopExp_Explorer_2(
-          result,
-          k.TopAbs_ShapeEnum.TopAbs_FACE,
-          k.TopAbs_ShapeEnum.TopAbs_SHAPE,
-        ),
-      );
-      const cutFaces: Shape[] = [];
-      while (ex.More()) {
-        cutFaces.push(acquire(k.TopoDS.Face_1(acquire(ex.Current()))));
-        ex.Next();
-      }
-      if (cutFaces.length !== 1) return noop;
-      const cutFace = cutFaces[0];
-      const edgeEntity = sketchRegionEdgeNames(cutFace!, regions);
-      return { face: cutFace, edgeEntity };
-    });
-  } catch {
-    return noop;
-  }
+  const regions = interiorSketchRegions(face, sketches);
+  if (regions.length === 0) return { face, edgeEntity: new ShapeMap() };
+  return kernelCall("face region subtraction", () => {
+    const op = cutOperation(face, sketchRegionCompound(regions));
+    if (!op.IsDone()) throw new Error("the kernel could not cut the regions");
+    const cutFaces = facesOf(acquire(op.Shape()));
+    if (cutFaces.length !== 1)
+      throw new Error(`the face split into ${cutFaces.length} pieces`);
+    const edgeEntity = sketchRegionEdgeNames(cutFaces[0]!, regions);
+    return { face: cutFaces[0]!, edgeEntity };
+  });
 }

@@ -363,8 +363,10 @@ function closedLoop(c: Curve): Loop {
   };
 }
 
-function contains(a: Loop, b: Loop): boolean {
-  if (a === b || a.area <= b.area) return false;
+type Ring = Pick<Loop, "polygon" | "area">;
+
+function contains(a: Ring, b: Ring): boolean {
+  if (a.area <= b.area) return false;
   const n = b.polygon.length / 2;
   const step = Math.max(1, Math.floor(n / 5));
   for (let i = 0; i < n; i += step)
@@ -392,6 +394,14 @@ function nest(loops: Loop[]): Profile[] {
       area: loop.area - direct.reduce((s, h) => s + h.area, 0),
     };
   });
+}
+
+export function uncovered(rings: number[][]): number[][] {
+  const all = rings.map((polygon) => ({
+    polygon,
+    area: Math.abs(polygonArea(polygon)),
+  }));
+  return rings.filter((_, i) => !all.some((o) => contains(o, all[i]!)));
 }
 
 const sense = (c: OrientedCurve) => c.entityId + (c.reversed ? "-" : "+");

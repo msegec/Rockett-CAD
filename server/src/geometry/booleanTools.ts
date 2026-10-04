@@ -1,8 +1,7 @@
 import {
+  faceRegions,
   LINEAR_TOL,
-  UNIT_DOT_TOL,
   type PlaneFrame,
-  type Profile,
   type Vec3,
 } from "@rockett/shared";
 import {
@@ -15,6 +14,7 @@ import {
   progress,
   vec,
   faces as facesOf,
+  planarFacePlane,
   type Shape,
 } from "./kernel.js";
 import { V, frameFromPlane, uvTo3d } from "./frames.js";
@@ -101,85 +101,45 @@ export function splitPlaneFace(
   return own(faceMk.Face());
 }
 
+type Region = ReturnType<typeof faceRegions<SketchOnPlane>>[number];
+
 export function interiorSketchRegions(
   face: Shape,
   sketches: Iterable<SketchOnPlane>,
 ) {
-  const result = scoped((own) => {
+  const plane = planarFacePlane(face);
+  if (!plane) return [];
+  const frame = frameFromPlane(plane.origin, plane.normal);
+  return scoped(() => {
     const k = getKernel();
     const faceT = acquire(k.TopoDS.Face_1(face));
-    const surf = acquire(new k.BRepAdaptor_Surface_2(faceT, false));
-    if (surf.GetType() !== k.GeomAbs_SurfaceType.GeomAbs_Plane) {
-      return null;
-    }
-    const pln = acquire(surf.Plane());
-    const loc = acquire(pln.Location());
-    const axd = acquire(acquire(pln.Axis()).Direction());
-    const fp: Vec3 = [loc.X(), loc.Y(), loc.Z()];
-    const fn: Vec3 = [axd.X(), axd.Y(), axd.Z()];
-    const samples = (polygon: number[]): [number, number][] => {
-      const n = polygon.length / 2;
-      const out: [number, number][] = [];
-      const step = Math.max(1, Math.ceil(n / 48));
-      for (let i = 0; i < n; i += step) {
-        out.push([polygon[i * 2]!, polygon[i * 2 + 1]!]);
-      }
-      return out;
-    };
-
-    const strictlyInside = (frame: PlaneFrame, polygon: number[]): boolean => {
-      const pts = samples(polygon);
-      if (pts.length === 0) return false;
-      for (const [u, v] of pts) {
-        const w = uvTo3d(frame, u, v);
-        const cls = acquire(
-          new k.BRepClass_FaceClassifier_4(
-            faceT,
-            pnt(w[0], w[1], w[2]),
-            LINEAR_TOL,
-            false,
-            0.1,
-          ),
-        );
-        const st = cls.State();
-        if (st !== k.TopAbs_State.TopAbs_IN) return false;
-      }
-      return true;
-    };
-    const regions: { sk: SketchOnPlane; profile: Profile }[] = [];
-    for (const sk of sketches) {
-      const n = sk.frame.normal;
-      const o = sk.frame.origin;
-      const ndot = Math.abs(n[0] * fn[0] + n[1] * fn[1] + n[2] * fn[2]);
-      if (ndot < 1 - UNIT_DOT_TOL) continue;
-      const doff = Math.abs(
-        (o[0] - fp[0]) * fn[0] +
-          (o[1] - fp[1]) * fn[1] +
-          (o[2] - fp[2]) * fn[2],
+    return faceRegions(frame, sketches, (u, v) => {
+      const w = uvTo3d(frame, u, v);
+      const cls = acquire(
+        new k.BRepClass_FaceClassifier_4(
+          faceT,
+          pnt(w[0], w[1], w[2]),
+          LINEAR_TOL,
+          false,
+          0.1,
+        ),
       );
-      if (doff > 1e-5) continue;
-      for (const p of sk.profiles) {
-        if (p.area <= 1e-9) continue;
-        if (strictlyInside(sk.frame, p.polygon))
-          regions.push({ sk, profile: p });
-      }
-    }
-
-    return { faceT: own.keep(faceT), regions };
+      return cls.State() === k.TopAbs_State.TopAbs_IN;
+    });
   });
-  if (result) acquire(result.faceT);
-  return result;
 }
 
-export function sketchRegionCompound(
-  regions: { sk: SketchOnPlane; profile: Profile }[],
-): Shape {
+export function sketchRegionCompound(regions: Region[]): Shape {
   const k = getKernel();
   const builder = acquire(new k.BRep_Builder());
   const comp = acquire(new k.TopoDS_Compound());
   builder.MakeCompound(comp);
-  for (const { sk, profile } of regions) {
-    const pf = buildProfileFace(profile, sk.entities, sk.frame);
+  for (const { sketch, profile } of regions) {
+    const pf = buildProfileFace(
+      { ...profile, holes: [] },
+      sketch.entities,
+      sketch.frame,
+    );
     builder.Add(comp, pf.face);
     pf.edgeEntity.release();
   }
@@ -187,17 +147,13 @@ export function sketchRegionCompound(
   return comp;
 }
 
-export function sketchRegionEdgeNames(
-  cutFace: Shape,
-  regions: { sk: SketchOnPlane; profile: Profile }[],
-) {
+export function sketchRegionEdgeNames(cutFace: Shape, regions: Region[]) {
   const edgeEntity = new ShapeMap<string>();
   const bySketch = new Map<SketchOnPlane, Set<string>>();
-  for (const { sk, profile } of regions) {
-    let ids = bySketch.get(sk);
-    if (!ids) bySketch.set(sk, (ids = new Set()));
+  for (const { sketch, profile } of regions) {
+    let ids = bySketch.get(sketch);
+    if (!ids) bySketch.set(sketch, (ids = new Set()));
     for (const c of profile.outer) ids.add(c.entityId);
-    for (const h of profile.holes) for (const c of h) ids.add(c.entityId);
   }
   for (const [sk, ids] of bySketch) {
     const matched = matchEdgesToEntities(

@@ -425,6 +425,13 @@ input bound, not a tolerance.
   profile has the same area and directed curves that all lie on that loop. A
   sketch without spurs resolves every id as it did before pruning:
   `shared/src/profiles.test.ts`.
+- A face extrude removes the regions of earlier sketches drawn on that face.
+  `faceRegions` in `shared/src/faceRegions.ts` picks them for the kernel and
+  the preview ghost alike: coplanar regions with area whose sampled outline
+  lies strictly inside the face. Each removes its whole outline, so a region
+  inside another, or a face hole inside one, adds nothing (`uncovered`). A
+  subtraction the kernel cannot build, or one that splits the face, fails the
+  feature and keeps the previous body.
 - Create Sketch on a planar face copies its boundary into local curves: lines,
   circles, ellipses and arcs, and B-spline edges, rational, trimmed or periodic,
   as splines with exact poles, weights and knots. A copy has no projection or

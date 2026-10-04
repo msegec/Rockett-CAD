@@ -1,10 +1,11 @@
 import { ShapeUtils, Vector2, Vector3 } from "three";
 import { cellsMeetSolid } from "./extrudeOverlap";
 import {
+  faceRegions,
   findProfile,
   LINEAR_TOL,
   pointInPolygon,
-  UNIT_DOT_TOL,
+  uncovered,
   type BodyPayload,
   type FaceInfo,
   type MeshPayload,
@@ -281,38 +282,34 @@ function gap(q: Vector2, a: Vector2, b: Vector2): number {
   return q.distanceTo(a.clone().addScaledVector(ab, t));
 }
 
-function sketchRegions(
-  rings: Vector2[][],
-  normal: Vec3,
-  depth: number,
+function holeRings(
+  [outer, ...holes]: Vector2[][],
+  face: PlaneFrame,
   sketches: SketchPayload[],
-  flat: (p: Vec3) => Vector2,
 ): Vector2[][] {
+  const rings = [outer!, ...holes];
   const polygons = rings.map(flatten);
-  const inside = (q: Vector2) =>
-    polygons.filter((p) => pointInPolygon(q.x, q.y, p)).length % 2 === 1 &&
-    rings.every((r) =>
-      r.every((a, k) => gap(q, a, r[(k + 1) % r.length]!) > LINEAR_TOL),
+  const inside = (u: number, v: number) => {
+    const q = new Vector2(u, v);
+    return (
+      polygons.filter((p) => pointInPolygon(u, v, p)).length % 2 === 1 &&
+      rings.every((r) =>
+        r.every((a, k) => gap(q, a, r[(k + 1) % r.length]!) > LINEAR_TOL),
+      )
     );
-  const found = sketches.flatMap(({ frame, profiles }) =>
-    Math.abs(dot(frame.normal, normal)) < 1 - UNIT_DOT_TOL ||
-    Math.abs(dot(frame.origin, normal) - depth) > 1e-5
-      ? []
-      : profiles.flatMap((p) => {
-          const ring = framePoints(frame, p.polygon).map(flat);
-          const step = Math.max(1, Math.ceil(ring.length / 48));
-          return p.area > 1e-9 &&
-            ring.every((q, i) => i % step > 0 || inside(q))
-            ? [ring]
-            : [];
-        }),
-  );
-  return found.filter(
-    (r, i) =>
-      !found.some(
-        (o, j) => j !== i && pointInPolygon(r[0]!.x, r[0]!.y, flatten(o)),
+  };
+  const all = [
+    ...holes,
+    ...faceRegions(face, sketches, inside).map(({ outline }) =>
+      Array.from(
+        { length: outline.length / 2 },
+        (_, i) => new Vector2(outline[i * 2], outline[i * 2 + 1]),
       ),
-  );
+    ),
+  ];
+  const flat = all.map(flatten);
+  const kept = new Set(uncovered(flat));
+  return all.filter((_, i) => kept.has(flat[i]!));
 }
 
 interface Section {
@@ -342,15 +339,24 @@ function prism(
     return q;
   };
   const lift = (q: Vector2, t = 0) =>
-    where.get(q)!.map((v, i) => v + normal[i]! * t) as Vec3;
+    (
+      where.get(q) ??
+      e1.map((v, i) => v * q.x + e2[i]! * q.y + normal[i]! * depth)
+    ).map((v, i) => v + normal[i]! * t) as Vec3;
   const rings = loops
     .map((l) => l.map(flat))
     .toSorted(
       (a, b) => Math.abs(ShapeUtils.area(b)) - Math.abs(ShapeUtils.area(a)),
     );
+  const face = {
+    origin: normal.map((v) => v * depth) as Vec3,
+    xAxis: e1,
+    yAxis: e2,
+    normal,
+  };
   const [outer, ...holes] = [
-    ...rings,
-    ...sketchRegions(rings, normal, depth, sketches, flat),
+    rings[0]!,
+    ...holeRings(rings, face, sketches),
   ].map((r, i) =>
     ShapeUtils.isClockWise(r) === (i === 0) ? r.toReversed() : r,
   );

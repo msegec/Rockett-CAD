@@ -140,17 +140,6 @@ export interface SketchOnPlane {
   profiles: Profile[];
 }
 
-/**
- * Fusion-style face splitting for direct face extrudes: closed regions of
- * sketches drawn on (coplanar with) a planar body face are subtracted from
- * it, so a circle sketched on a face extrudes as a hole unless its own
- * region is also extruded.
- *
- * Only regions that lie STRICTLY inside the face are subtracted (every
- * boundary sample must classify as interior) — a sketch region that equals
- * or crosses the face boundary leaves the face untouched. Any kernel
- * failure falls back to the unmodified face.
- */
 export function buildProfileFace(
   profile: Profile,
   entities: SketchEntity[],
