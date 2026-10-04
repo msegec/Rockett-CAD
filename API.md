@@ -384,9 +384,16 @@ module, in load order:
   project through the same write queue, transaction id and `If-Match` as a
   core edit, and applies the returned document and history. A route that is
   not a document edit, or no open project, rejects.
+- `project.read(route, params)` GETs a project route of the open project,
+  filling `:id` with its id and the other path parameters from `params`,
+  and resolves the route's typed JSON response. A route that is not GET, a
+  path parameter of `.` or `..`, or no open project, rejects before a
+  request goes out. A reply that lands after the open project changed
+  rejects.
 - `ui` passes the core `DraggablePanel`, `DialogFooter`, `NumField`,
-  `LengthField`, `AngleField`, `SelectField`, `CheckField`, `TextField` and
-  `TextAreaField`, so a module dialog uses the KIT fields. `LengthField`
+  `LengthField`, `AngleField`, `SelectField`, `CheckField`, `TextField`,
+  `TextAreaField` and `ContextMenu`, so a module dialog uses the KIT fields
+  and a module right-click menu is the core menu. `LengthField`
   takes millimetres and shows the user's length unit. `ui.openPanel(id)`
   and `ui.closePanel(id)` open and close a panel through the core panel
   state.
@@ -422,9 +429,9 @@ module, in load order:
   sign-out on 401 match core calls. `path` is one or more segments of
   letters, digits, `-` and `_` joined by single slashes; anything else,
   such as `..`, a leading slash, a URL, `%`, `?` or `#`, rejects before a
-  request goes out. Project routes are not reachable: a document edit goes
-  through `project.mutate`. A user-data etag travels in the JSON body, as
-  `userData` reads and writes it.
+  request goes out. Project routes are not reachable: a read goes through
+  `project.read` and a document edit through `project.mutate`. A user-data
+  etag travels in the JSON body, as `userData` reads and writes it.
 
 ## Project file
 

@@ -58,6 +58,7 @@ async function projectView(id: string): Promise<ProjectView> {
   return {
     get: () => open,
     subscribe: () => () => {},
+    read: () => Promise.reject(new Error("read is not used here")),
     async mutate(route, body) {
       const res = await request(route.path.replace(":id", id), {
         method: route.method,

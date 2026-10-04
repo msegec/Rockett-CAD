@@ -1,12 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { ContextMenuItem } from "@rockett/plugin-api";
 import { pushKeyContext } from "../commands/keymap";
 
-export type MenuItem = {
-  label: string;
-  danger?: boolean;
-} & (
-  { action: () => void; disabled?: false } | { disabled: true; action?: never }
-);
+export type MenuItem = ContextMenuItem;
 
 export function ContextMenu({
   x,

@@ -7,6 +7,7 @@ import type {
   NumberFieldProps,
   OpenProject,
   ProjectView,
+  RouteResponse,
   Workbench,
 } from "@rockett/plugin-api";
 import {
@@ -24,6 +25,7 @@ import {
 import { iconOf, registerModuleIcon } from "../icons";
 import { registerSelectionKind } from "../selection/kinds";
 import { confirm } from "../components/ConfirmPanel";
+import { ContextMenu } from "../components/ContextMenu";
 import { pickFile, saveDownload } from "../download";
 import { DraggablePanel } from "../components/DraggablePanel";
 import { DialogFooter } from "../components/form/DialogFooter";
@@ -142,6 +144,17 @@ const project: ProjectView = {
     useStore.subscribe((now, before) => {
       if (changed(now, before)) listener();
     }),
+  async read(route, params) {
+    const { projectId } = useStore.getState();
+    if (!projectId) throw new Error("No project is open.");
+    if (route.method !== "GET")
+      throw new Error(`${route.path} is not a GET route`);
+    const get = route as Route<string, unknown, RouteResponse<typeof route>>;
+    const reply = await send(get, { ...params, id: projectId });
+    if (useStore.getState().projectId !== projectId)
+      throw new Error("The open project changed.");
+    return reply;
+  },
   async mutate(route, body) {
     const { projectId, mutate } = useStore.getState();
     if (!projectId) throw new Error("No project is open.");
@@ -165,6 +178,7 @@ const ui: ClientUi = {
   CheckField,
   TextField,
   TextAreaField,
+  ContextMenu,
   openPanel,
   closePanel,
   confirm,

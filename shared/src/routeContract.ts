@@ -67,6 +67,8 @@ export function pathFor<P extends string>(
   return target.path.replace(/:(\w+)/g, (_match, key: string) => {
     const value = values[key];
     if (value === undefined) throw new Error(`${target.path} needs :${key}`);
+    if (value === "." || value === "..")
+      throw new Error(`${target.path} :${key} cannot be ${value}`);
     return encodeURIComponent(value);
   });
 }

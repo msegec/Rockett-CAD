@@ -35,6 +35,9 @@ export type RouteBody<R extends Route> = R extends { readonly body: object }
     : unknown
   : unknown;
 
+export type RouteResponse<R extends Route> =
+  R extends Route<string, unknown, infer Res> ? Res : unknown;
+
 export interface RouteRequest<R extends Route> {
   params: PathParams<R["path"]>;
   body: RouteBody<R>;
@@ -250,8 +253,19 @@ export type ProjectRoute = Route<`/projects/:id/${string}`>;
 export interface ProjectView {
   get(): OpenProject;
   subscribe(listener: () => void): Dispose;
+  read<R extends ProjectRoute>(
+    route: R,
+    params: Omit<PathParams<R["path"]>, "id">,
+  ): Promise<RouteResponse<R>>;
   mutate<R extends ProjectRoute>(route: R, body: RouteBody<R>): Promise<void>;
 }
+
+export type ContextMenuItem = {
+  label: string;
+  danger?: boolean;
+} & (
+  { action: () => void; disabled?: false } | { disabled: true; action?: never }
+);
 
 export interface NumberFieldProps {
   label?: string;
@@ -305,6 +319,13 @@ export interface ClientUi {
     onChange: (value: string) => void;
     rows?: number;
     disabled?: boolean;
+  }>;
+  ContextMenu: ComponentType<{
+    x: number;
+    y: number;
+    up?: boolean;
+    items: ContextMenuItem[];
+    onClose: () => void;
   }>;
   openPanel(id: string): void;
   closePanel(id: string): void;
