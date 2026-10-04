@@ -247,9 +247,9 @@ export function placementToTrsf(placement: Placement): any {
   );
 }
 
-export function transformOp(shape: Shape, trsf: any): any {
+export function transformOp(shape: Shape, trsf: any, copyMesh = false): any {
   return acquire(
-    new (getKernel().BRepBuilderAPI_Transform_2)(shape, trsf, true, false),
+    new (getKernel().BRepBuilderAPI_Transform_2)(shape, trsf, true, copyMesh),
   );
 }
 

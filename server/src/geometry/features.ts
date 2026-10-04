@@ -94,6 +94,7 @@ import {
   transformNames,
   type NamedBody,
 } from "./naming.js";
+import { transformCopy } from "./mesh.js";
 import { ShapeMap } from "./shapeMap.js";
 
 import { V, frameFromPlane, offsetFrame, uvTo3d } from "./frames.js";
@@ -700,7 +701,7 @@ export function evalMirror(state: EvalState, f: MirrorFeature) {
     for (const [j, bodyId] of f.bodies.entries()) {
       const body = state.bodies.get(bodyId);
       if (!body) throw new Error(`body ${bodyId} not found`);
-      const tr = transformOp(body.shape, trsf);
+      const tr = transformCopy(body.shape, trsf);
       const mirrored = acquire(tr.Shape());
       const mirroredNames = transformNames(tr, body, mirrorPrefix(f.id));
       if (f.combine) {
@@ -799,7 +800,7 @@ export function evalLinearPattern(state: EvalState, f: LinearPatternFeature) {
         const offset = V.scale(V.scale(direction, f.spacing), i);
         const prefix = patternPrefix(i, f.id);
         const trsf = placementToTrsf(Placement.fromTranslation(offset));
-        const tr = transformOp(body.shape, trsf);
+        const tr = transformCopy(body.shape, trsf);
         const instance = acquire(tr.Shape());
         const instNames = transformNames(tr, body, prefix);
         if (f.combine) {
@@ -856,7 +857,7 @@ export function evalCircularPattern(
         const trsf = placementToTrsf(
           Placement.fromAxisAngle(axis.direction, step * i, axis.origin),
         );
-        const tr = transformOp(body.shape, trsf);
+        const tr = transformCopy(body.shape, trsf);
         const instance = acquire(tr.Shape());
         const instNames = transformNames(tr, body, patternPrefix(i, f.id));
         if (f.combine) {
