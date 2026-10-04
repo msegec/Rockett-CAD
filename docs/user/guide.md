@@ -158,6 +158,11 @@ faces: Distance 1 and Distance 2 set where the round meets each face, and
 **Flip** swaps them. An edge at a curved face, a corner of three edges or a
 run of collinear edges is refused.
 
+**Add set** starts another selection set with its own radius, as Fusion's
+**+** does, and **Set** chooses which set your picks, the radius, the size
+hint and the drag arrow act on. **Remove set** drops the chosen set. Every
+set builds in one fillet. Two distances take one set.
+
 A fillet that meets two earlier fillets can fail. This is a current
 limitation. Fillet the vertical edges before the top edges to avoid it.
 

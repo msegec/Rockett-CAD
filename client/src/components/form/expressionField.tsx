@@ -139,7 +139,7 @@ export interface FieldLink {
 
 type Bind = string | FieldLink | undefined;
 
-function boundText(s: State, bind: Bind): string | undefined {
+export function boundText(s: State, bind: Bind): string | undefined {
   if (typeof bind === "object") return bind.text;
   const path = bind;
   if (path === undefined || s.active?.id !== "design.feature") return undefined;

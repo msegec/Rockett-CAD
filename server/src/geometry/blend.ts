@@ -13,6 +13,7 @@ import {
   type EdgeRef,
   type FilletFeature,
   type Vec3,
+  filletSets,
 } from "@rockett/shared";
 import {
   bboxOf,
@@ -50,12 +51,12 @@ import {
   type EvalState,
   type ToolResult,
 } from "./featureState.js";
-function blendPerBody(
+function blendPerBody<R extends EdgeRef>(
   state: EvalState,
-  refs: EdgeRef[],
-  blend: (body: NamedBody, refs: EdgeRef[]) => void,
+  refs: R[],
+  blend: (body: NamedBody, refs: R[]) => void,
 ): void {
-  const groups = new Map<string, EdgeRef[]>();
+  const groups = new Map<string, R[]>();
   for (const ref of refs) {
     const group = groups.get(ref.bodyId);
     if (group) group.push(ref);
@@ -94,10 +95,31 @@ function collectEdges(
   return tangentChain ? tangentEdges(body, refs).map(resolve) : seeds;
 }
 
+type SizedRef = EdgeRef & { radius: number };
+
+function filletRefs(state: EvalState, f: FilletFeature): SizedRef[] {
+  const seen = new Set<string>();
+  return filletSets(f).flatMap((set) =>
+    blendEdges(state, { type: "fillet", ...set })
+      .filter(({ bodyId, edgeName }) => {
+        const key = `${bodyId}\n${edgeName}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((ref) => ({ ...ref, radius: set.radius })),
+  );
+}
+
 export function evalFillet(state: EvalState, f: FilletFeature): void {
-  if (f.radius <= 0) throw new Error("fillet radius must be positive");
-  blendPerBody(state, blendEdges(state, f), (body, refs) =>
-    filletBody(state, f, body, refs),
+  if (filletSets(f).some((set) => set.radius <= 0))
+    throw new Error("fillet radius must be positive");
+  const refs = filletRefs(state, f);
+  const radii = [...new Set(refs.map((ref) => ref.radius))];
+  blendPerBody(state, refs, (body, bodyRefs) =>
+    radii.length === 1
+      ? filletBody(state, { ...f, radius: radii[0]! }, body, bodyRefs)
+      : mixedFillet(state, f, radii, body, bodyRefs),
   );
 }
 
@@ -113,6 +135,31 @@ function filletBody(
     const result =
       moduleFillet(body, sourceEdges, f, byName, refs) ??
       nativeFillet(body, sourceEdges, byName, refs, f);
+    registerBodySolids(state, body.bodyId, result.shape, result.names);
+  });
+}
+
+function mixedFillet(
+  state: EvalState,
+  f: FilletFeature,
+  radii: number[],
+  body: NamedBody,
+  refs: SizedRef[],
+): void {
+  kernelCall("fillet", () => {
+    const byName = computeEdgeNames(body).byName;
+    const seen = new Set<string>();
+    const sourceEdges = radii.flatMap((radius) =>
+      collectEdges(
+        body,
+        byName,
+        refs.filter((ref) => ref.radius === radius),
+        f.tangentChain,
+      )
+        .filter(({ name }) => !seen.has(name) && !!seen.add(name))
+        .map((edge) => ({ ...edge, radius })),
+    );
+    const result = nativeFillet(body, sourceEdges, byName, refs, f);
     registerBodySolids(state, body.bodyId, result.shape, result.names);
   });
 }

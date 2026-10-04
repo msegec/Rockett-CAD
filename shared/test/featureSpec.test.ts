@@ -356,6 +356,22 @@ const cases: Record<string, SpecCase> = {
         distance2: 2,
         flip: true,
       },
+      {
+        ...meta,
+        type: "fillet",
+        filletType: "equalDistance",
+        edges: [refEdge("E1")],
+        radius: 1,
+        sets: [
+          { edges: [refEdge("E2")], radius: 3 },
+          {
+            edges: [],
+            faces: [refFace("F1")],
+            features: ["ref:extrude"],
+            radius: 2,
+          },
+        ],
+      },
     ],
     invalid: [
       [
@@ -378,7 +394,7 @@ const cases: Record<string, SpecCase> = {
           radius: 1,
           distance2: 2,
         },
-        "request needs a second distance and a flip exactly for two distances",
+        "request needs a second distance and a flip exactly for two distances, and several sets only for equal distance",
         "",
       ],
       [
@@ -390,8 +406,34 @@ const cases: Record<string, SpecCase> = {
           radius: 1,
           distance2: 2,
         },
-        "request needs a second distance and a flip exactly for two distances",
+        "request needs a second distance and a flip exactly for two distances, and several sets only for equal distance",
         "",
+      ],
+      [
+        {
+          ...meta,
+          type: "fillet",
+          filletType: "twoDistances",
+          edges: [refEdge("E1")],
+          radius: 1,
+          distance2: 2,
+          flip: false,
+          sets: [{ edges: [refEdge("E2")], radius: 3 }],
+        },
+        "request needs a second distance and a flip exactly for two distances, and several sets only for equal distance",
+        "",
+      ],
+      [
+        {
+          ...meta,
+          type: "fillet",
+          filletType: "equalDistance",
+          edges: [refEdge("E1")],
+          radius: 1,
+          sets: [{ edges: [], radius: 3 }],
+        },
+        "sets.0 needs an edge, a face or a feature",
+        "/sets/0",
       ],
     ],
   },

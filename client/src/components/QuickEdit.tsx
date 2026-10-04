@@ -70,7 +70,12 @@ export function quickValues(f: Feature): QuickValue[] {
     case "revolve":
       return [key("angle", "Angle", "angle")];
     case "fillet":
-      return [key("radius", "Radius")];
+      return [
+        key("radius", (f.sets ?? []).length > 0 ? "Radius 1" : "Radius"),
+        ...(f.sets ?? []).map((_, i) =>
+          key(`sets/${i}/radius`, `Radius ${i + 2}`),
+        ),
+      ];
     case "chamfer":
     case "offsetFace":
       return [key("distance", "Distance")];

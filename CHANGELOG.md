@@ -160,6 +160,8 @@ release workflow remain under development.
   earlier edge-only blends load and build unchanged.
 - Schema 33: Fillet stores its type, equal distance or two distances with a
   flip; earlier fillets stay equal distance and build unchanged.
+- Schema 34: Fillet may hold more selection sets, each with its own radius;
+  earlier fillets load as one set and build unchanged.
 
 ### Known limits
 

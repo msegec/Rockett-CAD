@@ -308,7 +308,13 @@ export interface FilletFeature extends BlendFeatureBase {
   radius: number;
   distance2?: number;
   flip?: boolean;
+  sets?: FilletSet[];
 }
+
+export type FilletSet = Pick<
+  FilletFeature,
+  "edges" | "faces" | "features" | "radius"
+>;
 
 export interface ChamferFeature extends BlendFeatureBase {
   type: "chamfer";
@@ -321,7 +327,6 @@ export interface ChamferFeature extends BlendFeatureBase {
 
 export interface ShellFeature extends FeatureBase {
   type: "shell";
-  /** Faces removed (opened). May be empty for a hollow closed shell. */
   openFaces: FaceRef[];
   body?: string;
   direction: ShellDirection;
@@ -479,7 +484,6 @@ export * from "./documents.js";
 
 let idCounter = 0;
 
-/** Unique-enough id generator (time + counter + randomness). */
 export function normalizeDegrees(value: number): number {
   const wrapped = value - 360 * Math.floor(value / 360);
   return wrapped > 180 ? wrapped - 360 : wrapped;

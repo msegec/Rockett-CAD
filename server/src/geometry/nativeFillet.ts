@@ -25,9 +25,14 @@ export function rejectEmptyFilletContours(
   }
 }
 
+type Sized = { edge: Shape; name: string; radius?: number }[];
+
+const radiusOf = (f: FilletFeature, source: Sized) =>
+  [...new Set(source.map(({ radius }) => radius ?? f.radius))].join(" and ");
+
 export function nativeFillet(
   body: NamedBody,
-  sourceEdges: { edge: Shape; name: string }[],
+  sourceEdges: Sized,
   byName: Map<string, Shape>,
   refs: EdgeRef[],
   f: FilletFeature,
@@ -41,8 +46,8 @@ export function nativeFillet(
   );
   let result: Shape | undefined;
   {
-    for (const { edge } of sourceEdges) {
-      if (!op.Contour(edge)) op.Add_2(f.radius, edge);
+    for (const { edge, radius } of sourceEdges) {
+      if (!op.Contour(edge)) op.Add_2(radius ?? f.radius, edge);
     }
     rejectEmptyFilletContours(op, sourceEdges);
     op.Build(progress());
@@ -58,7 +63,9 @@ export function nativeFillet(
       return clipped;
     }
     if (!op.IsDone()) {
-      throw new Error(filletFailure(op, byName, refs, f.radius));
+      throw new Error(
+        filletFailure(op, byName, refs, radiusOf(f, sourceEdges)),
+      );
     }
     result = acquire(op.Shape());
     rejectBadBlend(
@@ -67,7 +74,7 @@ export function nativeFillet(
       result,
       body.shape,
       "fillet",
-      `radius ${f.radius}`,
+      `radius ${radiusOf(f, sourceEdges)}`,
       "try fewer edges or a different radius",
     );
     const names = blendNames(op, body, sourceEdges, result, f.id);
@@ -77,12 +84,12 @@ export function nativeFillet(
 
 function filletClipped(
   body: NamedBody,
-  sourceEdges: { edge: Shape }[],
+  sourceEdges: Sized,
   ends: OpenEnd[],
   f: FilletFeature,
 ): ToolResult | null {
   const k = getKernel();
-  const size = `radius ${f.radius}`;
+  const size = `radius ${radiusOf(f, sourceEdges)}`;
   const advice = "try fewer edges or a different radius";
   const clipped = scoped((own) => {
     const split = splitAtEnds(body, sourceEdges, ends, f.id, own);
@@ -94,8 +101,9 @@ function filletClipped(
         k.ChFi3d_FilletShape.ChFi3d_Rational,
       ),
     );
-    for (const { edge } of kept)
-      if (!op.Contour(edge)) op.Add_2(f.radius, edge);
+    kept.forEach(({ edge }, i) => {
+      if (!op.Contour(edge)) op.Add_2(sourceEdges[i]!.radius ?? f.radius, edge);
+    });
     op.Build(progress());
     if (!op.IsDone()) return null;
     const filleted = own(op.Shape());
@@ -120,7 +128,7 @@ export function filletFailure(
   op: any,
   byName: Map<string, Shape>,
   refs: EdgeRef[],
-  radius: number,
+  radius: number | string,
 ): string {
   return scoped(() => {
     const chosen = new Set(refs.map((r) => shapeHash(byName.get(r.edgeName)!)));

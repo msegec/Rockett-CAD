@@ -55,6 +55,7 @@ export type SharedInputParams = InputParams<{
   distance2: number;
   startOffset: number;
   radius: number;
+  activeSet: number;
   thickness: number;
   outsideThickness: number;
   depth: number;

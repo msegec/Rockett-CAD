@@ -1,7 +1,31 @@
 import { refsAt, registerCoreSpec } from "../featureSpec.js";
+import type { FilletFeature, FilletSet } from "../model.js";
 
-registerCoreSpec("fillet", "Fillet", (f) => [
-  ...refsAt("edge", "/edges", f.edges),
-  ...refsAt("face", "/faces", f.faces),
-  ...refsAt("feature", "/features", f.features),
-]);
+export const filletSets = (f: FilletFeature): FilletSet[] => [
+  {
+    edges: f.edges,
+    ...(f.faces && { faces: f.faces }),
+    ...(f.features && { features: f.features }),
+    radius: f.radius,
+  },
+  ...(f.sets ?? []),
+];
+
+export function withFilletSets<F extends FilletFeature>(
+  f: F,
+  [first, ...more]: [FilletSet, ...FilletSet[]],
+): F {
+  const { faces: _faces, features: _features, sets: _sets, ...rest } = f;
+  return { ...rest, ...first, ...(more.length > 0 && { sets: more }) } as F;
+}
+
+registerCoreSpec("fillet", "Fillet", (f) =>
+  filletSets(f).flatMap((set, i) => {
+    const at = i === 0 ? "" : `/sets/${i - 1}`;
+    return [
+      ...refsAt("edge", `${at}/edges`, set.edges),
+      ...refsAt("face", `${at}/faces`, set.faces),
+      ...refsAt("feature", `${at}/features`, set.features),
+    ];
+  }),
+);

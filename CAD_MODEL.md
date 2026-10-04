@@ -306,6 +306,30 @@ body.
   faces". Two picked edges meeting at a corner mitre; three refuse. An edge
   with a collinear neighbour refuses, picked or not.
 
+## Fillet sets
+
+`evalFillet` in `server/src/geometry/blend.ts`; `filletSets` and
+`withFilletSets` in `shared/src/features/fillet.ts`.
+
+- Schema 34 adds optional `sets`: each holds `edges`, optional `faces` and
+  `features`, and a `radius`. The fillet's own picks and `radius` are set 1,
+  so an earlier fillet loads as one set and the migration only bumps the
+  version. A binding on `/radius` stays on set 1; set 2 binds
+  `/sets/0/radius`.
+- Each set derives its edges as a blend does. An edge in two sets takes the
+  radius of the first, and a tangent chain follows the radius of the set it
+  grew from, again first set first.
+- Sets of one radius build as one set holding every edge, through today's
+  route. Different radii build in one kernel fillet with a radius per edge,
+  so sets meeting at a vertex share a corner. It passes the same validity
+  checks as any fillet.
+- `sets` exists with any non-empty pick per set, and only for
+  `equalDistance` once it has an entry. An empty list is one set; the dialog
+  sends it to clear stored sets.
+- The dialog keeps the active set in its params. The size hint sends the
+  draft with the active set first, so the search sizes that set's radius on
+  its edges while the others keep theirs.
+
 ## Chamfer
 
 `evalChamfer` in `server/src/geometry/blend.ts`.

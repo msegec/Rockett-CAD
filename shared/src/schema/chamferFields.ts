@@ -3,7 +3,7 @@ import type { ChamferType, Feature, FilletType } from "../model.js";
 const BLEND_FIELDS = ["distance2", "angle", "flip"] as const;
 type BlendField = (typeof BLEND_FIELDS)[number];
 type BlendKind = "fillet" | "chamfer";
-type Typed = Partial<Record<BlendField | `${BlendKind}Type`, unknown>>;
+type Typed = Partial<Record<BlendField | `${BlendKind}Type` | "sets", unknown>>;
 
 const TYPE_FIELDS: {
   fillet: Record<FilletType, readonly BlendField[]>;
@@ -27,7 +27,10 @@ export function ownsExactly(kind: BlendKind) {
   return (f: Typed) =>
     BLEND_FIELDS.every(
       (key) => blendOwns(kind, f, key) === (f[key] !== undefined),
-    );
+    ) &&
+    (!Array.isArray(f.sets) ||
+      f.sets.length === 0 ||
+      f[`${kind}Type`] === "equalDistance");
 }
 
 export function dropUnownedBlendFields(feature: Feature, patch: object) {

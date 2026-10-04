@@ -4,10 +4,23 @@ import {
   first,
   type FeatureHandleDefinition,
 } from "../three/featureHandles";
-import { FILLET_TYPES, newId, type FilletFeature } from "@rockett/shared";
-import { SelInfo } from "../components/form/fields";
-import { blendPicks } from "../commands/featureCommand";
-import { num } from "./inputs";
+import {
+  FILLET_TYPES,
+  newId,
+  withFilletSets,
+  filletSets,
+  type FilletFeature,
+  type FilletSet,
+} from "@rockett/shared";
+import { SelectField, SelInfo } from "../components/form/fields";
+import {
+  blendPicks,
+  featureParams,
+  setFeatureParams,
+} from "../commands/featureCommand";
+import { useStore, type Selection } from "../store";
+import { boundText } from "../components/form/expressionField";
+import { keptRefs, num, storedFeature } from "./inputs";
 import {
   blendHint,
   blendSelection,
@@ -33,7 +46,8 @@ export type FilletParams = InputParams<
     | "filletType"
     | "distance2"
     | "flip"
-  >
+    | "sets"
+  > & { activeSet: number }
 >;
 
 const handle = {
@@ -56,17 +70,97 @@ function sizes(params: FilletParams) {
       };
 }
 
-function FilletForm({ params, setParams }: FeatureFormProps<FilletParams>) {
-  const { filletType, radius, ...second } = sizes(params);
+const radiusPath = (set: number) =>
+  set === 0 ? "/radius" : `/sets/${set - 1}/radius`;
+
+const activeOf = (params: FilletParams) => num(params, "activeSet", 0);
+
+function liveSets(params: FilletParams, selection: Selection[]): FilletSet[] {
+  const picks = blendSources(params.id, selection);
+  const live = {
+    ...("error" in picks ? { edges: [] } : picks),
+    radius: sizes(params).radius,
+  };
+  const sets = params.sets?.length ? params.sets : [live];
+  return sets.map((set, i) => (i === activeOf(params) ? live : set));
+}
+
+function showSet(
+  setParams: (patch: Partial<FilletParams>) => void,
+  sets: FilletSet[],
+  active: number,
+) {
+  const set = sets[active]!;
+  setParams({ sets, activeSet: active, radius: set.radius });
+  useStore.getState().setSelection(blendSelection(set));
+}
+
+function FilletSets({ params, setParams }: FeatureFormProps<FilletParams>) {
+  const active = activeOf(params);
+  const count = Math.max(params.sets?.length ?? 1, 1);
+  const sets = () => liveSets(params, useStore.getState().selection);
+  const remove = () => {
+    const expressions = { ...featureParams().expressions };
+    for (let i = active; i < count; i++)
+      expressions[radiusPath(i)] =
+        (i + 1 < count
+          ? boundText(useStore.getState(), radiusPath(i + 1))
+          : undefined) ?? null;
+    const kept = sets().filter((_, i) => i !== active);
+    setFeatureParams({ expressions });
+    showSet(setParams, kept, Math.max(active - 1, 0));
+  };
   return (
     <>
+      {count > 1 && (
+        <SelectField
+          label="Set"
+          value={String(active)}
+          options={Array.from({ length: count }, (_, i): [string, string] => [
+            String(i),
+            `Set ${i + 1}`,
+          ])}
+          onChange={(v) => showSet(setParams, sets(), Number(v))}
+        />
+      )}
+      {params.filletType !== "twoDistances" && (
+        <button
+          type="button"
+          className="btn"
+          onClick={() =>
+            showSet(
+              setParams,
+              [...sets(), { edges: [], radius: sizes(params).radius }],
+              count,
+            )
+          }
+        >
+          Add set
+        </button>
+      )}
+      {count > 1 && (
+        <button type="button" className="btn" onClick={remove}>
+          Remove set
+        </button>
+      )}
+    </>
+  );
+}
+
+function FilletForm({ params, setParams }: FeatureFormProps<FilletParams>) {
+  const { filletType, radius, ...second } = sizes(params);
+  const active = activeOf(params);
+  return (
+    <>
+      <FilletSets params={params} setParams={setParams} />
       <SelInfo label="Edges" input="edges" hint={blendHint} />
       <TangentChainField params={params} setParams={setParams} />
       <BlendSizeFields
+        key={active}
         types={FILLET_TYPES}
         size={{ type: filletType, size: radius, ...second }}
         label="Radius"
-        bind="/radius"
+        bind={radiusPath(active)}
         onType={(v) => setParams({ filletType: v })}
         onSize={(v) => setParams({ radius: v })}
         setParams={setParams}
@@ -85,16 +179,27 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
   picks: [blendPicks],
   Form: FilletForm,
   build: (params, selection) => {
+    const sets = liveSets(params, selection);
     const picks = blendSources(params.id, selection);
-    if ("error" in picks) return picks;
-    return {
+    if ("error" in picks && sets.length === 1) return picks;
+    const empty = sets.findIndex((set) => blendSelection(set).length === 0);
+    if (empty >= 0)
+      return { error: `Select an edge, face or feature in set ${empty + 1}` };
+    const [first, ...more] = sets;
+    if (more.length > 0 && params.filletType === "twoDistances")
+      return { error: "Two distances take one set: remove the other sets" };
+    const base: FilletFeature = {
       id: params.id ?? newId("fillet"),
       type: "fillet",
       name: params.name ?? "",
       suppressed: false,
-      ...picks,
+      edges: [],
       ...sizes(params),
       tangentChain: params.tangentChain ?? true,
+    };
+    return {
+      ...withFilletSets(base, [first!, ...more]),
+      ...keptRefs("sets", more, storedFeature(params.id)),
     };
   },
   prefill: (f) => ({
@@ -106,6 +211,7 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
       distance2: f.distance2,
       flip: f.flip,
       tangentChain: f.tangentChain ?? false,
+      ...(f.sets?.length && { sets: filletSets(f), activeSet: 0 }),
     },
     selection: blendSelection(f),
   }),

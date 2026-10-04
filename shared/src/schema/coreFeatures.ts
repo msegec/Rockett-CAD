@@ -365,22 +365,22 @@ const loft = feature("loft", {
   targets,
 });
 
-const blend = <const T extends string, P extends TProperties>(
-  type: T,
-  properties: P,
-) =>
+const picks = {
+  edges: Type.Array(edgeRef),
+  faces: profileFaces,
+  features: Type.Optional(Type.Array(id)),
+};
+const picked = <T extends TSchema>(schema: T) =>
   Type.Refine(
-    feature(type, {
-      tangentChain: flag,
-      edges: Type.Array(edgeRef),
-      faces: profileFaces,
-      features: Type.Optional(Type.Array(id)),
-      ...properties,
-    }),
-    (f: Partial<Record<"edges" | "faces" | "features", unknown[]>>) =>
+    schema,
+    (f: Partial<Record<keyof typeof picks, unknown[]>>) =>
       [f.edges, f.faces, f.features].some((picks) => picks?.length),
     () => "needs an edge, a face or a feature",
   );
+const blend = <const T extends string, P extends TProperties>(
+  type: T,
+  properties: P,
+) => picked(feature(type, { tangentChain: flag, ...picks, ...properties }));
 
 const fillet = Type.Refine(
   blend("fillet", {
@@ -388,9 +388,13 @@ const fillet = Type.Refine(
     radius: positive,
     distance2: Type.Optional(positive),
     flip: flag,
+    sets: Type.Optional(
+      Type.Array(picked(Type.Object({ ...picks, radius: positive }))),
+    ),
   }),
   ownsExactly("fillet"),
-  () => "needs a second distance and a flip exactly for two distances",
+  () =>
+    "needs a second distance and a flip exactly for two distances, and several sets only for equal distance",
 );
 
 const chamfer = Type.Refine(

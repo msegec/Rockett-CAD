@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
+  filletSets,
   formatLength,
+  withFilletSets,
   type Feature,
   type SizedFeature,
   type SizeLimit,
@@ -9,6 +11,7 @@ import {
 import { api } from "../../api";
 import { PREVIEW_DEBOUNCE_MS } from "../../livePreview";
 import { dialogFeatureId, useStore } from "../../store";
+import { featureParams } from "../../commands/featureCommand";
 import { useSetting } from "../../settings";
 
 const UP_TO = { works: "Works up to", untried: "smaller" };
@@ -105,7 +108,16 @@ function sizePosition(id: string): number {
   return Math.min(before!.timelinePosition, before!.features.length);
 }
 
-export function SizeLimitHint({ draft }: { draft: Feature | null }) {
+function activeFirst(draft: Feature | null, active: number): Feature | null {
+  if (draft?.type !== "fillet") return draft;
+  const sets = filletSets(draft);
+  const [set] = sets.splice(active, 1);
+  return set ? withFilletSets(draft, [set, ...sets]) : draft;
+}
+
+export function SizeLimitHint({ draft: built }: { draft: Feature | null }) {
+  const active = useStore((s) => Number(featureParams(s).activeSet ?? 0));
+  const draft = activeFirst(built, active);
   const units = useSetting("units.length");
   const projectId = useStore((s) => s.projectId);
   const key = sizePicks(draft);

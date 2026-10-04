@@ -14,7 +14,10 @@ const edgeRefs = (bodyId: string, names: string[]): EdgeRef[] =>
 
 export function blendEdges(
   state: EvalState,
-  f: FilletFeature | ChamferFeature,
+  f: Pick<
+    FilletFeature | ChamferFeature,
+    "type" | "edges" | "faces" | "features"
+  >,
 ): EdgeRef[] {
   if (!f.faces?.length && !f.features?.length) {
     if (f.edges.length === 0) throw new Error("no edges selected");

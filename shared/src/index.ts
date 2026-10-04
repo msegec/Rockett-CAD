@@ -33,7 +33,7 @@ import "./features/revolve.js";
 import "./features/emboss.js";
 import "./features/sweep.js";
 import "./features/loft.js";
-import "./features/fillet.js";
+export * from "./features/fillet.js";
 import "./features/chamfer.js";
 import "./features/offsetFace.js";
 import "./features/combine.js";
