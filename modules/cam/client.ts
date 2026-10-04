@@ -6,6 +6,8 @@ import {
 import { manufactureBrowser } from "./src/client/browser.js";
 import {
   dialogPanel,
+  LASER_GROUP,
+  MILL_GROUP,
   OPERATION_DIALOGS,
   operationDialog,
 } from "./src/client/opDialog.js";
@@ -21,7 +23,6 @@ import {
 
 const MANUFACTURE = "rockett.cam.manufacture";
 const SETUP_GROUP = "rockett.cam.group.setup";
-const MILL_GROUP = "rockett.cam.group.mill";
 const PROGRAM_GROUP = "rockett.cam.group.program";
 
 type Dialog = {
@@ -83,11 +84,17 @@ export default defineClientModule({
       context: MANUFACTURE,
       after: "rockett.cam.group.plan",
     });
+    register.toolbarGroup({
+      id: LASER_GROUP,
+      label: "LASER",
+      context: MANUFACTURE,
+      after: "rockett.cam.group.surface",
+    });
     for (const op of OPERATION_DIALOGS)
       dialog(context, {
         id: op.type,
         label: op.label,
-        group: MILL_GROUP,
+        group: op.group,
         icon: op.icon,
         panel: dialogPanel(op),
         component: operationDialog(context, op),
@@ -96,7 +103,7 @@ export default defineClientModule({
       id: PROGRAM_GROUP,
       label: "PROGRAM",
       context: MANUFACTURE,
-      after: "rockett.cam.group.laser",
+      after: LASER_GROUP,
     });
     dialog(context, {
       id: "rockett.cam.nc",

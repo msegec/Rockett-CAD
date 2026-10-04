@@ -163,14 +163,8 @@ describe("laser mode", () => {
     });
   });
 
-  it("passes the laser fixture on a laser profile but its unregistered operation", () => {
-    expect(check(laser)).toEqual([
-      {
-        rule: "tool",
-        section: 0,
-        reason: "operation rockett.cam.laser is not supported",
-      },
-    ]);
+  it("passes the laser fixture on a laser profile", () => {
+    expect(check(laser)).toEqual([]);
   });
 
   it("rejects laser power outside 0 to 100 percent", () => {

@@ -6,6 +6,7 @@ export const OPERATION_VERSIONS = {
   "rockett.cam.pocket": 1,
   "rockett.cam.parallel": 1,
   "rockett.cam.waterline": 1,
+  "rockett.cam.laser": 1,
 } as const satisfies Record<string, number>;
 
 export type OperationType = keyof typeof OPERATION_VERSIONS;
@@ -23,6 +24,7 @@ const OPERATION_TOOLS: Readonly<
   "rockett.cam.pocket": ["flat", "bull"],
   "rockett.cam.parallel": ["ball"],
   "rockett.cam.waterline": ["flat", "ball", "bull"],
+  "rockett.cam.laser": ["flat"],
 };
 
 const listed = (kinds: Kinds) =>

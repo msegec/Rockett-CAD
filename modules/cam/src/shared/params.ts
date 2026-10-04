@@ -20,15 +20,12 @@ const faceRef = (title: string) =>
 
 export type FaceRef = Static<ReturnType<typeof faceRef>>;
 
+const outside = Type.Literal("outside", { title: "Outside" });
+const inside = Type.Literal("inside", { title: "Inside" });
+
 export const contourParams = Type.Object({
   face: faceRef("Face"),
-  side: Type.Union(
-    [
-      Type.Literal("outside", { title: "Outside" }),
-      Type.Literal("inside", { title: "Inside" }),
-    ],
-    { title: "Side" },
-  ),
+  side: Type.Union([outside, inside], { title: "Side" }),
   bottomOffset: Type.Number({ title: "Bottom offset", parameterUnit: "mm" }),
 });
 
@@ -54,6 +51,24 @@ export const parallelParams = Type.Object({
 export const waterlineParams = Type.Object({
   angle: Type.Number({ title: "Wall angle", parameterUnit: "deg" }),
   tolerance,
+});
+
+export const laserParams = Type.Object({
+  face: faceRef("Face"),
+  side: Type.Union(
+    [outside, inside, Type.Literal("on", { title: "On the line" })],
+    { title: "Side" },
+  ),
+  power: Type.Number({ title: "Power", parameterUnit: "%" }),
+  feed: Type.Number({
+    title: "Feed",
+    parameterUnit: "mm/min",
+    exclusiveMinimum: 0,
+  }),
+  passes: Type.Integer({ title: "Passes", minimum: 1 }),
+  zStep: Type.Optional(
+    Type.Number({ title: "Z step", parameterUnit: "mm", minimum: 0 }),
+  ),
 });
 
 export function paramsOf<S extends TSchema>(

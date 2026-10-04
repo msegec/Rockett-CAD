@@ -3,6 +3,7 @@ import { FINISH_PROFILE, type Program, type Section } from "../shared/ir.js";
 import { isOperation, type OperationType } from "../shared/operations.js";
 import {
   contourParams,
+  laserParams,
   paramsOf,
   parallelParams,
   pocketParams,
@@ -15,6 +16,7 @@ import type { Mesh } from "../surface/dropCutter.js";
 import { contour } from "../toolpath/contour.js";
 import { facing } from "../toolpath/facing.js";
 import { checkMoves, chorded } from "../toolpath/geometry.js";
+import { laser } from "../toolpath/laser.js";
 import { checkParallel, parallel } from "../toolpath/parallel.js";
 import { pocket } from "../toolpath/pocket.js";
 import { checkWaterline, waterline } from "../toolpath/waterline.js";
@@ -180,6 +182,19 @@ const GENERATORS: Readonly<Record<OperationType, Generator>> = {
     const { angle, tolerance } = paramsOf(waterlineParams, type, params);
     checkWaterline({ ...input, setup: { ...input.setup, tolerance }, angle });
     return [waterline({ ...surface(input, scope, tolerance), angle })];
+  },
+  "rockett.cam.laser"(input, scope) {
+    const { type, params } = input.operation;
+    const { face: ref, ...beam } = paramsOf(laserParams, type, params);
+    const { stock, face } = faceOf(input, scope, ref);
+    return [
+      laser({
+        ...cut(input),
+        ...beam,
+        stock,
+        profiles: [face.outer, ...face.inner],
+      }),
+    ];
   },
 };
 

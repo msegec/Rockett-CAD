@@ -5,7 +5,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import type { TObject } from "typebox";
+import { Type, type TObject } from "typebox";
 import type {
   ClientContext,
   FaceRef,
@@ -14,29 +14,47 @@ import type {
 } from "@rockett/plugin-api";
 import { signRoute, type CamData } from "../shared/document.js";
 import { toolRefusal } from "../shared/operations.js";
-import { contourParams, paramsOf, pocketParams } from "../shared/params.js";
+import {
+  contourParams,
+  laserParams,
+  paramsOf,
+  pocketParams,
+} from "../shared/params.js";
 import type { Preset, Tool } from "../shared/tools.js";
 import { banner, libraryOf, reason } from "./libraryParts.js";
 import { faceKeys, firstChoices, schemaFields } from "./schemaForm.js";
 import { camRead, editCam, withOperations } from "./setup.js";
+
+export const MILL_GROUP = "rockett.cam.group.mill";
+export const LASER_GROUP = "rockett.cam.group.laser";
 
 export const OPERATION_DIALOGS = [
   {
     type: "rockett.cam.contour",
     label: "Contour",
     icon: "contour.svg",
+    group: MILL_GROUP,
     schema: contourParams,
   },
   {
     type: "rockett.cam.pocket",
     label: "Pocket",
     icon: "pocket.svg",
+    group: MILL_GROUP,
     schema: pocketParams,
+  },
+  {
+    type: "rockett.cam.laser",
+    label: "Laser",
+    icon: "laser.svg",
+    group: LASER_GROUP,
+    schema: laserParams,
   },
 ] as const satisfies readonly {
   type: string;
   label: string;
   icon: `${string}.svg`;
+  group: string;
   schema: TObject;
 }[];
 
@@ -68,6 +86,7 @@ const unset = (schema: TObject, params: Params) =>
     .filter(
       ([key, field]) =>
         (field as { title?: string }).title !== undefined &&
+        !Type.IsOptional(field) &&
         params[key] === undefined,
     )
     .map(([key]) => key);
