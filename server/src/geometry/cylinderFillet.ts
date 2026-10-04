@@ -4,8 +4,10 @@ import {
   chamferSides,
   circleSides,
   cylinderOf,
+  ellipseSides,
   torusSides,
 } from "./blendSides.js";
+import { ellipseGuide } from "./ellipseFillet.js";
 import type { ToolResult } from "./featureState.js";
 import { V } from "./frames.js";
 import {
@@ -30,7 +32,7 @@ import {
   type BlendStrip,
 } from "./planarFillet.js";
 import { planarFilletSurface } from "./planarFilletSurface.js";
-import { arcTorusStrip, torusBlend } from "./torusFillet.js";
+import { arcTorusStrip, closedBlend, torusGuide } from "./torusFillet.js";
 
 function sameCylinder(a: Shape, b: Shape, own: Own) {
   const [first, second] = [cylinderOf(a, own), cylinderOf(b, own)];
@@ -110,12 +112,16 @@ function chainBlend(
       byName,
       refs,
     );
-  if (along(torusSides))
-    return torusBlend(
+  const closed = along(torusSides)
+    ? torusGuide(radius)
+    : along(ellipseSides) && ellipseGuide(radius);
+  if (closed)
+    return closedBlend(
       body,
       chain,
       { kind: "fillet", size: radius },
       featureId,
+      closed,
       own,
     );
   return along(circleSides)

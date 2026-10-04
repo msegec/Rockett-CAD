@@ -248,3 +248,43 @@ export function torusSides(edge: Shape, original: Shape[], own: Own) {
     ? circleSides(edge, original, own)
     : null;
 }
+
+function ellipseSide(face: Shape, edge: Shape, own: Own) {
+  const k = getKernel(),
+    cylinder = cylinderOf(face, own);
+  if (!cylinder) return null;
+  const guide = own(new k.BRepAdaptor_Curve_2(edge)),
+    ellipse = own(guide.Ellipse()),
+    centre = own(ellipse.Location()),
+    minor = own(own(ellipse.YAxis()).Direction()),
+    mid = own(
+      guide.EvalD0((guide.FirstParameter() + guide.LastParameter()) / 2),
+    );
+  if (
+    V.norm(radial(cylinder, [centre.X(), centre.Y(), centre.Z()])) >
+      LINEAR_TOL ||
+    Math.abs(ellipse.MinorRadius() - cylinder.radius) > LINEAR_TOL ||
+    Math.abs(V.dot([minor.X(), minor.Y(), minor.Z()], cylinder.axis)) >
+      UNIT_DOT_TOL
+  )
+    return null;
+  return {
+    normal: V.scale(
+      V.normalize(radial(cylinder, [mid.X(), mid.Y(), mid.Z()])),
+      cylinder.outward,
+    ),
+    radius: cylinder.outward * cylinder.radius,
+  };
+}
+
+export function ellipseSides(edge: Shape, original: Shape[], own: Own) {
+  if (vertices(edge).map(own).length !== 1) return null;
+  const sides = curveSides(
+    edge,
+    original,
+    own,
+    (face) => planeSide(face) ?? ellipseSide(face, edge, own),
+    getKernel().GeomAbs_CurveType.GeomAbs_Ellipse,
+  );
+  return sides?.some((side) => side.radius) ? sides : null;
+}

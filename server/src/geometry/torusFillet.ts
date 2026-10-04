@@ -162,11 +162,28 @@ function trimmedNeighbours(neighbours: Shape[], guides: Guide[], own: Own) {
   });
 }
 
-export function torusBlend(
+export type ClosedGuide = (
+  guide: Shape,
+  source: Shape[],
+  own: Own,
+) => { sides: PlanarSide[]; face: Shape };
+
+export function torusGuide(radius: number): ClosedGuide {
+  return (guide, source, own) => {
+    const sides = torusSides(guide, source, own);
+    if (!sides) throw new Error("the torus fillet guide changed in the copy");
+    const { point } = planeBoundarySample(guide, sides[0]!.normal, own);
+    const p: Vec3 = [point.X(), point.Y(), point.Z()];
+    return { sides, face: torusFace(p, sides, radius, own) };
+  };
+}
+
+export function closedBlend(
   body: NamedBody,
   chain: { edge: Shape }[],
   strip: Pick<BlendStrip, "kind" | "size">,
   featureId: string,
+  closed: ClosedGuide,
   own: Own,
 ) {
   const k = getKernel();
@@ -174,11 +191,7 @@ export function torusBlend(
   const { source, edge: copiedEdge } = copiedBody(body, original, own);
   const guides = chain.map(({ edge }) => {
     const guide = copiedEdge(edge);
-    const sides = torusSides(guide, source, own);
-    if (!sides) throw new Error("the torus fillet guide changed in the copy");
-    const { point } = planeBoundarySample(guide, sides[0]!.normal, own);
-    const p: Vec3 = [point.X(), point.Y(), point.Z()];
-    return { guide, sides, face: torusFace(p, sides, strip.size, own) };
+    return { guide, ...closed(guide, source, own) };
   });
   const neighbours = guides
     .flatMap(({ sides }) => sides.map((side) => side.face))
