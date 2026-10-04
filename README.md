@@ -38,6 +38,7 @@ everything downstream against persistent topology references.
 - **Modify**: fillet, chamfer (equal, two distances, or distance and angle), shell, combine, split and press/pull bodies.
 - **Move**: translate bodies, turn them about an axis, edge or sketch line, or add the moved copy as a new body.
 - **Tangent chains**: fillet and chamfer pick smooth connected edges in one click, on one or several bodies.
+- **Box select**: drag from empty space; left to right takes what lies inside, right to left what the box touches.
 - **Size hints**: fillet, chamfer, shell, inward Offset Face, cut depth and pattern spacing show the size that builds for your picks.
 - **Replicate**: mirror, rectangular pattern and circular pattern.
 - **Parameters**: name values with units, then type expressions like `width / 2` into feature fields, sketch dimensions and Quick Edit.
