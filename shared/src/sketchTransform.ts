@@ -192,6 +192,12 @@ function renamed(
       };
     case "spline":
       return { ...e, poles: e.poles.map(to) };
+    case "fitSpline":
+      return {
+        ...e,
+        points: e.points.map(to),
+        handles: [to(e.handles[0]), to(e.handles[1])],
+      };
   }
 }
 

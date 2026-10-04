@@ -19,6 +19,7 @@ export function Toolbar() {
   const active = useStore((s) => s.active);
   const workbench = useWorkbench((s) => s.current);
   useStore((s) => s.busy);
+  useStore((s) => s.selection);
   useKeymap();
 
   const viewport = useContext(ViewportContext);

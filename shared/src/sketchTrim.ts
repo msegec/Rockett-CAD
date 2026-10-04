@@ -4,6 +4,7 @@ import {
   type SketchEllipse,
   type SketchEntity,
   type SketchPoint,
+  type SketchFitSpline,
   type SketchSpline,
 } from "./model.js";
 import {
@@ -17,7 +18,10 @@ import type { SketchModification } from "./sketchModify.js";
 import { constraintEntityRefs } from "./sketchTransform.js";
 
 type XY = { x: number; y: number };
-type Curve = Exclude<SketchEntity, SketchPoint | SketchEllipse | SketchSpline>;
+type Curve = Exclude<
+  SketchEntity,
+  SketchPoint | SketchEllipse | SketchSpline | SketchFitSpline
+>;
 
 export interface TrimTarget {
   entityId: string;

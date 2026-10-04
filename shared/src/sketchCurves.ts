@@ -105,6 +105,8 @@ export function entityPointIds(e: SketchEntity): string[] {
       );
     case "spline":
       return e.poles;
+    case "fitSpline":
+      return [...e.points, ...e.handles];
   }
 }
 
@@ -476,7 +478,8 @@ export function sketchCurves(
           cy: c.y,
           r: e.radius,
         });
-    } else if (e.kind === "spline") curves.push(...splineCurve(e, points));
+    } else if (e.kind === "spline" || e.kind === "fitSpline")
+      curves.push(...splineCurve(e, points));
     else if (e.kind === "ellipse") {
       const [c, m, n, s, end] = entityPointIds(e).map((id) => points.get(id));
       if (!c || !m || !n) continue;

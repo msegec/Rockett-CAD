@@ -7,7 +7,7 @@ import {
   SHELL_DIRECTIONS,
 } from "../model.js";
 import { ownedFields } from "./chamferFields.js";
-import { splineEntity } from "./splineEntity.js";
+import { splineEntities } from "./splineEntity.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
 export const MAX_DIM = 100_000;
@@ -155,7 +155,7 @@ const entity = Type.Union([
     start: Type.Optional(id),
     end: Type.Optional(id),
   }),
-  splineEntity(projected, id),
+  ...splineEntities(projected, id),
 ]);
 
 const constraint = <const T extends string, P extends TProperties>(

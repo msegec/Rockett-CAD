@@ -484,7 +484,7 @@ input bound, not a tolerance.
 - Schema 36 adds the sketch `spline`: `degree`, `poles` as point ids,
   optional `weights`, `knots`, `multiplicities` and optional `periodic`.
   Validation refuses what `bsplineProblem` refuses, and constraints on the
-  curve itself; constraints on its poles stay. `importDxf` builds one from a
+  curve itself other than an end tangent; constraints on its poles stay. `importDxf` builds one from a
   SPLINE whose normal is Z, passing scale only to `sketchBuilder`. An open
   spline is clamped, so its end poles are its ends and share the points of
   touching curves; a periodic one closes on itself. Dragging a pole moves the
@@ -497,8 +497,23 @@ input bound, not a tolerance.
   samples each knot span and refines the nearest gap; it is not an exact
   intersection. `pieceEdge` builds the exact `Geom_BSplineCurve` edge, so
   sides name after the spline and solids keep its exact data. Trim, extend,
-  offset, dimensions, relations and sweep paths refuse it. DXF export samples
-  it, since the R12 writer has no SPLINE entity: `shared/test/spline.test.ts`.
+  offset, dimensions, relations other than an end tangent, and sweep paths
+  refuse it. DXF export samples it, since the R12 writer has no SPLINE
+  entity: `shared/test/spline.test.ts`.
+- Schema 37 adds `fitSpline` and the spline's optional `rho`, storing
+  defining points and deriving poles, so every stored point stays a solver
+  unknown and the migration is version only. A `fitSpline` keeps `points`
+  and two `handles`; `interpolateFit` in `shared/src/bspline.ts` builds the
+  cubic through every fit point at chord-length parameters, with each handle
+  as the second pole from its end, so the end tangent points at the handle.
+  A conic is a `spline` of degree 2 over start, apex and end with `rho` in
+  (0, 1); `conicSpline` derives the middle weight `rho / (1 - rho)`, putting
+  the shoulder at `rho` of the way from the chord midpoint to the apex. The
+  control point tool draws a clamped uniform `spline` of degree up to 3.
+  A tangent on a spline needs an end shared with a line, arc or spline, by
+  point or coincident; `splineTangent` in `shared/src/splineJoints.ts` finds
+  it and the solver holds the end directions parallel, or perpendicular to
+  the radius for an arc: `shared/test/splineConstraints.test.ts`.
 
 ## Frame conventions
 

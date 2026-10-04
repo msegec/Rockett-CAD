@@ -1,5 +1,7 @@
 import type { Static } from "typebox";
 import type { FEATURE_SCHEMAS } from "./schema/features.js";
+import type { SketchFitSpline, SketchSpline } from "./splineModel.js";
+export type { SketchFitSpline, SketchSpline } from "./splineModel.js";
 
 export type NamingVersion = 1 | 2;
 
@@ -128,27 +130,14 @@ export interface SketchEllipse {
   external?: boolean;
 }
 
-export interface SketchSpline {
-  projection?: EdgeRef;
-  id: string;
-  kind: "spline";
-  degree: number;
-  poles: string[];
-  weights?: number[];
-  knots: number[];
-  multiplicities: number[];
-  periodic?: boolean;
-  construction?: boolean;
-  external?: boolean;
-}
-
 export type SketchEntity =
   | SketchPoint
   | SketchLine
   | SketchCircle
   | SketchArc
   | SketchEllipse
-  | SketchSpline;
+  | SketchSpline
+  | SketchFitSpline;
 
 interface ConstraintBase {
   id: string;

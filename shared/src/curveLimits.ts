@@ -1,6 +1,11 @@
 import { bsplineParams, bsplinePoint, type Spline } from "./bspline.js";
 import { ARC_SEGMENTS, least } from "./curveSampling.js";
-import type { SketchEllipse, SketchEntity, SketchSpline } from "./model.js";
+import type {
+  SketchEllipse,
+  SketchEntity,
+  SketchFitSpline,
+  SketchSpline,
+} from "./model.js";
 import {
   crossingIds,
   curveDistance,
@@ -17,10 +22,10 @@ export const SPLINE_UNSUPPORTED = "This tool does not support splines yet.";
 export const CONTACT_UNSUPPORTED =
   "This tool does not support curves that touch ellipses or splines yet.";
 
-type Unsupported = SketchEllipse | SketchSpline;
+type Unsupported = SketchEllipse | SketchSpline | SketchFitSpline;
 
 export const unsupported = (e: SketchEntity | undefined): e is Unsupported =>
-  e?.kind === "ellipse" || e?.kind === "spline";
+  e?.kind === "ellipse" || e?.kind === "spline" || e?.kind === "fitSpline";
 
 export const refusal = (e: Unsupported) =>
   e.kind === "ellipse" ? ELLIPSE_UNSUPPORTED : SPLINE_UNSUPPORTED;
@@ -116,9 +121,9 @@ const CONTACT = {
   spline: ["Spline", "touches another curve away from its end poles"],
 } as const;
 
-function crossingOf(curves: Curve[]): Map<Unsupported["kind"], string[]> {
+function crossingOf(curves: Curve[]): Map<"ellipse" | "spline", string[]> {
   const crossing = crossingCurves(curves);
-  const out = new Map<Unsupported["kind"], string[]>();
+  const out = new Map<"ellipse" | "spline", string[]>();
   for (const c of curves)
     if ((c.kind === "ellipse" || c.kind === "spline") && crossing.has(c.id))
       out.set(c.kind, [...(out.get(c.kind) ?? []), c.id]);

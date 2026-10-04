@@ -26,6 +26,8 @@ import {
   type Residual,
 } from "./leastSquares.js";
 import { driving, firstRedundant } from "./solverRank.js";
+import { jointRow, lineOffset, stayRows, turn } from "./solverRows.js";
+import { splineTangent } from "./splineJoints.js";
 
 export interface SolveInput {
   entities: SketchEntity[];
@@ -43,7 +45,6 @@ export interface SolveResult {
 
 const CONFLICT_TOL = 1e-4;
 const DRAG_WEIGHT = 0.02;
-const STAY_WEIGHT = 1e-2;
 
 interface Problem {
   x0: Float64Array;
@@ -150,26 +151,19 @@ function buildProblem(input: SolveInput): Problem {
     refs.clear();
   };
 
-  const px = (id: string) => {
+  const coord = (id: string, k: 0 | 1) => {
     const p = points.get(id);
     if (!p) throw new SolverModelError(`unknown point ${id}`);
     refs.add(id);
     const vi = pointVarIndex.get(id)!;
     if (vi < 0) {
-      const fx = p.x;
-      return () => fx;
+      const fixed = k ? p.y : p.x;
+      return () => fixed;
     }
-    return (x: Float64Array) => x[vi]!;
+    return (x: Float64Array) => x[vi + k]!;
   };
-  const py = (id: string) => {
-    const p = points.get(id)!;
-    const vi = pointVarIndex.get(id)!;
-    if (vi < 0) {
-      const fy = p.y;
-      return () => fy;
-    }
-    return (x: Float64Array) => x[vi + 1]!;
-  };
+  const px = (id: string) => coord(id, 0);
+  const py = (id: string) => coord(id, 1);
   const radius = (id: string) => {
     const c = circles.get(id);
     if (c) {
@@ -228,10 +222,7 @@ function buildProblem(input: SolveInput): Problem {
       case "fix":
         break; // handled via variable pinning
       case "coincident": {
-        const ax = px(c.a),
-          ay = py(c.a),
-          bx = px(c.b),
-          by = py(c.b);
+        const [ax, ay, bx, by] = [px(c.a), py(c.a), px(c.b), py(c.b)];
         residuals.push((x) => ax(x) - bx(x));
         residuals.push((x) => ay(x) - by(x));
         break;
@@ -258,6 +249,12 @@ function buildProblem(input: SolveInput): Problem {
         break;
       }
       case "tangent": {
+        const joint = splineTangent(input.entities, input.constraints, c);
+        if (typeof joint === "string") throw new SolverModelError(joint);
+        if (joint) {
+          residuals.push(jointRow(joint, (id) => [px(id), py(id)]));
+          break;
+        }
         const lineId = lines.has(c.a) ? c.a : lines.has(c.b) ? c.b : null;
         const circId = lines.has(c.a) ? c.b : c.a;
         const oval = ellipseOf(circId);
@@ -452,40 +449,6 @@ function buildProblem(input: SolveInput): Problem {
     varsOf,
     apply: space.apply,
     numVars: space.vars.length,
-  };
-}
-
-function stayRows(
-  input: SolveInput,
-  varsOf: (id: string) => number[],
-  x0: number[],
-) {
-  const drag = input.drag?.pointId;
-  return input.entities.flatMap((e) => {
-    const ids = e.kind === "ellipse" ? entityPointIds(e) : [];
-    if (drag && ids.includes(drag)) return [];
-    return ids.flatMap(varsOf).map((v) => ({
-      v,
-      r: (x: Float64Array) => STAY_WEIGHT * (x[v]! - x0[v]!),
-    }));
-  });
-}
-
-type Ends = { x1: Residual; y1: Residual; x2: Residual; y2: Residual };
-
-function turn(a: Ends, b: Ends, x: Float64Array) {
-  const [ax, ay] = [a.x2(x) - a.x1(x), a.y2(x) - a.y1(x)];
-  const [bx, by] = [b.x2(x) - b.x1(x), b.y2(x) - b.y1(x)];
-  const scale = (Math.hypot(ax, ay) || 1) * (Math.hypot(bx, by) || 1);
-  return { dot: ax * bx + ay * by, cross: ax * by - ay * bx, scale };
-}
-
-function lineOffset(l: Ends) {
-  return (x: Float64Array, ptx: number, pty: number) => {
-    const dx = l.x2(x) - l.x1(x),
-      dy = l.y2(x) - l.y1(x);
-    const len = Math.hypot(dx, dy) || 1;
-    return (dx * (pty - l.y1(x)) - dy * (ptx - l.x1(x))) / len;
   };
 }
 

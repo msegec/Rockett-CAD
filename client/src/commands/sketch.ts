@@ -8,6 +8,9 @@ export type SketchTool =
   | "circle"
   | "arc3"
   | "ellipse"
+  | "fitSpline"
+  | "controlSpline"
+  | "conic"
   | "polygon"
   | "slot"
   | "point"
@@ -24,6 +27,7 @@ export interface SketchState {
   polygonSides: number;
   polygonType: "inscribed" | "circumscribed";
   polygonAngle: number | null;
+  conicRho: number;
   offsetEditId: string | null;
   offsetManualSelection: boolean;
   offsetDistance: number;
@@ -31,6 +35,8 @@ export interface SketchState {
   offsetJoinTolerance: number;
   moveCopy: boolean;
 }
+
+export const DEFAULT_RHO = 0.5;
 
 export function sketchState(sketchId: string, tool: SketchTool): SketchState {
   return {
@@ -40,6 +46,7 @@ export function sketchState(sketchId: string, tool: SketchTool): SketchState {
     polygonSides: 6,
     polygonType: "inscribed",
     polygonAngle: null,
+    conicRho: DEFAULT_RHO,
     offsetEditId: null,
     offsetManualSelection: false,
     offsetDistance: 2,
@@ -57,6 +64,11 @@ export const sketchHints: Record<SketchTool, string> = {
   circle: "Click centre, then a point on the circle",
   arc3: "Click start, end, then a point on the arc",
   ellipse: "Click centre, then a major axis end, then a minor axis point",
+  fitSpline:
+    "Click points for the spline to pass through · double-click to end · drag the end handles to set its tangents",
+  controlSpline: "Click control points · double-click to end",
+  conic:
+    "Click start, end, then the apex · Rho sets how far the curve bulges toward the apex",
   polygon: "Click centre, then a vertex",
   slot: "Click two centres, then the radius",
   point: "Click to place points",
@@ -89,8 +101,10 @@ export const lineShortcuts = [
   { key: ANGLE_LOCK_KEY, label: "lock or unlock the angle" },
 ];
 
+type CurveTool = "fitSpline" | "controlSpline" | "conic";
+
 export const sketchTools: {
-  id: SketchTool;
+  id: Exclude<SketchTool, CurveTool>;
   label: string;
   keys: string[];
   description?: string;
@@ -121,6 +135,12 @@ export const sketchTools: {
   { id: "trim", label: "Trim", keys: ["T"] },
   { id: "extend", label: "Extend", keys: [] },
   { id: "offset", label: "Offset", keys: [] },
+];
+
+export const curveTools: { id: CurveTool; label: string; keys: string[] }[] = [
+  { id: "fitSpline", label: "Fit Point Spline", keys: ["N"] },
+  { id: "controlSpline", label: "Control Point Spline", keys: ["B"] },
+  { id: "conic", label: "Conic", keys: ["K"] },
 ];
 
 export const sketchGroups: ToolbarGroup[] = [
@@ -177,6 +197,14 @@ export const sketchCommands: Command[] = [
       s.setSketchState({ moveCopy: false });
       s.setSketchTool(tool.id);
     },
+  })),
+  ...curveTools.map((tool): Command => ({
+    id: `design.sketch.${tool.id}`,
+    label: tool.label,
+    keys: tool.keys,
+    keyContext: "design.sketch",
+    enabled: sketching,
+    run: (s) => s.setSketchTool(tool.id),
   })),
   {
     id: "design.sketch.moveCopy",

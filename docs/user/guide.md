@@ -15,6 +15,13 @@ the flats on it, so the circle's diameter is the size across flats. A typed
 Angle holds the first vertex at that angle from sketch X. With Angle empty the
 first vertex follows the cursor, and Shift snaps it to the angle step.
 
+Splines have keys but no toolbar buttons yet. N draws a fit-point spline
+through each click; double-click to end, then drag its two construction
+handles to set the end tangents. B draws a control-point spline over its
+clicks. K draws a conic from start, end and apex; rho, between 0 and 1,
+sets how far it bulges toward the apex. A spline end that meets a line, arc
+or spline takes a tangent relation.
+
 Constraints: horizontal, vertical, parallel, perpendicular, tangent,
 coincident, concentric, equal, midpoint, collinear and fix. Dimensions:
 length, distance, radius, diameter and angle, all editable. The sketch shows
@@ -284,6 +291,7 @@ zoomed to fit.
 | ?               | Controls list, also on the Controls button                |
 | Ctrl+Z / Ctrl+Y | Undo / redo                                               |
 | V/L/R/C/D/P     | Sketch tools, in a sketch                                 |
+| N/B/K           | Fit-point, control-point and conic splines, in a sketch   |
 | X               | Toggle construction, in a sketch                          |
 | Delete          | Remove the selection, in a sketch                         |
 | Enter           | Confirm a tool panel from one of its fields               |

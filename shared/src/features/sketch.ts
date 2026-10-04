@@ -1,4 +1,4 @@
-import { bsplineProblem, splineCurve } from "../bspline.js";
+import { splineProblem } from "../bspline.js";
 import { refAt, registerCoreSpec } from "../featureSpec.js";
 import type { SketchConstraint, SketchFeature } from "../model.js";
 import { ValidationError } from "../schema/index.js";
@@ -9,6 +9,7 @@ import {
   entityPointIds,
 } from "../sketchCurves.js";
 import { constraintEntityRefs } from "../sketchTransform.js";
+import { splineLike, splineTangent } from "../splineJoints.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
 const MIN_OFFSET_MM = 1e-7;
@@ -42,9 +43,11 @@ function sketchReferences(f: SketchFeature): void {
       throw new ValidationError(`Missing endpoint on sketch entity ${e.id}`);
     if (e.kind !== "point" && e.projection && !e.external)
       throw new ValidationError("projected curves must be external");
-    const problem =
-      e.kind === "spline" && bsplineProblem(splineCurve(e, points)[0]!);
-    if (problem) throw new ValidationError(`Spline ${e.id}: ${problem}`);
+    const problem = splineLike(e) && splineProblem(e, points);
+    if (problem)
+      throw new ValidationError(
+        `${e.kind === "spline" ? "Spline" : "Fit spline"} ${e.id}: ${problem}`,
+      );
     if (e.kind !== "ellipse") continue;
     const [c, m, n] = refs.map((id) => points.get(id)!);
     const { a, b } = ellipseAxes(c!, m!, n!);
@@ -66,15 +69,19 @@ function sketchReferences(f: SketchFeature): void {
   const held = (c: SketchConstraint) =>
     (c.type === "pointOnCircle" && kinds.get(c.point) === "point") ||
     (c.type === "tangent" && [c.a, c.b].some((id) => kinds.get(id) === "line"));
-  for (const c of f.constraints)
+  for (const c of f.constraints) {
+    const joint =
+      c.type === "tangent" && splineTangent(f.entities, f.constraints, c);
+    if (typeof joint === "string") throw new ValidationError(joint);
     for (const id of constraintEntityRefs(c))
       if (
-        kinds.get(id) === "spline" ||
+        (["spline", "fitSpline"].includes(kinds.get(id)!) && !joint) ||
         (kinds.get(id) === "ellipse" && !held(c))
       )
         throw new ValidationError(
           `${c.type} constraints cannot reference ${kinds.get(id)} ${id} yet`,
         );
+  }
 }
 
 registerCoreSpec(

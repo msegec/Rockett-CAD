@@ -132,7 +132,7 @@ export function perpendicularSnap(
   };
 }
 
-function pointOrExisting(
+export function pointOrExisting(
   uv: UV,
   construction: boolean | undefined,
   out: SketchEntity[],

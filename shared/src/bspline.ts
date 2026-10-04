@@ -1,5 +1,5 @@
 import { ARC_SEGMENTS, least } from "./curveSampling.js";
-import type { SketchPoint, SketchSpline } from "./model.js";
+import type { SketchFitSpline, SketchPoint, SketchSpline } from "./model.js";
 import type { XY } from "./sketchCurves.js";
 import { LINEAR_TOL } from "./tolerance.js";
 
@@ -128,25 +128,150 @@ export function bsplineDistance(s: BSpline, x: number, y: number): number {
   return Math.min(gaps[best]!, gap(least(gap, lo, hi)));
 }
 
-export function splineCurve(
-  e: SketchSpline,
+const sub = (a: XY, b: XY): XY => [a[0] - b[0], a[1] - b[1]];
+const apart = (a: XY, b: XY) => Math.hypot(...sub(a, b)) > LINEAR_TOL;
+
+function basisAt(flat: number[], span: number, p: number, u: number) {
+  const n = [1];
+  const [left, right] = [[0], [0]];
+  for (let j = 1; j <= p; j++) {
+    left[j] = u - flat[span + 1 - j]!;
+    right[j] = flat[span + j]! - u;
+    let saved = 0;
+    for (let r = 0; r < j; r++) {
+      const t = n[r]! / (right[r + 1]! + left[j - r]!);
+      n[r] = saved + right[r + 1]! * t;
+      saved = left[j - r]! * t;
+    }
+    n[j] = saved;
+  }
+  return n;
+}
+
+export function interpolateFit(
+  fit: XY[],
+  [h0, h1]: [XY, XY],
+): BSpline | string {
+  const n = fit.length - 1;
+  if (n < 1) return "needs at least two fit points";
+  if (!fit.slice(1).every((q, k) => apart(q, fit[k]!)))
+    return "fit points must be apart from their neighbours";
+  if (!apart(h0, fit[0]!) || !apart(h1, fit[n]!))
+    return "each tangent handle must be apart from its end";
+  const chords = fit.slice(1).map((q, k) => Math.hypot(...sub(q, fit[k]!)));
+  const total = chords.reduce((a, b) => a + b, 0);
+  const u = [0];
+  for (const d of chords) u.push(u.at(-1)! + d / total);
+  u[n] = 1;
+  const flat = [0, 0, 0, 0, ...u.slice(1, -1), 1, 1, 1, 1];
+  const rows = u.slice(1, -1).map((uk, i) => {
+    const [a, b, c] = basisAt(flat, i + 4, 3, uk) as [number, number, number];
+    const known = (w: number, h: XY, at: boolean): XY =>
+      at ? [w * h[0], w * h[1]] : [0, 0];
+    const [k0, k1] = [known(a, h0, i === 0), known(c, h1, i === n - 2)];
+    const q = fit[i + 1]!;
+    return { a, b, c, r: [q[0] - k0[0] - k1[0], q[1] - k0[1] - k1[1]] as XY };
+  });
+  for (let i = 1; i < rows.length; i++) {
+    const [row, prev] = [rows[i]!, rows[i - 1]!];
+    const f = row.a / prev.b;
+    row.b -= f * prev.c;
+    row.r = [row.r[0] - f * prev.r[0], row.r[1] - f * prev.r[1]];
+  }
+  const inner: XY[] = [];
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const { b, c, r } = rows[i]!;
+    const next = inner[0] ?? [0, 0];
+    inner.unshift([(r[0] - c * next[0]) / b, (r[1] - c * next[1]) / b]);
+  }
+  return {
+    degree: 3,
+    poles: [fit[0]!, h0, ...inner, h1, fit[n]!],
+    knots: u,
+    multiplicities: u.map((_, i) => (i === 0 || i === n ? 4 : 1)),
+  };
+}
+
+export function conicSpline(
+  start: XY,
+  apex: XY,
+  end: XY,
+  rho: number,
+): BSpline | string {
+  if (!(rho > 0 && rho < 1)) return "rho must be between 0 and 1";
+  if (!apart(start, end)) return "a conic needs two different ends";
+  const [c, a] = [sub(end, start), sub(apex, start)];
+  if (!(Math.abs(c[0] * a[1] - c[1] * a[0]) / Math.hypot(...c) > LINEAR_TOL))
+    return "a conic needs an apex off the line between its ends";
+  return {
+    degree: 2,
+    poles: [start, apex, end],
+    weights: [1, rho / (1 - rho), 1],
+    knots: [0, 1],
+    multiplicities: [3, 3],
+  };
+}
+
+const CONIC_SHAPE =
+  "rho needs a single-span degree 2 spline over three poles with no weights";
+
+const conicShaped = (e: SketchSpline) =>
+  !e.weights &&
+  !e.periodic &&
+  e.degree === 2 &&
+  e.poles.length === 3 &&
+  e.knots.length === 2 &&
+  e.multiplicities.every((m) => m === 3);
+
+function derived(
+  e: SketchSpline | SketchFitSpline,
   points: ReadonlyMap<string, SketchPoint>,
-): Spline[] {
-  const poles = e.poles.map((id) => points.get(id));
-  if (!poles.every((p) => p !== undefined)) return [];
-  const { id, degree, weights, knots, multiplicities, periodic } = e;
-  return [
-    {
-      id,
-      kind: "spline",
+): BSpline | string | undefined {
+  const at = (ids: string[]) => {
+    const found = ids.map((id) => points.get(id));
+    return found.every((p) => p !== undefined)
+      ? found.map((p): XY => [p.x, p.y])
+      : undefined;
+  };
+  if (e.kind === "fitSpline") {
+    const [fit, ends] = [at(e.points), at(e.handles)];
+    return fit && ends && interpolateFit(fit, ends as [XY, XY]);
+  }
+  const poles = at(e.poles);
+  if (!poles) return undefined;
+  if (e.rho === undefined) {
+    const { degree, weights, knots, multiplicities, periodic } = e;
+    return {
       degree,
-      poles: poles.map((p): XY => [p.x, p.y]),
+      poles,
       ...(weights && { weights }),
       knots,
       multiplicities,
       ...(periodic && { periodic }),
-    },
-  ];
+    };
+  }
+  if (!conicShaped(e)) return CONIC_SHAPE;
+  const [s, a, end] = poles as [XY, XY, XY];
+  const conic = conicSpline(s, a, end, e.rho);
+  if (typeof conic === "string") return conic;
+  const [k0, k1] = e.knots as [number, number];
+  return { ...conic, knots: [k0, k1] };
+}
+
+export function splineCurve(
+  e: SketchSpline | SketchFitSpline,
+  points: ReadonlyMap<string, SketchPoint>,
+): Spline[] {
+  const s = derived(e, points);
+  return s && typeof s !== "string" ? [{ id: e.id, kind: "spline", ...s }] : [];
+}
+
+export function splineProblem(
+  e: SketchSpline | SketchFitSpline,
+  points: ReadonlyMap<string, SketchPoint>,
+): string | undefined {
+  const s = derived(e, points);
+  return typeof s === "string" ? s : s && bsplineProblem(s);
 }
 
 function runs(values: number[]): [number[], number[]] {

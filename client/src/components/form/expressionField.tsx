@@ -58,6 +58,7 @@ export interface FieldSpec {
   min?: number | undefined;
   above?: number | undefined;
   max?: number | undefined;
+  below?: number | undefined;
 }
 
 export type FieldResult =
@@ -119,6 +120,8 @@ export function evaluateField(
     return { error: `Must be more than ${withUnit(spec.above, spec)}` };
   if (spec.max !== undefined && value > spec.max)
     return { error: `Must be at most ${withUnit(spec.max, spec)}` };
+  if (spec.below !== undefined && value >= spec.below)
+    return { error: `Must be less than ${withUnit(spec.below, spec)}` };
   const linked = constant
     ? null
     : scaled && units !== "mm"

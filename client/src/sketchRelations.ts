@@ -3,6 +3,8 @@ import {
   entityPointIds,
   newId,
   sketchCurves,
+  splineLike,
+  splineTangent,
   SPLINE_UNSUPPORTED,
   type SketchConstraint,
   type SketchEntity,
@@ -45,7 +47,8 @@ export const CONSTRAINTS: Array<{
   {
     type: "tangent",
     label: "Tangent",
-    title: "Tangent (line + circle or ellipse, or 2 circles)",
+    title:
+      "Tangent (line + circle or ellipse, 2 circles, or a spline and the line, arc or spline at its end)",
   },
   { type: "equal", label: "Equal", title: "Equal (2 lines / 2 circles)" },
   {
@@ -100,12 +103,23 @@ function classify(draft: Draft, ids: string[]) {
       return k === "circle" || k === "arc";
     }),
     ellipses: ids.filter((id) => find(id)?.kind === "ellipse"),
-    splines: ids.filter((id) => find(id)?.kind === "spline"),
+    splines: ids.filter((id) => splineLike(find(id))),
   };
 }
 
 export const splineRefusal = (draft: Draft, ids: string[]) =>
   classify(draft, ids).splines.length > 0 && SPLINE_UNSUPPORTED;
+
+function splineRelation(
+  draft: Draft,
+  ids: string[],
+  type: RelationType,
+): SketchConstraint | null {
+  if (type !== "tangent" || ids.length !== 2) return null;
+  const c = { id: newId("c"), type, a: ids[0]!, b: ids[1]! } as const;
+  const joint = splineTangent(draft.entities, draft.constraints, c);
+  return typeof joint === "object" ? c : null;
+}
 
 export function constraintFor(
   draft: Draft,
@@ -116,7 +130,7 @@ export function constraintFor(
     draft,
     ids,
   );
-  if (splines.length) return null;
+  if (splines.length) return splineRelation(draft, ids, type);
   const [point, point2] = points;
   const [line, line2] = lines;
   const [circle, circle2] = circleLikes;
@@ -193,9 +207,19 @@ const refs = (c: SketchConstraint) =>
   ]);
 
 export function relationsFor(draft: Draft, ids: string[]): Relation[] {
-  const { own, points, lines, circleLikes, ellipses } = classify(draft, ids);
+  const { own, points, lines, circleLikes, ellipses, splines } = classify(
+    draft,
+    ids,
+  );
   const curves = circleLikes.length + ellipses.length;
   if (ids.length === 0) return [];
+  if (splines.length) {
+    const c = splineRelation(draft, ids, "tangent");
+    const fresh = c && !draft.constraints.some((k) => refs(k) === refs(c));
+    return fresh
+      ? [{ type: "tangent", label: "Tangent", constraints: [c] }]
+      : [];
+  }
   if (points.length + lines.length + curves !== ids.length) return [];
   const counts = `${points.length},${lines.length},${curves}`;
   const existing = new Set(draft.constraints.map(refs));

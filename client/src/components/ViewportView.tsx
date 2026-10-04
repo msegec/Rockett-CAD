@@ -60,6 +60,11 @@ import {
 } from "../commands/keymap";
 import { watchSnapshots } from "../snapshot";
 import * as tools from "../sketchTools";
+import {
+  buildFromClicksRaw,
+  finishClicks,
+  polygonOptions,
+} from "../sketchClicks";
 import { ANGLE_LOCK_KEY } from "../commands/sketch";
 
 import {
@@ -227,6 +232,9 @@ export function ViewportView({
     "ellipse",
     "polygon",
     "slot",
+    "fitSpline",
+    "controlSpline",
+    "conic",
   ]);
   const TWO_POINT_TOOLS = new Set([
     "line",
@@ -1423,78 +1431,6 @@ export function ViewportView({
     return r;
   }
 
-  function buildFromClicksRaw(
-    tool: string,
-    clicks: tools.UV[],
-    construction: boolean,
-  ): { created: tools.Created | null; chain: boolean } | null {
-    switch (tool) {
-      case "line":
-        return clicks.length >= 2
-          ? {
-              created: tools.createLine(clicks[0]!, clicks[1]!, construction),
-              chain: true,
-            }
-          : null;
-      case "rect":
-        return clicks.length >= 2
-          ? { created: tools.createRect(clicks[0]!, clicks[1]!), chain: false }
-          : null;
-      case "centerRect":
-        return clicks.length >= 2
-          ? {
-              created: tools.createCenterRect(clicks[0]!, clicks[1]!),
-              chain: false,
-            }
-          : null;
-      case "circle":
-        return clicks.length >= 2
-          ? {
-              created: tools.createCircle(clicks[0]!, clicks[1]!),
-              chain: false,
-            }
-          : null;
-      case "arc3":
-        return clicks.length >= 3
-          ? {
-              created: tools.createArc3(clicks[0]!, clicks[1]!, clicks[2]!),
-              chain: false,
-            }
-          : null;
-      case "ellipse":
-        return clicks.length >= 3
-          ? {
-              created: tools.createEllipse(clicks[0]!, clicks[1]!, clicks[2]!),
-              chain: false,
-            }
-          : null;
-      case "polygon": {
-        if (clicks.length < 2) return null;
-        return {
-          created: tools.createPolygon(
-            clicks[0]!,
-            clicks[1]!,
-            polygonOptions(),
-          ),
-          chain: false,
-        };
-      }
-      case "slot": {
-        if (clicks.length < 3) return null;
-        const r = Math.hypot(
-          clicks[2]!.x - clicks[1]!.x,
-          clicks[2]!.y - clicks[1]!.y,
-        );
-        return {
-          created: tools.createSlot(clicks[0]!, clicks[1]!, Math.max(r, 0.5)),
-          chain: false,
-        };
-      }
-      default:
-        return null;
-    }
-  }
-
   async function applyCreated(created: tools.Created, keepChaining: boolean) {
     const s = useStore.getState();
     const draft = s.draftSketch;
@@ -1959,6 +1895,13 @@ export function ViewportView({
           .then(() => alignCameraToActiveSketch(viewportRef));
       }
     } else if (s.active?.id === "design.sketch") {
+      const { tool, constructionMode } = s.active.state;
+      const open = finishClicks(
+        tool,
+        toolState.current.clicks,
+        constructionMode,
+      );
+      if (open) return void applyCreated(open, false);
       // double-click a curve → edit its size
       const vp = viewportRef.current!;
       const r = vp.pick(e.clientX, e.clientY, SKETCH_PICKS);
@@ -2384,17 +2327,6 @@ function angleSnapped(
         getSetting("sketch.angles"),
       )
     : uv;
-}
-
-function polygonOptions(): tools.PolygonOptions {
-  const { active } = useStore.getState();
-  const sketch = active?.id === "design.sketch" ? active.state : null;
-  const angle = sketch?.polygonAngle ?? null;
-  return {
-    sides: sketch?.polygonSides || 6,
-    type: sketch?.polygonType ?? "inscribed",
-    angle: angle !== null && Number.isFinite(angle) ? angle : null,
-  };
 }
 
 function round3(v: number): number {

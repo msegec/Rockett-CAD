@@ -57,6 +57,7 @@ export * from "./importDxf.js";
 export * from "./importSvg.js";
 export * from "./bspline.js";
 export * from "./curveLimits.js";
+export * from "./splineJoints.js";
 export type { SketchImport } from "./sketchBuilder.js";
 export * from "./meshFormat.js";
 export * from "./tolerance.js";

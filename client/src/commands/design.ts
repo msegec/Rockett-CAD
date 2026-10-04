@@ -13,6 +13,8 @@ import { NamedViewSelect } from "../components/NamedViewSelect";
 import { StepImportButton } from "../components/StepImportButton";
 import { SketchInsertButtons } from "../components/SketchInsertButtons";
 import { PolygonFields } from "../components/PolygonFields";
+import { ConicFields } from "../components/ConicFields";
+import { selectedConic } from "../splineTools";
 import { EVERY_WORKBENCH } from "@rockett/plugin-api";
 import {
   registerCommand,
@@ -59,6 +61,17 @@ registerCommand({
   when: (s) =>
     s.active?.id === "design.sketch" && s.active.state.tool === "polygon",
   Control: PolygonFields,
+});
+
+registerCommand({
+  id: "design.sketch.conicFields",
+  label: "Conic",
+  group: "design.sketch.group.sketch",
+  before: "design.sketch.construction",
+  when: (s) =>
+    s.active?.id === "design.sketch" &&
+    (s.active.state.tool === "conic" || !!selectedConic(s)),
+  Control: ConicFields,
 });
 
 registerCommand({
