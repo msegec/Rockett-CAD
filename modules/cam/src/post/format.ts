@@ -15,7 +15,7 @@ import {
   type Token,
 } from "./schema.js";
 
-export type FormatOptions = { maxBytes?: number };
+export type FormatOptions = { maxBytes?: number; laserPowerMax?: number };
 
 type Vars = Record<string, number | string | undefined>;
 
@@ -56,6 +56,7 @@ class Writer {
   readonly lines: string[] = [];
   readonly modal = new Map<string, string>();
   private readonly templates: Record<TemplateName, Token[][]>;
+  private readonly laserOn: Token[][];
   private readonly groups = new Map<string, string>();
   private readonly letters: Set<string>;
   private readonly words: Set<string>;
@@ -73,6 +74,9 @@ class Writer {
         ),
       ]),
     ) as Record<TemplateName, Token[][]>;
+    this.laserOn = (post.laser?.on ?? []).map((line) =>
+      line.split(" ").map((text) => token(text)!),
+    );
     post.modal.forEach((entry, i) => {
       if (Array.isArray(entry))
         for (const word of entry) this.groups.set(word, `#${i}`);
@@ -120,8 +124,21 @@ class Writer {
     const lines = this.templates[name];
     if (!lines.length && !MAY_BE_EMPTY.has(name))
       throw new Error(`post ${this.post.id} has no ${name} template`);
+    this.write(lines, vars, forced, MOTION.has(name));
+  }
+
+  laser() {
+    this.write(this.laserOn, {}, [], false);
+  }
+
+  private write(
+    lines: Token[][],
+    vars: Vars,
+    forced: string[],
+    motion: boolean,
+  ) {
     for (const line of lines) {
-      const text = this.expand(line, vars, forced, MOTION.has(name));
+      const text = this.expand(line, vars, forced, motion);
       if (text) this.push(text);
     }
   }
@@ -178,10 +195,16 @@ function arcVars(move: Extract<Move, { kind: "arc" }>, at: Xyz): Vars {
   return vars;
 }
 
-function writeMove(out: Writer, move: Move, at: Xyz | undefined) {
+type Power = ((percent: number | undefined) => number) | undefined;
+
+function writeMove(out: Writer, move: Move, at: Xyz | undefined, toS: Power) {
   if (move.kind === "rapid") return out.emit("rapid", xyz(move.to));
   if (move.kind === "feed")
-    return out.emit("linear", { ...xyz(move.to), feed: move.feed });
+    return out.emit("linear", {
+      ...xyz(move.to),
+      feed: move.feed,
+      power: toS?.(move.power),
+    });
   if (move.kind === "dwell")
     return out.emit("dwell", { seconds: move.seconds });
   if (move.kind === "comment") return out.comment(move.text);
@@ -190,7 +213,12 @@ function writeMove(out: Writer, move: Move, at: Xyz | undefined) {
   if (move.kind === "arc") {
     if (!at) throw new Error("an arc has no start point in its file");
     const name = move.dir === "cw" ? "arcCw" : "arcCcw";
-    return out.emit(name, arcVars(move, at), PLANE_AXES[move.plane]);
+    const power = toS?.(move.power);
+    return out.emit(
+      name,
+      { ...arcVars(move, at), power },
+      PLANE_AXES[move.plane],
+    );
   }
   out.modal.clear();
   if (move.kind === "raw")
@@ -225,9 +253,17 @@ export function formatProgram(
     throw new Error(
       `post ${post.id} has no work offset ${program.offsetIndex}`,
     );
+  const max = options.laserPowerMax;
+  if (max !== undefined && !post.laser)
+    throw new Error(`post ${post.id} has no laser mode`);
+  if (max !== undefined && !(max > 0 && Number.isFinite(max)))
+    throw new Error("the laser maximum power S must be above 0");
+  const power: Power =
+    max === undefined ? undefined : (percent) => ((percent ?? 0) * max) / 100;
   const budget = { bytes: 0, max: options.maxBytes ?? MAX_BYTES };
   return program.files.map((file) => {
     const out = new Writer(post, budget);
+    if (power && post.laser) out.comment(post.laser.note);
     out.emit("header", { units: UNITS[program.units], offset });
     let tool: string | undefined;
     let at: Xyz | undefined;
@@ -243,14 +279,17 @@ export function formatProgram(
         tool = section.toolId;
       }
       const { spindle } = section;
-      if (!spindle) out.emit("spindleOff");
+      if (power && spindle)
+        throw new Error("a laser program has a spindle section");
+      if (power) out.laser();
+      else if (!spindle) out.emit("spindleOff");
       else
         out.emit(spindle.dir === "cw" ? "spindleCw" : "spindleCcw", {
           rpm: spindle.rpm,
         });
       out.emit(COOLANT[section.coolant]);
       for (const move of section.moves) {
-        writeMove(out, move, at);
+        writeMove(out, move, at, power);
         at = endOf(move, at);
       }
     }

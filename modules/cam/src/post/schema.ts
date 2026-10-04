@@ -14,7 +14,9 @@ type Spec = {
 
 export const AXES = new Set(["x", "y", "z"]);
 const CYCLE = ["x", "y", "clear", "top", "bottom", "feed", "dwell"];
+const ARC = [...AXES, "i", "j", "k", "feed", "plane"];
 const PLANE_ONLY = new Set(["k", "plane"]);
+const POWERED = new Set<string>(["linear", "arcCw", "arcCcw"]);
 
 const TEMPLATES = {
   header: { needs: ["units", "offset"] },
@@ -28,9 +30,9 @@ const TEMPLATES = {
   coolantMist: { needs: [] },
   coolantOff: { needs: [] },
   rapid: { needs: [...AXES] },
-  linear: { needs: [...AXES, "feed"] },
-  arcCw: { needs: [...AXES, "i", "j", "k", "feed", "plane"], unless: "arcs" },
-  arcCcw: { needs: [...AXES, "i", "j", "k", "feed", "plane"], unless: "arcs" },
+  linear: { needs: [...AXES, "feed"], may: ["power"] },
+  arcCw: { needs: ARC, may: ["power"], unless: "arcs" },
+  arcCcw: { needs: ARC, may: ["power"], unless: "arcs" },
   drill: { needs: [], may: CYCLE, unless: "cycles" },
   drillDwell: { needs: [], may: CYCLE, unless: "always" },
   peck: { needs: [], may: [...CYCLE, "peck"], unless: "cycles" },
@@ -52,6 +54,7 @@ export type Post = {
   formats: Record<string, NumberFormat>;
   modal: (string | string[])[];
   workOffsets: string[];
+  laser?: { note: string; on: string[] };
   templates: Record<TemplateName, string[]> & { comment: string };
 };
 
@@ -79,6 +82,7 @@ const KEYS = [
   "formats",
   "modal",
   "workOffsets",
+  "laser",
   "templates",
 ];
 
@@ -221,9 +225,12 @@ function template(post: Post, name: TemplateName): string[] {
   const lines = post.templates[name];
   if (!isStrings(lines)) return [`${path}: must be a list of lines`];
   const { unless }: Spec = TEMPLATES[name];
-  const needs = TEMPLATES[name].needs.filter(
-    (need) => post.capabilities.arcs !== "xy" || !PLANE_ONLY.has(need),
-  );
+  const needs = [
+    ...TEMPLATES[name].needs.filter(
+      (need) => post.capabilities.arcs !== "xy" || !PLANE_ONLY.has(need),
+    ),
+    ...(post.laser !== undefined && POWERED.has(name) ? ["power"] : []),
+  ];
   if (!lines.length) {
     if (unless === "always" || (unless && !post.capabilities[unless]))
       return [];
@@ -270,6 +277,23 @@ function templates(post: Post): string[] {
   return problems;
 }
 
+function laser(post: Post): string[] {
+  if (post.laser === undefined) return [];
+  if (!isRecord(post.laser)) return ["laser: must be an object"];
+  const { note, on } = post.laser;
+  const problems = unknownKeys(post.laser, ["note", "on"], "laser.");
+  if (typeof note !== "string" || !/^[ -~]+$/.test(note))
+    problems.push("laser.note: must be printable text");
+  if (!isStrings(on) || !on.length)
+    return [...problems, "laser.on: must be a non-empty list of lines"];
+  on.forEach((line, i) => {
+    const bad = line.split(" ").filter((word) => !post.words.includes(word));
+    if (bad.length)
+      problems.push(`laser.on[${i}]: ${bad.join(" ")} is not in words`);
+  });
+  return problems;
+}
+
 export function validatePost(value: unknown): string[] {
   if (!isRecord(value)) return ["post: must be an object"];
   const problems = [
@@ -284,5 +308,11 @@ export function validatePost(value: unknown): string[] {
   )
     return problems;
   const post = value as Post;
-  return [...problems, ...modal(post), ...offsets(post), ...templates(post)];
+  return [
+    ...problems,
+    ...modal(post),
+    ...offsets(post),
+    ...laser(post),
+    ...templates(post),
+  ];
 }

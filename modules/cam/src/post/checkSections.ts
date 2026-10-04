@@ -7,7 +7,11 @@ import {
   type Section,
   type Xyz,
 } from "../shared/ir.js";
-import { spindleRange, type MachineProfile } from "../shared/machine.js";
+import {
+  machineKind,
+  spindleRange,
+  type MachineProfile,
+} from "../shared/machine.js";
 import { toolRefusal } from "../shared/operations.js";
 import type { Tool } from "../shared/tools.js";
 import type { CheckInput, Report } from "./check.js";
@@ -50,6 +54,29 @@ function spindleProblems(
   const { min, max } = spindleRange(machine);
   if (!(rpm > 0 && rpm >= min && rpm <= max))
     report("rpm", `${rpm} rpm is outside the machine's range`, s);
+}
+
+const power = (move: Move) => ("power" in move ? move.power : undefined);
+
+function laserProblems(section: Section, s: number, report: Report) {
+  if (section.spindle)
+    report("laser", "a laser cannot run a spindle operation", s);
+  section.moves.forEach((move, m) => {
+    const percent = power(move);
+    if (percent !== undefined && !(percent >= 0 && percent <= 100))
+      report("laser", `laser power ${percent}% is outside 0 to 100`, s, m);
+  });
+}
+
+function millProblems(
+  section: Section,
+  s: number,
+  machine: MachineProfile,
+  report: Report,
+) {
+  spindleProblems(section, s, machine, report);
+  const m = section.moves.findIndex((move) => power(move) !== undefined);
+  if (m >= 0) report("laser", "a mill cannot run a laser operation", s, m);
 }
 
 function rates(move: Move, at: Xyz | undefined): Xyz | undefined {
@@ -100,10 +127,12 @@ function feedLimits(machine: MachineProfile, report: Report) {
 export function sectionProblems(input: CheckInput, report: Report) {
   const { program, machine, operations } = input;
   const tools = new Map(program.tools.map((tool) => [tool.id, tool]));
+  const laser = machineKind(machine) === "laser";
   for (const [s, section] of program.sections.entries()) {
     const tool = tools.get(section.toolId);
     toolProblems(section, s, tool, operations, report);
-    spindleProblems(section, s, machine, report);
+    if (laser) laserProblems(section, s, report);
+    else millProblems(section, s, machine, report);
   }
   feedLimits(machine, report);
   for (const { s, m, move, at } of steps(program)) {

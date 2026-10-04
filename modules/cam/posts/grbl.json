@@ -56,6 +56,7 @@
     "S"
   ],
   "workOffsets": ["G54", "G55", "G56", "G57", "G58", "G59"],
+  "laser": { "note": "Laser mode: GRBL needs $32=1", "on": ["M4"] },
   "templates": {
     "header": ["G90 G94 G91.1 G17 {units}", "{offset}"],
     "footer": ["M5", "M9", "M30"],
@@ -68,9 +69,9 @@
     "coolantMist": ["M7"],
     "coolantOff": ["M9"],
     "rapid": ["G0 X{x} Y{y} Z{z}"],
-    "linear": ["G1 X{x} Y{y} Z{z} F{feed}"],
-    "arcCw": ["{plane} G2 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed}"],
-    "arcCcw": ["{plane} G3 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed}"],
+    "linear": ["G1 X{x} Y{y} Z{z} F{feed} S{power}"],
+    "arcCw": ["{plane} G2 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed} S{power}"],
+    "arcCcw": ["{plane} G3 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed} S{power}"],
     "drill": [],
     "drillDwell": [],
     "peck": [],

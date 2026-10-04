@@ -1,5 +1,9 @@
 import { validateProgram, type Program } from "../shared/ir.js";
-import { validateMachine, type MachineProfile } from "../shared/machine.js";
+import {
+  machineKind,
+  validateMachine,
+  type MachineProfile,
+} from "../shared/machine.js";
 import type { Box, Setup, Travel } from "../shared/setup.js";
 import { validateTool } from "../shared/tools.js";
 import { motionProblems, type Context } from "./checkMotion.js";
@@ -16,6 +20,7 @@ export type Rule =
   | "feed"
   | "rpm"
   | "spindle"
+  | "laser"
   | "raw"
   | "entry"
   | "retract"
@@ -98,6 +103,17 @@ function termination({ templates }: CheckInput["post"], report: Report) {
     report("termination", `the post footer never sends ${missing.join(" ")}`);
 }
 
+function laserMode(machine: MachineProfile, report: Report) {
+  const laser = machineKind(machine) === "laser";
+  if (machine.laserMode === undefined || machine.laserMode === laser) return;
+  report(
+    "laser",
+    laser
+      ? "the controller's laser mode ($32) is off on a laser"
+      : "the controller's laser mode ($32) is on for a mill, so it will not wait for the spindle",
+  );
+}
+
 function contextProblems(input: CheckInput, report: Report) {
   const { program, setup, machine, units } = input;
   if (program.units !== "mm")
@@ -115,6 +131,7 @@ function contextProblems(input: CheckInput, report: Report) {
   if (!(setup.safeHeight >= setup.clearance))
     report("entry", "safe height must be at least the clearance");
   for (const text of validateMachine(machine)) report("machine", text);
+  laserMode(machine, report);
   for (const tool of program.tools) {
     for (const text of validateTool(tool))
       report("tool", `tool ${tool.id}: ${text}`);

@@ -34,11 +34,16 @@ const toolChangeSchema = Type.Union(
 
 type ToolChange = Static<typeof toolChangeSchema>;
 
+const kindSchema = Type.Union([Type.Literal("mill"), Type.Literal("laser")]);
+
+export type MachineKind = Static<typeof kindSchema>;
+
 export const machineSchema = Type.Object({
   id: Type.String({ minLength: 1 }),
   name: Type.String(),
   firmware: firmwareSchema,
   post: Type.String({ minLength: 1 }),
+  kind: Type.Optional(kindSchema),
   xMin: travel("X min"),
   xMax: travel("X max"),
   yMin: travel("Y min"),
@@ -72,6 +77,8 @@ export const machineSchema = Type.Object({
     Type.Number({ title: "Junction deviation (mm)", minimum: 0 }),
   ),
   laserMode: Type.Optional(Type.Boolean({ title: "Laser mode" })),
+  laserPowerMax: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+  focusZ: Type.Optional(Type.Number()),
   accelerationProfiles: Type.Optional(
     Type.Boolean({ title: "Acceleration profiles (grblHAL)" }),
   ),
@@ -132,6 +139,9 @@ const AXES = [
   ["Z", "zMin", "zMax"],
 ] as const;
 
+export const machineKind = (machine: MachineProfile): MachineKind =>
+  machine.kind ?? "mill";
+
 export const spindleRange = (machine: MachineProfile) => ({
   min: machine.measuredRpmMin ?? machine.rpmMin,
   max: machine.measuredRpmMax ?? machine.rpmMax,
@@ -156,5 +166,7 @@ export function validateMachine(machine: MachineProfile): string[] {
     problems.push("rated power needs both watts and rpm");
   if (machine.firmware === "grbl" && machine.toolChange === "m6")
     problems.push("GRBL 1.1 has no M6; use one file per tool");
+  if (machineKind(machine) === "laser" && machine.laserPowerMax === undefined)
+    problems.push("a laser needs its maximum power S");
   return problems;
 }
