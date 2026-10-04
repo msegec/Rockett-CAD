@@ -2,10 +2,15 @@ import type { ServerContext } from "@rockett/plugin-api";
 import {
   Placement,
   resolveDocumentParameters,
+  type FeatureStatus,
   type User,
 } from "@rockett/shared";
 import { projectAccess } from "../api/projectAccess.js";
-import { bodyFingerprint } from "../geometry/fingerprint.js";
+import {
+  bodyDependencies,
+  bodyFingerprint,
+  type BodyInputs,
+} from "../geometry/fingerprint.js";
 import type { KernelClient } from "../kernel/client.js";
 import type { FolderStore } from "../store/folderStore.js";
 import { StoreError, type ProjectStore } from "../store/projectStore.js";
@@ -14,6 +19,11 @@ export type BodyKernel = Pick<
   KernelClient,
   "evaluate" | "stateQuery" | "version"
 >;
+
+const problem = (status: FeatureStatus) =>
+  status.status === "error" ||
+  status.status === "cancelled" ||
+  (status.refs?.length ?? 0) > 0;
 
 async function canView(
   store: ProjectStore,
@@ -37,8 +47,10 @@ export function moduleBodies(
   return async (projectId, user) => {
     if (!(await canView(store, folders, user, projectId)))
       throw new StoreError("project not found", "not_found");
-    const doc = await store.load(projectId);
-    const { bodies } = await kernel.evaluate(doc);
+    const stored = await store.load(projectId);
+    const doc = { ...stored, timelinePosition: stored.features.length };
+    const evaluation = await kernel.evaluate(doc);
+    const { bodies, featureStatuses } = evaluation;
     if (bodies.length === 0) return [];
     const breps = await kernel.stateQuery(doc, {
       kind: "brep",
@@ -49,12 +61,9 @@ export function moduleBodies(
       ...doc,
       features: resolveDocumentParameters(doc).features,
     };
-    return bodies.map(({ bodyId, name, bbox }, i) => ({
-      id: bodyId,
-      name,
-      bbox,
-      brep: breps[i]!,
-      fingerprint: bodyFingerprint({
+    const statusOf = new Map(featureStatuses.map((s) => [s.featureId, s]));
+    return bodies.map(({ bodyId, name, bbox }, i) => {
+      const inputs: BodyInputs = {
         doc: resolved,
         bodyId,
         sources,
@@ -62,7 +71,21 @@ export function moduleBodies(
         selection: [],
         camVersion: "",
         kernel: kernel.version(),
-      }),
-    }));
+        evaluation,
+      };
+      const features = bodyDependencies(inputs);
+      const problems = features.flatMap((f) => {
+        const status = statusOf.get(f.id);
+        return status && problem(status) ? [status] : [];
+      });
+      return {
+        id: bodyId,
+        name,
+        bbox,
+        brep: breps[i]!,
+        fingerprint: bodyFingerprint(inputs, features),
+        problems,
+      };
+    });
   };
 }

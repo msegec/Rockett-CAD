@@ -3,6 +3,7 @@ import type { Group, Object3D } from "three";
 import type {
   BodyPayload,
   CadDocument,
+  FeatureStatus,
   Health,
   PathParams,
   Route,
@@ -14,6 +15,7 @@ export type {
   Feature,
   FeatureRef,
   FeatureSpec,
+  FeatureStatus,
   MeasureRequest,
   MeasureResult,
   ModuleManifest,
@@ -139,6 +141,7 @@ export interface ModuleFiles {
 export interface ServerBody extends ProjectBody {
   readonly brep: string;
   readonly fingerprint: string;
+  readonly problems?: readonly FeatureStatus[];
 }
 
 export interface ServerContext {

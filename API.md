@@ -324,11 +324,29 @@ module, in load order:
 - `bodies(projectId, user)` reads the stored document under the same access
   rule as a project route. A user without view access and a missing project
   get the same `not_found` rejection, "project not found", which a route
-  answers as 404. It returns `{ id, name, bbox, brep, fingerprint }` for
-  each body of the document's evaluation, in model millimetres. `brep` is
-  the OCCT BREP text of the body, and `fingerprint` is `bodyFingerprint`
-  (CAM-003) over the resolved features with identity placement, no
-  selection and an empty CAM version.
+  answers as 404. It returns `{ id, name, bbox, brep, fingerprint, problems }`
+  for each body at the end of the timeline, whatever the Design rollback, in
+  model millimetres. `brep` is the OCCT BREP text of the body, and
+  `fingerprint` is `bodyFingerprint` (CAM-003) over the resolved features
+  the body depends on, with identity placement, no selection and an empty
+  CAM version. The rule errs toward stale. Walking back from the end, a
+  feature is left out only when its type is a core type, it evaluated `ok`,
+  and its reach is known and meets no body or feature already counted. Its
+  reach is the bodies it names, targets, modifies or made, and a sketch or
+  plane or reference image also reaches itself. A split piece `X:n` also
+  counts `X`. Every other feature counts, including one that failed, was
+  cancelled or warned, and a geometry feature with no known reach. An
+  extension type, or a geometry feature with no known reach, makes every
+  earlier feature count.
+  A counted face extrude, face revolve or Move makes every earlier sketch
+  count, since each reads all sketches, and a Move counts when a counted
+  sketch is earlier than it. An edit to another body leaves the fingerprint
+  unchanged, unless a counted feature also reaches that body. `problems`
+  lists the evaluate status of each counted feature that failed, was
+  cancelled or has unresolved references, empty when there are none. A
+  failed or cancelled feature counts for every body, so it is in every
+  body's `problems`. A failed feature leaves the body as it was before
+  that feature, so a body with problems is not the model as designed.
   Nothing is cached: each call evaluates, writes BREP for every body and
   hashes the import sources. Code: `server/src/modules/bodies.ts`.
 - `startKernelJob(id, input, { onProgress, signal })` runs one of the
