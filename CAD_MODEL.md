@@ -349,19 +349,25 @@ body.
 
 ## Variable radius
 
-`nativeFillet` in `server/src/geometry/nativeFillet.ts`.
+`moduleFillet` in `server/src/geometry/filletRoute.ts`, else `nativeFillet`
+in `server/src/geometry/nativeFillet.ts`.
 
 - Schema 35 adds `filletType` `variableRadius` with `endRadius`. `radius`
   holds at the start of each edge's curve, or of the tangent chain it grows,
-  and `endRadius` at its end, varying linearly between: OCCT's two-radius
-  edge, `BRepFilletAPI_MakeFillet::Add(R1, R2, E)`. Swapping the two values
-  reverses it. It takes one set and no size hint.
-- It builds only through OCCT, never through the blend module, so its
-  surfaces are OCCT's approximations, not KERN-020's. Follow-ups: a straight
-  edge between two planes has an exact cone as its variable fillet, which the
-  module route could build as it builds the two-distance strip; radii at
-  more than two points need OCCT's radius-at-parameter form
-  (`Add(UandR, E)`) and a points model.
+  and `endRadius` at its end. Swapping the two values reverses it. It takes
+  one set and no size hint.
+- Straight edges between flat faces, with flat faces at their ends, no
+  collinear neighbour and no shared corner, build our own exact cone
+  (`conicStrip.ts`): the envelope of balls tangent to both faces whose
+  radius runs from `radius` to `endRadius`. The blend module gives the ball
+  centre and contacts at each end; the cone's axis runs through both
+  centres and its contact lines lie in the faces. Equal radii and every
+  other edge build through OCCT's two-radius edge,
+  `BRepFilletAPI_MakeFillet::Add(R1, R2, E)`, an approximation. The cone's
+  radius is linear along the edge; OCCT's is not linear between the ends.
+- Radii at more than two points need OCCT's radius-at-parameter form
+  (`Add(UandR, E)`), whose array type the pinned build does not bind
+  (KERN-045).
 
 ## Chamfer
 

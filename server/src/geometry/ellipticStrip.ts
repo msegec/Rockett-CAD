@@ -4,6 +4,7 @@ import { NoCorner } from "./featureState.js";
 import { V } from "./frames.js";
 import { dir, getKernel, pnt, vec, type Own, type Shape } from "./kernel.js";
 import type { BlendStrip } from "./planarFillet.js";
+import { boundsReach } from "./planarFilletSurface.js";
 
 export type MeasuredEdge = { mid: Vec3; normal: Vec3 };
 
@@ -144,19 +145,7 @@ export function ellipticStrip(
           ),
         );
       }
-      const along = Array.from({ length: 8 }, (_, mask) =>
-        V.dot(
-          V.sub(
-            [
-              mask & 1 ? bounds.max[0] : bounds.min[0],
-              mask & 2 ? bounds.max[1] : bounds.min[1],
-              mask & 4 ? bounds.max[2] : bounds.min[2],
-            ],
-            section.centre,
-          ),
-          axis,
-        ),
-      );
+      const along = boundsReach(bounds, section.centre, axis);
       const face = stripFace(
         section,
         axis,

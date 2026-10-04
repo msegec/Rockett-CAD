@@ -38,17 +38,19 @@ function planeStrip(domain: any) {
 
 function stripRun(domain: any, own: Own) {
   const k = getKernel(),
-    torus = domain.GetType() === k.GeomAbs_SurfaceType.GeomAbs_Torus,
+    type = domain.GetType(),
+    torus = type === k.GeomAbs_SurfaceType.GeomAbs_Torus,
     plane = planeStrip(domain),
-    prism =
-      domain.GetType() === k.GeomAbs_SurfaceType.GeomAbs_SurfaceOfExtrusion,
+    cone = type === k.GeomAbs_SurfaceType.GeomAbs_Cone,
+    prism = type === k.GeomAbs_SurfaceType.GeomAbs_SurfaceOfExtrusion,
+    named = torus ? "Torus" : plane ? "Plane" : cone ? "Cone" : "Cylinder",
+    surface = prism ? null : own(domain[named]()),
     position = own(
-      prism
-        ? new k.gp_Ax3_5(own(domain.Value(0, 0)), own(domain.Direction()))
-        : own(
-            torus ? domain.Torus() : plane ? domain.Plane() : domain.Cylinder(),
-          ).Position(),
-    );
+      surface
+        ? surface.Position()
+        : new k.gp_Ax3_5(own(domain.Value(0, 0)), own(domain.Direction())),
+    ),
+    slant = cone ? Math.cos(surface.SemiAngle()) : 1;
   const [u, v] = [
     [domain.FirstUParameter(), domain.LastUParameter()],
     [domain.FirstVParameter(), domain.LastVParameter()],
@@ -68,9 +70,10 @@ function stripRun(domain: any, own: Own) {
         along.X(),
         along.Y(),
         along.Z(),
-      ]),
+      ]) / slant,
     span: v,
-    bound: (_selected: number, opposite: number) => opposite,
+    bound: (selected: number, opposite: number) =>
+      !cone ? opposite : selected > opposite ? v[0] : v[1],
     rect: (first: number, last: number) => [...u, first, last] as const,
   };
 }

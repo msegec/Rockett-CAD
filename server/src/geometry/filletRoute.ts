@@ -6,6 +6,7 @@ import {
 } from "@rockett/shared";
 import { planeSides } from "./blendSides.js";
 import { measuredFace } from "./chamferContour.js";
+import { conicStrip } from "./conicStrip.js";
 import { cylinderFillet } from "./cylinderFillet.js";
 import { ellipticStrip, type MeasuredEdge } from "./ellipticStrip.js";
 import { NoCorner, vertexPoint, type ToolResult } from "./featureState.js";
@@ -60,7 +61,12 @@ function continues(edge: Shape, all: Shape[], own: Own) {
   );
 }
 
-function refuseUnsupported(body: NamedBody, selected: Selected, own: Own) {
+function unsupported(
+  body: NamedBody,
+  selected: Selected,
+  own: Own,
+  meeting: number,
+) {
   const original = faces(body.shape).map(own);
   const ends = selected.flatMap(({ edge }) => vertices(edge).map(own));
   const touching = original.filter((face) =>
@@ -72,14 +78,13 @@ function refuseUnsupported(body: NamedBody, selected: Selected, own: Own) {
     selected.some(({ edge }) => !planeSides(edge, original, own)) ||
     touching.some((face) => !planarFacePlane(face))
   )
-    throw new Error(TWO_DISTANCE_FACES);
+    return TWO_DISTANCE_FACES;
   const all = edges(body.shape).map(own);
   if (selected.some(({ edge }) => continues(edge, all, own)))
-    throw new Error(CHANGING_CHAIN);
-  if (ends.some((end) => ends.filter((v) => v.IsSame(end)).length > 2))
-    throw new Error(
-      "two-distance fillet cannot round a corner where three edges meet: pick fewer edges or use equal distances",
-    );
+    return CHANGING_CHAIN;
+  if (ends.some((end) => ends.filter((v) => v.IsSame(end)).length > meeting))
+    return "two-distance fillet cannot round a corner where three edges meet: pick fewer edges or use equal distances";
+  return null;
 }
 
 function measuredEdges(
@@ -110,7 +115,8 @@ function twoDistanceFillet(
   refs: EdgeRef[],
 ): ToolResult {
   const measured = scoped((own) => {
-    refuseUnsupported(body, selected, own);
+    const reason = unsupported(body, selected, own, 2);
+    if (reason) throw new Error(reason);
     return measuredEdges(body, selected, f, own);
   });
   const failure = `could not build a ${distances[0]} by ${distances[1]} mm two-distance fillet: try smaller distances or fewer edges`;
@@ -131,6 +137,28 @@ function twoDistanceFillet(
   throw new Error(failure);
 }
 
+function conicFillet(
+  body: NamedBody,
+  selected: Selected,
+  f: FilletFeature,
+  radii: [number, number],
+  byName: Map<string, Shape>,
+  refs: EdgeRef[],
+): ToolResult | null {
+  const k = getKernel();
+  const starts = scoped((own) =>
+    unsupported(body, selected, own, 1)
+      ? null
+      : selected.map(({ edge }) =>
+          vertexPoint(own(k.TopExp.FirstVertex(edge, false))),
+        ),
+  );
+  return (
+    starts &&
+    planarBlend(body, selected, conicStrip(radii, starts), f.id, byName, refs)
+  );
+}
+
 export function moduleFillet(
   body: NamedBody,
   selected: Selected,
@@ -138,7 +166,11 @@ export function moduleFillet(
   byName: Map<string, Shape>,
   refs: EdgeRef[],
 ): ToolResult | null {
-  if (f.filletType === "variableRadius") return null;
+  if (f.filletType === "variableRadius")
+    return f.endRadius === undefined ||
+      Math.abs(f.endRadius - f.radius) <= LINEAR_TOL
+      ? null
+      : conicFillet(body, selected, f, [f.radius, f.endRadius], byName, refs);
   const second = f.filletType === "twoDistances" ? f.distance2 : undefined;
   if (second !== undefined && Math.abs(second - f.radius) > LINEAR_TOL)
     return twoDistanceFillet(

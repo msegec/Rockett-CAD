@@ -74,6 +74,41 @@ function alignCapCurve(
     );
 }
 
+export function stripFrame(
+  origin: Vec3,
+  axis: Vec3,
+  [a, b]: [Vec3, Vec3],
+  own: Own,
+) {
+  const k = getKernel();
+  const frame = own(
+    new k.gp_Ax3_3(own(pnt(...origin)), own(dir(...axis)), own(dir(...a))),
+  );
+  const y = own(frame.YDirection());
+  if (V.dot([y.X(), y.Y(), y.Z()], b) < 0) frame.YReverse();
+  return frame;
+}
+
+export function boundsReach(
+  bounds: ReturnType<typeof bboxOf>,
+  origin: Vec3,
+  axis: Vec3,
+) {
+  return Array.from({ length: 8 }, (_, mask) =>
+    V.dot(
+      V.sub(
+        [
+          mask & 1 ? bounds.max[0] : bounds.min[0],
+          mask & 2 ? bounds.max[1] : bounds.min[1],
+          mask & 4 ? bounds.max[2] : bounds.min[2],
+        ],
+        origin,
+      ),
+      axis,
+    ),
+  );
+}
+
 export function planarFilletSurface(
   sections: [FilletSection, FilletSection],
   axis: Vec3,
@@ -87,19 +122,8 @@ export function planarFilletSurface(
   const b = V.normalize(V.sub(sections[0].contacts[1], centre));
   const direction = axis;
   const circleDirection = V.normalize(V.cross(a, b));
-  const frame = own(
-    new k.gp_Ax3_3(own(pnt(...centre)), own(dir(...direction)), own(dir(...a))),
-  );
-  const y = own(frame.YDirection());
-  if (V.dot([y.X(), y.Y(), y.Z()], b) < 0) frame.YReverse();
-  const span = Array.from({ length: 8 }, (_, mask) => {
-    const corner: Vec3 = [
-      mask & 1 ? bounds.max[0] : bounds.min[0],
-      mask & 2 ? bounds.max[1] : bounds.min[1],
-      mask & 4 ? bounds.max[2] : bounds.min[2],
-    ];
-    return V.dot(V.sub(corner, centre), direction);
-  });
+  const frame = stripFrame(centre, direction, [a, b], own);
+  const span = boundsReach(bounds, centre, direction);
   const make = own(
     new k.BRepBuilderAPI_MakeFace_10(
       own(new k.gp_Cylinder_2(frame, radius)),

@@ -15,6 +15,7 @@ import {
 import type { NamedBody } from "./naming.js";
 import { planarInteriorPoints } from "./planeBoundary.js";
 import { planarBlend, type BlendStrip } from "./planarFillet.js";
+import { boundsReach } from "./planarFilletSurface.js";
 
 function consumed(
   face: Shape,
@@ -72,14 +73,7 @@ function chamferStrip(distance: number): BlendStrip {
       const [origin, across] = section[0];
       const width = V.norm(V.sub(across, origin));
       const x = V.scale(V.sub(across, origin), 1 / width);
-      const span = Array.from({ length: 8 }, (_, mask) => {
-        const corner: Vec3 = [
-          mask & 1 ? bounds.max[0] : bounds.min[0],
-          mask & 2 ? bounds.max[1] : bounds.min[1],
-          mask & 4 ? bounds.max[2] : bounds.min[2],
-        ];
-        return V.dot(V.sub(corner, origin), axis);
-      });
+      const span = boundsReach(bounds, origin, axis);
       const plane = own(
         new k.gp_Pln_2(
           own(
