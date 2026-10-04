@@ -228,7 +228,7 @@ export function readImport(
   return read;
 }
 
-export const MAX_MESH_TRIANGLES = 500_000;
+export const MAX_MESH_TRIANGLES = 1_000_000;
 
 type MeshFormat = ImportMeshFeature["format"];
 

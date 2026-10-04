@@ -1,8 +1,7 @@
 import {
   LINEAR_TOL,
-  type FaceInfo,
   type ImportMeshFeature,
-  type MeshPayload,
+  type MeshSource,
   type NamingVersion,
   type Vec3,
 } from "@rockett/shared";
@@ -326,10 +325,10 @@ export function drawnTriangles({
   names,
   outward,
   bbox,
-}: TriangleMesh): MeshPayload & { bbox: TriangleMesh["bbox"] } {
-  const normals: number[] = [];
-  const indices: number[] = [];
-  const faceInfos: FaceInfo[] = names.map((name, t) => {
+}: TriangleMesh): MeshSource & { bbox: TriangleMesh["bbox"] } {
+  const normals = new Float32Array(corners.length);
+  const indices = new Uint32Array(corners.length / 3);
+  names.forEach((_, t) => {
     const [p, q, r] = [0, 1, 2].map((c) => cornerOf(corners, 3 * t + c)) as [
       Vec3,
       Vec3,
@@ -337,22 +336,15 @@ export function drawnTriangles({
     ];
     const n = V.cross(V.sub(q, p), V.sub(r, p));
     const normal = V.scale(n, outward / V.norm(n));
-    normals.push(...normal, ...normal, ...normal);
+    for (let c = 0; c < 3; c++) normals.set(normal, 9 * t + 3 * c);
     const [b, c] = outward > 0 ? [1, 2] : [2, 1];
-    indices.push(3 * t, 3 * t + b, 3 * t + c);
-    return {
-      name,
-      start: 3 * t,
-      count: 3,
-      surface: { type: "plane", origin: p, normal },
-      area: V.norm(n) / 2,
-    };
+    indices.set([3 * t, 3 * t + b, 3 * t + c], 3 * t);
   });
   return {
-    positions: Array.from(corners),
+    positions: corners,
     normals,
     indices,
-    faces: faceInfos,
+    triangles: names,
     edges: [],
     vertices: [],
     bbox,

@@ -10,6 +10,8 @@
 import { createHash } from "node:crypto";
 import {
   compareNames,
+  encodeMesh,
+  lazyMesh,
   type EdgeInfo,
   type FaceInfo,
   type MeshedBody,
@@ -97,15 +99,15 @@ export function tessellateBody(
   meta: { name: string },
   opts: TessellationOptions = {},
 ): MeshedBody {
-  const mesh = body.mesh
+  const { bbox, ...mesh } = body.mesh
     ? drawnTriangles(body.mesh)
     : tessellateShape(body, opts);
-  return {
-    bodyId: body.bodyId,
-    name: meta.name,
-    meshKey: createHash("sha256").update(JSON.stringify(mesh)).digest("hex"),
-    ...mesh,
-  };
+  const binary = encodeMesh(mesh);
+  const meshKey = createHash("sha256").update(binary).digest("hex");
+  return lazyMesh(
+    { bodyId: body.bodyId, name: meta.name, meshKey, bbox },
+    binary,
+  );
 }
 
 function tessellateShape(body: NamedBody, opts: TessellationOptions) {

@@ -522,7 +522,7 @@ Under naming version 2, a closed single-part mesh import stays a mesh body
 per triangle named `x{n}` as version 2 names unnamed faces, with no edges or
 vertices, and sews into a solid only when a feature reads its shape. The
 solid keeps each triangle's name. Version 1 documents and open or
-multi-part meshes sew on import. An import over 500,000 triangles is
+multi-part meshes sew on import. An import over 1,000,000 triangles is
 refused before any meshing, and the import read budget bounds file bytes.
 
 ## Naming upgrade
