@@ -340,9 +340,9 @@ module, in load order:
   `progress` call.
 - After sign-in, `client/src/modules/host.ts` activates the client part of
   each listed module that this route reports `loaded`, with `ClientContext`:
-  `register`, `project` and `ui`. `register.command`, `toolbarGroup`, `panel` and
-  `workbench` take `plugin-api` types; `selectionKind` and `pickProvider`
-  still take core types. Activation is atomic as on the server. A command
+  `register`, `project`, `ui` and `request`. `register.command`,
+  `toolbarGroup`, `panel` and `workbench` take `plugin-api` types;
+  `selectionKind` and `pickProvider` still take core types. Activation is atomic as on the server. A command
   `Control` and a workbench `tree` and `bar` draw inside the panel error
   boundary.
 - A workbench's optional `tree` draws in the left dock and `bar` in the
@@ -363,6 +363,19 @@ module, in load order:
   dialog uses the KIT fields. `LengthField` takes millimetres and shows the
   user's length unit. `ui.openPanel(id)` and `ui.closePanel(id)` open and
   close a panel through the core panel state.
+- `ui.confirm(message)` asks through the core Confirm panel and resolves
+  true on OK, false on Cancel or Escape. A newer confirm answers the open
+  one false.
+- `request(method, path, body?)` calls the module's own user routes under
+  `/m/<moduleId>/`, with the dots of the id as slashes: `rockett.cam`
+  sending `"tools"` reaches `/m/rockett/cam/tools`. It goes through the core
+  client request, so the API prefix, JSON body, `ApiError` rejections and
+  sign-out on 401 match core calls. `path` is one or more segments of
+  letters, digits, `-` and `_` joined by single slashes; anything else,
+  such as `..`, a leading slash, a URL, `%`, `?` or `#`, rejects before a
+  request goes out. Project routes are not reachable: a document edit goes
+  through `project.mutate`. A user-data etag travels in the JSON body, as
+  `userData` reads and writes it.
 
 ## Project file
 

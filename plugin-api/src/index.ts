@@ -288,12 +288,18 @@ export interface ClientUi {
   }>;
   openPanel(id: string): void;
   closePanel(id: string): void;
+  confirm(message: string): Promise<boolean>;
 }
 
 export interface ClientContext {
   readonly register: ClientRegister;
   readonly project: ProjectView;
   readonly ui: ClientUi;
+  request<T = unknown>(
+    method: Route["method"],
+    path: string,
+    body?: unknown,
+  ): Promise<T>;
 }
 
 export interface ServerModule {

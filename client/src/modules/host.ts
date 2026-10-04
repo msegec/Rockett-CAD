@@ -15,7 +15,7 @@ import {
   type ModuleInfo,
   type Route,
 } from "@rockett/shared";
-import { send, type MutationResponse } from "../api";
+import { request, send, type MutationResponse } from "../api";
 import {
   registerCommand,
   registerToolbarGroup,
@@ -23,6 +23,7 @@ import {
 } from "../commands/registry";
 import { iconOf, registerModuleIcon } from "../icons";
 import { registerSelectionKind } from "../selection/kinds";
+import { confirm } from "../components/ConfirmPanel";
 import { DraggablePanel } from "../components/DraggablePanel";
 import { DialogFooter } from "../components/form/DialogFooter";
 import {
@@ -161,7 +162,19 @@ const ui: ClientUi = {
   CheckField,
   openPanel,
   closePanel,
+  confirm,
 };
+
+const ROUTE_PATH = /^[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*$/;
+
+const moduleRequest =
+  (moduleId: string): ClientContext["request"] =>
+  async (method, path, body) => {
+    if (!ROUTE_PATH.test(path))
+      throw new Error(`${path} is not a route of ${moduleId}`);
+    const prefix = `/m/${moduleId.replaceAll(".", "/")}/`;
+    return request(method, prefix + path, { body });
+  };
 
 function moduleContext(own: Dispose[], moduleId: string) {
   const track =
@@ -188,6 +201,7 @@ function moduleContext(own: Dispose[], moduleId: string) {
     register,
     project: { ...project, subscribe: track(project.subscribe) },
     ui,
+    request: moduleRequest(moduleId),
   };
 }
 
