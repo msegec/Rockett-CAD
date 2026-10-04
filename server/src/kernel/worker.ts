@@ -12,6 +12,7 @@ import {
 import { InProcessKernel } from "./client.js";
 import {
   fromWire,
+  meshesToWire,
   owned,
   toWire,
   type Call,
@@ -94,11 +95,13 @@ const RUN: {
     ...args: Calls[M]["args"]
   ) => Promise<Calls[M]["result"]>;
 } = {
-  evaluate: (id, doc, position, extra, stop) =>
-    kernelFor(id).evaluate(doc, position, extra, {
-      onFeatureStart: (...args) => post({ type: "featureStart", id, args }),
-      ...reporting(id, stop),
-    }),
+  evaluate: async (id, doc, position, extra, stop) =>
+    meshesToWire(
+      await kernelFor(id).evaluate(doc, position, extra, {
+        onFeatureStart: (...args) => post({ type: "featureStart", id, args }),
+        ...reporting(id, stop),
+      }),
+    ),
   stateQuery: (id, doc, query) => kernelFor(id).stateQuery(doc, query),
   visibleTargets: (id, ...args) => kernelFor(id).visibleTargets(...args),
   signResolved: (id, ...args) => kernelFor(id).signResolved(...args),
@@ -116,6 +119,13 @@ const RUN: {
     kernelFor(id).moduleJob(entry, job, input, reporting(id, stop)),
 };
 
+const TRANSFER: {
+  [M in Method]?: (value: Calls[M]["result"]) => Transferable[];
+} = {
+  evaluate: ({ bodies }) => bodies.map((body) => body.binary),
+  export: ({ data }) => [data],
+};
+
 const booted = initKernel().then(() =>
   post({ type: "ready", version: kernelVersion() }),
 );
@@ -127,15 +137,13 @@ async function serve({ id, method, args }: Call) {
     id: number,
     ...args: Calls[Method]["args"]
   ) => Promise<Calls[Method]["result"]>;
+  const transfer = TRANSFER[method] as
+    ((value: Calls[Method]["result"]) => Transferable[]) | undefined;
   try {
     const value = await run(id, ...args);
     post(
       { type: "reply", id, settled: { ok: true, value } },
-      value instanceof Object &&
-        "data" in value &&
-        value.data instanceof ArrayBuffer
-        ? [value.data]
-        : [],
+      transfer?.(value),
     );
   } catch (error) {
     post({ type: "reply", id, settled: { ok: false, error: toWire(error) } });

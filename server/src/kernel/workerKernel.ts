@@ -21,6 +21,7 @@ import type {
 } from "./client.js";
 import {
   fromWire,
+  meshesFromWire,
   owned,
   toWire,
   type Calls,
@@ -361,7 +362,7 @@ export class WorkerKernel implements KernelClient {
       );
       if (remaining.length) this.quarantined.set(doc.id, remaining);
       else this.quarantined.delete(doc.id);
-      return result;
+      return meshesFromWire(result);
     });
   }
 
