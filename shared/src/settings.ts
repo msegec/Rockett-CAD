@@ -41,6 +41,7 @@ export interface SettingTypes {
   "auth.sessionMaxDays": number;
   "ui.treeWidth": number;
   "keys.overrides": Record<string, string[]>;
+  "toolbar.layout": ToolbarLayout;
 }
 
 export type SettingOf<D extends SettingDefinition> = Static<D["schema"]>;
@@ -373,6 +374,31 @@ export const KEYS_OVERRIDES = defineSetting({
   schema: Type.Record(Type.String(), Type.Array(Type.String({ minLength: 1 }))),
 });
 
+const COMMAND_IDS = Type.Array(Type.String({ minLength: 1 }), {
+  uniqueItems: true,
+});
+
+export const TOOLBAR_LAYOUT = defineSetting({
+  key: "toolbar.layout",
+  label: "Toolbar layout",
+  scopes: ["app", "user"],
+  section: "user",
+  default: {},
+  schema: Type.Record(
+    Type.String(),
+    Type.Object(
+      {
+        order: Type.Optional(Type.Record(Type.String(), COMMAND_IDS)),
+        hidden: Type.Optional(COMMAND_IDS),
+        pinned: Type.Optional(COMMAND_IDS),
+      },
+      { additionalProperties: false },
+    ),
+  ),
+});
+
+export type ToolbarLayout = SettingOf<typeof TOOLBAR_LAYOUT>;
+
 registerSettings([
   UNITS_LENGTH,
   VIEWPORT_PICK_TOLERANCE,
@@ -390,4 +416,5 @@ registerSettings([
   SESSION_MAX_DAYS,
   UI_TREE_WIDTH,
   KEYS_OVERRIDES,
+  TOOLBAR_LAYOUT,
 ]);
