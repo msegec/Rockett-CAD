@@ -21,6 +21,7 @@ import {
 } from "../shared/document.js";
 import { banner, empty, reason, row, tree } from "./libraryParts.js";
 import { camRead, editCam } from "./setup.js";
+import type { Selection, ToolpathPreview } from "./toolpaths.js";
 
 type Setup = CamData["setups"][number];
 type Operation = NonNullable<Setup["operations"]>[number];
@@ -154,6 +155,8 @@ function useStatuses(project: ProjectView, open: OpenProject) {
 
 type Rows = {
   project: ProjectView;
+  preview: ToolpathPreview;
+  selection: Selection;
   statuses: Statuses;
   staleItems: ContextMenuItem[];
   act(action: () => Promise<void>): () => void;
@@ -201,6 +204,11 @@ const operationRow = (rows: Rows, setup: Setup, op: Operation, index: number) =>
     {
       key: op.id,
       name: `${index + 1} ${op.name ?? op.id}`,
+      selected:
+        rows.selection?.setupId === setup.id &&
+        rows.selection.operationId === op.id,
+      onClick: () =>
+        void rows.preview.select({ setupId: setup.id, operationId: op.id }),
       onContextMenu: rows.opener(operationItems(rows, setup, op, index)),
     },
     badge(rows.statuses[setup.id]?.[op.id]),
@@ -216,6 +224,9 @@ function setupSection(rows: Rows, setup: Setup, index: number, count: number) {
     {
       title: setup.name ?? setup.id,
       key: setup.id,
+      selected:
+        rows.selection?.setupId === setup.id && !rows.selection.operationId,
+      onClick: () => void rows.preview.select({ setupId: setup.id }),
       onContextMenu: rows.opener(items),
     },
     operations.length
@@ -224,9 +235,13 @@ function setupSection(rows: Rows, setup: Setup, index: number, count: number) {
   );
 }
 
-export function manufactureBrowser({ project, ui }: ClientContext) {
+export function manufactureBrowser(
+  { project, ui }: ClientContext,
+  preview: ToolpathPreview,
+) {
   return function ManufactureBrowser() {
     const open = useSyncExternalStore(project.subscribe, project.get);
+    const { selection } = useSyncExternalStore(preview.subscribe, preview.get);
     const { current, retry } = useStatuses(project, open);
     const [error, setError] = useState<string | null>(null);
     const [menu, setMenu] = useState<{
@@ -248,6 +263,8 @@ export function manufactureBrowser({ project, ui }: ClientContext) {
     );
     const rows: Rows = {
       project,
+      preview,
+      selection,
       statuses,
       act,
       staleItems: anyStale

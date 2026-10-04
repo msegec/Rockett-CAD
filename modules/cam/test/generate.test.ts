@@ -23,6 +23,7 @@ import {
 import {
   CAM_EXTENSION,
   migrateCam,
+  programRoute,
   saveCam,
   type CamData,
 } from "../src/shared/document.js";
@@ -315,7 +316,7 @@ async function mounted(r: Awaited<ReturnType<typeof rig>>) {
     register: {
       routeModule: (module) => {
         module.mount({
-          projectRoute: () => {},
+          projectRoute: (route, read) => edits.set(route.path, read as Edit),
           userRoute: () => {},
           projectMutation: (route, edit) => edits.set(route.path, edit as Edit),
         });
@@ -332,6 +333,12 @@ async function mounted(r: Awaited<ReturnType<typeof rig>>) {
   const run = (at: string, doc: CadDocument, sent: unknown) =>
     edits.get(at)!(doc, { params: { id: "p1" }, body: sent }, { user: mark });
   return {
+    program: (doc: CadDocument) =>
+      edits.get(programRoute.path)!(
+        doc,
+        { params: { id: "p1", setupId: "s1", operationId: "op1" } },
+        { user: mark },
+      ),
     generate: (doc: CadDocument) =>
       run(generateRoute.path, doc, { setupId: "s1", operationId: "op1" }),
     save: (doc: CadDocument, data: CamData) => run(saveCam.path, doc, data),
@@ -436,5 +443,91 @@ describe("POST /projects/:id/m/rockett/cam/generate", () => {
     await route.save(doc, data(doc));
     expect(doc.extensions).toEqual(project(before).extensions);
     expect(r.jobs).toEqual([]);
+  });
+});
+
+const stored = async (r: Awaited<ReturnType<typeof rig>>) =>
+  Promise.all(
+    (await r.files.list()).map(async (name) => [
+      name,
+      await r.files.read(name),
+    ]),
+  );
+
+describe("GET /projects/:id/m/rockett/cam/setups/:setupId/operations/:operationId/program", () => {
+  it("is a read, never a document edit", () => {
+    expect(programRoute.method).toBe("GET");
+    expect(programRoute.effect).toBeUndefined();
+  });
+
+  it("returns the cached program and changes nothing", async () => {
+    const r = await rig();
+    const route = await mounted(r);
+    const doc = project(saved);
+    const { program } = await route.generate(doc);
+    const [before, cache] = [structuredClone(doc), await stored(r)];
+    expect(await route.program(doc)).toEqual({ program });
+    expect(r.jobs).toHaveLength(1);
+    expect(doc).toEqual(before);
+    expect(await stored(r)).toEqual(cache);
+  });
+
+  it("returns a reason for an operation never generated", async () => {
+    const r = await rig();
+    const route = await mounted(r);
+    const doc = project(saved);
+    const [before, cache] = [structuredClone(doc), await stored(r)];
+    expect(await route.program(doc)).toEqual({
+      reason: "Face top has not been generated",
+    });
+    expect(r.jobs).toEqual([]);
+    expect(doc).toEqual(before);
+    expect(await stored(r)).toEqual(cache);
+  });
+
+  it("returns a reason when the program left the cache, and generates nothing", async () => {
+    const r = await rig();
+    const route = await mounted(r);
+    const doc = project(saved);
+    await route.generate(doc);
+    for (const name of await r.entries()) await r.files.remove(name);
+    const before = structuredClone(doc);
+    expect(await route.program(doc)).toEqual({
+      reason: "Face top is not cached; generate it again",
+    });
+    expect(r.jobs).toHaveLength(1);
+    expect(doc).toEqual(before);
+    expect(await r.entries()).toEqual([]);
+  });
+
+  it("leaves a corrupt cache entry in place and returns a reason", async () => {
+    const r = await rig();
+    const route = await mounted(r);
+    const doc = project(saved);
+    await route.generate(doc);
+    await r.files.write(
+      `cache/${generated(doc).fingerprint}.json`,
+      "{ not json",
+    );
+    const cache = await stored(r);
+    expect(await route.program(doc)).toEqual({
+      reason: "Face top is not cached; generate it again",
+    });
+    expect(await stored(r)).toEqual(cache);
+  });
+
+  it("removes nothing when it reads a cache over its limit", async () => {
+    const r = await rig();
+    const made = [];
+    for (const id of ["op1", "op2", "op3"])
+      made.push(await r.generate(withOperation(id)));
+    const cache = await stored(r);
+    const { byteLength } = (await r.files.read(
+      `cache/${made[0]!.fingerprint}.json`,
+    ))!;
+    const reader = programCache(r.files, Math.floor(byteLength * 1.5));
+    expect(await reader.cached(made[0]!.fingerprint)).toEqual(made[0]!.program);
+    expect(await reader.cached(made[2]!.fingerprint)).toEqual(made[2]!.program);
+    expect(await stored(r)).toEqual(cache);
   });
 });

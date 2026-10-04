@@ -1,6 +1,13 @@
 import { createElement as h, type MouseEvent, type ReactNode } from "react";
 
-type Menu = { onContextMenu?: (e: MouseEvent) => void };
+type Menu = {
+  onContextMenu?: (e: MouseEvent) => void;
+  onClick?: () => void;
+  selected?: boolean;
+};
+
+const marked = (className: string, selected?: boolean) =>
+  selected ? `${className} selected` : className;
 
 export const reason = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
@@ -24,24 +31,38 @@ export const empty = (text: string) =>
   h("div", { className: "tree-empty" }, text);
 
 export const row = (
-  { key, name, onContextMenu }: { key: string; name: string } & Menu,
+  { key, name, selected, ...handlers }: { key: string; name: string } & Menu,
   ...rest: ReactNode[]
 ) =>
   h(
     "div",
-    { key, className: "tree-item", role: "listitem", onContextMenu },
+    {
+      key,
+      className: marked("tree-item", selected),
+      role: "listitem",
+      ...handlers,
+    },
     h("span", null, name),
     ...rest,
   );
 
 export const tree = (
-  { title, key = title, onContextMenu }: { title: string; key?: string } & Menu,
+  {
+    title,
+    key = title,
+    selected,
+    ...handlers
+  }: { title: string; key?: string } & Menu,
   ...children: ReactNode[]
 ) =>
   h(
     "div",
     { key, className: "tree-section" },
-    h("div", { className: "tree-header", onContextMenu }, title),
+    h(
+      "div",
+      { className: marked("tree-header", selected), ...handlers },
+      title,
+    ),
     h(
       "div",
       { className: "tree-children", role: "list", "aria-label": title },

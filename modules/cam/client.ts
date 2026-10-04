@@ -3,6 +3,11 @@ import { manufactureBrowser } from "./src/client/browser.js";
 import { SETUP_PANEL, setupDialog } from "./src/client/setupDialog.js";
 import { stockLayer } from "./src/client/stockLayer.js";
 import { TOOL_PANEL, toolPanel } from "./src/client/toolPanel.js";
+import {
+  toolpathBar,
+  toolpathLayer,
+  toolpathPreview,
+} from "./src/client/toolpaths.js";
 
 const MANUFACTURE = "rockett.cam.manufacture";
 const SETUP_GROUP = "rockett.cam.group.setup";
@@ -10,12 +15,14 @@ const SETUP_GROUP = "rockett.cam.group.setup";
 export default defineClientModule({
   activate(context) {
     const { register, ui, project } = context;
+    const preview = toolpathPreview(project);
     register.workbench({
       id: MANUFACTURE,
       label: "Manufacture",
       panels: [],
       selectionKinds: [],
-      tree: manufactureBrowser(context),
+      tree: manufactureBrowser(context, preview),
+      bar: toolpathBar(preview),
     });
     register.toolbarGroup({
       id: SETUP_GROUP,
@@ -49,5 +56,6 @@ export default defineClientModule({
       component: toolPanel(context),
     });
     register.layer(stockLayer(project));
+    register.layer(toolpathLayer(preview));
   },
 });

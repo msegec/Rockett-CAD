@@ -15,6 +15,7 @@ import {
   generateRoute,
   generateStaleRoute,
   migrateCam,
+  programRoute,
   statusRoute,
   type CamData,
   type OperationStatus,
@@ -239,6 +240,15 @@ export function mountGenerate(
         }),
       ),
     );
+  });
+  api.projectRoute(programRoute, async (doc, req) => {
+    const { op } = find(cam(doc), req.params);
+    const name = op.name ?? op.id;
+    if (!op.lastGenerated) return { reason: `${name} has not been generated` };
+    const program = await cache.cached(op.lastGenerated.fingerprint);
+    return program
+      ? { program }
+      : { reason: `${name} is not cached; generate it again` };
   });
   api.projectMutation(generateRoute, async (doc, req, { user }) => {
     const data = cam(doc);

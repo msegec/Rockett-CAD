@@ -1,6 +1,7 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import type { CadDocument, Route } from "@rockett/plugin-api";
+import type { Program } from "./ir.js";
 import { presetSchema, toolSchema } from "./tools.js";
 
 export const CAM_EXTENSION = "rockett.cam";
@@ -165,6 +166,15 @@ export const statusRoute: Route<
 > = {
   method: "GET",
   path: "/projects/:id/m/rockett/cam/setups/:setupId/status",
+};
+
+export const programRoute: Route<
+  "/projects/:id/m/rockett/cam/setups/:setupId/operations/:operationId/program",
+  unknown,
+  { program: Program } | { reason: string }
+> = {
+  method: "GET",
+  path: "/projects/:id/m/rockett/cam/setups/:setupId/operations/:operationId/program",
 };
 
 export type CamRead =

@@ -111,6 +111,10 @@ export function programCache(files: ModuleFiles, limit = CACHE_BYTES) {
 
   return {
     failure: (fingerprint: string) => failed.get(fingerprint),
+    async cached(fingerprint: string) {
+      const bytes = await files.read(entry(fingerprint));
+      return bytes ? parsed(bytes) : undefined;
+    },
     async program(
       fingerprint: string,
       make: () => Promise<Program>,

@@ -52,7 +52,13 @@ function quadrantCuts(start: number, sweep: number, ccw: boolean): number[] {
   return [...cuts, sweep];
 }
 
-function expandArc(from: Xyz, arc: Arc): Move[] {
+type Feed = Extract<Move, { kind: "feed" }>;
+
+export function expandArc(
+  from: Xyz,
+  arc: Arc,
+  tolerance = PATH_TOLERANCE,
+): Feed[] {
   const { to, centre, dir, plane, ...motion } = arc;
   const [cu, cv] = inPlane(centre, plane);
   const [su, sv, sw] = inPlane(from, plane);
@@ -61,8 +67,7 @@ function expandArc(from: Xyz, arc: Arc): Move[] {
   const sweep = arcSweep(from, arc);
   const sign = dir === "ccw" ? 1 : -1;
   const start = Math.atan2(sv - cv, su - cu);
-  const step =
-    2 * Math.acos(Math.max(-1, 1 - PATH_TOLERANCE / Math.max(r0, r1)));
+  const step = 2 * Math.acos(Math.max(-1, 1 - tolerance / Math.max(r0, r1)));
   const cuts = quadrantCuts(start, sweep, dir === "ccw");
   const angles = cuts.slice(1).flatMap((end, i) => {
     const begin = cuts[i]!;
@@ -81,7 +86,7 @@ function expandArc(from: Xyz, arc: Arc): Move[] {
       plane,
     );
   };
-  const segment = (end: Xyz): Move => ({ ...motion, kind: "feed", to: end });
+  const segment = (end: Xyz): Feed => ({ ...motion, kind: "feed", to: end });
   return [...angles.slice(0, -1).map(pointAt), to].map(segment);
 }
 

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { Layer, OpenProject, ProjectView } from "@rockett/plugin-api";
-import { stockBox, type StockSetup } from "../shared/setup.js";
+import { stockBox, type Placement, type StockSetup } from "../shared/setup.js";
 import { bodyBoxes, camRead } from "./setup.js";
 
 export const STOCK_LAYER = "rockett.cam.stock";
@@ -9,17 +9,38 @@ const STOCK_TOKEN = "border";
 const AXIS_TOKENS = ["axis-x", "axis-y", "axis-z"] as const;
 const TRIAD_FRACTION = 0.25;
 
-function line(points: THREE.Vector3[], token: string) {
-  const material = new THREE.LineBasicMaterial({
-    color: getComputedStyle(document.documentElement)
+export function themed<M extends THREE.LineBasicMaterial>(
+  material: M,
+  token: string,
+): M {
+  material.color.set(
+    getComputedStyle(document.documentElement)
       .getPropertyValue(`--${token}`)
       .trim(),
-  });
-  material.userData.themeToken = token;
-  return new THREE.LineSegments(
-    new THREE.BufferGeometry().setFromPoints(points),
-    material,
   );
+  material.userData.themeToken = token;
+  return material;
+}
+
+const line = (points: THREE.Vector3[], token: string) =>
+  new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(points),
+    themed(new THREE.LineBasicMaterial(), token),
+  );
+
+export function placeInModel<O extends THREE.Object3D>(
+  object: O,
+  { translation, rotation }: Placement,
+): O {
+  new THREE.Matrix4()
+    .compose(
+      new THREE.Vector3(...translation),
+      new THREE.Quaternion(...rotation),
+      new THREE.Vector3(1, 1, 1),
+    )
+    .invert()
+    .decompose(object.position, object.quaternion, object.scale);
+  return object;
 }
 
 function stockObject(setup: StockSetup, open: OpenProject) {
@@ -49,15 +70,7 @@ function stockObject(setup: StockSetup, open: OpenProject) {
       ),
     ),
   );
-  new THREE.Matrix4()
-    .compose(
-      new THREE.Vector3(...modelToSetup.translation),
-      new THREE.Quaternion(...modelToSetup.rotation),
-      new THREE.Vector3(1, 1, 1),
-    )
-    .invert()
-    .decompose(object.position, object.quaternion, object.scale);
-  return object;
+  return placeInModel(object, modelToSetup);
 }
 
 function drawn(open: OpenProject) {
