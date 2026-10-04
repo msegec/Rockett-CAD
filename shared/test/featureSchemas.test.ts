@@ -452,8 +452,24 @@ const fixtures: {
     path: "/count",
   },
   move: {
-    valid: { ...base, type: "move", bodies: ["b1"], translation: [0, 0, 1] },
-    invalid: { ...base, type: "move", bodies: ["b1"], translation: [0, 0] },
+    valid: {
+      ...base,
+      type: "move",
+      bodies: ["b1"],
+      translation: [0, 0, 1],
+      axis: { kind: "originAxis", axis: "Z" },
+      angle: 0,
+      copy: false,
+    },
+    invalid: {
+      ...base,
+      type: "move",
+      bodies: ["b1"],
+      translation: [0, 0],
+      axis: { kind: "originAxis", axis: "Z" },
+      angle: 0,
+      copy: false,
+    },
     path: "/translation",
   },
 };

@@ -141,6 +141,9 @@ it("resolves schema units through nested unions, arrays and tuples and excludes 
       suppressed: false,
       bodies: ["body"],
       translation: [0, 0, 0],
+      axis: { kind: "originAxis", axis: "Z" },
+      angle: 0,
+      copy: false,
     },
   ];
   doc.timelinePosition = 2;

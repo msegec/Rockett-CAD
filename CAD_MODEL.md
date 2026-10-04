@@ -75,8 +75,8 @@ and `compareNames` in `shared/src/topoRefs.ts`.
   2 a join, cut or intersect names the rest `b:{featureId}:{n}`, numbered
   from 2 across the feature, so the id never grows with chain depth; version
   1 appends `:{n}` to the target's id.
-- Mirror and pattern copies are `b:{featureId}:{n}`, fixed length at any
-  depth. The first `splitBody` piece keeps its id.
+- Mirror, pattern and Move copies are `b:{featureId}:{n}`, fixed length at
+  any depth. The first `splitBody` piece keeps its id.
 - A fresh process gives the same ids and names.
 - Display names live in `document.bodyMeta`. Visibility lives in the user
   view; see [API.md](API.md), View state. `document.groups` never reaches
@@ -99,6 +99,7 @@ only the Naming upgrade changes a stored version.
 | Press/pull moved face, version 2            | the source face's name                                  |
 | Mirror or pattern copy, version 1           | `m:{featureId}:{name}`, `p{i}:{featureId}:{name}`       |
 | Mirror or pattern copy, version 2           | `m:{featureId}:{key}{~n}`, `p{i}:{featureId}:{key}{~n}` |
+| Move copy                                   | as the pattern copy with `i` 1                          |
 | STEP, IGES or BREP import face, version 2   | `f:{featureId}:g:{surface}:{key}`                       |
 | Anything the history cannot attribute       | `f:{featureId}:x{n}`                                    |
 
@@ -234,6 +235,22 @@ body.
 - Tangent chains: `server/src/geometry/tangentEdges.ts`.
 - Mesh imports cap at `MAX_MESH_TRIANGLES` in
   `server/src/geometry/importers.ts`.
+
+## Move
+
+`evalMove` in `server/src/geometry/move.ts`.
+
+- Move turns its bodies `angle` degrees about `axis`, then translates them.
+  `axis` is an origin axis, a straight edge or a sketch line, as Revolve and
+  Circular Pattern store it.
+- Schema 29 adds `axis`, `angle` and `copy`. An earlier Move migrates to the Z
+  axis, angle 0 and no copy, so it loads as translation only.
+- Without `copy`, each body keeps its id and face names. Sketches drawn on
+  it, or used by the feature that made it, move with it.
+- With `copy`, the originals stay put and each moved body is a new body,
+  named in `bodyMeta` like any other. One add is one undo step.
+- An axis edge or line that no longer resolves errors the feature and keeps
+  the bodies.
 
 ## Tolerances
 

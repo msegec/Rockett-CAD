@@ -405,11 +405,13 @@ export interface ReferenceImageFeature extends FeatureBase {
   height: number;
 }
 
-/** Rigid translation of whole bodies (parametric, editable in the timeline). */
 export interface MoveFeature extends FeatureBase {
   type: "move";
   bodies: string[];
   translation: [number, number, number];
+  axis: AxisRef;
+  angle: number;
+  copy: boolean;
 }
 
 export interface EmbossFeature extends ToolFeatureBase {

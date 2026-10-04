@@ -1,14 +1,31 @@
 import { formatLength, newId, type MoveFeature } from "@rockett/shared";
-import { LengthField, SelInfo } from "../components/form/fields";
+import {
+  AngleField,
+  AxisField,
+  CheckField,
+  LengthField,
+  SelInfo,
+} from "../components/form/fields";
 import { getSetting, useSetting } from "../settings";
-import { bodies } from "../commands/featureCommand";
+import { axis, bodies, clearInput } from "../commands/featureCommand";
 import * as THREE from "three";
 import { MoveGizmo } from "../three/MoveGizmo";
 import { baseBodies } from "../previewBase";
 import { previewedFeature, useStore } from "../store";
 import { dragPreview } from "../toolTargets";
 import type { FeatureGizmoContext, GizmoPointer } from "../three/featureGizmos";
-import { bodyIds, bodyPicks, num } from "./inputs";
+import {
+  axisHint,
+  axisMissing,
+  axisParams,
+  axisPicks,
+  axisRef,
+  axisSelection,
+  bodyIds,
+  bodyPicks,
+  num,
+  type AxisParams,
+} from "./inputs";
 import {
   registerFeatureUI,
   type FeatureFormProps,
@@ -16,7 +33,10 @@ import {
   type InputParams,
 } from "./registry";
 
-export type MoveParams = InputParams<Pick<MoveFeature, "id" | "name">> &
+export type MoveParams = InputParams<
+  Pick<MoveFeature, "id" | "name" | "angle" | "copy">
+> &
+  AxisParams &
   InputParams<{
     tx: MoveFeature["translation"][0];
     ty: MoveFeature["translation"][1];
@@ -25,6 +45,8 @@ export type MoveParams = InputParams<Pick<MoveFeature, "id" | "name">> &
 
 function MoveForm({ params, setParams }: FeatureFormProps<MoveParams>) {
   const units = useSetting("units.length");
+  const selection = useStore((s) => s.selection);
+  const document = useStore((s) => s.document);
   return (
     <>
       <SelInfo label="Bodies" input="bodies" hint="click bodies" />
@@ -49,6 +71,31 @@ function MoveForm({ params, setParams }: FeatureFormProps<MoveParams>) {
         value={num(params, "tz", 0)}
         onChange={(v) => setParams({ tz: v })}
         bind="/translation/2"
+      />
+      <SelInfo
+        label="Axis"
+        input="axis"
+        picks={axisPicks(selection, document)}
+        hint={axisHint(axisMissing(params, selection, document))}
+      />
+      <AxisField
+        axisSource={params.axisSource}
+        axis={params.axis}
+        onChange={(patch) => {
+          setParams(patch);
+          clearInput("axis");
+        }}
+      />
+      <AngleField
+        label="Angle"
+        value={num(params, "angle", 0)}
+        onChange={(v) => setParams({ angle: v })}
+        bind="/angle"
+      />
+      <CheckField
+        label="Create copy"
+        value={!!(params.copy ?? false)}
+        onChange={(v) => setParams({ copy: v })}
       />
     </>
   );
@@ -101,9 +148,9 @@ class MoveLayer {
     if (!this.dragging) this.gizmo.update(translation(this.context.params()));
   }
   down(event: GizmoPointer) {
-    const axis = this.gizmo.hitTest(event.clientX, event.clientY);
-    if (axis < 0) return false;
-    this.gizmo.beginDrag(axis, event.clientX, event.clientY);
+    const hit = this.gizmo.hitTest(event.clientX, event.clientY);
+    if (hit < 0) return false;
+    this.gizmo.beginDrag(hit, event.clientX, event.clientY);
     return true;
   }
   move(event: GizmoPointer) {
@@ -158,11 +205,13 @@ export const move: FeatureUI<MoveFeature, MoveParams> = {
   icon: "✥",
   title: "Move",
   group: "modify",
-  picks: [bodies],
+  picks: [bodies, axis],
   Form: MoveForm,
   build: (params, selection) => {
     const ids = bodyIds(selection);
     if (ids.length === 0) return { error: "Select at least one body" };
+    const axisOf = axisRef(params, selection, useStore.getState().document);
+    if (!axisOf) return { error: "Pick an axis" };
     return {
       id: params.id ?? newId("move"),
       type: "move",
@@ -174,6 +223,9 @@ export const move: FeatureUI<MoveFeature, MoveParams> = {
         num(params, "ty", 0),
         num(params, "tz", 0),
       ],
+      axis: axisOf,
+      angle: num(params, "angle", 0),
+      copy: !!(params.copy ?? false),
     };
   },
   prefill: (f) => ({
@@ -183,8 +235,11 @@ export const move: FeatureUI<MoveFeature, MoveParams> = {
       tx: f.translation[0],
       ty: f.translation[1],
       tz: f.translation[2],
+      angle: f.angle,
+      copy: f.copy,
+      ...axisParams(f.axis),
     },
-    selection: bodyPicks(f.bodies),
+    selection: [...bodyPicks(f.bodies), ...axisSelection(f.axis)],
   }),
 };
 

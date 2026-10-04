@@ -247,6 +247,21 @@ export const documentMigrations: Migrations<CadDocument> = {
       ),
     }),
     27: (doc) => doc,
+    28: (doc) => ({
+      ...doc,
+      features: (doc.features as Value[]).map((feature) =>
+        feature.type === "move"
+          ? Object.assign(
+              {
+                axis: { kind: "originAxis", axis: "Z" },
+                angle: 0,
+                copy: false,
+              },
+              feature,
+            )
+          : feature,
+      ),
+    }),
   },
   nested: extensionFeatures,
 };

@@ -430,6 +430,9 @@ const circularPattern = feature("circularPattern", {
 const move = feature("move", {
   bodies,
   translation: Type.Tuple([coordinate, coordinate, coordinate]),
+  axis: axisRef,
+  angle: degrees,
+  copy: Type.Boolean(),
 });
 
 export const FEATURE_SCHEMAS = {

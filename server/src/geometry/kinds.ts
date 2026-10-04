@@ -14,7 +14,6 @@ import {
   evalImportStep,
   evalLinearPattern,
   evalMirror,
-  evalMove,
   evalReferenceImage,
   evalRevolve,
   evalSketch,
@@ -23,6 +22,7 @@ import {
 } from "./features.js";
 import { evalChamfer, evalFillet } from "./blend.js";
 import { evalLoft } from "./loft.js";
+import { evalMove } from "./move.js";
 import { evalShell } from "./shell.js";
 
 const kind = <T extends FeatureType>(

@@ -82,6 +82,9 @@ function setup(type: "move" | "revolve", editing = false) {
             suppressed: false,
             bodies: ["body"],
             translation: [0, 0, 0],
+            axis: { kind: "originAxis", axis: "Z" },
+            angle: 0,
+            copy: false,
           }
         : {
             id: "edit",

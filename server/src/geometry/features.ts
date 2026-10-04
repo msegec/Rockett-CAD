@@ -30,9 +30,7 @@ import {
   solveSketch,
   settledEntities,
   projectEdge,
-  bodyMadeBy,
   derivedBodyId,
-  featureRefs,
   ANGULAR_TOL_DEG,
   LINEAR_TOL,
   UNIT_DOT_TOL,
@@ -42,12 +40,10 @@ import {
   type EmbossFeature,
   type ExtrudeFeature,
   type FaceRef,
-  type Feature,
   type ImportMeshFeature,
   type ImportStepFeature,
   type LinearPatternFeature,
   type MirrorFeature,
-  type MoveFeature,
   type OriginAxis,
   type ReferenceImageFeature,
   type CircularPatternFeature,
@@ -138,7 +134,7 @@ const originAxisDirection = (axis: OriginAxis): Vec3 => {
   return [i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0];
 };
 
-function resolveAxis(
+export function resolveAxis(
   state: EvalState,
   ref: AxisRef,
 ): { origin: Vec3; direction: Vec3 } {
@@ -723,59 +719,6 @@ export function evalMirror(state: EvalState, f: MirrorFeature) {
     }
     return warned(warnings);
   });
-}
-
-/** Rigid body translation: transform in place, preserving all face names so
- * downstream feature references survive. The sketches belonging to a moved
- * body (drawn on its faces, or consumed by the feature that created it) have
- * their frames translated too, so they stay attached visually and any later
- * features built from them land at the moved position. */
-export function evalMove(
-  { state, earlier }: EvalContext,
-  f: MoveFeature,
-): void {
-  if (f.bodies.length === 0)
-    throw new Error("select at least one body to move");
-  const placement = Placement.fromTranslation(f.translation);
-  kernelCall("move", () => {
-    for (const bodyId of f.bodies) {
-      const body = state.bodies.get(bodyId);
-      if (!body) throw new Error(`body ${bodyId} not found`);
-      const trsf = placementToTrsf(placement);
-      const tr = transformOp(body.shape, trsf);
-      const moved = acquire(tr.Shape());
-      // empty prefix: keep the original persistent names
-      const names = transformNames(tr, body, "");
-      registerBodySolids(state, bodyId, moved, names);
-    }
-  });
-
-  // carry the bodies' sketches along
-  const movedIds = new Set(f.bodies);
-  const createdBy = (g: Feature) =>
-    [...movedIds].some((id) => bodyMadeBy(g.id, id));
-  for (const [skId, sk] of state.sketches) {
-    const feat = earlier.find((g) => g.id === skId && g.type === "sketch") as
-      SketchFeature | undefined;
-    if (!feat) continue;
-    const follows =
-      (feat.plane.kind === "face" && movedIds.has(feat.plane.face.bodyId)) ||
-      earlier.some(
-        (g) =>
-          createdBy(g) &&
-          featureRefs(g).some(
-            (ref) =>
-              (ref.kind === "profile" && ref.profile.sketchId === skId) ||
-              (ref.kind === "sketch" && ref.sketch === skId),
-          ),
-      );
-    if (follows) {
-      state.sketches.set(skId, {
-        ...sk,
-        frame: Placement.applyToFrame(placement, sk.frame),
-      });
-    }
-  }
 }
 
 const patternCopyId = (id: string, sources: number, i: number, j: number) =>
