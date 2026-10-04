@@ -1,5 +1,11 @@
-import { createElement as h, type MouseEvent, type ReactNode } from "react";
-import type { UserDataEntry } from "@rockett/plugin-api";
+import {
+  createElement as h,
+  useEffect,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
+import type { ClientContext, UserDataEntry } from "@rockett/plugin-api";
 
 export type Library<T> = { items: T[]; etag: string | null };
 
@@ -25,6 +31,9 @@ export const reason = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
 export const unqualified = (label: string) => `${label} (unqualified)`;
+
+export const deleteQuestion = (name: string) =>
+  `Delete ${name} from your library? Projects that use it keep their copy.`;
 
 export const button = (
   text: string,
@@ -86,3 +95,32 @@ export const tree = (
       ...children,
     ),
   );
+
+export function useStored<T>(
+  request: ClientContext["request"],
+  path: string,
+  title: string,
+) {
+  const [library, setLibrary] = useState<Library<T> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    request<UserDataEntry | null>("GET", path)
+      .then(libraryOf<T>)
+      .then(setLibrary, (e) =>
+        setError(`${title} did not load: ${reason(e)}.`),
+      );
+  }, []);
+  return { library, setLibrary, error, setError };
+}
+
+export const placeholder = (
+  plural: string,
+  {
+    library,
+    error,
+  }: { library: Library<unknown> | null; error: string | null },
+  count = 0,
+) =>
+  !library
+    ? !error && empty(`Loading ${plural}...`)
+    : !count && empty(`No ${plural} yet.`);

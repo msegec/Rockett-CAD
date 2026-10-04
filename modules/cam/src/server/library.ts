@@ -7,11 +7,13 @@ import type {
   User,
   UserData,
 } from "@rockett/plugin-api";
+import type { Post } from "../post/schema.js";
 import {
   CAM_EXTENSION,
   CAM_VERSION,
   entry,
   migrateCam,
+  storedPostProblem,
 } from "../shared/document.js";
 import {
   machineSchema,
@@ -50,11 +52,11 @@ const addPost: Route<
 };
 
 function mountPosts(api: RouteModuleApi, store: UserData) {
-  api.userRoute({ method: "GET", path: addPost.path }, (_req, { user }) =>
-    store.read(user),
+  list<Post>(api, store, "post", entry, (post) =>
+    [storedPostProblem(post)].filter(Boolean),
   );
   api.userRoute(addPost, async (req, { user }) => {
-    const post = userPost(req.body.post);
+    const post = userPost(JSON.parse(req.body.post));
     const stored = (await store.read(user))?.data;
     const kept = Array.isArray(stored)
       ? stored.filter((item) => item?.id !== post.id)

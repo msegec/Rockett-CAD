@@ -103,22 +103,25 @@ const wcsSchema = Type.Object({
 export const POST_MAX_BYTES = 64 * 1024;
 export const USER_POST_PREFIX = "user.";
 
-export const postBytes = (text: string) =>
-  new TextEncoder().encode(text).length;
-
 export type PostCopy = Post & { libraryRef: Static<typeof entry> };
 
 export const copiedPost = ({ libraryRef: _ref, ...post }: PostCopy): Post =>
   post;
 
-function postProblem(copy: PostCopy) {
-  if (!copy.id.startsWith(USER_POST_PREFIX))
-    return `id must start with ${USER_POST_PREFIX}`;
-  const bytes = postBytes(JSON.stringify(copy));
-  if (bytes > POST_MAX_BYTES)
-    return `is ${bytes} bytes, over the ${POST_MAX_BYTES} byte limit`;
-  return validatePost(copiedPost(copy))[0] ?? "";
+export function sizeProblem(text: string): string {
+  const bytes = new TextEncoder().encode(text).length;
+  return bytes > POST_MAX_BYTES
+    ? `is ${bytes} bytes, over the ${POST_MAX_BYTES} byte limit`
+    : "";
 }
+
+export function storedPostProblem(post: Post): string {
+  if (!post.id.startsWith(USER_POST_PREFIX))
+    return `id must start with ${USER_POST_PREFIX}`;
+  return sizeProblem(JSON.stringify(post)) || (validatePost(post)[0] ?? "");
+}
+
+const postProblem = (copy: PostCopy) => storedPostProblem(copiedPost(copy));
 
 const docPost = Type.Refine(
   Type.Object({ id: Type.String(), libraryRef: entry }),

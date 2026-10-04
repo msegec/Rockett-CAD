@@ -1,13 +1,5 @@
-import {
-  createElement as h,
-  Fragment,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createElement as h, Fragment, useState, type ReactNode } from "react";
 import type { ClientContext, UserDataEntry } from "@rockett/plugin-api";
-import type { Post } from "../post/schema.js";
-import { POST_MAX_BYTES } from "../shared/document.js";
 import {
   machineSchema,
   newMachine,
@@ -27,14 +19,16 @@ import { GrblPaste } from "./grblPaste.js";
 import {
   banner,
   button,
-  empty,
+  deleteQuestion,
   libraryOf,
+  placeholder,
   reason,
   row,
   tree,
-  unqualified,
+  useStored,
   type Library,
 } from "./libraryParts.js";
+import { usePosts } from "./postLibrary.js";
 import { schemaFields } from "./schemaForm.js";
 import { newTool, toolFields } from "./toolForm.js";
 
@@ -88,35 +82,6 @@ const MACHINES: Section<MachineProfile> = {
   ],
 };
 
-function useStored<T>(
-  request: ClientContext["request"],
-  path: string,
-  title: string,
-) {
-  const [library, setLibrary] = useState<Library<T> | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    request<UserDataEntry | null>("GET", path)
-      .then(libraryOf<T>)
-      .then(setLibrary, (e) =>
-        setError(`${title} did not load: ${reason(e)}.`),
-      );
-  }, []);
-  return { library, setLibrary, error, setError };
-}
-
-const placeholder = (
-  plural: string,
-  {
-    library,
-    error,
-  }: { library: Library<unknown> | null; error: string | null },
-  count = 0,
-) =>
-  !library
-    ? !error && empty(`Loading ${plural}...`)
-    : !count && empty(`No ${plural} yet.`);
-
 function useSection<T extends Item>(
   { ui, request }: ClientContext,
   section: Section<T>,
@@ -151,11 +116,7 @@ function useSection<T extends Item>(
       .finally(() => setPending(false));
   };
   const remove = async (item: T) => {
-    if (
-      await ui.confirm(
-        `Delete ${item.name} from your library? Projects that use it keep their copy.`,
-      )
-    )
+    if (await ui.confirm(deleteQuestion(item.name)))
       await write(library!.items.filter((t) => t.id !== item.id));
   };
   return {
@@ -426,42 +387,6 @@ function useTransfer(context: ClientContext, tools: State<Tool>) {
       },
     });
   return { buttons, dialog };
-}
-
-function usePosts({ ui, request }: ClientContext) {
-  const stored = useStored<Post>(request, "posts", "Posts");
-  const { library, setLibrary, setError } = stored;
-  const [pending, setPending] = useState(false);
-  const pick = async () => {
-    setPending(true);
-    try {
-      const file = await ui.pickFile({
-        accept: ".json,application/json",
-        maxBytes: POST_MAX_BYTES,
-      });
-      if (!file) return;
-      const entry = await request<UserDataEntry>("POST", "posts", {
-        post: file.text,
-        etag: library!.etag,
-      });
-      setLibrary(libraryOf<Post>(entry));
-      setError(null);
-    } catch (e) {
-      setError(`Post did not import: ${reason(e)}.`);
-    } finally {
-      setPending(false);
-    }
-  };
-  const rows = library?.items.map(({ id, label }) =>
-    row({ key: id, name: unqualified(label) }),
-  );
-  return h(
-    Fragment,
-    { key: "post" },
-    banner(stored.error),
-    tree({ title: "Posts" }, placeholder("posts", stored, rows?.length), rows),
-    library && button("Import post", "Import post", pending, () => void pick()),
-  );
 }
 
 export function toolPanel(context: ClientContext) {

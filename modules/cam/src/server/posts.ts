@@ -5,15 +5,15 @@ import grblhal from "../../posts/grblhal.json";
 import linuxcnc from "../../posts/linuxcnc.json";
 import mach from "../../posts/mach.json";
 import marlin from "../../posts/marlin.json";
-import { validatePost, type Post } from "../post/schema.js";
+import { importPostProblems, type Post } from "../post/schema.js";
 import {
-  POST_MAX_BYTES,
-  postBytes,
+  sizeProblem,
+  storedPostProblem,
   USER_POST_PREFIX,
 } from "../shared/document.js";
 
 function shipped(value: unknown): Post {
-  const problems = validatePost(value);
+  const problems = importPostProblems(value);
   if (problems.length) throw new Error(problems.join("\n"));
   return value as Post;
 }
@@ -33,16 +33,16 @@ function parsed(text: string): unknown {
 }
 
 function userPostProblem(text: string): string {
-  const bytes = postBytes(text);
-  if (bytes > POST_MAX_BYTES)
-    return `is ${bytes} bytes, over the ${POST_MAX_BYTES} byte limit`;
+  const size = sizeProblem(text);
+  if (size) return size;
   const value = parsed(text);
   if (value === undefined) return "is not JSON";
-  return validatePost(value)[0] ?? "";
+  return (
+    importPostProblems(value)[0] ?? storedPostProblem(userPost(value as Post))
+  );
 }
 
-export function userPost(text: string): Post {
-  const post = JSON.parse(text) as Post;
+export function userPost(post: Post): Post {
   return post.id.startsWith(USER_POST_PREFIX)
     ? post
     : { ...post, id: `${USER_POST_PREFIX}${post.id}` };

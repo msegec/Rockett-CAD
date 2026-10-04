@@ -2,6 +2,7 @@ import { act, createElement as h, Fragment } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MAX_SETTINGS_TEXT } from "../src/import/grblSettings.js";
+import { POST_KIT_FILE, postKit } from "../src/post/kit.js";
 import type { Post } from "../src/post/schema.js";
 import type { MachineProfile } from "../src/shared/machine.js";
 import type { Tool } from "../src/shared/tools.js";
@@ -22,6 +23,7 @@ let machines: { data: MachineProfile[]; etag: string } | null;
 let machinePuts: { data: MachineProfile[]; etag: string | null }[];
 let posts: { data: Post[]; etag: string } | null;
 let postPosts: { post: string; etag: string | null }[];
+let postPuts: { data: Post[]; etag: string | null }[];
 let refusal: string | null;
 let host: HTMLElement;
 let root: Root;
@@ -43,6 +45,11 @@ function servePosts(method: string, init: RequestInit) {
   if (method === "GET")
     return Response.json(posts && { version: 1, ...posts, readOnly: false });
   const body = JSON.parse(String(init.body));
+  if (method === "PUT") {
+    postPuts.push(body);
+    posts = { data: body.data, etag: `q${postPuts.length}` };
+    return Response.json({ version: 1, ...posts, readOnly: false });
+  }
   postPosts.push(body);
   if (refusal) return Response.json({ error: refusal }, { status: 400 });
   posts = { data: [JSON.parse(body.post)], etag: `p${postPosts.length}` };
@@ -77,6 +84,7 @@ beforeEach(async () => {
   machinePuts = [];
   posts = null;
   postPosts = [];
+  postPuts = [];
   refusal = null;
   vi.stubGlobal(
     "fetch",
@@ -449,4 +457,44 @@ it("says why a post did not import", async () => {
     "Post did not import: post templates.linear: needs {feed}.",
   );
   expect(library.textContent).toContain("No posts yet.");
+});
+
+it("deletes a user post after ui.confirm", async () => {
+  const other = { ...mine, id: "user.other", label: "Other" };
+  posts = { data: [{ ...mine, id: "user.my-grbl" }, other], etag: "p0" };
+  const library = await openLibrary();
+
+  await click(library, "Delete My GRBL");
+  expect(panelTitled("Confirm")!.textContent).toContain(
+    "Delete My GRBL from your library? Projects that use it keep their copy.",
+  );
+  await click(panelTitled("Confirm")!, "OK");
+  expect(postPuts).toEqual([{ data: [other], etag: "p0" }]);
+  expect(rows()).toEqual(["Other (unqualified)"]);
+});
+
+it("downloads the generated post kit beside Import post", async () => {
+  posts = { data: [], etag: "p0" };
+  const blobs: Blob[] = [];
+  Object.assign(URL, {
+    createObjectURL: (blob: Blob) => `blob:${blobs.push(blob)}`,
+    revokeObjectURL: () => {},
+  });
+  const save = vi
+    .spyOn(HTMLAnchorElement.prototype, "click")
+    .mockImplementation(() => {});
+  const library = await openLibrary();
+  const labels = [...library.querySelectorAll("button")].map(
+    (b) => b.textContent,
+  );
+  expect(labels.indexOf("Download post kit")).toBe(
+    labels.indexOf("Import post") + 1,
+  );
+
+  await click(library, "Download post kit");
+  expect((save.mock.contexts[0] as HTMLAnchorElement).download).toBe(
+    POST_KIT_FILE,
+  );
+  expect(blobs[0]!.type).toBe("text/markdown");
+  expect(await blobs[0]!.text()).toBe(postKit());
 });

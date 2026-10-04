@@ -28,7 +28,7 @@ const fake: Post = {
   extension: "nc",
   capabilities: { arcs: true, cycles: true, toolChange: true },
   words: [
-    "G0 G1 G2 G3 G4 G17 G18 G19 G20 G21 G43 G54 G55 G80 G81 G83 G90",
+    "G0 G1 G2 G3 G4 G17 G18 G19 G20 G21 G43 G54 G55 G80 G81 G82 G83 G90",
     "M0 M1 M3 M4 M5 M6 M7 M8 M9 M30",
   ]
     .join(" ")
@@ -49,7 +49,7 @@ const fake: Post = {
     H: { decimals: 0, trim: true },
   },
   modal: [
-    ["G0", "G1", "G2", "G3", "G80", "G81", "G83"],
+    ["G0", "G1", "G2", "G3", "G80", "G81", "G82", "G83"],
     ["G17", "G18", "G19"],
     ["M3", "M4", "M5"],
     ["M7", "M8", "M9"],
@@ -72,7 +72,7 @@ const fake: Post = {
     arcCw: ["{plane} G2 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed}"],
     arcCcw: ["{plane} G3 X{x} Y{y} Z{z} I{i} J{j} K{k} F{feed}"],
     drill: ["G81 X{x} Y{y} Z{bottom} R{clear} F{feed}"],
-    drillDwell: [],
+    drillDwell: ["G82 X{x} Y{y} Z{bottom} R{clear} P{dwell} F{feed}"],
     peck: ["G83 X{x} Y{y} Z{bottom} R{clear} Q{peck} F{feed}"],
     cycleEnd: ["G80"],
     dwell: ["G4 P{seconds}"],
@@ -353,14 +353,24 @@ describe("post schema", () => {
     expect(validatePost(JSON.parse(JSON.stringify(fake)))).toEqual([]);
   });
 
-  it("names each invalid path", () => {
-    const bad = {
+  it("names each invalid path with its accepted values", () => {
+    const shape = {
       ...fake,
       extra: 1,
       capabilities: { ...fake.capabilities, arcs: "yes" },
+      formats: { ...fake.formats, G: axis },
+      templates: { ...fake.templates, comment: "{text}" },
+    };
+    expect(validatePost(shape)).toEqual([
+      "extra: unknown key; accepted: id, label, extension, capabilities, toolChangeDefault, words, formats, modal, workOffsets, laser, templates",
+      'capabilities.arcs: is not an accepted value; accepted: true, false or "xy"',
+      "formats.G: unknown key; accepted: address letters other than G, M, N and O",
+      'templates.comment: must match pattern "^(?:(\\()\\{text\\}\\)|(; ?)\\{text\\})$"; accepted: "({text})", ";{text}" or "; {text}"',
+    ]);
+    const bad = {
+      ...fake,
       workOffsets: ["G59"],
       modal: [...fake.modal, "A", ["G0"]],
-      formats: { ...fake.formats, G: axis },
       templates: {
         ...fake.templates,
         header: ["G90 G17", "{offset}"],
@@ -369,27 +379,24 @@ describe("post schema", () => {
         linear: ["G1 A{x} Y{y} Z{z} F{feed}"],
         dwell: ["G4  P{seconds}"],
         cycleEnd: [],
-        comment: "{text}",
-        probe: ["G38.2"],
       },
     };
+    const letters = Object.keys(fake.formats).join(", ");
+    const inWords = "accepted: a word listed in words";
     expect(validatePost(bad)).toEqual([
-      "extra: unknown key",
-      'capabilities.arcs: must be a boolean or "xy"',
-      "formats.G: must be an address letter other than G, M, N or O",
-      "modal[11]: A has no number format",
-      "modal[12]: G0 is already in a modal group",
-      "workOffsets[0]: G59 is not in words",
-      "templates.probe: unknown key",
+      `modal[11]: A has no number format; accepted: a letter in formats (${letters})`,
+      "modal[12]: G0 is already in a modal group; accepted: each word in one group",
+      `workOffsets[0]: G59 is not in words; ${inWords}`,
       "templates.header: needs {units}",
-      "templates.footer[0]: G999 is not in words",
-      "templates.rapid[0]: {feed} is not a rapid variable",
-      "templates.linear[0]: A has no number format",
-      "templates.cycleEnd: must not be empty when capabilities.cycles is true",
-      "templates.dwell[0]: malformed token",
-      "templates.comment: must be a line with one {text} after a ( or ; opener",
+      `templates.footer[0]: G999 is not in words; ${inWords}`,
+      "templates.rapid[0]: {feed} is not a rapid variable; accepted: {x}, {y}, {z}",
+      `templates.linear[0]: A has no number format; accepted: a letter in formats (${letters})`,
+      "templates.cycleEnd: must not be empty when capabilities.cycles is true; accepted: at least one line, or capabilities.cycles false",
+      'templates.dwell[0]: malformed token ""; accepted: a word in words, {units}, {offset}, {plane}, or a letter and a variable as X{x}, separated by single spaces',
     ]);
-    expect(validatePost(null)).toEqual(["post: must be an object"]);
+    expect(validatePost(null)).toEqual([
+      "(top level): is not an object; accepted: a post object",
+    ]);
   });
 });
 
