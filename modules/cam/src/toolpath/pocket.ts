@@ -26,12 +26,19 @@ import {
   type Motion,
 } from "./geometry.js";
 
-export type PocketInput = Cut & {
+export type ClearInput = Cut & {
   operationId: string;
   setup: Pick<Setup, "fixtures">;
-  boundary: Loop;
-  islands: Loop[];
   rampAngle: number;
+};
+
+export type PocketInput = ClearInput & { boundary: Loop; islands: Loop[] };
+
+type Layer = { target: Loop[]; cleared: Loop[] };
+
+export type Clearing = Layer & {
+  region: Loop[];
+  floor?: Layer & { below: number };
 };
 
 type Entry = { kind: "helix"; centre: Xy } | { kind: "ramp" };
@@ -41,7 +48,7 @@ type Step = { ring: RegionLoop; entry?: Entry };
 type Plan = { steps: Step[]; descend: boolean };
 
 type Pocket = {
-  input: PocketInput;
+  input: ClearInput;
   radius: number;
   stepover: number;
   walls: Loop[];
@@ -51,6 +58,7 @@ type Pocket = {
 
 const WALL = 1e-3;
 const PROOF = 2e-3;
+export const SKIN = WALL + PROOF;
 const HELIX = 0.45;
 const MARGIN = 0.05;
 
@@ -67,7 +75,10 @@ function nested(levels: Loop[][][], k: number, parent?: Loop[]): Loop[] {
   return order;
 }
 
-function rings(region: Loop[], { radius, stepover }: Pocket): Loop[] {
+function rings(
+  region: Loop[],
+  { radius, stepover }: Pick<Pocket, "radius" | "stepover">,
+): Loop[] {
   const levels: Loop[][][] = [];
   for (let k = 0; ; k++) {
     const found = offsetLoops(region, -(radius + WALL + k * stepover));
@@ -108,11 +119,27 @@ function entryFor(ring: RegionLoop, shape: Pocket): Entry {
   );
 }
 
-function covered(cleared: Loop[], shape: Pocket) {
-  const left = subtractLoops(
-    offsetLoops(shape.walls, shape.radius - PROOF),
-    cleared,
+export function provenCleared(region: Loop[], radius: number): Loop[] {
+  return offsetLoops(offsetLoops(region, -(radius + WALL)), radius - PROOF);
+}
+
+export function flatFloor(
+  input: Pick<PocketInput, "boundary" | "islands" | "tool" | "preset">,
+  corner: number,
+): Loop[] {
+  const { boundary, islands, tool, preset } = input;
+  const radius = tool.diameter / 2;
+  const order = rings(subtractLoops([boundary], islands), {
+    radius,
+    stepover: stepoverOf(preset, tool),
+  });
+  return unionLoops(
+    order.flatMap((points) => bandOf(points, radius - corner - PROOF)),
   );
+}
+
+function covered(cleared: Loop[], reach: Loop[], shape: Pocket) {
+  const left = subtractLoops(reach, cleared);
   const at = left[0]?.[0];
   if (at)
     throw new RangeError(
@@ -120,8 +147,17 @@ function covered(cleared: Loop[], shape: Pocket) {
     );
 }
 
-function plan(order: Loop[], shape: Pocket): Plan {
-  let cleared: Loop[] = [];
+function plan(
+  { target, cleared: prior }: Layer,
+  shape: Pocket,
+): Plan | undefined {
+  if (!target.length) return undefined;
+  const order = rings(target, shape);
+  if (!order.length)
+    throw new RangeError(
+      `the ${shape.input.tool.diameter} mm tool does not fit the area to clear`,
+    );
+  let cleared = prior;
   let at: Xy | undefined;
   const chosen: Step[] = [];
   for (const points of order) {
@@ -135,7 +171,7 @@ function plan(order: Loop[], shape: Pocket): Plan {
     cleared = next;
     at = ring.start;
   }
-  covered(cleared, shape);
+  covered(cleared, provenCleared(target, shape.radius), shape);
   const first = chosen[0]!.ring.start;
   return { steps: chosen, descend: reachable(at!, first, cleared, shape) };
 }
@@ -305,7 +341,10 @@ function guarded(moves: Motion[], shape: Pocket): Motion[] {
   return out;
 }
 
-export function pocket(input: PocketInput): Section {
+export function clearRegion(
+  input: ClearInput,
+  { region, floor, ...layer }: Clearing,
+): Section {
   checkCut("pocket", input);
   const { setup, stock, tool, preset, rampAngle } = input;
   if (!(rampAngle > 0 && rampAngle < 90))
@@ -313,7 +352,6 @@ export function pocket(input: PocketInput): Section {
   const top = stock.max[2];
   const levels = depthLevels(top, input.bottom, preset.stepdown);
   const radius = tool.diameter / 2;
-  const region = subtractLoops([input.boundary], input.islands);
   const walls = offsetLoops(region, -(radius + WALL));
   if (!walls.length)
     throw new RangeError(
@@ -327,12 +365,18 @@ export function pocket(input: PocketInput): Section {
     room: offsetLoops(walls, PIECE),
     slope: Math.tan((rampAngle * Math.PI) / 180),
   };
-  const planned = plan(rings(region, shape), shape);
+  const upper = plan(layer, shape);
+  const deep = floor && plan(floor, shape);
   const moves: Motion[] = [];
-  for (const [l, z] of levels.entries())
-    moves.push(
-      ...level(z, l ? levels[l - 1]! : top, planned, shape, moves.at(-1)?.to),
-    );
+  let last: Plan | undefined;
+  for (const [l, z] of levels.entries()) {
+    const chosen = floor && z < floor.below ? deep : upper;
+    if (!chosen) continue;
+    const from = l ? levels[l - 1]! : top;
+    const linked = chosen === last ? chosen : { ...chosen, descend: false };
+    moves.push(...level(z, from, linked, shape, moves.at(-1)?.to));
+    last = chosen;
+  }
   const end = moves.at(-1)!.to;
   moves.push({ kind: "rapid", to: [end[0], end[1], top + setup.safeHeight] });
   return {
@@ -343,4 +387,9 @@ export function pocket(input: PocketInput): Section {
     coolant: preset.coolant,
     moves: guarded(moves, shape),
   };
+}
+
+export function pocket(input: PocketInput): Section {
+  const region = subtractLoops([input.boundary], input.islands);
+  return clearRegion(input, { region, target: region, cleared: [] });
 }

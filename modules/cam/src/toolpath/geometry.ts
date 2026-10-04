@@ -35,7 +35,7 @@ export type Cut = {
 
 const UNITS_PER_MM = 10_000;
 const EPSILON = 1e-9;
-const ARC_TOLERANCE = 0.0005 * UNITS_PER_MM;
+const ARC_TOLERANCE = 0.0005;
 const MITER_LIMIT = 2;
 export const PIECE = 1e-3;
 
@@ -77,7 +77,12 @@ function fromClipper(paths: Paths64): Loop[] {
   );
 }
 
-function inflated(loops: Loop[], distance: number, end: EndType): Loop[] {
+function inflated(
+  loops: Loop[],
+  distance: number,
+  end: EndType,
+  tolerance = ARC_TOLERANCE,
+): Loop[] {
   return fromClipper(
     inflatePaths(
       toClipper(loops),
@@ -85,13 +90,17 @@ function inflated(loops: Loop[], distance: number, end: EndType): Loop[] {
       JoinType.Round,
       end,
       MITER_LIMIT,
-      ARC_TOLERANCE,
+      tolerance * UNITS_PER_MM,
     ),
   );
 }
 
-export function offsetLoops(loops: Loop[], distance: number): Loop[] {
-  return inflated(loops, distance, EndType.Polygon);
+export function offsetLoops(
+  loops: Loop[],
+  distance: number,
+  tolerance = ARC_TOLERANCE,
+): Loop[] {
+  return inflated(loops, distance, EndType.Polygon, tolerance);
 }
 
 export function bandOf(loop: Loop, radius: number): Loop[] {
