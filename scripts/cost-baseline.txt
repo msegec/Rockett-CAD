@@ -1,9 +1,9 @@
 client/src/api.ts 647
-client/src/components/ControlsHelp.tsx ControlsHelp 102
+client/src/components/ControlsHelp.tsx ControlsHelp 85
 client/src/components/DraggablePanel.tsx DraggablePanel 130
 client/src/components/FeatureDialog.tsx DialogBody 104
-client/src/components/ModelTree.tsx 551
-client/src/components/ModelTree.tsx ModelTree 419
+client/src/components/ModelTree.tsx 546
+client/src/components/ModelTree.tsx ModelTree 408
 client/src/components/ProjectItems.tsx 535
 client/src/components/ProjectItems.tsx BrowserItems 110
 client/src/components/ProjectItems.tsx ItemRow 97
@@ -38,9 +38,9 @@ server/src/api/jobRoutes.ts createJobRoutes 119
 server/src/geometry/blend.ts built 209
 server/src/geometry/blend.ts chamferByEnvelope 219
 server/src/geometry/engine.ts 549
-server/src/geometry/features.ts 1017
+server/src/geometry/features.ts 1016
 server/src/store/projectStore.ts 520
-shared/src/routes.ts 511
+shared/src/routes.ts 509
 shared/src/sketchModify.ts 735
 shared/src/sketchModify.ts joinOffsetEndpoints 110
 shared/src/sketchModify.ts offsetRoundedChain 124
