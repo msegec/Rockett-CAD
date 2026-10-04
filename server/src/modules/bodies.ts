@@ -82,7 +82,8 @@ export function moduleBodies(
         id: bodyId,
         name,
         bbox,
-        brep: breps[i]!,
+        brep: breps[i]!.brep,
+        faceNames: breps[i]!.faceNames,
         fingerprint: bodyFingerprint(inputs, features),
         problems,
       };

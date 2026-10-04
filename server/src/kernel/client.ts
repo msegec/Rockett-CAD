@@ -37,7 +37,11 @@ import {
 } from "../geometry/kernel.js";
 import { measure } from "../geometry/measure.js";
 import { resolvePlaneFrame, type EvalState } from "../geometry/features.js";
-import { computeEdgeNames, withNamingVersion } from "../geometry/naming.js";
+import {
+  computeEdgeNames,
+  faceNamesOf,
+  withNamingVersion,
+} from "../geometry/naming.js";
 import { resolveRefs } from "../geometry/resolve.js";
 import { curveInfo } from "../geometry/tessellate.js";
 import { faceDrawing } from "../geometry/dxf.js";
@@ -80,7 +84,7 @@ export interface StateAnswers {
   projectFace: { entities: SketchEntity[]; warning?: string };
   sign: Array<RefSignature | undefined>;
   sizeLimit: SizeLimit;
-  brep: string[];
+  brep: Array<{ brep: string; faceNames: string[] }>;
 }
 
 export interface SignRequest {
@@ -220,7 +224,7 @@ const ANSWERS: {
     bodyIds.map((id) => {
       const body = state.bodies.get(id);
       if (!body) throw new ValidationError(`body ${id} is not in the model`);
-      return brepText(body.shape);
+      return { brep: brepText(body.shape), faceNames: faceNamesOf(body) };
     }),
 };
 
@@ -228,12 +232,10 @@ function brepText(shape: unknown): string {
   const k = getKernel();
   const file = `/rockett-brep-${crypto.randomUUID()}.brep`;
   try {
-    if (
-      !scoped((own) =>
-        k.BRepTools.Write_3(shape, file, own(new k.Message_ProgressRange_1())),
-      )
-    )
-      throw new Error("the kernel could not write the body as BREP");
+    const ok = scoped((own) =>
+      k.BRepTools.Write_3(shape, file, own(new k.Message_ProgressRange_1())),
+    );
+    if (!ok) throw new Error("the kernel could not write the body as BREP");
     return k.FS.readFile(file, { encoding: "utf8" });
   } finally {
     if (k.FS.analyzePath(file).exists) k.FS.unlink(file);

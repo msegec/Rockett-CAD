@@ -324,9 +324,16 @@ module, in load order:
 - `bodies(projectId, user)` reads the stored document under the same access
   rule as a project route. A user without view access and a missing project
   get the same `not_found` rejection, "project not found", which a route
-  answers as 404. It returns `{ id, name, bbox, brep, fingerprint, problems }`
-  for each body at the end of the timeline, whatever the Design rollback, in
-  model millimetres. `brep` is the OCCT BREP text of the body, and
+  answers as 404. It returns
+  `{ id, name, bbox, brep, faceNames, fingerprint, problems }` for each body
+  at the end of the timeline, whatever the Design rollback, in model
+  millimetres. `brep` is the OCCT BREP text of the body. `faceNames` holds
+  one regen face name per face, in the order `TopExp_Explorer` visits the
+  faces of the shape read back from `brep`, so a kernel job resolves a
+  `FaceRef` by taking the face at the index of its `faceName`. A face the
+  name map does not cover holds `""`. A face the explorer visits twice
+  appears at both indexes, and a repeated name resolves to its first index,
+  as core resolves it. A `~?` name never resolves as a `FaceRef`.
   `fingerprint` is `bodyFingerprint` (CAM-003) over the resolved features
   the body depends on, with identity placement, no selection and an empty
   CAM version. The rule errs toward stale. Walking back from the end, a
@@ -347,8 +354,9 @@ module, in load order:
   failed or cancelled feature counts for every body, so it is in every
   body's `problems`. A failed feature leaves the body as it was before
   that feature, so a body with problems is not the model as designed.
-  Nothing is cached: each call evaluates, writes BREP for every body and
-  hashes the import sources. Code: `server/src/modules/bodies.ts`.
+  Nothing is cached: each call evaluates, writes BREP for every body, reads
+  its face names from the evaluated name map and hashes the import
+  sources. Code: `server/src/modules/bodies.ts`.
 - `startKernelJob(id, input, { onProgress, signal })` runs one of the
   module's own jobs in the kernel worker and resolves to its result. A job is
   synchronous; one that returns a promise is refused. The job

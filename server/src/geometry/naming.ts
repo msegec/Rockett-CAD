@@ -378,15 +378,7 @@ export function transformNames(
   });
 }
 
-export interface EdgeNames {
-  byName: Map<string, Shape>;
-}
-
-export interface VertexNames {
-  byName: Map<string, Shape>;
-}
-
-export function computeEdgeNames(body: NamedBody): EdgeNames {
+export function computeEdgeNames(body: NamedBody) {
   const result = scoped((own) => {
     const k = getKernel();
     const map = acquire(new k.TopTools_IndexedDataMapOfShapeListOfShape_1());
@@ -477,11 +469,21 @@ export function nameVertices<T extends VertexFaces>(
   return suffixDuplicates(groups, (e) => e.position, version);
 }
 
-export function computeVertexNames(body: NamedBody): VertexNames {
+export function computeVertexNames(body: NamedBody) {
   const byName = new Map<string, Shape>();
   for (const [e, name] of nameVertices(vertexFaces(body), body.names.version))
     byName.set(name, e.vertex);
   return { byName };
+}
+
+export function faceNamesOf({ shape, names }: NamedBody): string[] {
+  return scoped((own) => {
+    const { TopExp_Explorer_2, TopAbs_ShapeEnum: E } = getKernel();
+    const ex = own(new TopExp_Explorer_2(shape, E.TopAbs_FACE, E.TopAbs_SHAPE));
+    const out: string[] = [];
+    for (; ex.More(); ex.Next()) out.push(names.get(own(ex.Current())) ?? "");
+    return out;
+  });
 }
 
 export function findFace(body: NamedBody, faceName: string): Shape | null {

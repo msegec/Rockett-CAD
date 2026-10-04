@@ -118,6 +118,7 @@ beforeAll(async () => {
     name: "Body 1",
     bbox,
     brep: brep((own) => box(own, [0, 0, 0], [100, 50, 17.5])),
+    faceNames: [],
     fingerprint: "f".repeat(64),
   };
 }, 120_000);

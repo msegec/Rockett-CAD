@@ -140,6 +140,7 @@ export interface ModuleFiles {
 
 export interface ServerBody extends ProjectBody {
   readonly brep: string;
+  readonly faceNames: readonly string[];
   readonly fingerprint: string;
   readonly problems?: readonly FeatureStatus[];
 }
