@@ -63,14 +63,20 @@ export function cylinderOf(face: Shape, own: Own) {
   const k = getKernel(),
     domain = own(new k.BRepAdaptor_Surface_2(face, false));
   if (domain.GetType() !== k.GeomAbs_SurfaceType.GeomAbs_Cylinder) return null;
-  const cylinder = own(domain.Cylinder()),
-    position = own(cylinder.Position()),
+  const cylinder = own(domain.Cylinder());
+  return {
+    ...revolutionFrame(face, own(cylinder.Position()), own),
+    radius: cylinder.Radius(),
+  };
+}
+
+function revolutionFrame(face: Shape, position: any, own: Own) {
+  const k = getKernel(),
     centre = own(position.Location()),
     direction = own(position.Direction());
   return {
     origin: [centre.X(), centre.Y(), centre.Z()] as Vec3,
     axis: [direction.X(), direction.Y(), direction.Z()] as Vec3,
-    radius: cylinder.Radius(),
     outward:
       (face.Orientation_1() === k.TopAbs_Orientation.TopAbs_REVERSED ? -1 : 1) *
       (position.Direct() ? 1 : -1),
@@ -157,40 +163,83 @@ export function chamferSides(edge: Shape, original: Shape[], own: Own) {
   );
 }
 
-function circleSide(face: Shape, edge: Shape, own: Own) {
+function guideCircle(edge: Shape, own: Own) {
   const k = getKernel(),
-    cylinder = cylinderOf(face, own);
-  if (!cylinder) return null;
-  const guide = own(new k.BRepAdaptor_Curve_2(edge)),
+    guide = own(new k.BRepAdaptor_Curve_2(edge)),
     circle = own(guide.Circle()),
     axis = own(own(circle.Axis()).Direction()),
     centre = own(circle.Location()),
     mid = own(
       guide.EvalD0((guide.FirstParameter() + guide.LastParameter()) / 2),
     );
+  return {
+    axis: [axis.X(), axis.Y(), axis.Z()] as Vec3,
+    centre: [centre.X(), centre.Y(), centre.Z()] as Vec3,
+    radius: circle.Radius(),
+    mid: [mid.X(), mid.Y(), mid.Z()] as Vec3,
+  };
+}
+
+function aboutAxis(
+  circle: ReturnType<typeof guideCircle>,
+  frame: { origin: Vec3; axis: Vec3 },
+) {
+  return (
+    1 - Math.abs(V.dot(circle.axis, frame.axis)) <= UNIT_DOT_TOL &&
+    V.norm(radial(frame, circle.centre)) <= LINEAR_TOL
+  );
+}
+
+function circleSide(face: Shape, edge: Shape, own: Own) {
+  const cylinder = cylinderOf(face, own);
+  if (!cylinder) return null;
+  const circle = guideCircle(edge, own);
   if (
-    1 - Math.abs(V.dot([axis.X(), axis.Y(), axis.Z()], cylinder.axis)) >
-      UNIT_DOT_TOL ||
-    Math.abs(circle.Radius() - cylinder.radius) > LINEAR_TOL ||
-    V.norm(radial(cylinder, [centre.X(), centre.Y(), centre.Z()])) > LINEAR_TOL
+    !aboutAxis(circle, cylinder) ||
+    Math.abs(circle.radius - cylinder.radius) > LINEAR_TOL
   )
     return null;
   return {
     normal: V.scale(
-      V.normalize(radial(cylinder, [mid.X(), mid.Y(), mid.Z()])),
+      V.normalize(radial(cylinder, circle.mid)),
       cylinder.outward,
     ),
     radius: cylinder.outward * cylinder.radius,
   };
 }
 
+function coneSide(face: Shape, edge: Shape, own: Own) {
+  const k = getKernel(),
+    domain = own(new k.BRepAdaptor_Surface_2(face, false));
+  if (domain.GetType() !== k.GeomAbs_SurfaceType.GeomAbs_Cone) return null;
+  const cone = own(domain.Cone()),
+    frame = revolutionFrame(face, own(cone.Position()), own),
+    circle = guideCircle(edge, own);
+  if (!aboutAxis(circle, frame)) return null;
+  const angle = cone.SemiAngle();
+  return {
+    normal: V.scale(
+      V.sub(
+        V.scale(V.normalize(radial(frame, circle.mid)), Math.cos(angle)),
+        V.scale(frame.axis, Math.sin(angle)),
+      ),
+      frame.outward,
+    ),
+    radius: 0,
+  };
+}
+
 export function torusSides(edge: Shape, original: Shape[], own: Own) {
   if (vertices(edge).map(own).length !== 1) return null;
-  return curveSides(
+  const sides = curveSides(
     edge,
     original,
     own,
-    (face) => planeSide(face) ?? circleSide(face, edge, own),
+    (face) =>
+      planeSide(face) ??
+      circleSide(face, edge, own) ??
+      coneSide(face, edge, own),
     getKernel().GeomAbs_CurveType.GeomAbs_Circle,
   );
+  return sides?.some((side) => side.radius) ? sides : null;
 }

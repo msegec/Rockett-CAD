@@ -32,16 +32,16 @@ const TURN = 2 * Math.PI;
 
 function torusFace(edge: Shape, sides: PlanarSide[], radius: number, own: Own) {
   const k = getKernel();
-  const plane = sides.find((side) => side.radius === 0)!;
   const wall = sides.find((side) => side.radius !== 0)!;
+  const other = sides.find((side) => side !== wall)!;
   const cylinder = cylinderOf(wall.face, own)!;
-  const { point } = planeBoundarySample(edge, plane.normal, own);
+  const { point } = planeBoundarySample(edge, other.normal, own);
   const p: Vec3 = [point.X(), point.Y(), point.Z()];
   const out = V.normalize(radial(cylinder, p));
   const tangent = V.cross(cylinder.axis, out);
   const [section] = planeFilletSection(
     [p, V.add(p, tangent)],
-    [plane, wall],
+    [other, wall],
     radius,
   );
   const major = V.dot(radial(cylinder, section.centre), out);
