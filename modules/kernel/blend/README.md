@@ -10,6 +10,15 @@ returns the exact centre and contact points of the fillet section at both
 ends, or declines a concave edge, a flat or knife fold, and an edge that does
 not lie in both planes. A number that is not finite traps.
 
+`fillet_section` takes `chamfer_section`'s inputs with the fillet radius in
+place of the distance. It offsets each side by the radius into the material
+and intersects the offsets, then returns the centre and both contact points
+at each end, as `fillet_planes` does. Two planes give exactly the
+`fillet_planes` section. A plane and a cylinder take the intersection nearest
+the edge. It declines two cylinders, a concave edge, a flat or knife fold, a
+radius not smaller than a convex cylinder's, and a contact that leaves its
+face.
+
 `chamfer_section` takes a straight edge, the outward normal, the direction
 into the face and a signed radius for each side, and a distance. A radius of
 0 is a plane; otherwise the face is a cylinder whose axis runs parallel to the

@@ -372,7 +372,7 @@ function chamferChain(
   );
 }
 
-function contourContinuations(
+export function contourContinuations(
   contour: any,
   chosen: { edge: Shape }[],
   own: Own,

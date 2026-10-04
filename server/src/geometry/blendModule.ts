@@ -8,6 +8,7 @@ type Exports = {
   _initialize(): void;
   buffer(): number;
   fillet_planes(): number;
+  fillet_section(): number;
   chamfer_section(): number;
 };
 
@@ -33,14 +34,14 @@ export function blendModule(): WebAssembly.Module {
 
 function call(
   module: WebAssembly.Module,
-  name: "fillet_planes" | "chamfer_section",
+  name: "fillet_planes" | "fillet_section" | "chamfer_section",
   input: number[],
   outputs: number,
 ) {
   const wasm = new WebAssembly.Instance(module, {}).exports as Exports;
   try {
     wasm["_initialize"]();
-    const io = new Float64Array(wasm.memory.buffer, wasm.buffer(), 37);
+    const io = new Float64Array(wasm.memory.buffer, wasm.buffer(), 39);
     io.set(input);
     const status = wasm[name]();
     return status === 0
@@ -52,6 +53,15 @@ function call(
       cause: error,
     });
   }
+}
+
+function filletSections(out: number[]): [FilletSection, FilletSection] {
+  const at = (i: number): Vec3 => [out[i]!, out[i + 1]!, out[i + 2]!];
+  const section = (i: number): FilletSection => ({
+    centre: at(i),
+    contacts: [at(i + 3), at(i + 6)],
+  });
+  return [section(0), section(9)];
 }
 
 export function filletBetweenPlanes(
@@ -74,13 +84,39 @@ export function filletBetweenPlanes(
     ],
     18,
   );
-  if (!out) return null;
-  const at = (i: number): Vec3 => [out[i]!, out[i + 1]!, out[i + 2]!];
-  const section = (i: number): FilletSection => ({
-    centre: at(i),
-    contacts: [at(i + 3), at(i + 6)],
-  });
-  return [section(0), section(9)];
+  return out && filletSections(out);
+}
+
+function sectionInputs(
+  edge: [Vec3, Vec3],
+  [a, b]: [ChamferSide, ChamferSide],
+  size: number,
+) {
+  return [
+    ...edge[0],
+    ...edge[1],
+    ...a.normal,
+    ...a.into,
+    a.radius,
+    ...b.normal,
+    ...b.into,
+    b.radius,
+    size,
+  ];
+}
+
+export function filletSection(
+  edge: [Vec3, Vec3],
+  sides: [ChamferSide, ChamferSide],
+  radius: number,
+): [FilletSection, FilletSection] | null {
+  const out = call(
+    blendModule(),
+    "fillet_section",
+    sectionInputs(edge, sides, radius),
+    18,
+  );
+  return out && filletSections(out);
 }
 
 export function chamferSection(
@@ -88,21 +124,10 @@ export function chamferSection(
   sides: [ChamferSide, ChamferSide],
   distance: number,
 ): [[Vec3, Vec3], [Vec3, Vec3]] | null {
-  const [a, b] = sides;
   const out = call(
     blendModule(),
     "chamfer_section",
-    [
-      ...edge[0],
-      ...edge[1],
-      ...a.normal,
-      ...a.into,
-      a.radius,
-      ...b.normal,
-      ...b.into,
-      b.radius,
-      distance,
-    ],
+    sectionInputs(edge, sides, distance),
     12,
   );
   if (!out) return null;

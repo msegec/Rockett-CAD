@@ -425,7 +425,10 @@ function junctionEnds(
     const [a, b] = incident as [Incident[number], Incident[number]];
     const k = getKernel();
     const collinear =
-      planeStrip(own(new k.BRepAdaptor_Surface_2(a.patch.face, true))) &&
+      (planeStrip(own(new k.BRepAdaptor_Surface_2(a.patch.face, true))) ||
+        own(k.BRep_Tool.Surface_2(a.patch.face))
+          .get()
+          .isAliasOf(own(k.BRep_Tool.Surface_2(b.patch.face)).get())) &&
       1 - Math.abs(V.dot(guideAxis(a.patch), guideAxis(b.patch))) <=
         UNIT_DOT_TOL;
     const across = () =>

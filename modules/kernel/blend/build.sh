@@ -19,7 +19,7 @@ mkdir -p /build
 cd /build
 tar -xf -
 em++ -O2 -std=c++20 -sSTANDALONE_WASM --no-entry \
-    -sEXPORTED_FUNCTIONS=_fillet_planes,_chamfer_section,_buffer \
+    -sEXPORTED_FUNCTIONS=_fillet_planes,_fillet_section,_chamfer_section,_buffer \
     entry.cpp -o blend.wasm >&2
 cat blend.wasm
 ' >"$output"
