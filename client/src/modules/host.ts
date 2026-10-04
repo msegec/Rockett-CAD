@@ -5,6 +5,7 @@ import type {
   Dispose,
   FaceRef,
   Layer,
+  ModuleSettings,
   NumberFieldProps,
   OpenProject,
   ProjectView,
@@ -14,6 +15,7 @@ import type {
   Workbench,
 } from "@rockett/plugin-api";
 import {
+  checkModuleSetting,
   DOCUMENT_EDITS,
   moduleHiddenSetting,
   moduleHostSettings,
@@ -52,7 +54,13 @@ import {
   TextAreaField,
   TextField,
 } from "../components/form/fields";
-import { getSetting, publish, subscribe, useSetting } from "../settings";
+import {
+  getSetting,
+  publish,
+  setSetting,
+  subscribe,
+  useSetting,
+} from "../settings";
 import {
   closePanel,
   openPanel,
@@ -253,6 +261,21 @@ const moduleRequest =
     return request(method, prefix + path, { body });
   };
 
+function moduleSettings(
+  manifest: SettingOwner,
+  track: (dispose: Dispose) => Dispose,
+): ModuleSettings {
+  const own = (key: string) => {
+    checkModuleSetting(manifest, key);
+    return key;
+  };
+  return {
+    get: (key) => getSetting(own(key)) as never,
+    set: async (key, value) => setSetting(own(key), value as never),
+    subscribe: (key, listener) => track(subscribe(own(key), listener)),
+  };
+}
+
 type Shown = { show: () => Dispose; hide: Dispose | null };
 
 function hideable(own: Dispose[], moduleId: string) {
@@ -321,6 +344,10 @@ function moduleContext(own: Dispose[], manifest: SettingOwner) {
     register,
     project: { ...project, subscribe: track(project.subscribe) },
     ui,
+    settings: moduleSettings(
+      manifest,
+      track((dispose: Dispose) => dispose),
+    ),
     request: moduleRequest(moduleId),
   };
 }

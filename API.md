@@ -419,7 +419,7 @@ module, in load order:
   `progress` call.
 - After sign-in, `client/src/modules/host.ts` activates the client part of
   each listed module that this route reports `loaded`, with `ClientContext`:
-  `register`, `project`, `ui` and `request`. `register.command`,
+  `register`, `project`, `ui`, `settings` and `request`. `register.command`,
   `toolbarGroup`, `panel`, `workbench`, `layer`, `setting` and
   `settingsPage` take `plugin-api` types; `selectionKind` and `pickProvider`
   take core types. Activation is atomic as on the server. A command
@@ -428,6 +428,14 @@ module, in load order:
 - `register.settingsPage({ id, title, component })` lists a page with id
   `<moduleId>.<name>` under the module's Settings section, with the title
   above `component`. `ui.openSettings(page)` opens Settings at that page.
+- `settings.get(key)` returns the resolved value of one of the module's own
+  settings, `settings.set(key, value)` writes it to the narrowest layer its
+  `scopes` allow that this user can write, and
+  `settings.subscribe(key, listener)` calls the listener with each new value
+  and returns its disposer, removed with the module. The key must start with
+  `plugin.<moduleId>.`, must not be a host key and must be in
+  `contributes.settings`; any other key throws, and `set` rejects, naming
+  the key. There is no server-side access.
 - A workbench's optional `tree` draws in the left dock and `bar` in the
   timeline row, in place of the model tree and timeline. The view toolbar
   group shows at the right end of every workbench.

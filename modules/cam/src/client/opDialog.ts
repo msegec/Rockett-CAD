@@ -64,7 +64,7 @@ export const dialogPanel = ({ type }: OperationDialog) => `${type}.dialog`;
 
 type Params = Record<string, unknown>;
 
-type List<T> =
+export type List<T> =
   | { status: "loading" }
   | { status: "ready"; items: T[] }
   | { status: "failed"; reason: string };

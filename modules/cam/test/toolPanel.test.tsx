@@ -18,7 +18,7 @@ const POSTS = "/api/m/rockett/cam/posts";
 
 let stored: { data: Tool[]; etag: string } | null;
 let puts: { data: Tool[]; etag: string | null }[];
-let failLoad: boolean;
+let failing: string | null;
 let machines: { data: MachineProfile[]; etag: string } | null;
 let machinePuts: { data: MachineProfile[]; etag: string | null }[];
 let posts: { data: Post[]; etag: string } | null;
@@ -58,11 +58,11 @@ function servePosts(method: string, init: RequestInit) {
 
 function serve(url: RequestInfo | URL, init: RequestInit = {}) {
   const method = init.method ?? "GET";
+  if (method === "GET" && String(url) === failing)
+    return Response.json({ error: "disk unavailable" }, { status: 500 });
   if (String(url) === MACHINES) return serveMachines(method, init);
   if (String(url) === POSTS) return servePosts(method, init);
   if (String(url) !== TOOLS) throw new Error(`${method} ${url}`);
-  if (method === "GET" && failLoad)
-    return Response.json({ error: "disk unavailable" }, { status: 500 });
   if (method === "GET")
     return Response.json(stored && { version: 1, ...stored, readOnly: false });
   const body = JSON.parse(String(init.body));
@@ -79,7 +79,7 @@ async function flush() {
 beforeEach(async () => {
   stored = null;
   puts = [];
-  failLoad = false;
+  failing = null;
   machines = null;
   machinePuts = [];
   posts = null;
@@ -97,6 +97,7 @@ beforeEach(async () => {
     { clientModules },
     { Panels },
     { ConfirmPanel },
+    { SettingsButton },
     { useSettings },
     registry,
   ] = await Promise.all([
@@ -104,16 +105,11 @@ beforeEach(async () => {
     load("../../index.client.ts"),
     client("shell/panels.tsx"),
     client("components/ConfirmPanel.tsx"),
+    client("components/SettingsPanel.tsx"),
     client("settings.ts"),
     client("commands/registry.ts"),
   ]);
   runCommand = registry.runCommand;
-  useSettings.setState((s: { resolved: object }) => ({
-    resolved: {
-      ...s.resolved,
-      "units.length": { value: "in", source: "user" },
-    },
-  }));
   unload = await loadClientModules(clientModules, async () => [
     {
       id: "rockett.cam",
@@ -125,10 +121,18 @@ beforeEach(async () => {
       error: null,
     },
   ]);
+  useSettings.setState((s: { resolved: object }) => ({
+    resolved: {
+      ...s.resolved,
+      "units.length": { value: "in", source: "user" },
+    },
+  }));
   host = document.body.appendChild(document.createElement("div"));
   root = createRoot(host);
   await act(async () =>
-    root.render(h(Fragment, null, h(Panels), h(ConfirmPanel))),
+    root.render(
+      h(Fragment, null, h(Panels), h(SettingsButton), h(ConfirmPanel)),
+    ),
   );
 });
 
@@ -182,15 +186,23 @@ async function click(panel: Element, label: string) {
   await flush();
 }
 
+const page = () => host.querySelector(".settings-panel")!;
+
 const rows = () =>
-  [...panelTitled("Library")!.querySelectorAll(".tree-item > span")].map(
+  [...page().querySelectorAll(".tree-item > span:first-child")].map(
     (s) => s.textContent,
   );
 
-async function openLibrary() {
+const cards = () =>
+  [...page().querySelectorAll(".tree-header")].map(
+    (header) => header.firstChild!.textContent,
+  );
+
+async function openLibrary(title = "Tools") {
   await act(async () => void runCommand("rockett.cam.library"));
   await flush();
-  return panelTitled("Library")!;
+  if (title !== "Machines") await click(page(), title);
+  return page();
 }
 
 const flat: Tool = {
@@ -207,15 +219,16 @@ const flat: Tool = {
 
 it("a diameter entered in inch is stored in mm", async () => {
   const library = await openLibrary();
-  expect(library.querySelector(".tree-header")?.textContent).toBe("Tools");
+  expect(library.querySelector(".tree-header")?.textContent).toBe("Your tools");
   expect(library.textContent).toContain("No tools yet.");
   expect(library.querySelector('[role="alert"]')).toBeNull();
 
   await click(library, "Add tool");
-  const form = panelTitled("Tool 1")!;
+  const form = page();
   expect(
     [...form.querySelectorAll(".field span")].map((s) => s.textContent),
   ).toEqual([
+    "Name",
     "Kind",
     "Diameter (in)",
     "Flute length (in)",
@@ -232,7 +245,7 @@ it("a diameter entered in inch is stored in mm", async () => {
   expect(puts[0]!.data).toHaveLength(1);
   expect(puts[0]!.data[0]!.diameter).toBeCloseTo(6.35, 9);
   expect(puts[0]!.data[0]).toMatchObject({ name: "Tool 1", kind: "flat" });
-  expect(panelTitled("Tool 1")).toBeUndefined();
+  expect(button(page(), "OK")).toBeUndefined();
   expect(rows()).toEqual(["Tool 1"]);
 });
 
@@ -242,7 +255,7 @@ it("edits a library tool with the etag of the last read", async () => {
   expect(rows()).toEqual(["6 mm flat"]);
 
   await click(library, "Edit 6 mm flat");
-  const form = panelTitled("6 mm flat")!;
+  const form = page();
   await choose(form, "Kind", "vbit");
   expect(field(form, "Tip angle (°)")).toBeDefined();
   await type(form, "Tip angle (°)", "60");
@@ -251,9 +264,9 @@ it("edits a library tool with the etag of the last read", async () => {
   expect(puts).toEqual([
     { data: [{ ...flat, kind: "vbit", tipAngle: 60 }], etag: "e0" },
   ]);
-  await click(panelTitled("Library")!, "Edit 6 mm flat");
-  await choose(panelTitled("6 mm flat")!, "Kind", "flat");
-  await click(panelTitled("6 mm flat")!, "OK");
+  await click(page(), "Edit 6 mm flat");
+  await choose(page(), "Kind", "flat");
+  await click(page(), "OK");
   expect(puts[1]).toEqual({ data: [flat], etag: "e1" });
 });
 
@@ -268,14 +281,14 @@ it("deletes a tool only after ui.confirm says OK", async () => {
   expect(puts).toEqual([]);
   expect(rows()).toEqual(["6 mm flat"]);
 
-  await click(panelTitled("Library")!, "Delete 6 mm flat");
+  await click(page(), "Delete 6 mm flat");
   await click(panelTitled("Confirm")!, "OK");
   expect(puts).toEqual([{ data: [], etag: "e0" }]);
-  expect(panelTitled("Library")!.textContent).toContain("No tools yet.");
+  expect(page().textContent).toContain("No tools yet.");
 });
 
 it("says why the tools did not load", async () => {
-  failLoad = true;
+  failing = TOOLS;
   const library = await openLibrary();
   expect(library.querySelector('[role="alert"]')?.textContent).toMatch(
     /^Tools did not load: .+\.$/,
@@ -283,12 +296,12 @@ it("says why the tools did not load", async () => {
   expect(button(library, "Add tool")).toBeUndefined();
 });
 
-it("adds and saves a machine through the panel", async () => {
-  const library = await openLibrary();
+it("adds and saves a machine through the page", async () => {
+  const library = await openLibrary("Machines");
   expect(library.textContent).toContain("No machines yet.");
 
   await click(library, "Add machine");
-  const form = panelTitled("Machine 1")!;
+  const form = page();
   await choose(form, "Firmware", "grblhal");
   await type(form, "X max (in)", "10");
   await click(form, "OK");
@@ -304,7 +317,7 @@ it("adds and saves a machine through the panel", async () => {
     post: "grblhal",
     toolChange: "perFile",
   });
-  expect(panelTitled("Machine 1")).toBeUndefined();
+  expect(button(page(), "OK")).toBeUndefined();
   expect(rows()).toEqual(["Machine 1"]);
 });
 
@@ -364,8 +377,8 @@ const listed = (panel: Element) =>
 
 async function editRouter(machine: MachineProfile) {
   machines = { data: [machine], etag: "m0" };
-  await click(await openLibrary(), "Edit Router");
-  return panelTitled("Router")!;
+  await click(await openLibrary("Machines"), "Edit Router");
+  return page();
 }
 
 it("a pasted $$ missing $122 fills $110 and lists $122", async () => {
@@ -431,8 +444,8 @@ const pickPost = (text: string) =>
 
 it("imports a post file with the etag of the last read and lists it unqualified", async () => {
   posts = { data: [], etag: "p0" };
-  const library = await openLibrary();
-  expect(library.textContent).toContain("No posts yet.");
+  const library = await openLibrary("Posts");
+  expect(library.textContent).toContain("No posts of your own yet.");
   const text = JSON.stringify(mine);
   const picker = pickPost(text);
   await click(library, "Import post");
@@ -441,13 +454,13 @@ it("imports a post file with the etag of the last read and lists it unqualified"
     ".json,application/json",
   );
   expect(postPosts).toEqual([{ post: text, etag: "p0" }]);
-  expect(rows()).toEqual(["My GRBL (unqualified)"]);
+  expect(cards()).toContain("My GRBL (unqualified)");
   expect(library.querySelector('[role="alert"]')).toBeNull();
 });
 
 it("says why a post did not import", async () => {
   refusal = "post templates.linear: needs {feed}";
-  const library = await openLibrary();
+  const library = await openLibrary("Posts");
   pickPost(JSON.stringify(loadPost("grbl")));
   await click(library, "Import post");
 
@@ -456,13 +469,13 @@ it("says why a post did not import", async () => {
   expect(library.querySelector('[role="alert"]')?.textContent).toBe(
     "Post did not import: post templates.linear: needs {feed}.",
   );
-  expect(library.textContent).toContain("No posts yet.");
+  expect(library.textContent).toContain("No posts of your own yet.");
 });
 
 it("deletes a user post after ui.confirm", async () => {
   const other = { ...mine, id: "user.other", label: "Other" };
   posts = { data: [{ ...mine, id: "user.my-grbl" }, other], etag: "p0" };
-  const library = await openLibrary();
+  const library = await openLibrary("Posts");
 
   await click(library, "Delete My GRBL");
   expect(panelTitled("Confirm")!.textContent).toContain(
@@ -470,7 +483,47 @@ it("deletes a user post after ui.confirm", async () => {
   );
   await click(panelTitled("Confirm")!, "OK");
   expect(postPuts).toEqual([{ data: [other], etag: "p0" }]);
-  expect(rows()).toEqual(["Other (unqualified)"]);
+  expect(cards().filter((c) => c!.endsWith("(unqualified)"))).toEqual([
+    "Other (unqualified)",
+  ]);
+});
+
+it("names each machine that uses a user post as its default before deleting it", async () => {
+  posts = { data: [{ ...mine, id: "user.my-grbl" }], etag: "p0" };
+  machines = {
+    data: [
+      { ...router, post: "user.my-grbl" },
+      { ...router, id: "m2", name: "Mill" },
+    ],
+    etag: "m0",
+  };
+  const library = await openLibrary("Posts");
+
+  await click(library, "Delete My GRBL");
+  expect(panelTitled("Confirm")!.textContent).toContain(
+    "Delete My GRBL from your library? Projects that use it keep their copy. Router uses it as its default post.",
+  );
+  await click(panelTitled("Confirm")!, "Cancel");
+  machines.data[1]!.post = "user.my-grbl";
+  await click(page(), "Machines");
+  await click(page(), "Posts");
+  await click(page(), "Delete My GRBL");
+  expect(panelTitled("Confirm")!.textContent).toContain(
+    "Router and Mill use it as their default post.",
+  );
+});
+
+it("says why the posts did not load beside a machine's default post", async () => {
+  failing = POSTS;
+  machines = { data: [router], etag: "m0" };
+  const library = await openLibrary("Machines");
+
+  await click(library, "Edit Router");
+  const alert = page().querySelector('[role="alert"]')!;
+  expect(alert.textContent).toBe("Posts did not load: HTTP 500.");
+  expect(alert.nextElementSibling!.querySelector("span")!.textContent).toBe(
+    "Default post",
+  );
 });
 
 it("downloads the generated post kit beside Import post", async () => {
@@ -483,7 +536,7 @@ it("downloads the generated post kit beside Import post", async () => {
   const save = vi
     .spyOn(HTMLAnchorElement.prototype, "click")
     .mockImplementation(() => {});
-  const library = await openLibrary();
+  const library = await openLibrary("Posts");
   const labels = [...library.querySelectorAll("button")].map(
     (b) => b.textContent,
   );

@@ -22,12 +22,21 @@ import {
   type OperationStatus,
 } from "../shared/document.js";
 import type { MachineProfile } from "../shared/machine.js";
+import { defaultMachine } from "../shared/settings.js";
 import {
   byAcceleration,
   estimateTime,
   type SectionTime,
 } from "../shared/time.js";
-import { banner, empty, libraryOf, reason, row, tree } from "./libraryParts.js";
+import {
+  banner,
+  dimmed,
+  empty,
+  libraryOf,
+  reason,
+  row,
+  tree,
+} from "./libraryParts.js";
 import { camRead, editCam, withOperations } from "./setup.js";
 import type { Selection, ToolpathPreview } from "./toolpaths.js";
 
@@ -199,14 +208,14 @@ async function setupTime(
 
 export function setupTimes(
   project: ProjectView,
-  request: ClientContext["request"],
+  { request, settings }: Pick<ClientContext, "request" | "settings">,
 ) {
   let kept = new Map<string, { key: string; time: SetupTime }>();
   return async (setups: Setup[], statuses: Statuses): Promise<Times> => {
     const machines = await request<UserDataEntry | null>("GET", "machines")
       .then(libraryOf<MachineProfile>)
       .catch(() => null);
-    const machine = machines?.items[0];
+    const machine = defaultMachine(settings, machines?.items ?? []);
     if (!machine) return {};
     const next = new Map<string, { key: string; time: SetupTime }>();
     await Promise.all(
@@ -346,9 +355,7 @@ function setupSection(rows: Rows, setup: Setup, index: number, count: number) {
     {
       title: setup.name ?? setup.id,
       key: setup.id,
-      aside:
-        seconds !== undefined &&
-        h("span", { className: "dimmed" }, clock(seconds)),
+      aside: seconds !== undefined && dimmed(clock(seconds)),
       selected:
         rows.selection?.setupId === setup.id && !rows.selection.operationId,
       onClick: () => void rows.preview.select({ setupId: setup.id }),
@@ -361,10 +368,10 @@ function setupSection(rows: Rows, setup: Setup, index: number, count: number) {
 }
 
 export function manufactureBrowser(
-  { project, ui, request }: ClientContext,
+  { project, ui, request, settings }: ClientContext,
   preview: ToolpathPreview,
 ) {
-  const readTimes = setupTimes(project, request);
+  const readTimes = setupTimes(project, { request, settings });
   return function ManufactureBrowser() {
     const open = useSyncExternalStore(project.subscribe, project.get);
     const { selection } = useSyncExternalStore(preview.subscribe, preview.get);

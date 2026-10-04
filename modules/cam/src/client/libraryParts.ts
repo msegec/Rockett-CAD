@@ -1,11 +1,17 @@
 import {
   createElement as h,
+  useCallback,
   useEffect,
   useState,
+  useSyncExternalStore,
   type MouseEvent,
   type ReactNode,
 } from "react";
-import type { ClientContext, UserDataEntry } from "@rockett/plugin-api";
+import type {
+  ClientContext,
+  ModuleSettings,
+  UserDataEntry,
+} from "@rockett/plugin-api";
 
 export type Library<T> = { items: T[]; etag: string | null };
 
@@ -49,6 +55,9 @@ export const button = (
 
 export const banner = (error: string | null) =>
   error && h("div", { className: "error-banner", role: "alert" }, error);
+
+export const dimmed = (text: string) =>
+  h("span", { className: "dimmed" }, text);
 
 export const empty = (text: string) =>
   h("div", { className: "tree-empty" }, text);
@@ -124,3 +133,11 @@ export const placeholder = (
   !library
     ? !error && empty(`Loading ${plural}...`)
     : !count && empty(`No ${plural} yet.`);
+
+export function useModuleSetting(settings: ModuleSettings, key: string) {
+  const subscribe = useCallback(
+    (onChange: () => void) => settings.subscribe(key, onChange),
+    [settings, key],
+  );
+  return useSyncExternalStore(subscribe, () => settings.get(key));
+}

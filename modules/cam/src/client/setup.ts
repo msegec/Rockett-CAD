@@ -34,7 +34,10 @@ export const bodyBoxes = ({ bodies }: OpenProject): Record<string, Box> =>
 
 const MARGINS = { xMin: 2, xMax: 2, yMin: 2, yMax: 2, zMin: 2, zMax: 1 };
 
-export function newSetup(project: OpenProject): DialogSetup {
+export function newSetup(
+  project: OpenProject,
+  defaults: Pick<Setup, "safeHeight" | "clearance">,
+): DialogSetup {
   return {
     id: crypto.randomUUID(),
     name: `Setup ${camData(project).setups.length + 1}`,
@@ -46,8 +49,7 @@ export function newSetup(project: OpenProject): DialogSetup {
       offsetIndex: 1,
       machine: { kind: "unknown" },
     },
-    safeHeight: 15,
-    clearance: 3,
+    ...defaults,
   };
 }
 

@@ -3,11 +3,16 @@
   "id": "rockett.cam",
   "name": "CAM",
   "version": "0.1.0",
-  "apiRange": "^0.4",
+  "apiRange": "^0.5",
   "licence": "UNLICENSED",
   "author": "Rockett CAD",
   "contributes": {
     "workbenches": ["rockett.cam.manufacture"],
+    "settings": [
+      "plugin.rockett.cam.defaultMachine",
+      "plugin.rockett.cam.safeHeight",
+      "plugin.rockett.cam.clearance"
+    ],
     "routes": ["rockett.cam.document"],
     "kernelJobs": ["rockett.cam.regions", "rockett.cam.generate"],
     "postProcessors": [

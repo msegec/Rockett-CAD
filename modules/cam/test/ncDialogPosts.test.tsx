@@ -3,24 +3,28 @@ import { expect, it } from "vitest";
 import { POSTS } from "../src/server/posts.js";
 import { CAM_EXTENSION, type CamData } from "../src/shared/document.js";
 import {
+  entry,
   exports,
   fetchMock,
   flush,
   library,
   mine,
   open,
+  router,
   saved,
+  serve,
 } from "./helpers/camClient.js";
 
 const camSaves = () =>
   fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT").length;
 
+const exportButton = (panel: Element) =>
+  [...panel.querySelectorAll("button")].find(
+    (b) => b.textContent === "Export",
+  )!;
+
 async function exportNc(panel: Element) {
-  await act(async () =>
-    [...panel.querySelectorAll("button")]
-      .find((b) => b.textContent === "Export")!
-      .click(),
-  );
+  await act(async () => exportButton(panel).click());
   await flush();
 }
 
@@ -63,4 +67,32 @@ it("lists a library post as unqualified and copies its latest version onto the p
     libraryRef: { id: "user.my-grbl" },
   });
   expect(exports.at(-1)).toEqual({ path, revision: before + 2 });
+});
+
+it("says the machine's default post is gone beside the disabled Export", async () => {
+  library.posts = [];
+  fetchMock.mockImplementation(async (url, init) =>
+    String(url) === "/api/m/rockett/cam/machines"
+      ? entry([{ ...router, post: mine.id }])
+      : serve(url, init),
+  );
+  try {
+    const panel = await open("NC Program", "rockett.cam.nc");
+    expect(exportButton(panel).disabled).toBe(true);
+    expect(panel.querySelector(".dialog-body")!.lastChild!.textContent).toBe(
+      "Router's default post is gone. Pick a post.",
+    );
+
+    const post = [...panel.querySelectorAll("label.field")]
+      .find((l) => l.querySelector("span")?.textContent === "Post")!
+      .querySelector("select")!;
+    await act(async () => {
+      post.value = "grbl";
+      post.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(exportButton(panel).disabled).toBe(false);
+    expect(panel.textContent).not.toContain("default post is gone");
+  } finally {
+    fetchMock.mockImplementation(serve);
+  }
 });

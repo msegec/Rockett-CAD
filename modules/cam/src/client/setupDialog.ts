@@ -1,6 +1,7 @@
 import { createElement as h, Fragment, useState } from "react";
 import type { ClientContext, NumberFieldProps } from "@rockett/plugin-api";
 import type { Xyz } from "../shared/ir.js";
+import { setupDefaults } from "../shared/settings.js";
 import type { Stock } from "../shared/setup.js";
 import {
   newSetup,
@@ -104,9 +105,11 @@ function stockSizes(
   ];
 }
 
-export function setupDialog({ ui, project }: ClientContext) {
+export function setupDialog({ ui, project, settings }: ClientContext) {
   return function SetupDialog() {
-    const [setup, setSetup] = useState(() => newSetup(project.get()));
+    const [setup, setSetup] = useState(() =>
+      newSetup(project.get(), setupDefaults(settings)),
+    );
     const [pending, setPending] = useState(false);
     const open = project.get();
     const edit = (patch: Partial<DialogSetup>) =>

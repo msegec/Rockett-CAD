@@ -11,6 +11,7 @@ import type {
 } from "@rockett/plugin-api";
 import { CAM_EXTENSION, migrateCam } from "../src/shared/document.js";
 import { newSetup, saveSetup } from "../src/client/setup.js";
+import { CLEARANCE, SAFE_HEIGHT } from "../src/shared/settings.js";
 
 const core = (file: string) =>
   import(new URL(`../../../server/src/${file}`, import.meta.url).href);
@@ -148,12 +149,17 @@ async function project(data?: unknown): Promise<CadDocument> {
   return doc;
 }
 
+const defaults = {
+  safeHeight: SAFE_HEIGHT.default as number,
+  clearance: CLEARANCE.default as number,
+};
+
 describe("setup dialog save", () => {
   it("adds exactly one history entry holding the dialog's setup", async () => {
     const doc = await project();
     const view = await projectView(doc.id);
     const before = await historyLength(doc.id);
-    const setup = newSetup(view.get());
+    const setup = newSetup(view.get(), defaults);
     await saveSetup(view, setup);
     expect(await historyLength(doc.id)).toBe(before + 1);
     expect(setup).toMatchObject({
@@ -182,7 +188,7 @@ describe("setup dialog save", () => {
     });
     const view = await projectView(doc.id);
     const before = await historyLength(doc.id);
-    const setup = newSetup(view.get());
+    const setup = newSetup(view.get(), defaults);
     expect(setup.name).toBe("Setup 2");
     await saveSetup(view, setup);
     expect(await historyLength(doc.id)).toBe(before + 1);

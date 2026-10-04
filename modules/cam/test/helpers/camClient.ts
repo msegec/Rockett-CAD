@@ -257,7 +257,7 @@ beforeEach(async () => {
   const { createEmptyDocument } = await load(
     "../../../../shared/src/documents.ts",
   );
-  const setup = newSetup(project as never);
+  const setup = newSetup(project as never, { safeHeight: 15, clearance: 3 });
   saved = {
     ...createEmptyDocument("p1", "Plate"),
     revision: 4,

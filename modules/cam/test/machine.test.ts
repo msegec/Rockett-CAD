@@ -12,7 +12,7 @@ import type {
   UserData,
 } from "@rockett/plugin-api";
 import { mountLibrary } from "../src/server/library.js";
-import { machineFields } from "../src/client/toolPanel.js";
+import { machineFields } from "../src/client/machineForm.js";
 import {
   FIRMWARE,
   newMachine,

@@ -12,18 +12,21 @@ import {
   operationDialog,
 } from "./src/client/opDialog.js";
 import { NC_PANEL, ncDialog } from "./src/client/ncDialog.js";
+import { postsPage } from "./src/client/postLibrary.js";
 import { SETUP_PANEL, setupDialog } from "./src/client/setupDialog.js";
 import { stockLayer } from "./src/client/stockLayer.js";
-import { TOOL_PANEL, toolPanel } from "./src/client/toolPanel.js";
+import { machinesPage, toolsPage } from "./src/client/toolPanel.js";
 import {
   toolpathBar,
   toolpathLayer,
   toolpathPreview,
 } from "./src/client/toolpaths.js";
+import { CAM_SETTINGS } from "./src/shared/settings.js";
 
 const MANUFACTURE = "rockett.cam.manufacture";
 const SETUP_GROUP = "rockett.cam.group.setup";
 const PROGRAM_GROUP = "rockett.cam.group.program";
+const MACHINES_PAGE = "rockett.cam.machines";
 
 type Dialog = {
   id: string;
@@ -45,10 +48,31 @@ function dialog({ register, ui }: ClientContext, item: Dialog) {
   });
 }
 
+function settingsPages(context: ClientContext) {
+  const { register } = context;
+  for (const setting of CAM_SETTINGS) register.setting(setting);
+  register.settingsPage({
+    id: MACHINES_PAGE,
+    title: "Machines",
+    component: machinesPage(context),
+  });
+  register.settingsPage({
+    id: "rockett.cam.posts",
+    title: "Posts",
+    component: postsPage(context),
+  });
+  register.settingsPage({
+    id: "rockett.cam.tools",
+    title: "Tools",
+    component: toolsPage(context),
+  });
+}
+
 export default defineClientModule({
   activate(context) {
-    const { register, project } = context;
+    const { register, project, ui } = context;
     const preview = toolpathPreview(project);
+    settingsPages(context);
     register.workbench({
       id: MANUFACTURE,
       label: "Manufacture",
@@ -70,13 +94,12 @@ export default defineClientModule({
       panel: SETUP_PANEL,
       component: setupDialog(context),
     });
-    dialog(context, {
+    register.command({
       id: "rockett.cam.library",
       label: "Library",
       group: SETUP_GROUP,
       icon: "library.svg",
-      panel: TOOL_PANEL,
-      component: toolPanel(context),
+      run: () => ui.openSettings(MACHINES_PAGE),
     });
     register.toolbarGroup({
       id: MILL_GROUP,

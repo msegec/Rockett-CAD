@@ -93,20 +93,26 @@ export interface SettingOwner {
   contributes?: Partial<Record<string, readonly string[]>>;
 }
 
-export function registerModuleSetting(
+export function checkModuleSetting(
   { id, contributes }: SettingOwner,
-  definition: SettingDefinition,
+  key: string,
 ) {
-  const { key } = definition;
   const prefix = `plugin.${id}.`;
   if (!key.startsWith(prefix))
     throw new Error(`setting ${key} must start with ${prefix}`);
   if (isHostSetting(key))
     throw new Error(
-      `setting ${key} is a host setting, so a module cannot define it`,
+      `setting ${key} is a host setting, so a module cannot use it`,
     );
   if (!contributes?.settings?.includes(key))
     throw new Error(`setting ${key} is not in ${id} contributes.settings`);
+}
+
+export function registerModuleSetting(
+  owner: SettingOwner,
+  definition: SettingDefinition,
+) {
+  checkModuleSetting(owner, definition.key);
   return registerSettings([definition]);
 }
 

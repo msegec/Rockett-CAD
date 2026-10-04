@@ -1,12 +1,12 @@
 import { createElement as h, Fragment, useState, type ReactNode } from "react";
 import type { ClientContext, UserDataEntry } from "@rockett/plugin-api";
+import type { Post } from "../post/schema.js";
 import {
-  machineSchema,
   newMachine,
   validateMachine,
-  withFirmware,
   type MachineProfile,
 } from "../shared/machine.js";
+import { DEFAULT_MACHINE, defaultMachine } from "../shared/settings.js";
 import { validateTool, type Preset, type Tool } from "../shared/tools.js";
 import {
   exportTools,
@@ -15,24 +15,22 @@ import {
   TOOLS_FILE,
   type ToolImport,
 } from "../import/rockett.js";
-import { GrblPaste } from "./grblPaste.js";
 import {
   banner,
   button,
   deleteQuestion,
+  dimmed,
   libraryOf,
   placeholder,
   reason,
   row,
   tree,
+  useModuleSetting,
   useStored,
   type Library,
 } from "./libraryParts.js";
-import { usePosts } from "./postLibrary.js";
-import { schemaFields } from "./schemaForm.js";
+import { machineForm } from "./machineForm.js";
 import { newTool, toolFields } from "./toolForm.js";
-
-export const TOOL_PANEL = "rockett.cam.library.panel";
 
 type Ui = ClientContext["ui"];
 type Item = { id: string; name: string };
@@ -45,23 +43,10 @@ type Section<T extends Item> = {
   fields(ui: Ui, item: T, edit: (item: T) => void): ReactNode[];
 };
 
-const saved = <T extends Item>(items: T[], item: T) =>
+export const saved = <T extends Item>(items: T[], item: T) =>
   items.some((t) => t.id === item.id)
     ? items.map((t) => (t.id === item.id ? item : t))
     : [...items, item];
-
-export const machineFields = (
-  ui: Ui,
-  machine: MachineProfile,
-  edit: (machine: MachineProfile) => void,
-) =>
-  schemaFields(ui, machineSchema, machine, (next) =>
-    edit(
-      next.firmware === machine.firmware
-        ? next
-        : withFirmware(next, next.firmware),
-    ),
-  );
 
 const TOOLS: Section<Tool> = {
   noun: "tool",
@@ -71,18 +56,18 @@ const TOOLS: Section<Tool> = {
   fields: toolFields,
 };
 
-const MACHINES: Section<MachineProfile> = {
+export const machineSection = (
+  posts: Post[],
+  postsError: string | null = null,
+): Section<MachineProfile> => ({
   noun: "machine",
   title: "Machines",
   create: newMachine,
   problems: validateMachine,
-  fields: (ui, machine, edit) => [
-    h(GrblPaste, { key: "grblPaste", ui, machine, edit }),
-    ...machineFields(ui, machine, edit),
-  ],
-};
+  fields: machineForm(posts, postsError),
+});
 
-function useSection<T extends Item>(
+export function useSection<T extends Item>(
   { ui, request }: ClientContext,
   section: Section<T>,
 ) {
@@ -137,33 +122,38 @@ type State<T extends Item> = ReturnType<typeof useSection<T>>;
 function sectionForm<T extends Item>(ui: Ui, state: State<T>) {
   const { section, library, editing, pending } = state;
   if (!library || !editing) return null;
-  return h(ui.DraggablePanel, {
-    title: editing.name,
-    children: h(
-      Fragment,
-      null,
+  const problems = section.problems(editing);
+  return h(
+    Fragment,
+    null,
+    banner(state.error),
+    section.fields(ui, editing, state.setEditing),
+    problems.length > 0 &&
       h(
-        "div",
-        { className: "dialog-body" },
-        banner(state.error),
-        section.fields(ui, editing, state.setEditing),
+        "span",
+        { className: "field-hint" },
+        `Fix before saving: ${problems.join("; ")}.`,
       ),
-      h(ui.DialogFooter, {
-        onOk: () => void state.write(saved(library.items, editing)),
-        onCancel: () => state.setEditing(null),
-        pending,
-        okDisabled: section.problems(editing).length > 0,
-      }),
-    ),
-  });
+    h(ui.DialogFooter, {
+      onOk: () => void state.write(saved(library.items, editing)),
+      onCancel: () => state.setEditing(null),
+      pending,
+      okDisabled: problems.length > 0,
+    }),
+  );
 }
 
-function sectionList<T extends Item>(state: State<T>, extra?: ReactNode) {
+function sectionList<T extends Item>(
+  state: State<T>,
+  extra?: ReactNode,
+  mark?: (item: T) => ReactNode,
+) {
   const { section, library, error, pending } = state;
   const plural = section.title.toLowerCase();
   const rows = library?.items.map((item) =>
     row(
       { key: item.id, name: item.name },
+      mark?.(item),
       button("Edit", `Edit ${item.name}`, pending, () =>
         state.setEditing(item),
       ),
@@ -181,7 +171,7 @@ function sectionList<T extends Item>(state: State<T>, extra?: ReactNode) {
     { key: section.noun },
     banner(error),
     tree(
-      { title: section.title },
+      { title: `Your ${plural}` },
       placeholder(plural, state, rows?.length),
       rows,
     ),
@@ -233,50 +223,41 @@ export function importDialog(ui: Ui, view: ImportView) {
   const unchanged =
     merge(view.tools, result.tools, replace) === view.tools &&
     merge(view.presets, result.presets, replace) === view.presets;
-  return h(ui.DraggablePanel, {
-    title: `Import ${view.name}`,
-    children: h(
-      Fragment,
-      null,
-      h(
-        "div",
-        { className: "dialog-body" },
-        banner(view.error),
-        result.tools.length > 0 &&
-          tree(
-            { title: "Tools" },
-            importRows(view.tools, result.tools, replace),
-          ),
-        result.presets.length > 0 &&
-          tree(
-            { title: "Presets" },
-            importRows(view.presets, result.presets, replace),
-          ),
-        result.rejects.length > 0 &&
-          tree(
-            { title: "Rejected" },
-            result.rejects.map((reject, index) =>
-              row(
-                { key: String(index), name: reject.item },
-                h("span", null, reject.reason),
-              ),
-            ),
-          ),
-        h(ui.CheckField, {
-          label: "Replace tools and presets with the same id",
-          value: replace,
-          onChange: view.setReplace,
-        }),
+  return h(
+    Fragment,
+    null,
+    h("span", { className: "field-hint" }, `Import ${view.name}`),
+    banner(view.error),
+    result.tools.length > 0 &&
+      tree({ title: "Tools" }, importRows(view.tools, result.tools, replace)),
+    result.presets.length > 0 &&
+      tree(
+        { title: "Presets" },
+        importRows(view.presets, result.presets, replace),
       ),
-      h(ui.DialogFooter, {
-        onOk: view.onOk,
-        onCancel: view.onCancel,
-        okLabel: "Import",
-        okDisabled: unchanged,
-        pending: view.pending,
-      }),
-    ),
-  });
+    result.rejects.length > 0 &&
+      tree(
+        { title: "Rejected" },
+        result.rejects.map((reject, index) =>
+          row(
+            { key: String(index), name: reject.item },
+            h("span", null, reject.reason),
+          ),
+        ),
+      ),
+    h(ui.CheckField, {
+      label: "Replace tools and presets with the same id",
+      value: replace,
+      onChange: view.setReplace,
+    }),
+    h(ui.DialogFooter, {
+      onOk: view.onOk,
+      onCancel: view.onCancel,
+      okLabel: "Import",
+      okDisabled: unchanged,
+      pending: view.pending,
+    }),
+  );
 }
 
 type Importing = {
@@ -389,33 +370,47 @@ function useTransfer(context: ClientContext, tools: State<Tool>) {
   return { buttons, dialog };
 }
 
-export function toolPanel(context: ClientContext) {
+export function toolsPage(context: ClientContext) {
   const { ui } = context;
-  const close = () => ui.closePanel(TOOL_PANEL);
-  return function ToolPanel() {
+  return function ToolsPage() {
     const tools = useSection(context, TOOLS);
-    const machines = useSection(context, MACHINES);
     const transfer = useTransfer(context, tools);
-    const posts = usePosts(context);
     return (
       transfer.dialog ||
       sectionForm(ui, tools) ||
+      sectionList(tools, transfer.buttons)
+    );
+  };
+}
+
+export function machinesPage(context: ClientContext) {
+  const { ui, request, settings } = context;
+  return function MachinesPage() {
+    const posts = useStored<Post>(request, "posts", "Posts");
+    const machines = useSection(
+      context,
+      machineSection(posts.library?.items ?? [], posts.error),
+    );
+    useModuleSetting(settings, DEFAULT_MACHINE.key);
+    const [error, setError] = useState<string | null>(null);
+    const chosen = defaultMachine(settings, machines.library?.items ?? []);
+    const makeDefault = (machine: MachineProfile) =>
+      settings.set(DEFAULT_MACHINE.key, machine.id).then(
+        () => setError(null),
+        (e) => setError(`Default machine did not save: ${reason(e)}.`),
+      );
+    const mark = (machine: MachineProfile) =>
+      machine === chosen
+        ? dimmed("Default")
+        : button(
+            "Make default",
+            `Make ${machine.name} the default machine`,
+            machines.pending,
+            () => void makeDefault(machine),
+          );
+    return (
       sectionForm(ui, machines) ||
-      h(ui.DraggablePanel, {
-        title: "Library",
-        children: h(
-          Fragment,
-          null,
-          h(
-            "div",
-            { className: "dialog-body" },
-            sectionList(tools, transfer.buttons),
-            sectionList(machines),
-            posts,
-          ),
-          h(ui.DialogFooter, { onCancel: close, cancelLabel: "Close" }),
-        ),
-      })
+      h(Fragment, null, banner(error), sectionList(machines, null, mark))
     );
   };
 }

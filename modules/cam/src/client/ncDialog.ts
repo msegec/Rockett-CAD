@@ -15,6 +15,7 @@ import {
   type PostCopy,
 } from "../shared/document.js";
 import { machineSchema, type MachineProfile } from "../shared/machine.js";
+import { defaultMachine } from "../shared/settings.js";
 import { generateOperation } from "./browser.js";
 import {
   banner,
@@ -37,9 +38,9 @@ import { editCam } from "./setup.js";
 
 export const NC_PANEL = "rockett.cam.nc.dialog";
 
-const MACHINE_TEXTS = {
+export const MACHINE_TEXTS = {
   loading: "Loading machines...",
-  empty: "No machines yet. Add one in Library.",
+  empty: "No machines yet. Add one in Settings, CAM, Machines.",
   failed: "Machines did not load",
 };
 
@@ -184,6 +185,15 @@ function postFields(
   );
 }
 
+const lostPost = (machine: MachineProfile | undefined, lost: boolean) =>
+  machine &&
+  lost &&
+  h(
+    "span",
+    { className: "field-hint" },
+    `${machine.name}'s default post is gone. Pick a post.`,
+  );
+
 function useRun() {
   const [run, setRun] = useState<Run>({
     pending: false,
@@ -213,7 +223,7 @@ function useRun() {
   return { run, act };
 }
 
-export function ncDialog({ ui, project, request }: ClientContext) {
+export function ncDialog({ ui, project, request, settings }: ClientContext) {
   const close = () => ui.closePanel(NC_PANEL);
   return function NcDialog() {
     const open = useSyncExternalStore(project.subscribe, project.get);
@@ -223,7 +233,13 @@ export function ncDialog({ ui, project, request }: ClientContext) {
     const [choice, setChoice] = useState<Choice>({ off: [] });
     const { run, act } = useRun();
     const setups = setupList(open);
-    const machine = chosen(machines, machineId);
+    const machine = chosen(
+      machines,
+      machineId ||
+        (machines.status === "ready" &&
+          defaultMachine(settings, machines.items)?.id) ||
+        "",
+    );
     const postId = choice.postId ?? machine?.post ?? "";
     const picked =
       setups.status === "ready"
@@ -272,6 +288,7 @@ export function ncDialog({ ui, project, request }: ClientContext) {
         run.pending,
         (blocker) => void generate(blocker),
       ),
+      lostPost(machine, !post && posts.status === "ready"),
     );
     const footer = h(ui.DialogFooter, {
       onOk: () => void exportNc(),

@@ -10,10 +10,12 @@ import { mountGenerate } from "./src/server/generate.js";
 import { mountLibrary } from "./src/server/library.js";
 import { mountExport } from "./src/server/ncExport.js";
 import { mountSurface } from "./src/server/surface.js";
+import { CAM_SETTINGS } from "./src/shared/settings.js";
 
 export default defineServerModule({
   activate(context) {
     const { register, userData } = context;
+    for (const setting of CAM_SETTINGS) register.setting(setting);
     register.kernelJob(
       "rockett.cam.regions",
       new URL("./kernel.ts", import.meta.url),

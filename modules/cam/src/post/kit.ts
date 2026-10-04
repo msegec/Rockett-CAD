@@ -206,7 +206,7 @@ const RULES = [
 const IMPORT = [
   "## Import and refusals",
   "",
-  `The Library panel's Import post takes one JSON file of at most ${POST_MAX_BYTES} bytes in UTF-8. Rockett adds ${code(USER_POST_PREFIX)} to the id, so a user post never replaces a shipped one, and importing the same id again replaces the earlier copy. The post as Rockett stores it, with no spaces and with the new id, must also fit in ${POST_MAX_BYTES} bytes.`,
+  `Import post in Settings, CAM, Posts takes one JSON file of at most ${POST_MAX_BYTES} bytes in UTF-8. Rockett adds ${code(USER_POST_PREFIX)} to the id, so a user post never replaces a shipped one, and importing the same id again replaces the earlier copy. The post as Rockett stores it, with no spaces and with the new id, must also fit in ${POST_MAX_BYTES} bytes.`,
   "",
   "A refusal is one line naming the JSON path, the problem and the accepted values, as:",
   "",
@@ -214,7 +214,7 @@ const IMPORT = [
   `Post did not import: post ${importPostProblems({ ...grbl, capabilities: { ...grbl.capabilities, arcs: "yes" } })[0]}.`,
   "```",
   "",
-  "Delete in the Library panel removes a user post. Setups that use it keep their own copy and still export.",
+  "Delete in Settings, CAM, Posts removes a user post. Setups that use it keep their own copy and still export.",
 ].join("\n");
 
 const MAPPING = [

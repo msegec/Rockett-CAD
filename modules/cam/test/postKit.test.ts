@@ -117,6 +117,16 @@ describe("post kit", () => {
     await expect(kit).toMatchFileSnapshot("../docs/post-kit.md");
   });
 
+  it("sends the user to Settings, CAM, Posts and never to the Library panel", () => {
+    expect(kit).toContain(
+      "Import post in Settings, CAM, Posts takes one JSON file",
+    );
+    expect(kit).toContain(
+      "Delete in Settings, CAM, Posts removes a user post.",
+    );
+    expect(kit).not.toContain("Library panel");
+  });
+
   it("has a schema that accepts all six shipped posts", () => {
     const schema = fenced("JSON schema");
     expect(POSTS.size).toBe(6);

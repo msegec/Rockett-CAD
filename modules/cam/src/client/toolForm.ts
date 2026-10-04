@@ -40,6 +40,12 @@ export function toolFields(
       ...bound,
     });
   return [
+    h(ui.TextField, {
+      key: "name",
+      label: "Name",
+      value: tool.name,
+      onChange: (name) => edit({ ...tool, name }),
+    }),
     h(ui.SelectField<Kind>, {
       key: "kind",
       label: "Kind",

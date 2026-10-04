@@ -30,7 +30,7 @@ export type {
   User,
 } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.4.0";
+export const PLUGIN_API_VERSION = "0.5.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -362,10 +362,17 @@ export interface ClientUi {
   }): Promise<{ name: string; text: string } | null>;
 }
 
+export interface ModuleSettings {
+  get<T = unknown>(key: string): T;
+  set(key: string, value: unknown): Promise<void>;
+  subscribe(key: string, listener: (value: unknown) => void): Dispose;
+}
+
 export interface ClientContext {
   readonly register: ClientRegister;
   readonly project: ProjectView;
   readonly ui: ClientUi;
+  readonly settings: ModuleSettings;
   request<T = unknown>(
     method: Route["method"],
     path: string,

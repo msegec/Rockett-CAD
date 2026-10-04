@@ -1,4 +1,4 @@
-import { createElement as h, type ReactNode } from "react";
+import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ClientUi } from "@rockett/plugin-api";
@@ -157,13 +157,6 @@ describe("rockett-tools.json", () => {
 });
 
 const ui = {
-  DraggablePanel: ({
-    title,
-    children,
-  }: {
-    title: string;
-    children: ReactNode;
-  }) => h("section", { title }, children),
   DialogFooter: ({
     okLabel,
     okDisabled,
@@ -205,7 +198,7 @@ describe("import dialog", () => {
         [preset],
       ),
     );
-    expect(html).toContain('title="Import tools.json"');
+    expect(html).toContain('<span class="field-hint">Import tools.json</span>');
     expect(html).toContain(
       "<span>6 mm flat</span><span>Skipped, already in your library</span>",
     );

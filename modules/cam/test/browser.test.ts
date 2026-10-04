@@ -369,7 +369,12 @@ describe("Manufacture browser", () => {
     };
     const request = async <T>() =>
       ({ version: 1, data: [limits], etag: "e", readOnly: false }) as T;
-    const readTimes = setupTimes(counted, request);
+    const settings = {
+      get: () => null as never,
+      set: async () => {},
+      subscribe: () => () => {},
+    };
+    const readTimes = setupTimes(counted, { request, settings });
     const s1 = () =>
       (view.get().document!.extensions[CAM_EXTENSION]!.data as CamData)
         .setups[0]!;
