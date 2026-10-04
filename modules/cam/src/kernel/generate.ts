@@ -4,17 +4,23 @@ import { isOperation, type OperationType } from "../shared/operations.js";
 import {
   contourParams,
   paramsOf,
+  parallelParams,
   pocketParams,
+  waterlineParams,
   type FaceRef,
 } from "../shared/params.js";
 import { stockBox, type Box, type Setup } from "../shared/setup.js";
 import type { Preset, Tool } from "../shared/tools.js";
+import type { Mesh } from "../surface/dropCutter.js";
 import { contour } from "../toolpath/contour.js";
 import { facing } from "../toolpath/facing.js";
 import { checkMoves, chorded } from "../toolpath/geometry.js";
+import { checkParallel, parallel } from "../toolpath/parallel.js";
 import { pocket } from "../toolpath/pocket.js";
+import { checkWaterline, waterline } from "../toolpath/waterline.js";
 import offset, { type OffsetInput } from "./offset.js";
 import { planarFace, type FaceBody, type RegionLoop } from "./regions.js";
+import surfaceMesh, { type SurfaceMeshInput } from "./surfaceMesh.js";
 
 export type GenerateInput = {
   setup: Pick<
@@ -33,6 +39,11 @@ const offsetJob = offset["rockett.cam.offset"] as (
   input: OffsetInput,
   scope: KernelJobScope,
 ) => RegionLoop[];
+
+const meshJob = surfaceMesh["rockett.cam.surfaceMesh"] as (
+  input: SurfaceMeshInput,
+  scope: KernelJobScope,
+) => Mesh;
 
 const boxes = ({ bodies }: GenerateInput) =>
   Object.fromEntries(bodies.map(({ id, bbox }) => [id, bbox]));
@@ -57,6 +68,30 @@ function faceOf(input: GenerateInput, scope: KernelJobScope, ref: FaceRef) {
     throw new RangeError(`face body ${ref.bodyId} is not a setup body`);
   const stock = stockBox(input.setup, boxes(input));
   return { stock, face: planarFace(scope, body, ref, stock.modelToSetup) };
+}
+
+function surface(
+  input: GenerateInput,
+  scope: KernelJobScope,
+  tolerance: number,
+) {
+  const stock = stockBox(input.setup, boxes(input));
+  const mesh = meshJob(
+    {
+      bodies: input.bodies.map(({ brep }) => ({ identity: brep, brep })),
+      modelToSetup: stock.modelToSetup,
+      tolerance,
+    },
+    scope,
+  );
+  return {
+    operationId: input.operation.id,
+    setup: { ...input.setup, tolerance },
+    stock,
+    mesh,
+    tool: input.tool,
+    preset: input.preset,
+  };
 }
 
 const cut = ({ operation, setup, tool, preset }: GenerateInput) => ({
@@ -118,6 +153,33 @@ const GENERATORS: Readonly<Record<OperationType, Generator>> = {
         islands: face.inner.map(chorded),
       }),
     ];
+  },
+  "rockett.cam.parallel"(input, scope) {
+    const { type, params } = input.operation;
+    const { angle, tolerance } = paramsOf(parallelParams, type, params);
+    checkParallel({ ...input, setup: { ...input.setup, tolerance }, angle });
+    const at = surface(input, scope, tolerance);
+    const [min, max] = [at.stock.min, at.stock.max];
+    return [
+      parallel({
+        ...at,
+        angle,
+        boundary: [
+          [
+            { x: min[0], y: min[1] },
+            { x: max[0], y: min[1] },
+            { x: max[0], y: max[1] },
+            { x: min[0], y: max[1] },
+          ],
+        ],
+      }),
+    ];
+  },
+  "rockett.cam.waterline"(input, scope) {
+    const { type, params } = input.operation;
+    const { angle, tolerance } = paramsOf(waterlineParams, type, params);
+    checkWaterline({ ...input, setup: { ...input.setup, tolerance }, angle });
+    return [waterline({ ...surface(input, scope, tolerance), angle })];
   },
 };
 

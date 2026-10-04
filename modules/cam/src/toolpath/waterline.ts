@@ -1,13 +1,16 @@
+import { CHORD_FRACTION } from "../kernel/surfaceMesh.js";
 import type { Move, Section, Xy } from "../shared/ir.js";
 import { toolRefusal } from "../shared/operations.js";
+import { MIN_TOLERANCE } from "../shared/params.js";
 import type { Box, Setup } from "../shared/setup.js";
 import type { Preset, Tool } from "../shared/tools.js";
 import {
-  dropCutter,
   indexMesh,
   type IndexedMesh,
   type Mesh,
 } from "../surface/dropCutter.js";
+import { depthLevels } from "./geometry.js";
+import { dropBudget, type Budget } from "./parallel.js";
 
 export type WaterlineInput = {
   operationId: string;
@@ -29,6 +32,7 @@ type Grid = {
 };
 
 type Probe = {
+  budget: Budget;
   mesh: IndexedMesh;
   tool: Tool;
   z: number;
@@ -38,7 +42,6 @@ type Probe = {
   tolerance: number;
   spacing: number;
   reach: number;
-  points: number;
 };
 
 const GRID_FRACTION = 0.25;
@@ -46,9 +49,6 @@ const STEP_FRACTION = 0.125;
 const MARGIN_FRACTION = 0.25;
 const RESIDUAL_FRACTION = 0.01;
 const SLOPE_PROBE = 4;
-const MAX_SAMPLES = 16_000_000;
-const MAX_POINTS = 1_000_000;
-const EPSILON = 1e-9;
 
 const CASES: [number, number][][] = [
   [],
@@ -102,7 +102,7 @@ function unit(x: number, y: number): Xy {
 }
 
 const left = (a: Xy, b: Xy) => unit(a[1] - b[1], b[0] - a[0]);
-const height = (c: Probe, [x, y]: Xy) => dropCutter(c.mesh, c.tool, x, y);
+const height = (c: Probe, [x, y]: Xy) => c.budget.drop(c.mesh, c.tool, x, y);
 const free = (c: Probe, p: Xy) => height(c, p) <= c.z;
 
 function shape(tool: Tool) {
@@ -128,21 +128,23 @@ function extent(mesh: IndexedMesh) {
   return { low, high };
 }
 
-function sample(mesh: IndexedMesh, tool: Tool, radius: number): Grid {
+function sample(
+  mesh: IndexedMesh,
+  tool: Tool,
+  radius: number,
+  budget: Budget,
+): Grid {
   const size = radius * GRID_FRACTION;
   const { low, high } = extent(mesh);
   const x = low[0]! - radius - size;
   const y = low[1]! - radius - size;
   const columns = Math.ceil((high[0]! + radius + size - x) / size) + 1;
   const rows = Math.ceil((high[1]! + radius + size - y) / size) + 1;
-  if (columns * rows > MAX_SAMPLES)
-    throw new RangeError(
-      `waterline needs ${columns * rows} drop-cutter samples, above ${MAX_SAMPLES}`,
-    );
+  budget.need(columns * rows);
   const heights = new Float64Array(columns * rows);
   for (let j = 0; j < rows; j++)
     for (let i = 0; i < columns; i++)
-      heights[j * columns + i] = dropCutter(
+      heights[j * columns + i] = budget.drop(
         mesh,
         tool,
         x + i * size,
@@ -215,10 +217,6 @@ function refine(c: Probe, loop: Xy[]): Xy[] {
     while (pending.length) {
       const mid = split(c, from, pending.at(-1)!);
       if (mid) {
-        if (++c.points > MAX_POINTS)
-          throw new RangeError(
-            `waterline needs more than ${MAX_POINTS} points at Z ${c.at}`,
-          );
         pending.push(mid);
         continue;
       }
@@ -331,10 +329,8 @@ function levels(
   [top, bottom, lift]: [number, number, number],
   input: WaterlineInput,
 ) {
-  const { stepdown } = input.preset;
-  const count = Math.max(1, Math.ceil((top - bottom) / stepdown - EPSILON));
-  const steps = Array.from({ length: count }, (_, i) =>
-    i + 1 < count ? top - (i + 1) * stepdown : bottom,
+  const all = depthLevels(top, bottom, input.preset.stepdown).map(
+    (z): [number, number] => [z, z - lift],
   );
   const { points: p, corners: k } = mesh;
   const floors = new Set<number>();
@@ -346,31 +342,36 @@ function levels(
       p[k[t + 1]! + 2] === z &&
       p[k[t + 2]! + 2] === z
     )
-      floors.add(z + lift);
+      floors.add(z);
   }
-  const all = [...steps];
   for (const floor of floors) {
-    const at = all.findIndex((z) => z < floor);
-    all.splice(at < 0 ? all.length : at, 0, floor);
+    const at = all.findIndex(([z]) => z < floor + lift);
+    all.splice(at < 0 ? all.length : at, 0, [floor + lift, floor]);
   }
   return all.filter(
-    (z, i) => i === 0 || all[i - 1]! - z > input.setup.tolerance,
+    ([z], i) => i === 0 || all[i - 1]![0] - z > input.setup.tolerance,
   );
 }
 
-function checked(input: WaterlineInput) {
-  const { setup, preset, angle } = input;
-  const refusal = toolRefusal("rockett.cam.waterline", input.tool.kind);
+export function checkWaterline({
+  setup,
+  tool,
+  angle,
+}: Pick<WaterlineInput, "setup" | "tool" | "angle">) {
+  const refusal = toolRefusal("rockett.cam.waterline", tool.kind);
   if (refusal) throw new RangeError(refusal);
-  if (!(preset.stepdown > 0)) throw new RangeError("stepdown must be above 0");
   if (!(angle >= 0 && angle < 90))
     throw new RangeError("wall angle must be at least 0 and below 90 degrees");
-  if (!(setup.tolerance > 0 && Number.isFinite(setup.tolerance)))
-    throw new RangeError("tolerance must be a number above 0");
+  if (!(setup.tolerance >= MIN_TOLERANCE && Number.isFinite(setup.tolerance)))
+    throw new RangeError(`tolerance must be at least ${MIN_TOLERANCE} mm`);
   if (!(setup.clearance > 0 && setup.safeHeight >= setup.clearance))
     throw new RangeError(
       "clearance must be above 0 and at most the safe height",
     );
+}
+
+function checked(input: WaterlineInput) {
+  checkWaterline(input);
   if (!input.mesh.indices.length)
     throw new RangeError("waterline needs a mesh with triangles");
   const mesh = indexMesh(input.mesh);
@@ -392,18 +393,20 @@ export function waterline(input: WaterlineInput): Section {
     diameter: 2 * (radius + lift),
     cornerRadius: corner + lift,
   };
-  const grid = sample(mesh, grown, radius + lift);
+  const all = levels(mesh, [top, bottom, lift], input);
+  const budget = dropBudget("waterline");
+  const grid = sample(mesh, grown, radius + lift, budget);
   const probe: Probe = {
+    budget,
     mesh,
     tool: grown,
     z: top,
     at: top,
     step: tolerance * STEP_FRACTION,
     margin: tolerance * MARGIN_FRACTION,
-    tolerance,
+    tolerance: tolerance * (1 - CHORD_FRACTION),
     spacing: spacing(radius + lift, corner + lift, lift),
     reach: 2 * radius + grid.size,
-    points: 0,
   };
   const reach = SLOPE_PROBE * tolerance;
   const rise =
@@ -412,8 +415,9 @@ export function waterline(input: WaterlineInput): Section {
   const clear = stock.max[2] + setup.clearance;
   const safe = stock.max[2] + setup.safeHeight;
   const moves: Move[] = [];
-  for (const z of levels(mesh, [top, bottom, lift], input)) {
-    Object.assign(probe, { z: z - lift, at: z, points: 0 });
+  for (const [n, [z, low]] of all.entries()) {
+    Object.assign(probe, { z: low, at: z });
+    budget.what = `waterline at depth level ${n + 1} of ${all.length}`;
     const loops = contours(probe, grid);
     if (crossings(loops, grid.size))
       throw new RangeError(`waterline loops cross at Z ${z}`);

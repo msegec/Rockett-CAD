@@ -9,7 +9,7 @@ import {
   type IndexedMesh,
   type Mesh,
 } from "../surface/dropCutter.js";
-import type { Loop } from "./geometry.js";
+import { stepoverOf, type Loop } from "./geometry.js";
 
 export type ParallelInput = {
   operationId: string;
@@ -24,14 +24,39 @@ export type ParallelInput = {
 
 export const MAX_SAMPLES = 1_000_000;
 
+export type Budget = ReturnType<typeof dropBudget>;
+
 type Frame = { cos: number; sin: number };
 type Pass = { v: number; from: number; to: number };
 type Sample = { u: number; at: Xyz };
 
 const EPSILON = 1e-9;
-const TOO_MANY = `parallel needs over ${MAX_SAMPLES} drop cutter samples`;
 
-function checked({ setup, tool, preset, angle, mesh }: ParallelInput) {
+export function dropBudget(what: string) {
+  let used = 0;
+  const budget = {
+    what,
+    need(count: number) {
+      if (used + count > MAX_SAMPLES)
+        throw new RangeError(
+          `${budget.what} passes the limit of ${MAX_SAMPLES.toLocaleString("en")} drop cutter samples`,
+        );
+    },
+    drop(mesh: IndexedMesh, tool: Tool, x: number, y: number) {
+      budget.need(1);
+      used++;
+      return dropCutter(mesh, tool, x, y);
+    },
+  };
+  return budget;
+}
+
+export function checkParallel({
+  setup,
+  tool,
+  preset,
+  angle,
+}: Pick<ParallelInput, "setup" | "tool" | "preset" | "angle">) {
   const refusal = toolRefusal("rockett.cam.parallel", tool.kind);
   if (refusal) throw new RangeError(refusal);
   const radius = tool.diameter / 2;
@@ -40,15 +65,13 @@ function checked({ setup, tool, preset, angle, mesh }: ParallelInput) {
     throw new RangeError("tolerance must be above 0 and below the tool radius");
   if (!(setup.clearance >= 0 && setup.safeHeight >= setup.clearance))
     throw new RangeError("safe height must be at least the clearance");
-  if (!(preset.stepoverFraction > 0 && preset.stepoverFraction <= 1))
-    throw new RangeError("stepover fraction must be above 0 and at most 1");
+  const stepover = stepoverOf(preset, tool);
   if (!Number.isFinite(angle)) throw new RangeError("angle must be finite");
-  if (!mesh.indices.length) throw new RangeError("mesh has no triangles");
   const budget = setup.tolerance * (1 - CHORD_FRACTION);
   return {
     budget,
     chord: 2 * Math.sqrt(budget * (2 * radius - budget)),
-    stepover: preset.stepoverFraction * tool.diameter,
+    stepover,
   };
 }
 
@@ -71,7 +94,12 @@ function crossings(boundary: Loop[], frame: Frame, v: number): number[] {
   return out;
 }
 
-function passes(boundary: Loop[], frame: Frame, stepover: number): Pass[] {
+function passes(
+  boundary: Loop[],
+  frame: Frame,
+  stepover: number,
+  budget: Budget,
+): Pass[] {
   let [low, high] = [Infinity, -Infinity];
   for (const p of boundary.flat()) {
     const v = inFrame(p, frame)[1];
@@ -81,7 +109,7 @@ function passes(boundary: Loop[], frame: Frame, stepover: number): Pass[] {
     throw new RangeError("boundary needs finite loops");
   const middle = (low + high) / 2;
   const reach = Math.ceil((high - low) / 2 / stepover - EPSILON) - 1;
-  if (2 * reach + 1 > MAX_SAMPLES) throw new RangeError(TOO_MANY);
+  budget.need(2 * reach + 1);
   const out: Pass[] = [];
   for (let k = -reach; k <= reach; k++) {
     const v = middle + k * stepover;
@@ -99,13 +127,16 @@ function passes(boundary: Loop[], frame: Frame, stepover: number): Pass[] {
   return out;
 }
 
-function sampler(input: ParallelInput, mesh: IndexedMesh, frame: Frame) {
-  let count = 0;
+function sampler(
+  input: ParallelInput,
+  mesh: IndexedMesh,
+  frame: Frame,
+  budget: Budget,
+) {
   return (pass: Pass, u: number): Sample => {
-    if (++count > MAX_SAMPLES) throw new RangeError(TOO_MANY);
     const x = u * frame.cos - pass.v * frame.sin;
     const y = u * frame.sin + pass.v * frame.cos;
-    return { u, at: [x, y, dropCutter(mesh, input.tool, x, y)] };
+    return { u, at: [x, y, budget.drop(mesh, input.tool, x, y)] };
   };
 }
 
@@ -148,18 +179,19 @@ function runs(
 
 export function parallel(input: ParallelInput): Section {
   const { setup, stock, tool, preset } = input;
-  const limits = checked(input);
+  const limits = checkParallel(input);
+  if (!input.mesh.indices.length) throw new RangeError("mesh has no triangles");
   const turn = (input.angle * Math.PI) / 180;
   const frame = { cos: Math.cos(turn), sin: Math.sin(turn) };
-  const rows = passes(input.boundary, frame, limits.stepover);
+  const budget = dropBudget("parallel");
+  const rows = passes(input.boundary, frame, limits.stepover, budget);
   const counts = rows.map((pass) =>
     Math.max(
       1,
       Math.ceil(Math.abs(pass.to - pass.from) / limits.chord - EPSILON),
     ),
   );
-  if (counts.reduce((sum, n) => sum + n + 1, 0) > MAX_SAMPLES)
-    throw new RangeError(TOO_MANY);
+  budget.need(counts.reduce((sum, n) => sum + n + 1, 0));
   const mesh = indexMesh(input.mesh);
   const top = stock.max[2];
   let part = -Infinity;
@@ -168,7 +200,7 @@ export function parallel(input: ParallelInput): Section {
   if (part > top)
     throw new RangeError("stock top must not be below the part top");
   const plane = top + setup.clearance;
-  const drop = sampler(input, mesh, frame);
+  const drop = sampler(input, mesh, frame, budget);
   const cuts = rows.flatMap((pass, n) => runs(pass, drop, limits, counts[n]!));
   if (!cuts.length) throw new RangeError("no surface lies inside the boundary");
   const moves: Move[] = [];

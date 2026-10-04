@@ -37,6 +37,24 @@ export const pocketParams = Type.Object({
   rampAngle: Type.Number({ title: "Ramp angle", parameterUnit: "deg" }),
 });
 
+export const MIN_TOLERANCE = 0.001;
+
+const tolerance = Type.Number({
+  title: "Tolerance",
+  parameterUnit: "mm",
+  minimum: MIN_TOLERANCE,
+});
+
+export const parallelParams = Type.Object({
+  angle: Type.Number({ title: "Pass angle", parameterUnit: "deg" }),
+  tolerance,
+});
+
+export const waterlineParams = Type.Object({
+  angle: Type.Number({ title: "Wall angle", parameterUnit: "deg" }),
+  tolerance,
+});
+
 export function paramsOf<S extends TSchema>(
   schema: S,
   type: string,
