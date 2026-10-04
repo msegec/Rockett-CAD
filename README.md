@@ -36,7 +36,7 @@ everything downstream against persistent topology references.
 - **Tool targets**: join, cut and intersect act on bodies you pick from the list or by click; Auto takes visible ones.
 - **Modify**: fillet, chamfer, shell, combine, split, press/pull and move bodies; shell with no open face hollows the picked or first body.
 - **Tangent chains**: fillet and chamfer pick smooth connected edges in one click, on one or several bodies.
-- **Size hints**: fillet, chamfer, shell and an inward Press / Pull (Offset Face) show the largest size that builds for the current picks; a cut extrude shows the depth that cuts through all, and a linear pattern the spacing that keeps copies apart.
+- **Size hints**: fillet, chamfer, shell, inward Offset Face, cut depth and pattern spacing show the size that builds for your picks.
 - **Replicate**: mirror, rectangular pattern and circular pattern.
 - **Parameters**: name values with units, then type expressions like `width / 2` into feature fields, sketch dimensions and Quick Edit.
 - **Construction**: offset, midplane, angled, three-point or two-edge planes, with flip; sketch on planar faces with any boundary; hide planes.
