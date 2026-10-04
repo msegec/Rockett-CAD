@@ -219,8 +219,8 @@ export class CadViewport {
     this.frames.dispose();
     window.removeEventListener("scroll", this.forgetRect, true);
     this.layers.dispose();
-    clearGroup(this.scene);
     this.bodyLayer.dispose();
+    clearGroup(this.scene);
     this.ghosts.clear();
     this.renderer.dispose();
     this.renderer.domElement.remove();

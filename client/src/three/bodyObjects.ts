@@ -1,9 +1,8 @@
 import * as THREE from "three";
 import { pathFor, ROUTES, type BodyPayload } from "@rockett/shared";
 import { request } from "../api";
-import { themeColor } from "../theme/tokens";
-import { BODY_APPEARANCE } from "../tunables";
-import { disposeGroup } from "./dispose";
+import { disposeAll, disposeGroup } from "./dispose";
+import { BodyMaterials } from "./materials";
 import type { PickBody } from "./pickProviders";
 
 const MAX_FETCHES = 6;
@@ -35,11 +34,6 @@ function meshOf(p: BodyPayload): BodyMesh {
   return { positions, normals, indices, faces, edges, vertices, bbox };
 }
 
-function paint(material: THREE.MeshStandardMaterial, color?: string) {
-  material.userData.themeToken = color === undefined ? "body" : undefined;
-  material.color.set(color ?? themeColor("body"));
-}
-
 function edgeLines(p: BodyPayload) {
   const points: number[] = [];
   const edgeSegments: string[] = [];
@@ -61,12 +55,7 @@ function edgeLines(p: BodyPayload) {
     "position",
     new THREE.Float32BufferAttribute(points, 3),
   );
-  const edges = new THREE.LineSegments(
-    geometry,
-    new THREE.LineBasicMaterial({ color: themeColor("edge") }),
-  );
-  edges.userData.bodyId = p.bodyId;
-  return { edges, edgeSegments };
+  return { edgeGeometry: geometry, edgeSegments };
 }
 
 function vertexPoints(p: BodyPayload) {
@@ -81,20 +70,14 @@ function vertexPoints(p: BodyPayload) {
     "position",
     new THREE.Float32BufferAttribute(points, 3),
   );
-  const vertices = new THREE.Points(
-    geometry,
-    new THREE.PointsMaterial({
-      color: themeColor("edge"),
-      size: BODY_APPEARANCE.vertexSizePx,
-      sizeAttenuation: false,
-    }),
-  );
-  vertices.visible = false;
-  vertices.userData.bodyId = p.bodyId;
-  return { vertices, vertexNames };
+  return { vertexGeometry: geometry, vertexNames };
 }
 
-function buildBody(p: BodyPayload): BodyObjects {
+function buildBody(
+  p: BodyPayload,
+  materials: BodyMaterials,
+  dimmed: boolean,
+): BodyObjects {
   const group = new THREE.Group();
   group.userData.bodyId = p.bodyId;
   const geom = new THREE.BufferGeometry();
@@ -104,18 +87,16 @@ function buildBody(p: BodyPayload): BodyObjects {
   );
   geom.setAttribute("normal", new THREE.Float32BufferAttribute(p.normals, 3));
   geom.setIndex(p.indices);
-  const material = new THREE.MeshStandardMaterial({
-    metalness: BODY_APPEARANCE.metalness,
-    roughness: BODY_APPEARANCE.roughness,
-    polygonOffset: true,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits: 1,
-  });
-  paint(material, p.color);
+  const { edgeGeometry, edgeSegments } = edgeLines(p);
+  const { vertexGeometry, vertexNames } = vertexPoints(p);
+  const material = materials.face(p.color, dimmed);
   const mesh = new THREE.Mesh(geom, material);
   mesh.userData.bodyId = p.bodyId;
-  const { edges, edgeSegments } = edgeLines(p);
-  const { vertices, vertexNames } = vertexPoints(p);
+  const edges = new THREE.LineSegments(edgeGeometry, materials.edge());
+  edges.userData.bodyId = p.bodyId;
+  const vertices = new THREE.Points(vertexGeometry, materials.vertex());
+  vertices.visible = false;
+  vertices.userData.bodyId = p.bodyId;
   group.add(mesh, edges, vertices);
   return {
     group,
@@ -132,8 +113,10 @@ function buildBody(p: BodyPayload): BodyObjects {
 
 export class BodyLayer {
   readonly bodies = new Map<string, BodyObjects>();
+  private readonly materials = new BodyMaterials();
   private missing = new Map<string, LayerBody[]>();
   private hidden: ReadonlySet<string> = new Set();
+  private dimmed: ReadonlySet<string> = new Set();
   private scope: FetchScope | null = null;
   private active = 0;
 
@@ -165,10 +148,17 @@ export class BodyLayer {
     this.changed();
   }
 
+  dim(ids: ReadonlySet<string>) {
+    this.dimmed = ids;
+    for (const built of this.bodies.values())
+      this.paint(built, built.payload.color);
+    this.changed();
+  }
+
   dispose() {
     this.useProject(undefined);
     this.missing.clear();
-    this.bodies.clear();
+    for (const [id, built] of this.bodies) this.remove(id, built);
   }
 
   private useProject(id: string | undefined) {
@@ -181,7 +171,7 @@ export class BodyLayer {
   }
 
   private update(built: BodyObjects, body: LayerBody) {
-    if (built.payload.color !== body.color) paint(built.material, body.color);
+    if (built.payload.color !== body.color) this.paint(built, body.color);
     built.payload = decoded(body)
       ? body
       : { ...meshOf(built.payload), ...body };
@@ -191,15 +181,34 @@ export class BodyLayer {
   private place(body: BodyPayload) {
     const old = this.bodies.get(body.bodyId);
     if (old) this.remove(body.bodyId, old);
-    const built = buildBody(body);
+    const built = buildBody(body, this.materials, this.dimmed.has(body.bodyId));
     built.group.visible = !this.hidden.has(body.bodyId);
     this.bodies.set(body.bodyId, built);
     this.root.add(built.group);
   }
 
+  private paint(built: BodyObjects, color: string | undefined) {
+    const old = built.material;
+    const next = this.materials.face(
+      color,
+      this.dimmed.has(built.payload.bodyId),
+    );
+    this.materials.release(old);
+    if (next === old) return;
+    built.material = next;
+    const { mesh } = built;
+    mesh.material = Array.isArray(mesh.material)
+      ? mesh.material.map((m) => (m === old ? next : m))
+      : next;
+    disposeAll([old], this.materials.live());
+  }
+
   private remove(id: string, built: BodyObjects) {
     this.root.remove(built.group);
-    disposeGroup(built.group);
+    this.materials.release(built.material);
+    this.materials.release(built.edges.material);
+    this.materials.release(built.vertices.material);
+    disposeGroup(built.group, this.materials.live());
     this.bodies.delete(id);
   }
 
