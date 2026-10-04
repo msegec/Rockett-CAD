@@ -5,11 +5,35 @@ import { themeColor } from "../theme/tokens";
 import { disposeAll, disposeGroup } from "./dispose";
 import { BodyMaterials } from "./materials";
 import type { PickBody } from "./pickProviders";
-import { hashOf, meshes, meshOf, type LayerBody } from "./meshes";
+import { halfHeightPerDistance } from "./camera";
+import { hashOf, meshes, type LayerBody } from "./meshes";
 
 export interface BodyObjects extends PickBody {
   material: THREE.MeshStandardMaterial;
   tint: THREE.MeshStandardMaterial | null;
+  coarse: boolean;
+}
+
+const COARSE_PX = 64;
+const middle = new THREE.Vector3();
+const canvas = new THREE.Vector2();
+
+const sameMesh = (a: LayerBody, b: LayerBody) =>
+  hashOf(a) === hashOf(b) && a.coarse?.hash === b.coarse?.hash;
+
+function bboxPixels(
+  { min, max }: LayerBody["bbox"],
+  camera: THREE.Camera,
+  height: number,
+) {
+  const size = Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
+  if (camera instanceof THREE.OrthographicCamera)
+    return (size * height * camera.zoom) / (camera.top - camera.bottom);
+  if (!(camera instanceof THREE.PerspectiveCamera)) return Infinity;
+  middle.set(min[0] + max[0], min[1] + max[1], min[2] + max[2]);
+  const distance = camera.position.distanceTo(middle.multiplyScalar(0.5));
+  if (distance <= size / 2) return Infinity;
+  return (size * height) / (2 * distance * halfHeightPerDistance(camera.fov));
 }
 
 function edgeLines(p: MeshPayload) {
@@ -54,6 +78,7 @@ function vertexPoints(p: MeshPayload) {
 function buildBody(
   p: LayerBody,
   shape: MeshPayload,
+  coarse: boolean,
   materials: BodyMaterials,
   dimmed: boolean,
 ): BodyObjects {
@@ -90,6 +115,8 @@ function buildBody(
     vertices,
     vertexNames,
     payload: p,
+    shape,
+    coarse,
   };
 }
 
@@ -100,6 +127,8 @@ export class BodyLayer {
   private synced: readonly LayerBody[] = [];
   private hidden: ReadonlySet<string> = new Set();
   private dimmed: ReadonlySet<string> = new Set();
+  private tints: ReadonlyMap<string, PreviewTint> = new Map();
+  private eye: { camera: THREE.Camera; height: number } | null = null;
   private readonly unsubscribe = meshes.subscribe(() => this.arrive());
 
   constructor(
@@ -121,8 +150,7 @@ export class BodyLayer {
     for (const body of bodies) {
       seen.add(body.bodyId);
       const built = this.bodies.get(body.bodyId);
-      if (built && hashOf(built.payload) === hashOf(body))
-        this.update(built, body);
+      if (built && sameMesh(built.payload, body)) this.update(built, body);
       else this.show(body, built);
     }
     for (const [id, built] of this.bodies)
@@ -137,9 +165,16 @@ export class BodyLayer {
     this.changed();
   }
 
+  view(camera: THREE.Camera, renderer: Pick<THREE.WebGLRenderer, "getSize">) {
+    this.eye = { camera, height: renderer.getSize(canvas).y };
+    if (this.relevel()) meshes.notify();
+  }
+
   tint(tints: ReadonlyMap<string, PreviewTint>) {
+    this.tints = tints;
+    this.relevel();
     for (const [id, b] of this.bodies) {
-      const tint = tints.get(id);
+      const tint = b.coarse ? undefined : tints.get(id);
       const geom = b.mesh.geometry;
       geom.clearGroups();
       if (!tint) {
@@ -173,9 +208,29 @@ export class BodyLayer {
     for (const [id, built] of this.bodies) this.remove(id, built);
   }
 
+  private wantsCoarse(body: LayerBody) {
+    if (!body.coarse || !this.eye || this.tints.has(body.bodyId)) return false;
+    const { camera, height } = this.eye;
+    return bboxPixels(body.bbox, camera, height) < COARSE_PX;
+  }
+
+  private relevel() {
+    let swapped = false;
+    for (const built of this.bodies.values()) {
+      const coarse = this.wantsCoarse(built.payload);
+      const shape =
+        coarse !== built.coarse && meshes.get(built.payload, coarse);
+      if (!shape) continue;
+      this.place(built.payload, shape, coarse);
+      swapped = true;
+    }
+    return swapped;
+  }
+
   private show(body: LayerBody, stale: BodyObjects | undefined) {
-    const shape = meshOf(body);
-    if (shape) return this.place(body, shape);
+    const coarse = this.wantsCoarse(body);
+    const shape = meshes.get(body, coarse);
+    if (shape) return this.place(body, shape, coarse);
     if (stale) stale.group.visible = !this.hidden.has(body.bodyId);
     this.missing.push(body);
   }
@@ -184,7 +239,7 @@ export class BodyLayer {
     const waiting = this.missing;
     this.missing = [];
     for (const body of waiting) this.show(body, this.bodies.get(body.bodyId));
-    if (this.missing.length < waiting.length) this.changed();
+    if (this.relevel() || this.missing.length < waiting.length) this.changed();
   }
 
   private update(built: BodyObjects, body: LayerBody) {
@@ -193,12 +248,13 @@ export class BodyLayer {
     built.group.visible = !this.hidden.has(body.bodyId);
   }
 
-  private place(body: LayerBody, shape: MeshPayload) {
+  private place(body: LayerBody, shape: MeshPayload, coarse: boolean) {
     const old = this.bodies.get(body.bodyId);
     if (old) this.remove(body.bodyId, old);
     const built = buildBody(
       body,
       shape,
+      coarse,
       this.materials,
       this.dimmed.has(body.bodyId),
     );

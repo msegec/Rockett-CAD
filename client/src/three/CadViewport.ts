@@ -112,7 +112,6 @@ export class CadViewport {
   perspCam: THREE.PerspectiveCamera;
   projection: "orthographic" | "perspective" = getSetting("view.projection");
   target = new THREE.Vector3(0, 0, 0);
-  /** ortho half-height in mm */
   zoom = 90;
 
   private container: HTMLElement;
@@ -256,6 +255,7 @@ export class CadViewport {
   }
 
   render() {
+    this.bodyLayer.view(this.camera, this.renderer);
     this.renderer.render(this.scene, this.camera);
   }
 

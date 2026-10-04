@@ -122,7 +122,10 @@ const RUN: {
 const TRANSFER: {
   [M in Method]?: (value: Calls[M]["result"]) => Transferable[];
 } = {
-  evaluate: ({ bodies }) => bodies.map((body) => body.binary),
+  evaluate: ({ bodies }) =>
+    bodies.flatMap(({ binary, coarseBinary }) =>
+      coarseBinary ? [binary, coarseBinary] : [binary],
+    ),
   export: ({ data }) => [data],
 };
 

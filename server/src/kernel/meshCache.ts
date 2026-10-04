@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { promises } from "node:fs";
 import {
+  coarseOf,
   meshBinary,
   type BodyPayload,
   type EvaluateResult,
@@ -18,6 +19,9 @@ const MESH_LIMITS = {
 };
 
 type Entry = { hash: string; data: Buffer };
+
+const levelOf = ({ hash, data }: Entry) => ({ hash, bytes: data.length });
+
 type Project = { revision?: number; hashes: Set<string>; recent: Set<string> };
 
 const CACHE_FILE = /^[0-9a-f]{64}\.rkm(\.[0-9a-f-]+\.tmp)?$/;
@@ -130,14 +134,24 @@ export class MeshCache {
       dir === undefined ? undefined : new MeshDisk(dir, this.limits.disk);
   }
 
-  private encoded(body: MeshedBody): Entry {
-    const hit = this.entries.get(body.meshKey);
+  private levels(body: MeshedBody): { fine: Entry; coarse?: Entry } {
+    const fine = this.encoded(body.meshKey, () => meshBinary(body));
+    const coarse = coarseOf(body);
+    if (!coarse) return { fine };
+    return {
+      fine,
+      coarse: this.encoded(`${body.meshKey} coarse`, () => coarse),
+    };
+  }
+
+  private encoded(key: string, encode: () => Uint8Array): Entry {
+    const hit = this.entries.get(key);
     if (hit) {
-      this.entries.delete(body.meshKey);
-      this.entries.set(body.meshKey, hit);
+      this.entries.delete(key);
+      this.entries.set(key, hit);
       return hit;
     }
-    const binary = meshBinary(body);
+    const binary = encode();
     const data = Buffer.from(
       binary.buffer,
       binary.byteOffset,
@@ -148,11 +162,11 @@ export class MeshCache {
       this.disk?.put(entry);
       return entry;
     }
-    this.entries.set(body.meshKey, entry);
+    this.entries.set(key, entry);
     this.size += data.length;
-    for (const [key, old] of this.entries) {
+    for (const [oldKey, old] of this.entries) {
       if (this.size <= this.limits.bytes) break;
-      this.entries.delete(key);
+      this.entries.delete(oldKey);
       this.size -= old.data.length;
       this.disk?.put(old);
     }
@@ -176,7 +190,12 @@ export class MeshCache {
     current = true,
   ): EvaluateResult {
     const bodies = evaluation.bodies.map((body) => this.wire(body));
-    const hashes = new Set(bodies.map((body) => body.mesh!.hash));
+    const hashes = new Set(
+      bodies.flatMap(({ mesh, coarse }) => [
+        mesh!.hash,
+        ...(coarse ? [coarse.hash] : []),
+      ]),
+    );
     const project = this.project(projectId);
     const before = project.hashes.size + project.recent.size;
     if (current) {
@@ -205,10 +224,17 @@ export class MeshCache {
   }
 
   private wire(body: MeshedBody): BodyPayload {
-    const { hash, data } = this.encoded(body);
+    const { fine, coarse } = this.levels(body);
     const { bodyId, name, color, meshKey, bbox } = body;
-    const mesh = { hash, bytes: data.length };
-    return { bodyId, name, ...(color && { color }), meshKey, mesh, bbox };
+    return {
+      bodyId,
+      name,
+      ...(color && { color }),
+      meshKey,
+      mesh: levelOf(fine),
+      ...(coarse && { coarse: levelOf(coarse) }),
+      bbox,
+    };
   }
 
   rejects(projectId: string, revision: number, hash: string): boolean {
@@ -235,8 +261,9 @@ export class MeshCache {
     return this.disk?.get(hash);
   }
 
-  materialize(body: MeshedBody): Buffer {
-    return this.encoded(body).data;
+  materialize(body: MeshedBody, hash: string): Buffer | undefined {
+    const { fine, coarse } = this.levels(body);
+    return [fine, coarse].find((level) => level?.hash === hash)?.data;
   }
 
   drop(projectId: string): void {

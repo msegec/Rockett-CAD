@@ -26,11 +26,13 @@ export function meshRoute(
     if (!bytes) {
       const result = await evaluate(doc);
       const { bodies } = cache.publish(doc.id, doc.revision, result);
-      const at = bodies.findIndex((item) => item.mesh?.hash === hash);
+      const at = bodies.findIndex(
+        ({ mesh, coarse }) => mesh?.hash === hash || coarse?.hash === hash,
+      );
       if (at >= 0)
         bytes =
           (await cache.get(doc.id, doc.revision, hash)) ??
-          cache.materialize(result.bodies[at]!);
+          cache.materialize(result.bodies[at]!, hash);
     }
     if (!bytes) return missing();
     res.set("Cache-Control", "private, max-age=31536000, immutable");

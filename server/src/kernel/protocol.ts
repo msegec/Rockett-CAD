@@ -1,7 +1,9 @@
 import {
+  coarseOf,
   lazyMesh,
   meshBinary,
   meshHead,
+  withCoarse,
   ValidationError,
   type ApiErrorCode,
   type BodyPayload,
@@ -64,7 +66,10 @@ export interface Calls {
 
 export type Method = keyof Calls;
 
-export type WireBody = BodyPayload & { binary: ArrayBuffer };
+export type WireBody = BodyPayload & {
+  binary: ArrayBuffer;
+  coarseBinary?: ArrayBuffer;
+};
 
 export interface WireEvaluation extends EvaluateResult {
   bodies: WireBody[];
@@ -148,16 +153,26 @@ export function owned(bytes: Uint8Array): ArrayBuffer {
 }
 
 export function meshesToWire(evaluation: MeshedEvaluation): WireEvaluation {
-  const bodies = evaluation.bodies.map((body) => ({
-    ...meshHead(body),
-    binary: meshBinary(body).slice().buffer,
-  }));
+  const bodies = evaluation.bodies.map((body) => {
+    const coarse = coarseOf(body);
+    return {
+      ...meshHead(body),
+      binary: meshBinary(body).slice().buffer,
+      ...(coarse && { coarseBinary: coarse.slice().buffer }),
+    };
+  });
   return { ...evaluation, bodies };
 }
 
 export function meshesFromWire(evaluation: WireEvaluation): MeshedEvaluation {
-  const bodies = evaluation.bodies.map(({ binary, ...body }) =>
-    lazyMesh(body, new Uint8Array(binary)),
+  const bodies = evaluation.bodies.map(({ binary, coarseBinary, ...body }) =>
+    lazyMesh(
+      body,
+      withCoarse(
+        new Uint8Array(binary),
+        coarseBinary && new Uint8Array(coarseBinary),
+      ),
+    ),
   );
   return { ...evaluation, bodies };
 }

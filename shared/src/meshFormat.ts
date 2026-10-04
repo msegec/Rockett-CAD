@@ -193,6 +193,7 @@ const MESH_FIELDS = [
 ] as const satisfies (keyof MeshPayload)[];
 
 const binaries = new WeakMap<object, Uint8Array>();
+const coarseLevels = new WeakMap<Uint8Array, Uint8Array>();
 
 function numbers(view: ArrayLike<number>): number[] {
   const out: number[] = [];
@@ -232,6 +233,16 @@ export function lazyMesh<T extends object>(
   ) as T & MeshPayload;
   binaries.set(body, binary);
   return body;
+}
+
+export function withCoarse(binary: Uint8Array, coarse?: Uint8Array) {
+  if (coarse) coarseLevels.set(binary, coarse);
+  return binary;
+}
+
+export function coarseOf(body: object): Uint8Array | undefined {
+  const binary = binaries.get(body);
+  return binary && coarseLevels.get(binary);
 }
 
 export function meshBinary(body: MeshSource): Uint8Array {

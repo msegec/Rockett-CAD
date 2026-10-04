@@ -73,6 +73,7 @@ function body(
     vertices,
     vertexNames: [],
     payload,
+    shape: payload,
   };
 }
 

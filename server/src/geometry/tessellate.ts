@@ -9,12 +9,18 @@
 
 import { createHash } from "node:crypto";
 import {
+  coarseOf,
   compareNames,
   encodeMesh,
   lazyMesh,
+  meshHead,
+  meshPayloadOf,
+  withCoarse,
   type EdgeInfo,
   type FaceInfo,
   type MeshedBody,
+  type MeshPayload,
+  type MeshSource,
   type RefSignature,
   type VertexInfo,
   type Vec3,
@@ -29,7 +35,7 @@ import {
   type Shape,
 } from "./kernel.js";
 import { curveInfo } from "./edgeCurve.js";
-import { meshShape, type FaceMesh } from "./mesh.js";
+import { meshDetached, meshShape, type FaceMesh } from "./mesh.js";
 import { drawnTriangles } from "./meshBody.js";
 import {
   computeEdgeNames,
@@ -49,13 +55,15 @@ export interface TessellationOptions {
   angular?: number;
 }
 
+const COARSE = 12;
+const COARSE_MIN_TRIANGLES = 1024;
+
+type Level = Pick<MeshPayload, "positions" | "normals" | "indices" | "faces">;
+
 function appendFaceMesh(
   body: NamedBody,
   m: FaceMesh,
-  positions: number[],
-  normals: number[],
-  indices: number[],
-  faceInfos: FaceInfo[],
+  { positions, normals, indices, faces }: Level,
 ): void {
   const start = indices.length;
   const vertexOffset = positions.length / 3;
@@ -85,7 +93,7 @@ function appendFaceMesh(
       Math.hypot(uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx) / 2;
   }
 
-  faceInfos.push({
+  faces.push({
     name: body.names.get(m.face) ?? "?",
     start,
     count: indices.length - start,
@@ -99,33 +107,42 @@ export function tessellateBody(
   meta: { name: string },
   opts: TessellationOptions = {},
 ): MeshedBody {
-  const { bbox, ...mesh } = body.mesh
+  const { bbox, coarse, ...mesh }: Tessellated = body.mesh
     ? drawnTriangles(body.mesh)
     : tessellateShape(body, opts);
   const binary = encodeMesh(mesh);
   const meshKey = createHash("sha256").update(binary).digest("hex");
   return lazyMesh(
     { bodyId: body.bodyId, name: meta.name, meshKey, bbox },
-    binary,
+    withCoarse(binary, coarse && encodeMesh({ ...mesh, ...coarse })),
   );
 }
 
+type Tessellated = MeshSource & { bbox: MeshedBody["bbox"]; coarse?: Level };
+
+function meshLevel(body: NamedBody, meshes: FaceMesh[]): Level {
+  const level: Level = { positions: [], normals: [], indices: [], faces: [] };
+  for (const mesh of meshes) appendFaceMesh(body, mesh, level);
+  return level;
+}
+
 function tessellateShape(body: NamedBody, opts: TessellationOptions) {
-  return scoped(() => {
+  return scoped((): Tessellated => {
     const k = getKernel();
-    const positions: number[] = [];
-    const normals: number[] = [];
-    const indices: number[] = [];
-    const faceInfos: FaceInfo[] = [];
     const bbox = bboxOf(body.shape);
-
-    const meshes = meshShape(body.shape, {
-      linear: opts.linear ?? viewportDeflection(bbox),
-      angular: opts.angular ?? 0.35,
-    });
-
-    for (const mesh of meshes)
-      appendFaceMesh(body, mesh, positions, normals, indices, faceInfos);
+    const linear = opts.linear ?? viewportDeflection(bbox);
+    const angular = opts.angular ?? 0.35;
+    const fine = meshLevel(body, meshShape(body.shape, { linear, angular }));
+    const coarse =
+      fine.indices.length >= 3 * COARSE_MIN_TRIANGLES
+        ? meshLevel(
+            body,
+            meshDetached(body.shape, {
+              linear: linear * COARSE,
+              angular: angular * COARSE,
+            }),
+          )
+        : undefined;
 
     const edgeNames = computeEdgeNames(body).byName;
     const edgeInfos: EdgeInfo[] = [];
@@ -150,13 +167,13 @@ function tessellateShape(body: NamedBody, opts: TessellationOptions) {
     }
 
     return {
-      positions,
-      normals,
-      indices,
-      faces: faceInfos,
+      ...fine,
       edges: edgeInfos,
       vertices: vertexInfos,
       bbox,
+      ...(coarse &&
+        coarse.indices.length > 0 &&
+        2 * coarse.indices.length <= fine.indices.length && { coarse }),
     };
   });
 }
@@ -210,21 +227,22 @@ export function movePayload(
           .map(named),
       ),
     );
-  return {
+  const face = (f: FaceInfo): FaceInfo => ({
+    ...f,
+    name: named(f.name),
+    surface:
+      f.surface.type === "other"
+        ? f.surface
+        : { ...f.surface, origin: at(f.surface.origin) },
+  });
+  const moved: MeshedBody = {
     ...source,
     bodyId,
     meshKey: createHash("sha256")
       .update(JSON.stringify([source.meshKey, offset, prefix]))
       .digest("hex"),
     positions: along(source.positions),
-    faces: source.faces.map((f) => ({
-      ...f,
-      name: named(f.name),
-      surface:
-        f.surface.type === "other"
-          ? f.surface
-          : { ...f.surface, origin: at(f.surface.origin) },
-    })),
+    faces: source.faces.map(face),
     edges: source.edges
       .map((e) => ({
         ...e,
@@ -242,6 +260,41 @@ export function movePayload(
     ).map(([v, name]) => ({ name, position: v.position })),
     bbox: { min: at(source.bbox.min), max: at(source.bbox.max) },
   };
+  return withMovedCoarse(source, moved, along, face);
+}
+
+function withMovedCoarse(
+  source: MeshedBody,
+  moved: MeshedBody,
+  along: (xs: number[]) => number[],
+  face: (f: FaceInfo) => FaceInfo,
+): MeshedBody {
+  const coarse = coarseOf(source);
+  if (!coarse) return moved;
+  const level = coarseLevelOf(coarse);
+  return lazyMesh(
+    meshHead(moved),
+    withCoarse(
+      encodeMesh(moved),
+      encodeMesh({
+        ...moved,
+        positions: along(level.positions),
+        normals: level.normals,
+        indices: level.indices,
+        faces: level.faces.map(face),
+      }),
+    ),
+  );
+}
+
+const coarseSources = new WeakMap<Uint8Array, MeshPayload>();
+
+function coarseLevelOf(binary: Uint8Array): MeshPayload {
+  const known = coarseSources.get(binary);
+  if (known) return known;
+  const level = meshPayloadOf(binary);
+  coarseSources.set(binary, level);
+  return level;
 }
 
 function movedCurve(

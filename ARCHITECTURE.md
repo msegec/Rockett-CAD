@@ -119,5 +119,9 @@ router checks project access first (`server/src/api/projectAccess.ts`).
   body sent without its mesh is fetched by hash, at most 6 at once, aborted
   on a project switch and retried on the next sync:
   `client/src/three/bodyObjects.ts`.
+- A body whose bbox diagonal projects under 64 px draws its coarse level when
+  it has one, and picks and highlights use the level on screen. Bodies under
+  1,024 triangles get no coarse level, and mesh bodies none at all: they are
+  the imported triangles.
 - Sketch drags solve in the browser; API.md, Evaluation, says when a sketch
   write or evaluation solves.

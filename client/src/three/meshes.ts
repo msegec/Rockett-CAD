@@ -41,12 +41,14 @@ export class MeshRegistry {
     return () => void this.listeners.delete(listener);
   };
 
-  get(body: LayerBody): MeshPayload | undefined {
+  get(body: LayerBody, coarse = false): MeshPayload | undefined {
     if (decoded(body)) return body;
-    const hit = this.meshes.get(body.meshKey);
-    if (!hit) return this.want(body);
-    this.meshes.delete(body.meshKey);
-    this.meshes.set(body.meshKey, hit);
+    const level = coarse ? body.coarse?.hash : undefined;
+    const key = level ?? body.meshKey;
+    const hit = this.meshes.get(key);
+    if (!hit) return this.want(key, level ?? hashOf(body));
+    this.meshes.delete(key);
+    this.meshes.set(key, hit);
     return hit;
   }
 
@@ -66,6 +68,11 @@ export class MeshRegistry {
     this.failed.clear();
   }
 
+  notify() {
+    this.version++;
+    for (const listener of this.listeners) listener();
+  }
+
   private keep(key: string, mesh: MeshPayload) {
     const replaced = this.meshes.get(key);
     if (replaced) this.size -= numbers(replaced);
@@ -80,11 +87,10 @@ export class MeshRegistry {
     return mesh;
   }
 
-  private want(body: LayerBody): undefined {
-    const key = body.meshKey;
+  private want(key: string, hash: string): undefined {
     if (!this.scope || this.fetching.has(key) || this.failed.has(key)) return;
     this.queue.delete(key);
-    this.queue.set(key, hashOf(body));
+    this.queue.set(key, hash);
     for (const [old] of this.queue) {
       if (this.queue.size <= QUEUE_LIMIT) break;
       this.queue.delete(old);
@@ -119,8 +125,7 @@ export class MeshRegistry {
       .then((bytes) => {
         if (scope !== this.scope) return;
         this.keep(key, meshPayloadOf(new Uint8Array(bytes)));
-        this.version++;
-        for (const listener of this.listeners) listener();
+        this.notify();
       })
       .catch(() => {
         if (scope === this.scope) this.failed.add(key);

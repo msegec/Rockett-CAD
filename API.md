@@ -186,8 +186,11 @@ in the same edit.
 - Evaluate answers `EvaluateResult` and mutations `MutationResponse`
   (`shared/src/routes.ts`). Each `BodyPayload` carries `bodyId`, `name`,
   `color`, `meshKey`, `bbox` and `mesh`, the hash and byte size of its
-  mesh, never the mesh itself. The client fetches each hash from the mesh
-  route once: `client/src/three/meshes.ts`.
+  mesh, never the mesh itself. A B-Rep body with at least 1,024 triangles
+  whose mesh at 12 times the viewport deflection has at most half of them
+  also carries `coarse`, that level's hash and byte size; the mesh route
+  serves both. The client
+  fetches each hash from the mesh route once: `client/src/three/meshes.ts`.
 - `BodyPayload.color` is the body's stored `bodyMeta` colour, else the
   `#rrggbb` a STEP file gave it, kept per body id through later features
   (`EvalState.imported`).

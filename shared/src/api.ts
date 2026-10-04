@@ -97,6 +97,7 @@ export interface BodyPayload {
   color?: string;
   meshKey: string;
   mesh?: { hash: string; bytes: number };
+  coarse?: { hash: string; bytes: number };
   bbox: { min: Vec3; max: Vec3 };
 }
 

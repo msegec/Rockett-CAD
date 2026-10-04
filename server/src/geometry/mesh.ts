@@ -4,6 +4,7 @@ import {
   faces as facesOf,
   scoped,
   transformOp,
+  type Own,
   type Shape,
 } from "./kernel.js";
 import { compound } from "./importers.js";
@@ -99,22 +100,48 @@ export function meshShape(
   });
 }
 
-export function meshCopy(
+function detached(
+  own: Own,
   shape: Shape,
   { linear, angular }: { linear: number; angular: number },
+): Shape[] {
+  const k = getKernel();
+  const copy = own(
+    own(new k.BRepBuilderAPI_Copy_2(shape, false, false)).Shape(),
+  );
+  own(new k.BRepMesh_IncrementalMesh_2(copy, linear, false, angular, false));
+  return facesOf(copy).map(own);
+}
+
+export function meshDetached(
+  shape: Shape,
+  deflection: { linear: number; angular: number },
+): FaceMesh[] {
+  const k = getKernel();
+  return scoped((own) => {
+    const faces = facesOf(shape).map(own);
+    if (faces.some(isExact)) return [];
+    return detached(own, shape, deflection).flatMap((copied, i) => {
+      const mesh = k.meshFace(copied);
+      if (!mesh) return [];
+      return [{ face: own.keep(faces[i]!), ...mesh }];
+    });
+  }).map((mesh) => {
+    acquire(mesh.face);
+    return mesh;
+  });
+}
+
+export function meshCopy(
+  shape: Shape,
+  deflection: { linear: number; angular: number },
 ): Omit<FaceMesh, "face">[] {
   const k = getKernel();
   return scoped((own) => {
-    let faces = facesOf(shape).map(own);
-    if (!faces.every(isExact)) {
-      const copy = own(
-        own(new k.BRepBuilderAPI_Copy_2(shape, false, false)).Shape(),
-      );
-      own(
-        new k.BRepMesh_IncrementalMesh_2(copy, linear, false, angular, false),
-      );
-      faces = facesOf(copy).map(own);
-    }
-    return faces.flatMap((face) => k.meshFace(face) ?? []);
+    const faces = facesOf(shape).map(own);
+    const meshed = faces.every(isExact)
+      ? faces
+      : detached(own, shape, deflection);
+    return meshed.flatMap((face) => k.meshFace(face) ?? []);
   });
 }

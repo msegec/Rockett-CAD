@@ -1,13 +1,12 @@
 import * as THREE from "three";
-import type { OriginAxis, PlaneRef, Vec3 } from "@rockett/shared";
+import type { MeshPayload, OriginAxis, PlaneRef, Vec3 } from "@rockett/shared";
 import { HIGHLIGHT_APPEARANCE } from "../tunables";
 import { themeColor } from "../theme/tokens";
-import { meshOf, type LayerBody } from "../three/meshes";
 
 export type HighlightStyle = "select" | "hover";
 
 interface HighlightSources {
-  bodies: ReadonlyMap<string, { payload: LayerBody; mesh: THREE.Mesh }>;
+  bodies: ReadonlyMap<string, { shape: MeshPayload; mesh: THREE.Mesh }>;
   originAxisLines: ReadonlyMap<OriginAxis, THREE.Line>;
   originPlaneMeshes: readonly THREE.Mesh[];
   constructionPlanes: THREE.Group;
@@ -37,7 +36,7 @@ export class HighlightContext {
 
   mesh(bodyId: string) {
     const body = this.sources.bodies.get(bodyId);
-    return body && meshOf(body.payload);
+    return body?.shape;
   }
 
   flush() {

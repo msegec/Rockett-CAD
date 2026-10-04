@@ -1,6 +1,5 @@
 import * as THREE from "three";
 import type { Selection } from "../selection/kinds";
-import { meshOf } from "./meshes";
 import type { PickBody } from "./pickProviders";
 import { worldToClient } from "./screen";
 
@@ -96,10 +95,9 @@ function bodyPicks(
   const wants = (id: string) => scene.providerIds.includes(id);
   const out: Selection[] = [];
   for (const body of scene.bodies.values()) {
-    const shape = meshOf(body.payload);
-    if (!body.group.visible || !shape) continue;
+    if (!body.group.visible) continue;
     const { bodyId } = body.payload;
-    const { faces, edges, vertices, positions, indices } = shape;
+    const { faces, edges, vertices, positions, indices } = body.shape;
     const matrix = body.mesh.matrixWorld;
     const corners = wants("design.face") ? project(positions, matrix) : [];
     for (const f of wants("design.face") ? faces : [])

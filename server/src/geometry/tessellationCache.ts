@@ -1,4 +1,5 @@
 import {
+  coarseOf,
   lazyMesh,
   meshBinary,
   meshHead,
@@ -56,11 +57,12 @@ export function store(body: NamedBody, payload: MeshedBody): Tessellation {
   evict(key);
   const head = meshHead(payload);
   const binary = meshBinary(payload);
+  const coarse = coarseOf(payload)?.byteLength ?? 0;
   const entry = {
     source: sourceOf(body),
     head,
     binary,
-    bytes: binary.byteLength + payloadBytes(head),
+    bytes: binary.byteLength + coarse + payloadBytes(head),
   };
   tessCache.entries.set(key, entry);
   tessCache.bytes += entry.bytes;

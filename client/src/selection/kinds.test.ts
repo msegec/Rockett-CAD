@@ -357,7 +357,7 @@ function highlightFixture() {
     ]),
   );
   const ctx = new HighlightContext(root, {
-    bodies: new Map([["b", { mesh, payload }]]),
+    bodies: new Map([["b", { mesh, shape: payload }]]),
     originPlaneMeshes: [plane],
     originAxisLines: new Map([["Z", axis]]),
     constructionPlanes,

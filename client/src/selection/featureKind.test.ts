@@ -70,7 +70,7 @@ function body(bodyId: string, faces: MeshedBody["faces"]) {
     edges: [],
     vertices: [],
   } as unknown as MeshedBody;
-  return [bodyId, { payload, mesh: new THREE.Mesh(geometry) }] as const;
+  return [bodyId, { shape: payload, mesh: new THREE.Mesh(geometry) }] as const;
 }
 
 it("highlights every face the feature made on every body", () => {
