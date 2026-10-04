@@ -76,6 +76,7 @@ import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { previewEdit } from "../toolTargets";
 import { peekHighlight, usePeekedFeature } from "../timelinePeek";
 import { ViewportHud } from "./ViewportHud";
+import { IDLE_PICKS, primaryDrag, SKETCH_PICKS } from "./primaryDrag";
 import {
   DimensionEdit,
   updateOfferingDriven,
@@ -92,16 +93,6 @@ interface DimLabel {
   anchorWorld: THREE.Vector3;
   reference?: [THREE.Vector3, THREE.Vector3];
 }
-
-const IDLE_PICKS = [
-  "design.face",
-  "design.edge",
-  "design.vertex",
-  "sketch.profile",
-  "sketch.entity",
-  "sketch.point",
-];
-const SKETCH_PICKS = ["sketch.entity", "sketch.point"];
 
 const NUDGE_EVENTS = ["pointerdown", "pointerup", "wheel"];
 
@@ -601,7 +592,7 @@ export function ViewportView({
     const container = containerRef.current;
     if (!vp || !container) return;
     const el = vp.renderer.domElement;
-
+    const drag = primaryDrag(vp, container, planeUV);
     let button = -1;
     let lastX = 0,
       lastY = 0;
@@ -632,7 +623,6 @@ export function ViewportView({
         return;
       }
       if (e.button === 0) {
-        // gizmo drags take priority over everything else
         if (commandGizmo.current?.down(e)) {
           e.preventDefault();
           return;
@@ -645,7 +635,7 @@ export function ViewportView({
           e.preventDefault();
           return;
         }
-        handlePrimaryDown(e);
+        if (!drag.down(e)) handlePrimaryDown(e);
       }
     };
 
@@ -668,7 +658,7 @@ export function ViewportView({
       } else if (panning) {
         vp.pan(dx, dy);
       } else if (button === 0) {
-        handlePrimaryDrag(e);
+        if (!drag.move(e)) handlePrimaryDrag(e);
       } else {
         handleHover(e);
       }
@@ -694,14 +684,14 @@ export function ViewportView({
       const b = button;
       button = -1;
       if (wasOrbit || wasPan) {
-        // right-click without dragging → context menu on picked topology
         if (b === 2 && !dragMoved) handleContextClick(e);
         return;
       }
-      if (b === 0) handlePrimaryUp(e, dragMoved);
+      if (b === 0) drag.up(e, dragMoved, handlePrimaryUp);
     };
 
     const onPointerCancel = () => {
+      drag.cancel();
       if (commandGizmo.current?.cancel()) button = -1;
     };
 
@@ -726,8 +716,8 @@ export function ViewportView({
       unlistenWheel();
       el.removeEventListener("contextmenu", onContext);
       el.removeEventListener("dblclick", onDblClick);
+      drag.cancel();
     };
-    // handlers read latest state via zustand getState
   }, []);
 
   function activeSketchFrame(): PlaneFrame | null {

@@ -230,11 +230,17 @@ readable JSON format.
 | Action                             | Input                                                                                   |
 | ---------------------------------- | --------------------------------------------------------------------------------------- |
 | Select                             | Left click (Ctrl adds; Alt+click cycles overlapping picks)                              |
+| Box select                         | Left-drag from empty space: rightward takes what is inside, leftward what it crosses    |
+| Box add or remove                  | Hold Shift while dragging to add to the selection, Ctrl to remove from it               |
+| Move sketch geometry               | With Select, drag a sketch point or line                                                |
 | Context menu                       | Right click on a project, tree row, timeline chip or the viewport                       |
 | Orbit                              | Right-drag or Shift+middle-drag, about the point under the cursor; or drag the ViewCube |
 | Pan                                | Middle-drag, or two-finger scroll on a trackpad                                         |
 | Zoom                               | Scroll wheel or trackpad pinch, to the cursor                                           |
 | Named views / fit / ortho or persp | Toolbar (right side) and ViewCube                                                       |
+
+A selection box reaches through the model: hidden faces, edges and vertices
+inside it are selected too. Escape during the drag cancels the box.
 
 Each project reopens at your last camera. A project you have not moved opens
 zoomed to fit.

@@ -28,6 +28,7 @@ import {
   type PickResult,
 } from "./pickProviders";
 import { clientRay } from "./screen";
+import { boxPick, type BoxMode, type ClientBox } from "./boxPick";
 import { clearGroup, disposeGroup, disposeObject } from "./dispose";
 import { fillGhost } from "./ghostGeometry";
 import { type LayerHandle, sceneLayers } from "./sceneLayers";
@@ -627,10 +628,6 @@ export class CadViewport {
     this.requestRender();
   }
 
-  // -------------------------------------------------------------------------
-  // Bodies
-  // -------------------------------------------------------------------------
-
   syncBodies(payloads: BodyPayload[], hidden: ReadonlySet<string> = new Set()) {
     const seen = new Set<string>();
     for (const p of payloads) {
@@ -685,7 +682,6 @@ export class CadViewport {
     mesh.userData.bodyId = p.bodyId;
     group.add(mesh);
 
-    // edges as segment soup with per-segment edge names
     const edgePts: number[] = [];
     const edgeSegments: string[] = [];
     for (const e of p.edges) {
@@ -713,7 +709,6 @@ export class CadViewport {
     edges.userData.bodyId = p.bodyId;
     group.add(edges);
 
-    // vertices
     const vertPts: number[] = [];
     const vertexNames: string[] = [];
     for (const v of p.vertices) {
@@ -819,10 +814,6 @@ export class CadViewport {
     return [...this.bodies.values()].map((b) => b.payload);
   }
 
-  // -------------------------------------------------------------------------
-  // Picking
-  // -------------------------------------------------------------------------
-
   pick(
     clientX: number,
     clientY: number,
@@ -845,6 +836,12 @@ export class CadViewport {
       },
       depth,
     );
+  }
+
+  boxPick(box: ClientBox, mode: BoxMode, providerIds: readonly string[]) {
+    const { bodies, sketches } = this;
+    const scene = { bodies, sketches: sketches.group, providerIds };
+    return boxPick(scene, box, mode, this.canvasRect(), this.camera);
   }
 
   clearHighlights() {

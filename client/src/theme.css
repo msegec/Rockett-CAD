@@ -590,6 +590,17 @@ button.doc-name:hover .doc-name-pen {
   margin-left: 2px;
 }
 
+.select-box {
+  position: absolute;
+  pointer-events: none;
+  z-index: 4;
+  border: 1px solid var(--accent);
+}
+
+.select-box.crossing {
+  border-style: dashed;
+}
+
 /* snap glyphs (drawn at the snapped cursor position) */
 .snap-marker {
   position: fixed;
