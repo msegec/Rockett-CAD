@@ -4,7 +4,7 @@ import {
   type OriginAxis,
   type ExtrudeFeature,
 } from "@rockett/shared";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { selectionKey, useStore, type Selection } from "../../store";
 import { previewBodies, usePreviewBase } from "../../previewBase";
@@ -119,6 +119,30 @@ export function AxisField({
   );
 }
 
+function Labelled({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string | null | undefined;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      <label className="field">
+        <span>{label}</span>
+        {children}
+      </label>
+      {error && (
+        <span className="field-hint" role="alert">
+          {error}
+        </span>
+      )}
+    </>
+  );
+}
+
 export function TextField({
   label,
   value,
@@ -133,23 +157,76 @@ export function TextField({
   onChange: (v: string) => void;
 }) {
   return (
-    <>
-      <label className="field">
-        <span>{label}</span>
-        <input
-          type="text"
-          aria-invalid={!!error}
-          value={value}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </label>
-      {error && (
-        <span className="field-hint" role="alert">
-          {error}
-        </span>
-      )}
-    </>
+    <Labelled label={label} error={error}>
+      <input
+        type="text"
+        aria-invalid={!!error}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </Labelled>
+  );
+}
+
+export function TextAreaField({
+  label,
+  value,
+  maxLength,
+  rows = 3,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  maxLength: number;
+  rows?: number;
+  disabled?: boolean;
+  onChange: (v: string) => void;
+}) {
+  const [cutTo, setCutTo] = useState<string | null>(null);
+  const composing = useRef<string | null>(null);
+  const change = (area: HTMLTextAreaElement, before: string) => {
+    const next = area.value;
+    const size = Array.from(next).length;
+    const drop = Math.min(size - maxLength, size - Array.from(before).length);
+    if (drop <= 0) {
+      setCutTo(null);
+      onChange(next);
+      return;
+    }
+    const end = area.selectionEnd;
+    const head = Array.from(next.slice(0, end));
+    const keep = head.slice(0, head.length - drop).join("");
+    const kept = keep + next.slice(end);
+    area.value = kept;
+    area.setSelectionRange(keep.length, keep.length);
+    setCutTo(kept);
+    onChange(kept);
+  };
+  const error =
+    cutTo === value ? `Cut to the ${maxLength} character limit` : null;
+  return (
+    <Labelled label={label} error={error}>
+      <textarea
+        rows={rows}
+        value={value}
+        disabled={disabled}
+        onCompositionStart={() => {
+          composing.current = value;
+        }}
+        onCompositionEnd={(e) => {
+          const before = composing.current ?? value;
+          composing.current = null;
+          change(e.currentTarget, before);
+        }}
+        onChange={(e) =>
+          composing.current === null
+            ? change(e.target, value)
+            : onChange(e.target.value)
+        }
+      />
+    </Labelled>
   );
 }
 

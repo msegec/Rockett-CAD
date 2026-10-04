@@ -254,8 +254,9 @@ export interface ProjectView {
 
 export interface NumberFieldProps {
   label?: string;
-  value: number;
+  value: number | undefined;
   onChange(value: number): void;
+  onClear?(): void;
   min?: number;
   max?: number;
   above?: number;
@@ -294,6 +295,14 @@ export interface ClientUi {
     value: string;
     onChange: (value: string) => void;
     error?: string | null;
+    disabled?: boolean;
+  }>;
+  TextAreaField: ComponentType<{
+    label: string;
+    value: string;
+    maxLength: number;
+    onChange: (value: string) => void;
+    rows?: number;
     disabled?: boolean;
   }>;
   openPanel(id: string): void;

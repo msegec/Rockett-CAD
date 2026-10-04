@@ -33,6 +33,7 @@ import {
   LengthField,
   NumField,
   SelectField,
+  TextAreaField,
   TextField,
 } from "../components/form/fields";
 import { useSetting } from "../settings";
@@ -163,6 +164,7 @@ const ui: ClientUi = {
   SelectField,
   CheckField,
   TextField,
+  TextAreaField,
   openPanel,
   closePanel,
   confirm,

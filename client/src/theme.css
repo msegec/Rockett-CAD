@@ -31,7 +31,8 @@ button {
 }
 
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: var(--text);
   background: var(--bg0);
@@ -41,7 +42,8 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: 1px solid var(--accent);
 }
 
@@ -886,6 +888,7 @@ kbd {
 
 .field input[type="number"],
 .field input[type="text"],
+.field textarea,
 .field select {
   width: 110px;
 }

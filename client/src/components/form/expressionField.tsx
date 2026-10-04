@@ -171,7 +171,7 @@ function settle(path: Bind) {
 
 export interface ExpressionFieldProps extends FieldSpec {
   label?: string | undefined;
-  value: number;
+  value: number | undefined;
   onChange: (v: number) => void;
   step?: number | undefined;
   ariaLabel?: string | undefined;
@@ -184,7 +184,7 @@ export interface ExpressionFieldProps extends FieldSpec {
 
 export function ExpressionField({
   label,
-  value,
+  value = Number.NaN,
   onChange,
   step,
   ariaLabel,

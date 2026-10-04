@@ -377,10 +377,23 @@ module, in load order:
   core edit, and applies the returned document and history. A route that is
   not a document edit, or no open project, rejects.
 - `ui` passes the core `DraggablePanel`, `DialogFooter`, `NumField`,
-  `LengthField`, `AngleField`, `SelectField`, `CheckField` and `TextField`,
-  so a module dialog uses the KIT fields. `LengthField` takes millimetres
-  and shows the user's length unit. `ui.openPanel(id)` and
-  `ui.closePanel(id)` open and close a panel through the core panel state.
+  `LengthField`, `AngleField`, `SelectField`, `CheckField`, `TextField` and
+  `TextAreaField`, so a module dialog uses the KIT fields. `LengthField`
+  takes millimetres and shows the user's length unit. `ui.openPanel(id)`
+  and `ui.closePanel(id)` open and close a panel through the core panel
+  state.
+- A number field's `value` may be `undefined`, which shows a blank box.
+  With `onClear`, clearing the box calls it, so the module can store
+  `undefined`; without it, a blank box shows "Enter a value" and calls
+  nothing.
+- `TextAreaField` takes `label`, `value`, `onChange`, a `maxLength` in
+  characters, and optional `rows` (3) and `disabled`. Line breaks arrive
+  as LF, because browsers normalise CRLF in a textarea. An edit past
+  `maxLength` keeps the existing text and as much of the new text as fits,
+  puts the caret after the kept insertion and shows
+  `Cut to the <maxLength> character limit`. The alert clears on the next
+  edit that fits or when the module changes `value`. An IME composition is
+  cut when it ends.
 - `ui.confirm(message)` asks through the core Confirm panel and resolves
   true on OK, false on Cancel or Escape. A newer confirm answers the open
   one false.
