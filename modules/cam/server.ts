@@ -8,9 +8,11 @@ import {
 } from "./src/shared/document.js";
 import { mountGenerate } from "./src/server/generate.js";
 import { mountLibrary } from "./src/server/library.js";
+import { mountExport } from "./src/server/ncExport.js";
 
 export default defineServerModule({
-  activate({ register, userData, ...context }) {
+  activate(context) {
+    const { register, userData } = context;
     register.kernelJob(
       "rockett.cam.regions",
       new URL("./kernel.ts", import.meta.url),
@@ -39,7 +41,7 @@ export default defineServerModule({
           return signed;
         });
         mountLibrary(api, userData);
-        mountGenerate(api, context);
+        mountExport(api, context, mountGenerate(api, context));
       },
     });
   },

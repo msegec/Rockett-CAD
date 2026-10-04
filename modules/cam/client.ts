@@ -1,10 +1,15 @@
-import { defineClientModule } from "@rockett/plugin-api";
+import {
+  defineClientModule,
+  type ClientContext,
+  type Panel,
+} from "@rockett/plugin-api";
 import { manufactureBrowser } from "./src/client/browser.js";
 import {
   dialogPanel,
   OPERATION_DIALOGS,
   operationDialog,
 } from "./src/client/opDialog.js";
+import { NC_PANEL, ncDialog } from "./src/client/ncDialog.js";
 import { SETUP_PANEL, setupDialog } from "./src/client/setupDialog.js";
 import { stockLayer } from "./src/client/stockLayer.js";
 import { TOOL_PANEL, toolPanel } from "./src/client/toolPanel.js";
@@ -17,10 +22,31 @@ import {
 const MANUFACTURE = "rockett.cam.manufacture";
 const SETUP_GROUP = "rockett.cam.group.setup";
 const MILL_GROUP = "rockett.cam.group.mill";
+const PROGRAM_GROUP = "rockett.cam.group.program";
+
+type Dialog = {
+  id: string;
+  label: string;
+  group: string;
+  icon: `${string}.svg`;
+  panel: string;
+  component: Panel["component"];
+};
+
+function dialog({ register, ui }: ClientContext, item: Dialog) {
+  const { panel, component, ...command } = item;
+  register.command({ ...command, run: () => ui.openPanel(panel) });
+  register.panel({
+    id: panel,
+    title: command.label,
+    when: (_state, open) => open.includes(panel),
+    component,
+  });
+}
 
 export default defineClientModule({
   activate(context) {
-    const { register, ui, project } = context;
+    const { register, project } = context;
     const preview = toolpathPreview(project);
     register.workbench({
       id: MANUFACTURE,
@@ -35,30 +61,20 @@ export default defineClientModule({
       label: "SETUP",
       context: MANUFACTURE,
     });
-    register.command({
+    dialog(context, {
       id: "rockett.cam.setup",
       label: "Setup",
       group: SETUP_GROUP,
       icon: "setup.svg",
-      run: () => ui.openPanel(SETUP_PANEL),
-    });
-    register.panel({
-      id: SETUP_PANEL,
-      title: "Setup",
-      when: (_state, open) => open.includes(SETUP_PANEL),
+      panel: SETUP_PANEL,
       component: setupDialog(context),
     });
-    register.command({
+    dialog(context, {
       id: "rockett.cam.library",
       label: "Library",
       group: SETUP_GROUP,
       icon: "library.svg",
-      run: () => ui.openPanel(TOOL_PANEL),
-    });
-    register.panel({
-      id: TOOL_PANEL,
-      title: "Library",
-      when: (_state, open) => open.includes(TOOL_PANEL),
+      panel: TOOL_PANEL,
       component: toolPanel(context),
     });
     register.toolbarGroup({
@@ -67,22 +83,29 @@ export default defineClientModule({
       context: MANUFACTURE,
       after: "rockett.cam.group.plan",
     });
-    for (const op of OPERATION_DIALOGS) {
-      const panel = dialogPanel(op);
-      register.command({
+    for (const op of OPERATION_DIALOGS)
+      dialog(context, {
         id: op.type,
         label: op.label,
         group: MILL_GROUP,
         icon: op.icon,
-        run: () => ui.openPanel(panel),
-      });
-      register.panel({
-        id: panel,
-        title: op.label,
-        when: (_state, open) => open.includes(panel),
+        panel: dialogPanel(op),
         component: operationDialog(context, op),
       });
-    }
+    register.toolbarGroup({
+      id: PROGRAM_GROUP,
+      label: "PROGRAM",
+      context: MANUFACTURE,
+      after: "rockett.cam.group.laser",
+    });
+    dialog(context, {
+      id: "rockett.cam.nc",
+      label: "NC Program",
+      group: PROGRAM_GROUP,
+      icon: "nc-program.svg",
+      panel: NC_PANEL,
+      component: ncDialog(context),
+    });
     register.layer(stockLayer(project, preview));
     register.layer(toolpathLayer(preview));
   },

@@ -4,6 +4,7 @@ import type {
   Route,
   RouteModuleApi,
   ServerContext,
+  User,
   UserData,
 } from "@rockett/plugin-api";
 import {
@@ -68,6 +69,19 @@ function list<T extends { id: string }>(
   });
 }
 
+export async function libraryItem<T extends TSchema>(
+  store: UserData,
+  user: User,
+  id: string,
+  schema: T,
+): Promise<Static<T> | undefined> {
+  const stored = (await store.read(user))?.data;
+  const item: unknown = Array.isArray(stored)
+    ? stored.find((value) => value?.id === id)
+    : undefined;
+  return Value.Check(schema, item) ? item : undefined;
+}
+
 export function mountLibrary(
   api: RouteModuleApi,
   userData: ServerContext["userData"],
@@ -92,12 +106,8 @@ export function mountLibrary(
     const cam = migrateCam(doc.extensions[CAM_EXTENSION]);
     if (cam.status === "kept") throw new Error(cam.reason);
     const { id } = req.body;
-    const stored = (await tools.read(user))?.data;
-    const tool = Array.isArray(stored)
-      ? stored.find((value) => value?.id === id)
-      : undefined;
-    if (!Value.Check(toolSchema, tool))
-      throw new Error(`tool ${id} is not in your library`);
+    const tool = await libraryItem(tools, user, id, toolSchema);
+    if (!tool) throw new Error(`tool ${id} is not in your library`);
     cam.data.tools.push({
       ...tool,
       id: crypto.randomUUID(),

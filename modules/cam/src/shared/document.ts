@@ -186,6 +186,32 @@ export const signRoute: Route<
   path: "/projects/:id/m/rockett/cam/bodies/:bodyId/faces/:faceName/sig",
 };
 
+export type Blocker =
+  | {
+      kind: "operation";
+      setupId: string;
+      operationId: string;
+      name: string;
+      status: OperationStatus["status"];
+      reason?: string;
+    }
+  | { kind: "check"; setupId: string; rule: string; reason: string };
+
+export type NcExport =
+  | { fileName: string; nc: string }
+  | { fileName: string; zip: string }
+  | { blocked: Blocker[] }
+  | { reason: string };
+
+export const ncRoute: Route<
+  "/projects/:id/m/rockett/cam/nc/:machineId/:postId/:toolChange/:setupIds",
+  unknown,
+  NcExport
+> = {
+  method: "GET",
+  path: "/projects/:id/m/rockett/cam/nc/:machineId/:postId/:toolChange/:setupIds",
+};
+
 export type CamRead =
   { status: "ready"; data: CamData } | { status: "kept"; reason: string };
 

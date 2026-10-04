@@ -1,4 +1,5 @@
 import {
+  arcStep,
   arcSweep,
   endOf,
   inPlane,
@@ -15,7 +16,6 @@ import {
   type Xyz,
 } from "../shared/ir.js";
 import { MM_PER_INCH } from "../shared/tools.js";
-import { arcStep } from "../toolpath/geometry.js";
 import type { Post } from "./schema.js";
 
 export type Units = "mm" | "inch";

@@ -93,6 +93,10 @@ export function arcSweep(from: Xyz, arc: Arc): number {
     : (((arc.dir === "ccw" ? turn : -turn) % TAU) + TAU) % TAU;
 }
 
+export function arcStep(radius: number, tolerance: number): number {
+  return 2 * Math.acos(Math.max(-1, 1 - tolerance / radius));
+}
+
 function arcLength(from: Xyz, arc: Arc): number {
   const rise = inPlane(arc.to, arc.plane)[2] - inPlane(from, arc.plane)[2];
   return Math.hypot(radii(from, arc)[0] * arcSweep(from, arc), rise);

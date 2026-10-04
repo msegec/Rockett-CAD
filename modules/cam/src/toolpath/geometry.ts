@@ -11,7 +11,13 @@ import {
   type Paths64,
 } from "clipper2-ts";
 import type { RegionLoop, Segment } from "../kernel/regions.js";
-import { arcSweep, type Move, type Xy, type Xyz } from "../shared/ir.js";
+import {
+  arcStep,
+  arcSweep,
+  type Move,
+  type Xy,
+  type Xyz,
+} from "../shared/ir.js";
 import { toolRefusal } from "../shared/operations.js";
 import type { Box, Setup } from "../shared/setup.js";
 import {
@@ -51,10 +57,6 @@ export function checkMoves(what: string, count: number) {
 
 export function append<T>(out: T[], items: readonly T[]) {
   for (const item of items) out.push(item);
-}
-
-export function arcStep(radius: number, tolerance: number): number {
-  return 2 * Math.acos(Math.max(-1, 1 - tolerance / radius));
 }
 
 export function steps(length: number, step: number): number {

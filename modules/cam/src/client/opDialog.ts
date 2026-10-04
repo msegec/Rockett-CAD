@@ -72,7 +72,7 @@ const unset = (schema: TObject, params: Params) =>
     )
     .map(([key]) => key);
 
-function setupList(open: OpenProject): List<CamData["setups"][number]> {
+export function setupList(open: OpenProject): List<CamData["setups"][number]> {
   const read = camRead(open);
   return read.status === "kept"
     ? { status: "failed", reason: read.reason }
@@ -134,7 +134,7 @@ function addOperation(
   ]);
 }
 
-function picker<T extends Named>(
+export function picker<T extends Named>(
   ui: ClientContext["ui"],
   label: string,
   list: List<T>,
@@ -164,7 +164,7 @@ function picker<T extends Named>(
   });
 }
 
-function useLibrary<T>(
+export function useLibrary<T>(
   request: ClientContext["request"],
   noun: string,
   keep: (item: T) => boolean = () => true,
@@ -186,7 +186,7 @@ function useLibrary<T>(
   return list;
 }
 
-const chosen = <T extends Named>(list: List<T>, id: string) =>
+export const chosen = <T extends Named>(list: List<T>, id: string) =>
   list.status === "ready"
     ? (list.items.find((item) => item.id === id) ?? list.items[0])
     : undefined;
@@ -207,14 +207,16 @@ async function saveOperation(
   );
 }
 
+export const SETUP_TEXTS: Texts = {
+  loading: "Loading setups...",
+  empty: "No setups yet. Add one with Setup.",
+  failed: "Setups did not load",
+};
+
 const listTexts = ({
   label,
 }: OperationDialog): Record<"setup" | "tool" | "preset", Texts> => ({
-  setup: {
-    loading: "Loading setups...",
-    empty: "No setups yet. Add one with Setup.",
-    failed: "Setups did not load",
-  },
+  setup: SETUP_TEXTS,
   tool: {
     loading: "Loading tools...",
     empty: `No tool in your library can cut a ${label.toLowerCase()}.`,

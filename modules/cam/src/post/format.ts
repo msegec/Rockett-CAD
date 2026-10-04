@@ -48,7 +48,7 @@ const COOLANT: Record<Coolant, TemplateName> = {
   mist: "coolantMist",
 };
 const PROFILES: Record<Section["pass"], number> = { rough: 1, finish: 3 };
-const NUMBER = /^([A-Z])-?\d+(?:\.(\d+))?$/;
+export const NUMBER = /^([A-Z])-?\d+(?:\.(\d+))?$/;
 
 function number(value: number, format: NumberFormat): string {
   let text = value.toFixed(format.decimals);
@@ -63,6 +63,23 @@ function clean(text: string): string {
     .trim();
 }
 
+export function dialectLine(post: Post): (line: string) => boolean {
+  const words = new Set(post.words);
+  const { open, close } = commentForm(post.templates.comment)!;
+  return (line) => {
+    if (line.startsWith(open.trim())) {
+      const inner = line.slice(open.length, line.length - close.length);
+      return line === `${open}${clean(inner)}${close}`;
+    }
+    return line.split(" ").every((word) => {
+      if (words.has(word)) return true;
+      const [, letter, fraction = ""] = NUMBER.exec(word) ?? [];
+      const format = letter ? post.formats[letter] : undefined;
+      return format !== undefined && fraction.length <= format.decimals;
+    });
+  };
+}
+
 class Writer {
   readonly lines: string[] = [];
   readonly modal = new Map<string, string>();
@@ -70,7 +87,7 @@ class Writer {
   private readonly laserOn: Token[][];
   private readonly groups = new Map<string, string>();
   private readonly letters: Set<string>;
-  private readonly words: Set<string>;
+  private readonly allowed: (line: string) => boolean;
   private readonly comments: { open: string; close: string };
   private profile: number | undefined;
 
@@ -94,22 +111,8 @@ class Writer {
         for (const word of entry) this.groups.set(word, `#${i}`);
     });
     this.letters = new Set(post.modal.filter((e) => typeof e === "string"));
-    this.words = new Set(post.words);
+    this.allowed = dialectLine(post);
     this.comments = commentForm(post.templates.comment)!;
-  }
-
-  private allowed(line: string): boolean {
-    const { open, close } = this.comments;
-    if (line.startsWith(open.trim())) {
-      const inner = line.slice(open.length, line.length - close.length);
-      return line === `${open}${clean(inner)}${close}`;
-    }
-    return line.split(" ").every((word) => {
-      if (this.words.has(word)) return true;
-      const [, letter, fraction = ""] = NUMBER.exec(word) ?? [];
-      const format = letter ? this.post.formats[letter] : undefined;
-      return format !== undefined && fraction.length <= format.decimals;
-    });
   }
 
   push(line: string) {

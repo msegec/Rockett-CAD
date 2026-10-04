@@ -34,14 +34,14 @@ export type GenerateRequest = Omit<GenerateInput, "bodies"> & {
   user: User;
 };
 
-const sorted = (_key: string, value: unknown) =>
+export const sorted = (_key: string, value: unknown) =>
   value && typeof value === "object" && !Array.isArray(value)
     ? Object.fromEntries(
         Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
       )
     : value;
 
-async function sha256(text: string) {
+export async function sha256(text: string) {
   const digest = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(text),
@@ -62,11 +62,11 @@ const why = ({ featureId, status, error }: FeatureStatus) =>
       ? `${featureId}, which was cancelled`
       : `${featureId}, which has unresolved references`;
 
-type Model = Map<string, ServerBody>;
+export type Model = Map<string, ServerBody>;
 type Job = Omit<GenerateInput, "bodies">;
 type Ready = { fingerprint: string; input: GenerateInput };
 
-const readModel = async (
+export const readModel = async (
   context: Pick<ServerContext, "bodies">,
   projectId: string,
   user: User,
@@ -151,7 +151,7 @@ export function generator(
   };
 }
 
-function cam(doc: CadDocument): CamData {
+export function cam(doc: CadDocument): CamData {
   const read = migrateCam(doc.extensions[CAM_EXTENSION]);
   if (read.status === "kept") throw new Error(read.reason);
   return read.data;
@@ -165,7 +165,7 @@ const find = (data: CamData, { setupId, operationId }: Target) => {
   return { setup, op };
 };
 
-function inputs(data: CamData, at: Target): Job | string {
+export function inputs(data: CamData, at: Target): Job | string {
   const { setup, op } = find(data, at);
   const { bodies, stock, wcs, safeHeight, clearance } = setup;
   if (!bodies || !stock || !wcs || safeHeight === undefined)
@@ -187,7 +187,7 @@ function inputs(data: CamData, at: Target): Job | string {
   });
 }
 
-async function assess(
+export async function assess(
   model: Model,
   data: CamData,
   at: Target,
@@ -220,7 +220,7 @@ const save = (doc: CadDocument, data: CamData) => {
 export function mountGenerate(
   api: RouteModuleApi,
   context: Pick<ServerContext, "bodies" | "startKernelJob" | "files">,
-) {
+): ProgramCache {
   const cache = programCache(context.files);
   const generate = generator(context, cache);
   const produce = producer(context, cache);
@@ -283,4 +283,5 @@ export function mountGenerate(
     save(doc, data);
     return { label: "Generate all stale" };
   });
+  return cache;
 }
