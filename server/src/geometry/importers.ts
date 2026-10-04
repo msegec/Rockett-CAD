@@ -13,12 +13,14 @@ import {
   explore,
   acquire,
   bboxOf,
+  edges as edgesOf,
   scoped,
   getKernel,
   faces,
   solids,
   progress,
   volumeOf,
+  type Own,
   type Shape,
 } from "./kernel.js";
 import { setExactTriangle } from "./mesh.js";
@@ -84,6 +86,16 @@ function pointText(p: number[]): string {
   return `(${p.map((v) => roundedLength(v, "mm")).join(", ")})`;
 }
 
+const MAX_SEW_TOL = 0.01;
+
+function sewTolerance(shape: Shape, own: Own): number {
+  const k = getKernel();
+  const widest = edgesOf(shape)
+    .map(own)
+    .reduce((most, edge) => Math.max(most, k.BRep_Tool.Tolerance_2(edge)), 0);
+  return Math.min(MAX_SEW_TOL, Math.max(LINEAR_TOL, widest));
+}
+
 function sewFaces(shape: Shape | undefined, label: string): Shape | undefined {
   if (
     !shape ||
@@ -96,7 +108,13 @@ function sewFaces(shape: Shape | undefined, label: string): Shape | undefined {
   return acquire(
     scoped((own) => {
       const sewing = own(
-        new k.BRepBuilderAPI_Sewing(LINEAR_TOL, true, true, true, false),
+        new k.BRepBuilderAPI_Sewing(
+          sewTolerance(shape, own),
+          true,
+          true,
+          true,
+          false,
+        ),
       );
       sewing.Add(shape);
       sewing.Perform(progress());
