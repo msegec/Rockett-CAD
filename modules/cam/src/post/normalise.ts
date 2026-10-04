@@ -14,6 +14,7 @@ import {
   type Xy,
   type Xyz,
 } from "../shared/ir.js";
+import { MM_PER_INCH } from "../shared/tools.js";
 import type { Post } from "./schema.js";
 
 export type Units = "mm" | "inch";
@@ -33,7 +34,6 @@ export type NormalisedProgram = {
 };
 
 const PATH_TOLERANCE = 0.005;
-const MM_PER_INCH = 25.4;
 const QUARTER = Math.PI / 2;
 const EPSILON = 1e-9;
 

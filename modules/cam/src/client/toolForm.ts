@@ -1,6 +1,8 @@
 import { createElement as h } from "react";
 import type { ClientUi, NumberFieldProps } from "@rockett/plugin-api";
-import type { Tool } from "../shared/tools.js";
+import { withKind, type Tool } from "../shared/tools.js";
+
+export { newTool } from "../shared/tools.js";
 
 type Kind = Tool["kind"];
 type LengthKey = "diameter" | "fluteLength" | "overallLength" | "shankDiameter";
@@ -19,32 +21,6 @@ const LENGTHS: [LengthKey, string][] = [
   ["overallLength", "Overall length"],
   ["shankDiameter", "Shank diameter"],
 ];
-
-const CORNER_RADIUS = 1;
-const TIP_ANGLE = 90;
-
-export const newTool = (count: number): Tool => ({
-  id: crypto.randomUUID(),
-  name: `Tool ${count + 1}`,
-  kind: "flat",
-  diameter: 6,
-  fluteLength: 20,
-  overallLength: 50,
-  shankDiameter: 6,
-  flutes: 2,
-  centreCutting: true,
-});
-
-function withKind(tool: Tool, kind: Kind): Tool {
-  const { cornerRadius, tipAngle, ...rest } = tool as Tool & {
-    cornerRadius?: number;
-    tipAngle?: number;
-  };
-  if (kind === "bull")
-    return { ...rest, kind, cornerRadius: cornerRadius ?? CORNER_RADIUS };
-  if (kind === "flat" || kind === "ball") return { ...rest, kind };
-  return { ...rest, kind, tipAngle: tipAngle ?? TIP_ANGLE };
-}
 
 export function toolFields(
   ui: ClientUi,
