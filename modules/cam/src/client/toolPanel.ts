@@ -21,6 +21,8 @@ import {
   TOOLS_FILE,
   type ToolImport,
 } from "../import/rockett.js";
+import { GrblPaste } from "./grblPaste.js";
+import { banner, button, reason, row, tree } from "./libraryParts.js";
 import { schemaFields } from "./schemaForm.js";
 import { newTool, toolFields } from "./toolForm.js";
 
@@ -52,21 +54,6 @@ function libraryOf<T>(entry: UserDataEntry | null): Library<T> {
   };
 }
 
-const reason = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
-
-const button = (
-  text: string,
-  label: string,
-  disabled: boolean,
-  onClick: () => void,
-) =>
-  h(
-    "button",
-    { className: "btn", "aria-label": label, disabled, onClick },
-    text,
-  );
-
 export const machineFields = (
   ui: Ui,
   machine: MachineProfile,
@@ -93,7 +80,10 @@ const MACHINES: Section<MachineProfile> = {
   title: "Machines",
   create: newMachine,
   problems: validateMachine,
-  fields: machineFields,
+  fields: (ui, machine, edit) => [
+    h(GrblPaste, { key: "grblPaste", ui, machine, edit }),
+    ...machineFields(ui, machine, edit),
+  ],
 };
 
 function useSection<T extends Item>(
@@ -156,9 +146,6 @@ function useSection<T extends Item>(
 
 type State<T extends Item> = ReturnType<typeof useSection<T>>;
 
-const banner = (error: string | null) =>
-  error && h("div", { className: "error-banner", role: "alert" }, error);
-
 function sectionForm<T extends Item>(ui: Ui, state: State<T>) {
   const { section, library, editing, pending } = state;
   if (!library || !editing) return null;
@@ -182,26 +169,6 @@ function sectionForm<T extends Item>(ui: Ui, state: State<T>) {
     ),
   });
 }
-
-const row = (key: string, name: string, ...rest: ReactNode[]) =>
-  h(
-    "div",
-    { key, className: "tree-item", role: "listitem" },
-    h("span", null, name),
-    ...rest,
-  );
-
-const tree = (title: string, ...children: ReactNode[]) =>
-  h(
-    "div",
-    { key: title, className: "tree-section" },
-    h("div", { className: "tree-header" }, title),
-    h(
-      "div",
-      { className: "tree-children", role: "list", "aria-label": title },
-      ...children,
-    ),
-  );
 
 function sectionList<T extends Item>(state: State<T>, extra?: ReactNode) {
   const { section, library, error, pending } = state;

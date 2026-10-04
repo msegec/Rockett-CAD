@@ -86,6 +86,25 @@ describe("GRBL $$ import", () => {
     expect(lathe.missing).not.toContain("$32");
   });
 
+  it("leaves the spindle rpm alone in laser mode", () => {
+    const shop = { ...machine, rpmMin: 8000, rpmMax: 24000 };
+    const dump = "$30=1000.\n$31=0.\n$32=1\n$110=5000.000\n";
+    const laser = importGrblSettings(dump, shop);
+    expect(laser.machine).toMatchObject({
+      rpmMin: 8000,
+      rpmMax: 24000,
+      laserMode: true,
+      maxFeedX: 5000,
+    });
+    expect(laser.missing).not.toContain("$30");
+    expect(laser.missing).not.toContain("$31");
+    const stored = importGrblSettings("$30=1000.\n", {
+      ...shop,
+      laserMode: true,
+    });
+    expect(stored.machine.rpmMax).toBe(24000);
+  });
+
   it("lists values the profile cannot hold and keeps the old ones", () => {
     const dump = grbl
       .replace("$120=400.000", "$120=0.000")

@@ -5,7 +5,13 @@ const travel = (title: string) => Type.Number({ title, parameterUnit: "mm" });
 const feed = (axis: string) =>
   Type.Number({ title: `Max feed ${axis} (mm/min)`, exclusiveMinimum: 0 });
 
-const acceleration = Type.Optional(Type.Number({ exclusiveMinimum: 0 }));
+const acceleration = (axis: string) =>
+  Type.Optional(
+    Type.Number({
+      title: `Acceleration ${axis} (mm/s^2)`,
+      exclusiveMinimum: 0,
+    }),
+  );
 
 const firmwareSchema = Type.Union(
   [
@@ -44,17 +50,31 @@ export const machineSchema = Type.Object({
   maxFeedZ: feed("Z"),
   rpmMin: Type.Integer({ title: "Min spindle speed (rpm)", minimum: 0 }),
   rpmMax: Type.Integer({ title: "Max spindle speed (rpm)", minimum: 1 }),
-  measuredRpmMin: Type.Optional(Type.Integer({ minimum: 0 })),
-  measuredRpmMax: Type.Optional(Type.Integer({ minimum: 1 })),
-  ratedWatts: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
-  ratedRpm: Type.Optional(Type.Integer({ minimum: 1 })),
-  spinUpSeconds: Type.Optional(Type.Number({ minimum: 0 })),
-  accelX: acceleration,
-  accelY: acceleration,
-  accelZ: acceleration,
-  junctionDeviation: Type.Optional(Type.Number({ minimum: 0 })),
-  laserMode: Type.Optional(Type.Boolean()),
-  accelerationProfiles: Type.Optional(Type.Boolean()),
+  measuredRpmMin: Type.Optional(
+    Type.Integer({ title: "Measured min spindle speed (rpm)", minimum: 0 }),
+  ),
+  measuredRpmMax: Type.Optional(
+    Type.Integer({ title: "Measured max spindle speed (rpm)", minimum: 1 }),
+  ),
+  ratedWatts: Type.Optional(
+    Type.Number({ title: "Rated power (W)", exclusiveMinimum: 0 }),
+  ),
+  ratedRpm: Type.Optional(
+    Type.Integer({ title: "Rated speed (rpm)", minimum: 1 }),
+  ),
+  spinUpSeconds: Type.Optional(
+    Type.Number({ title: "Spin-up time (s)", minimum: 0 }),
+  ),
+  accelX: acceleration("X"),
+  accelY: acceleration("Y"),
+  accelZ: acceleration("Z"),
+  junctionDeviation: Type.Optional(
+    Type.Number({ title: "Junction deviation (mm)", minimum: 0 }),
+  ),
+  laserMode: Type.Optional(Type.Boolean({ title: "Laser mode" })),
+  accelerationProfiles: Type.Optional(
+    Type.Boolean({ title: "Acceleration profiles (grblHAL)" }),
+  ),
   toolChange: toolChangeSchema,
   units: Type.Union(
     [

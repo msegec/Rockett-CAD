@@ -33,9 +33,11 @@ export function importGrblSettings(text: string, machine: MachineProfile) {
     const match = LINE.exec(line);
     if (match) found.set(`$${match[1]}`, match[2]!);
   }
+  const laser = mode(found.get("$32") ?? "") ?? machine.laserMode === true;
   const filled: Partial<MachineProfile> = {};
   const missing: string[] = [];
   for (const [setting, key, read] of SETTINGS) {
+    if (laser && (key === "rpmMax" || key === "rpmMin")) continue;
     const raw = found.get(setting);
     const value = raw === undefined ? null : read(raw);
     if (value !== null && Value.Check(machineSchema.properties[key], value))

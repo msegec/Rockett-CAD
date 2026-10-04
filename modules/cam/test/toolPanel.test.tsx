@@ -1,6 +1,7 @@
 import { act, createElement as h, Fragment } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { MAX_SETTINGS_TEXT } from "../src/import/grblSettings.js";
 import type { MachineProfile } from "../src/shared/machine.js";
 import type { Tool } from "../src/shared/tools.js";
 
@@ -276,4 +277,113 @@ it("adds and saves a machine through the panel", async () => {
   });
   expect(panelTitled("Machine 1")).toBeUndefined();
   expect(rows()).toEqual(["Machine 1"]);
+});
+
+const router: MachineProfile = {
+  id: "m1",
+  name: "Router",
+  firmware: "grbl",
+  post: "grbl",
+  xMin: 0,
+  xMax: 300,
+  yMin: 0,
+  yMax: 300,
+  zMin: -80,
+  zMax: 0,
+  maxFeedX: 3000,
+  maxFeedY: 3000,
+  maxFeedZ: 1000,
+  rpmMin: 0,
+  rpmMax: 24000,
+  toolChange: "perFile",
+  units: "mm",
+};
+
+const dump = [
+  "$11=0.010",
+  "$30=24000.",
+  "$31=0.",
+  "$32=0",
+  "$110=5000.000",
+  "$111=5000.000",
+  "$112=1500.000",
+  "$120=400.000",
+  "$121=400.000",
+  "ok",
+].join("\r\n");
+
+const setText = Object.getOwnPropertyDescriptor(
+  HTMLTextAreaElement.prototype,
+  "value",
+)!.set!;
+
+async function paste(panel: Element, text: string) {
+  await click(panel, "Import $$");
+  const area = field(panel, "$$ output").querySelector("textarea")!;
+  await act(async () => {
+    setText.call(area, text);
+    area.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  return area;
+}
+
+const shown = (panel: Element, label: string) =>
+  field(panel, label).querySelector("input")!.value;
+
+const listed = (panel: Element) =>
+  [...panel.querySelectorAll(".tree-item > span")].map((s) => s.textContent);
+
+async function editRouter(machine: MachineProfile) {
+  machines = { data: [machine], etag: "m0" };
+  await click(await openLibrary(), "Edit Router");
+  return panelTitled("Router")!;
+}
+
+it("a pasted $$ missing $122 fills $110 and lists $122", async () => {
+  const form = await editRouter(router);
+  expect(shown(form, "Acceleration Z (mm/s^2)")).toBe("");
+  await paste(form, dump);
+  await click(form, "Fill from $$");
+
+  expect(form.querySelector('[role="alert"]')).toBeNull();
+  expect(listed(form)).toEqual(["$122"]);
+  expect(shown(form, "Max feed X (mm/min)")).toBe("5000");
+  await click(form, "OK");
+  const saved = machinePuts[0]!.data[0]!;
+  expect(saved).toMatchObject({
+    maxFeedX: 5000,
+    accelX: 400,
+    laserMode: false,
+  });
+  expect(saved).not.toHaveProperty("accelZ");
+});
+
+it("refuses a $$ with $30 below the stored minimum", async () => {
+  const form = await editRouter({ ...router, rpmMin: 10000 });
+  await paste(form, "$30=5000.\n$110=5000.000\n");
+  await click(form, "Fill from $$");
+
+  expect(form.querySelector('[role="alert"]')?.textContent).toBe(
+    "$$ import refused: max spindle speed must be at least the min.",
+  );
+  expect(shown(form, "Max feed X (mm/min)")).toBe("3000");
+  await click(form, "OK");
+  expect(machinePuts[0]!.data[0]).toEqual({ ...router, rpmMin: 10000 });
+});
+
+it("saves a cleared optional limit as unset", async () => {
+  const form = await editRouter({ ...router, accelX: 400 });
+  expect(shown(form, "Acceleration X (mm/s^2)")).toBe("400");
+  await type(form, "Acceleration X (mm/s^2)", "");
+  await click(form, "OK");
+  expect(machinePuts[0]!.data[0]).toEqual(router);
+});
+
+it("cuts a paste over the $$ cap and says so", async () => {
+  const form = await editRouter(router);
+  const area = await paste(form, "x".repeat(MAX_SETTINGS_TEXT + 10));
+  expect(area.value).toHaveLength(MAX_SETTINGS_TEXT);
+  expect(form.querySelector('[role="alert"]')?.textContent).toBe(
+    `Cut to the ${MAX_SETTINGS_TEXT} character limit`,
+  );
 });

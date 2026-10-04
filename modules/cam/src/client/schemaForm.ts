@@ -53,7 +53,7 @@ export function schemaFields<T extends Record<string, unknown>>(
       return h(ui.CheckField, {
         key,
         label,
-        value: value[key] as boolean,
+        value: value[key] === true,
         onChange,
       });
     if (Type.IsNumber(field) || Type.IsInteger(field)) {
@@ -62,6 +62,9 @@ export function schemaFields<T extends Record<string, unknown>>(
         label,
         value: value[key] as number,
         onChange,
+        ...(Type.IsOptional(field) && {
+          onClear: () => edit({ ...value, [key]: undefined }),
+        }),
         ...bounds(field),
       };
       return meta(field).parameterUnit === "mm"
