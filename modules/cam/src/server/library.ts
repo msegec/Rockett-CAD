@@ -26,6 +26,7 @@ import {
   type Preset,
   type Tool,
 } from "../shared/tools.js";
+import { userPost, userPostText } from "./posts.js";
 
 const useTool: Route<
   "/projects/:id/m/rockett/cam/tools",
@@ -36,6 +37,31 @@ const useTool: Route<
   body: entry,
   effect: "document",
 };
+
+const etagOrNull = Type.Union([Type.String(), Type.Null()]);
+
+const addPost: Route<
+  "/m/rockett/cam/posts",
+  { post: string; etag: string | null }
+> & { readonly body: TSchema } = {
+  method: "POST",
+  path: "/m/rockett/cam/posts",
+  body: Type.Object({ post: userPostText, etag: etagOrNull }),
+};
+
+function mountPosts(api: RouteModuleApi, store: UserData) {
+  api.userRoute({ method: "GET", path: addPost.path }, (_req, { user }) =>
+    store.read(user),
+  );
+  api.userRoute(addPost, async (req, { user }) => {
+    const post = userPost(req.body.post);
+    const stored = (await store.read(user))?.data;
+    const kept = Array.isArray(stored)
+      ? stored.filter((item) => item?.id !== post.id)
+      : [];
+    return store.write(user, [...kept, post], req.body.etag);
+  });
+}
 
 function list<T extends { id: string }>(
   api: RouteModuleApi,
@@ -52,7 +78,7 @@ function list<T extends { id: string }>(
     path,
     body: Type.Object({
       data: Type.Array(item),
-      etag: Type.Union([Type.String(), Type.Null()]),
+      etag: etagOrNull,
     }),
   };
   api.userRoute({ method: "GET", path }, (_req, { user }) => store.read(user));
@@ -102,6 +128,7 @@ export function mountLibrary(
     machineSchema,
     validateMachine,
   );
+  mountPosts(api, userData("posts", 1));
   api.projectMutation(useTool, async (doc, req, { user }) => {
     const cam = migrateCam(doc.extensions[CAM_EXTENSION]);
     if (cam.status === "kept") throw new Error(cam.reason);

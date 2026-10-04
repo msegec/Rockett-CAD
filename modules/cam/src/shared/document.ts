@@ -1,6 +1,7 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import type { CadDocument, Route, SignedFaceRef } from "@rockett/plugin-api";
+import { validatePost, type Post } from "../post/schema.js";
 import type { Program, Xy } from "./ir.js";
 import { presetSchema, toolSchema } from "./tools.js";
 
@@ -99,6 +100,32 @@ const wcsSchema = Type.Object({
   ]),
 });
 
+export const POST_MAX_BYTES = 64 * 1024;
+export const USER_POST_PREFIX = "user.";
+
+export const postBytes = (text: string) =>
+  new TextEncoder().encode(text).length;
+
+export type PostCopy = Post & { libraryRef: Static<typeof entry> };
+
+export const copiedPost = ({ libraryRef: _ref, ...post }: PostCopy): Post =>
+  post;
+
+function postProblem(copy: PostCopy) {
+  if (!copy.id.startsWith(USER_POST_PREFIX))
+    return `id must start with ${USER_POST_PREFIX}`;
+  const bytes = postBytes(JSON.stringify(copy));
+  if (bytes > POST_MAX_BYTES)
+    return `is ${bytes} bytes, over the ${POST_MAX_BYTES} byte limit`;
+  return validatePost(copiedPost(copy))[0] ?? "";
+}
+
+const docPost = Type.Refine(
+  Type.Object({ id: Type.String(), libraryRef: entry }),
+  (copy) => !postProblem(copy as PostCopy),
+  (copy) => postProblem(copy as PostCopy),
+);
+
 const docSetup = Type.Intersect([
   entry,
   Type.Partial(
@@ -111,6 +138,7 @@ const docSetup = Type.Intersect([
       safeHeight: Type.Number(),
       clearance: Type.Number(),
       operations: Type.Array(docOperation),
+      post: docPost,
     }),
   ),
 ]);

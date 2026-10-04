@@ -24,6 +24,8 @@ const marked = (className: string, selected?: boolean) =>
 export const reason = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
+export const unqualified = (label: string) => `${label} (unqualified)`;
+
 export const button = (
   text: string,
   label: string,

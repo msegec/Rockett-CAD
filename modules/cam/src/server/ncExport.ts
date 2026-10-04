@@ -7,10 +7,13 @@ import { formatProgram, type FormatOptions } from "../post/format.js";
 import { normalise } from "../post/normalise.js";
 import { commentForm, type Post } from "../post/schema.js";
 import {
+  copiedPost,
   ncRoute,
   type Blocker,
   type CamData,
   type NcExport,
+  type PostCopy,
+  USER_POST_PREFIX,
 } from "../shared/document.js";
 import type { Program } from "../shared/ir.js";
 import {
@@ -243,22 +246,25 @@ function reply(files: File[], title: string, setups: Setup[]): NcExport {
   };
 }
 
+const postOf = (setup: Setup, postId: string) =>
+  POSTS.get(postId) ??
+  (postId.startsWith(USER_POST_PREFIX) && setup.post?.id === postId
+    ? copiedPost(setup.post as PostCopy)
+    : undefined);
+
 async function targetOf(
   context: Pick<ServerContext, "userData" | "kernelVersion">,
   user: User,
-  params: { machineId: string; postId: string; toolChange: string },
-): Promise<Target | string> {
-  const { machineId, postId, toolChange } = params;
+  params: { machineId: string; toolChange: string },
+): Promise<Omit<Target, "post"> | string> {
+  const { machineId, toolChange } = params;
   const machines = context.userData("machines", 1);
   const machine = await libraryItem(machines, user, machineId, machineSchema);
   if (!machine) return `machine ${machineId} is not in your library`;
-  const post = POSTS.get(postId);
-  if (!post) return `post ${postId} is not installed`;
   if (!Value.Check(machineSchema.properties.toolChange, toolChange))
     return `tool change ${toolChange} is not perFile or m6`;
   const kernel = context.kernelVersion;
   return {
-    post,
     machine,
     toolChange: toolChange === "m6",
     kernel: kernel ? `OCCT ${kernel.occt} ${kernel.commit}` : "unknown",
@@ -277,6 +283,9 @@ export function mountExport(
     if (typeof chosen === "string") return { reason: chosen };
     const setups = chosenSetups(data, params.setupIds);
     if (typeof setups === "string") return { reason: setups };
+    const posts = new Map(setups.map((s) => [s, postOf(s, params.postId)]));
+    if ([...posts.values()].includes(undefined))
+      return { reason: `post ${params.postId} is not installed` };
     const model = await readModel(context, params.id, user);
     const gathered = [];
     for (const setup of setups)
@@ -288,7 +297,8 @@ export function mountExport(
     let room = maxBytes;
     for (const { setup, made } of gathered) {
       if (!made.length) continue;
-      const out = await posted(model, data, setup, made, chosen, room).catch(
+      const target = { ...chosen, post: posts.get(setup)! };
+      const out = await posted(model, data, setup, made, target, room).catch(
         (error: unknown): Posted => ({
           blocked: [
             {
@@ -304,7 +314,7 @@ export function mountExport(
         blocked.push(...out.blocked);
         continue;
       }
-      files.push(...named(setup, out.files, chosen.post, used));
+      files.push(...named(setup, out.files, target.post, used));
       room -= Buffer.byteLength(out.files.join(""));
     }
     return blocked.length ? { blocked } : reply(files, doc.name, setups);

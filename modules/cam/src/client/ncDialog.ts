@@ -5,12 +5,26 @@ import {
   useSyncExternalStore,
 } from "react";
 import { Type } from "typebox";
-import type { ClientContext } from "@rockett/plugin-api";
+import type { ClientContext, UserDataEntry } from "@rockett/plugin-api";
+import type { Post } from "../post/schema.js";
 import { POSTS } from "../server/posts.js";
-import { ncRoute, type Blocker, type NcExport } from "../shared/document.js";
+import {
+  ncRoute,
+  type Blocker,
+  type NcExport,
+  type PostCopy,
+} from "../shared/document.js";
 import { machineSchema, type MachineProfile } from "../shared/machine.js";
 import { generateOperation } from "./browser.js";
-import { banner, button, reason, row, tree } from "./libraryParts.js";
+import {
+  banner,
+  button,
+  libraryOf,
+  reason,
+  row,
+  tree,
+  unqualified,
+} from "./libraryParts.js";
 import {
   chosen,
   picker,
@@ -19,6 +33,7 @@ import {
   useLibrary,
 } from "./opDialog.js";
 import { schemaFields } from "./schemaForm.js";
+import { editCam } from "./setup.js";
 
 export const NC_PANEL = "rockett.cam.nc.dialog";
 
@@ -41,6 +56,7 @@ type Run = { pending: boolean; error: string; blocked: Blocker[] };
 type Blocked = Extract<Blocker, { kind: "operation" }>;
 type File = Extract<NcExport, { fileName: string }>;
 type Setups = ReturnType<typeof setupList>;
+type Setup = Extract<Setups, { status: "ready" }>["items"][number];
 
 function save(ui: Ui, out: File) {
   if ("nc" in out)
@@ -99,9 +115,56 @@ function setupChecks(
   );
 }
 
+function postChoices(own: Post[], picked: Setup[], postId: string) {
+  const copies = picked.flatMap(({ post }) => (post ? [post as PostCopy] : []));
+  const others = [...own, ...copies].filter(
+    ({ id }, i, all) =>
+      !POSTS.has(id) && all.findIndex((each) => each.id === id) === i,
+  );
+  const options: [string, string][] = [
+    ...POST_CHOICES,
+    ...others.map(({ id, label }): [string, string] => [
+      id,
+      unqualified(label),
+    ]),
+  ];
+  const mine = (each: Post) => each.id === postId;
+  return {
+    options,
+    post: POSTS.get(postId) ?? others.find(mine),
+    library: POSTS.has(postId) ? undefined : own.find(mine),
+  };
+}
+
+async function copyPost(
+  { project, request }: Pick<ClientContext, "project" | "request">,
+  postId: string,
+  picked: Setup[],
+) {
+  const stored = await request<UserDataEntry | null>("GET", "posts");
+  const post = libraryOf<Post>(stored).items.find(({ id }) => id === postId);
+  if (!post) return;
+  const copy = { ...post, libraryRef: { id: post.id } };
+  const text = JSON.stringify(copy);
+  const stale = new Set(
+    picked
+      .filter((setup) => JSON.stringify(setup.post) !== text)
+      .map(({ id }) => id),
+  );
+  if (!stale.size) return;
+  await editCam(project, (data) => ({
+    ...data,
+    setups: data.setups.map((setup) =>
+      stale.has(setup.id) ? { ...setup, post: copy } : setup,
+    ),
+  }));
+}
+
 function postFields(
   ui: Ui,
+  options: [string, string][],
   postId: string,
+  post: Post | undefined,
   toolChange: ToolChange,
   setChoice: (change: (now: Choice) => Choice) => void,
 ) {
@@ -111,10 +174,10 @@ function postFields(
     h(ui.SelectField<string>, {
       label: "Post",
       value: postId,
-      options: POST_CHOICES,
+      options,
       onChange: (id: string) => setChoice((now) => ({ ...now, postId: id })),
     }),
-    POSTS.get(postId)?.capabilities.toolChange &&
+    post?.capabilities.toolChange &&
       schemaFields(ui, postOptions, { toolChange }, (next) =>
         setChoice((now) => ({ ...now, toolChange: next.toolChange })),
       ),
@@ -155,23 +218,26 @@ export function ncDialog({ ui, project, request }: ClientContext) {
   return function NcDialog() {
     const open = useSyncExternalStore(project.subscribe, project.get);
     const machines = useLibrary<MachineProfile>(request, "machines");
+    const posts = useLibrary<Post>(request, "posts");
     const [machineId, setMachineId] = useState("");
     const [choice, setChoice] = useState<Choice>({ off: [] });
     const { run, act } = useRun();
     const setups = setupList(open);
     const machine = chosen(machines, machineId);
     const postId = choice.postId ?? machine?.post ?? "";
-    const post = POSTS.get(postId);
-    const toolChange = post?.capabilities.toolChange
-      ? (choice.toolChange ?? machine?.toolChange ?? "perFile")
-      : "perFile";
     const picked =
       setups.status === "ready"
         ? setups.items.filter(({ id }) => !choice.off.includes(id))
         : [];
+    const own = posts.status === "ready" ? posts.items : [];
+    const { options, post, library } = postChoices(own, picked, postId);
+    const toolChange = post?.capabilities.toolChange
+      ? (choice.toolChange ?? machine?.toolChange ?? "perFile")
+      : "perFile";
     const exportNc = () =>
       act(async () => {
         if (!machine) return undefined;
+        if (library) await copyPost({ project, request }, postId, picked);
         const out = await project.read(ncRoute, {
           machineId: machine.id,
           postId,
@@ -200,7 +266,7 @@ export function ncDialog({ ui, project, request }: ClientContext) {
       banner(run.error || null),
       setupChecks(ui, setups, choice.off, turn),
       picker(ui, "Machine", machines, machine, setMachineId, MACHINE_TEXTS),
-      machine && postFields(ui, postId, toolChange, setChoice),
+      machine && postFields(ui, options, postId, post, toolChange, setChoice),
       blockedList(
         run.blocked,
         run.pending,

@@ -6,6 +6,8 @@ import {
   type ReactNode,
 } from "react";
 import type { ClientContext, UserDataEntry } from "@rockett/plugin-api";
+import type { Post } from "../post/schema.js";
+import { POST_MAX_BYTES } from "../shared/document.js";
 import {
   machineSchema,
   newMachine,
@@ -30,6 +32,7 @@ import {
   reason,
   row,
   tree,
+  unqualified,
   type Library,
 } from "./libraryParts.js";
 import { schemaFields } from "./schemaForm.js";
@@ -85,22 +88,47 @@ const MACHINES: Section<MachineProfile> = {
   ],
 };
 
-function useSection<T extends Item>(
-  { ui, request }: ClientContext,
-  section: Section<T>,
+function useStored<T>(
+  request: ClientContext["request"],
+  path: string,
+  title: string,
 ) {
   const [library, setLibrary] = useState<Library<T> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState<T | null>(null);
-  const [pending, setPending] = useState(false);
-  const path = `${section.noun}s`;
   useEffect(() => {
     request<UserDataEntry | null>("GET", path)
       .then(libraryOf<T>)
       .then(setLibrary, (e) =>
-        setError(`${section.title} did not load: ${reason(e)}.`),
+        setError(`${title} did not load: ${reason(e)}.`),
       );
   }, []);
+  return { library, setLibrary, error, setError };
+}
+
+const placeholder = (
+  plural: string,
+  {
+    library,
+    error,
+  }: { library: Library<unknown> | null; error: string | null },
+  count = 0,
+) =>
+  !library
+    ? !error && empty(`Loading ${plural}...`)
+    : !count && empty(`No ${plural} yet.`);
+
+function useSection<T extends Item>(
+  { ui, request }: ClientContext,
+  section: Section<T>,
+) {
+  const path = `${section.noun}s`;
+  const { library, setLibrary, error, setError } = useStored<T>(
+    request,
+    path,
+    section.title,
+  );
+  const [editing, setEditing] = useState<T | null>(null);
+  const [pending, setPending] = useState(false);
   const write = (items: T[]) => {
     setPending(true);
     return request<UserDataEntry>("PUT", path, {
@@ -186,15 +214,16 @@ function sectionList<T extends Item>(state: State<T>, extra?: ReactNode) {
       ),
     ),
   );
-  const placeholder = !library
-    ? !error && empty(`Loading ${plural}...`)
-    : !rows?.length && empty(`No ${plural} yet.`);
   const add = `Add ${section.noun}`;
   return h(
     Fragment,
     { key: section.noun },
     banner(error),
-    tree({ title: section.title }, placeholder, rows),
+    tree(
+      { title: section.title },
+      placeholder(plural, state, rows?.length),
+      rows,
+    ),
     library &&
       button(add, add, pending, () =>
         state.setEditing(section.create(library.items.length)),
@@ -399,6 +428,42 @@ function useTransfer(context: ClientContext, tools: State<Tool>) {
   return { buttons, dialog };
 }
 
+function usePosts({ ui, request }: ClientContext) {
+  const stored = useStored<Post>(request, "posts", "Posts");
+  const { library, setLibrary, setError } = stored;
+  const [pending, setPending] = useState(false);
+  const pick = async () => {
+    setPending(true);
+    try {
+      const file = await ui.pickFile({
+        accept: ".json,application/json",
+        maxBytes: POST_MAX_BYTES,
+      });
+      if (!file) return;
+      const entry = await request<UserDataEntry>("POST", "posts", {
+        post: file.text,
+        etag: library!.etag,
+      });
+      setLibrary(libraryOf<Post>(entry));
+      setError(null);
+    } catch (e) {
+      setError(`Post did not import: ${reason(e)}.`);
+    } finally {
+      setPending(false);
+    }
+  };
+  const rows = library?.items.map(({ id, label }) =>
+    row({ key: id, name: unqualified(label) }),
+  );
+  return h(
+    Fragment,
+    { key: "post" },
+    banner(stored.error),
+    tree({ title: "Posts" }, placeholder("posts", stored, rows?.length), rows),
+    library && button("Import post", "Import post", pending, () => void pick()),
+  );
+}
+
 export function toolPanel(context: ClientContext) {
   const { ui } = context;
   const close = () => ui.closePanel(TOOL_PANEL);
@@ -406,6 +471,7 @@ export function toolPanel(context: ClientContext) {
     const tools = useSection(context, TOOLS);
     const machines = useSection(context, MACHINES);
     const transfer = useTransfer(context, tools);
+    const posts = usePosts(context);
     return (
       transfer.dialog ||
       sectionForm(ui, tools) ||
@@ -420,6 +486,7 @@ export function toolPanel(context: ClientContext) {
             { className: "dialog-body" },
             sectionList(tools, transfer.buttons),
             sectionList(machines),
+            posts,
           ),
           h(ui.DialogFooter, { onCancel: close, cancelLabel: "Close" }),
         ),

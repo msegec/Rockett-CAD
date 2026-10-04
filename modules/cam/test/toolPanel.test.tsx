@@ -2,8 +2,10 @@ import { act, createElement as h, Fragment } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MAX_SETTINGS_TEXT } from "../src/import/grblSettings.js";
+import type { Post } from "../src/post/schema.js";
 import type { MachineProfile } from "../src/shared/machine.js";
 import type { Tool } from "../src/shared/tools.js";
+import { loadPost } from "./goldens.js";
 
 const load = (path: string) => import(path);
 
@@ -11,12 +13,16 @@ const client = (file: string) => load(`../../../client/src/${file}`);
 
 const TOOLS = "/api/m/rockett/cam/tools";
 const MACHINES = "/api/m/rockett/cam/machines";
+const POSTS = "/api/m/rockett/cam/posts";
 
 let stored: { data: Tool[]; etag: string } | null;
 let puts: { data: Tool[]; etag: string | null }[];
 let failLoad: boolean;
 let machines: { data: MachineProfile[]; etag: string } | null;
 let machinePuts: { data: MachineProfile[]; etag: string | null }[];
+let posts: { data: Post[]; etag: string } | null;
+let postPosts: { post: string; etag: string | null }[];
+let refusal: string | null;
 let host: HTMLElement;
 let root: Root;
 let unload = () => {};
@@ -33,9 +39,20 @@ function serveMachines(method: string, init: RequestInit) {
   return Response.json({ version: 1, ...machines, readOnly: false });
 }
 
+function servePosts(method: string, init: RequestInit) {
+  if (method === "GET")
+    return Response.json(posts && { version: 1, ...posts, readOnly: false });
+  const body = JSON.parse(String(init.body));
+  postPosts.push(body);
+  if (refusal) return Response.json({ error: refusal }, { status: 400 });
+  posts = { data: [JSON.parse(body.post)], etag: `p${postPosts.length}` };
+  return Response.json({ version: 1, ...posts, readOnly: false });
+}
+
 function serve(url: RequestInfo | URL, init: RequestInit = {}) {
   const method = init.method ?? "GET";
   if (String(url) === MACHINES) return serveMachines(method, init);
+  if (String(url) === POSTS) return servePosts(method, init);
   if (String(url) !== TOOLS) throw new Error(`${method} ${url}`);
   if (method === "GET" && failLoad)
     return Response.json({ error: "disk unavailable" }, { status: 500 });
@@ -58,6 +75,9 @@ beforeEach(async () => {
   failLoad = false;
   machines = null;
   machinePuts = [];
+  posts = null;
+  postPosts = [];
+  refusal = null;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: RequestInfo | URL, init?: RequestInit) =>
@@ -109,6 +129,7 @@ afterEach(async () => {
   host.remove();
   unload();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const panelTitled = (title: string) =>
@@ -386,4 +407,46 @@ it("cuts a paste over the $$ cap and says so", async () => {
   expect(form.querySelector('[role="alert"]')?.textContent).toBe(
     `Cut to the ${MAX_SETTINGS_TEXT} character limit`,
   );
+});
+
+const mine = { ...loadPost("grbl"), id: "my-grbl", label: "My GRBL" };
+
+const pickPost = (text: string) =>
+  vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(function (
+    this: HTMLInputElement,
+  ) {
+    Object.defineProperty(this, "files", {
+      value: [new File([text], "my-grbl.json")],
+    });
+    this.dispatchEvent(new Event("change"));
+  });
+
+it("imports a post file with the etag of the last read and lists it unqualified", async () => {
+  posts = { data: [], etag: "p0" };
+  const library = await openLibrary();
+  expect(library.textContent).toContain("No posts yet.");
+  const text = JSON.stringify(mine);
+  const picker = pickPost(text);
+  await click(library, "Import post");
+
+  expect((picker.mock.contexts[0] as HTMLInputElement).accept).toBe(
+    ".json,application/json",
+  );
+  expect(postPosts).toEqual([{ post: text, etag: "p0" }]);
+  expect(rows()).toEqual(["My GRBL (unqualified)"]);
+  expect(library.querySelector('[role="alert"]')).toBeNull();
+});
+
+it("says why a post did not import", async () => {
+  refusal = "post templates.linear: needs {feed}";
+  const library = await openLibrary();
+  pickPost(JSON.stringify(loadPost("grbl")));
+  await click(library, "Import post");
+
+  expect(postPosts).toHaveLength(1);
+  expect(postPosts[0]!.etag).toBeNull();
+  expect(library.querySelector('[role="alert"]')?.textContent).toBe(
+    "Post did not import: post templates.linear: needs {feed}.",
+  );
+  expect(library.textContent).toContain("No posts yet.");
 });
