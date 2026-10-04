@@ -14,6 +14,16 @@ export type FieldSchema = {
   items?: { type?: string };
 };
 
+export function fieldKind(schema: FieldSchema) {
+  if (schema.enum) return "select";
+  if (schema.type === "boolean") return "check";
+  if (schema.type === "number" || schema.type === "integer") return "number";
+  if (schema.type === "array" && schema.items?.type === "number")
+    return "numberList";
+  if (schema.type === "string") return "text";
+  return undefined;
+}
+
 export function numberInputError(
   schema: FieldSchema,
   target: EventTarget,
@@ -88,19 +98,19 @@ export function FieldControl({
         onChange={onChange}
       />
     );
-  const choices = schema.enum?.filter(
-    (item): item is string => typeof item === "string",
-  );
-  if (choices)
+  const kind = fieldKind(schema);
+  if (kind === "select")
     return (
       <SelectField
         label={definition.label}
         value={String(value)}
-        options={choices.map((choice) => [choice, choice])}
+        options={(schema.enum ?? [])
+          .filter((item): item is string => typeof item === "string")
+          .map((choice) => [choice, choice])}
         onChange={onChange}
       />
     );
-  if (schema.type === "boolean")
+  if (kind === "check")
     return (
       <CheckField
         label={definition.label}
@@ -108,7 +118,7 @@ export function FieldControl({
         onChange={onChange}
       />
     );
-  if (schema.type === "number" || schema.type === "integer")
+  if (kind === "number")
     return (
       <NumField
         label={definition.label}
@@ -119,7 +129,7 @@ export function FieldControl({
         int={schema.type === "integer"}
       />
     );
-  if (schema.type === "array" && schema.items?.type === "number")
+  if (kind === "numberList")
     return (
       <NumberListField
         label={definition.label}

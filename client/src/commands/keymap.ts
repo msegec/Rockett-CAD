@@ -1,13 +1,13 @@
 import { createRegistry } from "@rockett/shared";
 import { activeCommand } from "./active";
 import type { ViewportRef } from "../viewportRef";
+import { getSetting } from "../settings";
 import { useStore } from "../store";
 import { useWorkbench } from "../shell/workbench";
 import {
   commands,
   runCommand,
   runnable,
-  type Command,
   type CommandContext,
 } from "./registry";
 
@@ -63,49 +63,116 @@ export function handleKeyUp(e: Pick<KeyboardEvent, "key">): void {
   releaseHolds(e.key);
 }
 
-type Bound = Command & { keys: readonly string[]; keyContext: string };
+const MODIFIERS: Readonly<Record<string, string>> = {
+  ctrl: "Ctrl",
+  control: "Ctrl",
+  meta: "Ctrl",
+  cmd: "Ctrl",
+  alt: "Alt",
+  option: "Alt",
+  shift: "Shift",
+};
+const ORDER = ["Ctrl", "Alt", "Shift"];
 
-const bound = (): Bound[] =>
-  commands().filter((c): c is Bound => c.keyContext !== undefined);
+export function normalizeChord(chord: string): string {
+  const parts = chord.split("+");
+  const last = parts.pop() ?? "";
+  const key = last === "" ? "+" : last;
+  const named = parts
+    .filter(Boolean)
+    .map((part) => MODIFIERS[part.toLowerCase()] ?? part);
+  const mods = [
+    ...ORDER.filter((mod) => named.includes(mod)),
+    ...new Set(named.filter((mod) => !ORDER.includes(mod))),
+  ];
+  const name =
+    key.length === 1 ? key.toUpperCase() : key[0]!.toUpperCase() + key.slice(1);
+  return [...mods, name].join("+");
+}
+
+type Keyable = { id: string; keys?: readonly string[]; keyContext?: string };
+
+interface KeyBinding<C extends Keyable> {
+  command: C;
+  context: string;
+  chords: readonly string[];
+  override: boolean;
+}
+
+interface KeyConflict {
+  chord: string;
+  ids: [string, string];
+}
+
+const clash = (a: KeyBinding<Keyable>, b: KeyBinding<Keyable>) =>
+  a.context === b.context || a.context === "global" || b.context === "global";
+
+function conflictsOf(bindings: readonly KeyBinding<Keyable>[]): KeyConflict[] {
+  const ranked = bindings.toSorted((a, b) => +b.override - +a.override);
+  return ranked.flatMap((a, i) =>
+    ranked.slice(i + 1).flatMap((b) =>
+      clash(a, b)
+        ? a.chords
+            .filter((chord) => b.chords.includes(chord))
+            .map((chord) => ({
+              chord,
+              ids: [a.command.id, b.command.id] as [string, string],
+            }))
+        : [],
+    ),
+  );
+}
+
+export function resolveKeymap<C extends Keyable>(
+  list: readonly C[],
+  overrides: Readonly<Record<string, readonly string[]>>,
+) {
+  const declared = list.flatMap((command): KeyBinding<C>[] => {
+    if (command.keyContext === undefined) return [];
+    const own = Object.hasOwn(overrides, command.id)
+      ? overrides[command.id]
+      : undefined;
+    const keys = own ?? command.keys ?? [];
+    return [
+      {
+        command,
+        context: command.keyContext,
+        chords: [...new Set(keys.map(normalizeChord))],
+        override: own !== undefined,
+      },
+    ];
+  });
+  const taken = (b: KeyBinding<C>, chord: string) =>
+    declared.some((o) => o.override && clash(o, b) && o.chords.includes(chord));
+  const bindings = declared.map((b) =>
+    b.override ? b : { ...b, chords: b.chords.filter((c) => !taken(b, c)) },
+  );
+  return { bindings, conflicts: conflictsOf(declared) };
+}
+
+export const activeKeymap = () =>
+  resolveKeymap(commands(), getSetting("keys.overrides"));
 
 export function keyBindings(context: string) {
-  return bound()
-    .filter((c) => c.keyContext === context)
-    .flatMap((c) =>
-      c.keys.slice(0, 1).map((chord) => ({ id: c.id, chord, label: c.label })),
+  return activeKeymap()
+    .bindings.filter((b) => b.context === context)
+    .flatMap((b) =>
+      b.chords.slice(0, 1).map((chord) => ({
+        id: b.command.id,
+        chord,
+        label: b.command.label,
+      })),
     );
 }
 
-export function keyConflicts() {
-  const pairs = bound().flatMap((c) =>
-    [...new Set(c.keys)].map((chord) => ({
-      context: c.keyContext,
-      chord,
-      id: c.id,
-    })),
-  );
-  return pairs
-    .map((p) => ({
-      context: p.context,
-      chord: p.chord,
-      ids: pairs
-        .filter((q) => q.context === p.context && q.chord === p.chord)
-        .map((q) => q.id),
-    }))
-    .filter((x, i) => x.ids.length > 1 && x.ids[0] === pairs[i]?.id);
-}
-
 function chordOf(e: KeyEvent): string {
-  const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
-  const shift = e.shiftKey && (e.key.length > 1 || key !== e.key.toLowerCase());
-  return [
+  const cased = e.key.length > 1 || e.key.toUpperCase() !== e.key.toLowerCase();
+  const mods = [
     (e.ctrlKey || e.metaKey) && "Ctrl",
     e.altKey && "Alt",
-    shift && "Shift",
-    key,
-  ]
-    .filter(Boolean)
-    .join("+");
+    e.shiftKey && cased && "Shift",
+  ];
+  return normalizeChord([...mods, e.key].filter(Boolean).join("+"));
 }
 
 function keyContexts(s: CommandContext): string[] {
@@ -155,18 +222,19 @@ export function handleKey(e: KeyEvent, viewport?: ViewportRef): void {
   if (e.repeat || pressHold(e) || typing) return;
   const s = useStore.getState();
   const chord = chordOf(e);
+  const { bindings } = activeKeymap();
   for (const context of keyContexts(s)) {
-    const command = bound().find(
-      (c) =>
-        (c.keyContext === context ||
-          (c.id === s.active?.id &&
+    const binding = bindings.find(
+      (b) =>
+        (b.context === context ||
+          (b.command.id === s.active?.id &&
             context === activeCommand(s)?.keyContext)) &&
-        c.keys.includes(chord) &&
-        runnable(c, s),
+        b.chords.includes(chord) &&
+        runnable(b.command, s),
     );
-    if (!command) continue;
+    if (!binding) continue;
     e.preventDefault();
-    void runCommand(command.id, viewport);
+    void runCommand(binding.command.id, viewport);
     return;
   }
 }

@@ -40,6 +40,7 @@ export interface SettingTypes {
   "auth.sessionDays": number;
   "auth.sessionMaxDays": number;
   "ui.treeWidth": number;
+  "keys.overrides": Record<string, string[]>;
 }
 
 export type SettingOf<D extends SettingDefinition> = Static<D["schema"]>;
@@ -363,6 +364,15 @@ export const UI_TREE_WIDTH = defineSetting({
   schema: Type.Integer({ minimum: PANEL_MIN_PX }),
 });
 
+export const KEYS_OVERRIDES = defineSetting({
+  key: "keys.overrides",
+  label: "Keyboard shortcuts",
+  scopes: ["app", "user"],
+  section: "user",
+  default: {},
+  schema: Type.Record(Type.String(), Type.Array(Type.String({ minLength: 1 }))),
+});
+
 registerSettings([
   UNITS_LENGTH,
   VIEWPORT_PICK_TOLERANCE,
@@ -379,4 +389,5 @@ registerSettings([
   SESSION_DAYS,
   SESSION_MAX_DAYS,
   UI_TREE_WIDTH,
+  KEYS_OVERRIDES,
 ]);

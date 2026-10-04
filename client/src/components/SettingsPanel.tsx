@@ -19,6 +19,7 @@ import { useStore } from "../store";
 import { SelectField } from "./form/fields";
 import {
   FieldControl,
+  fieldKind,
   numberInputError,
   type FieldSchema,
 } from "./SettingControl";
@@ -162,14 +163,12 @@ function SettingField({
 function ResetSection({
   section,
   scope,
-  page,
 }: {
   section: string;
   scope: SettingScope;
-  page: SettingDefinition[];
 }) {
   const loaded = useSettings((state) => state.loaded);
-  const keys = page
+  const keys = pageOf(section)
     .filter((definition) => definition.scopes.includes(scope))
     .map((definition) => definition.key);
   if (!loaded.app || !loaded[scope] || keys.length === 0) return null;
@@ -222,7 +221,7 @@ function PageContent({
           />
         )}
         {available.includes(selected) && (
-          <ResetSection section={section} scope={selected} page={page} />
+          <ResetSection section={section} scope={selected} />
         )}
       </div>
       {section === "project" && !projectOpen ? (
@@ -304,7 +303,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [scope, setScope] = useState<SettingScope>("app");
   const session = useSession();
   const projectOpen = useSettings((state) => state.projectOpen);
-  const page = pageOf(section);
+  const page = pageOf(section).filter((definition) =>
+    fieldKind(definition.schema as FieldSchema),
+  );
   const admin = session.kind === "signed-in" && session.user.role === "admin";
   const available = writableScopes(section, projectOpen, admin);
   const selected = available.includes(scope)
