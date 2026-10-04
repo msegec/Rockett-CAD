@@ -96,12 +96,29 @@ function unlocated({ k, own }: Session, shape: Shape): Shape {
   return own(own(transformOp(origin, own(location.Transformation()))).Shape());
 }
 
+const directive =
+  (code: string, digits: number) =>
+  (run: string): string =>
+    `\\${code}\\${Array.from(run, (c) =>
+      c.codePointAt(0)!.toString(16).toUpperCase().padStart(digits, "0"),
+    ).join("")}\\X0\\`;
+
+function basicAlphabet(utf8: Uint8Array): Buffer {
+  return Buffer.from(
+    Buffer.from(utf8)
+      .toString("utf8")
+      .replace(/[\u0080-\uffff]+/gu, directive("X2", 4))
+      .replace(/[\u{10000}-\u{10ffff}]+/gu, directive("X4", 8)),
+    "ascii",
+  );
+}
+
 function buildXdeDocument(xde: Session, parts: readonly XdePart[]) {
   const { k, own } = xde;
   const { doc, shapes, colours } = xde.newDocument();
   for (const { shape, name, color } of parts) {
     const label = own(shapes.AddShape(unlocated(xde, shape), false, true));
-    k.setLabelName(label, name);
+    k.setLabelName(label, name.replaceAll("\0", ""));
     if (color)
       colours.SetColor_2(
         label,
@@ -129,7 +146,7 @@ export function writeXdeStep(parts: readonly XdePart[]): Buffer {
         xde.progress(),
       ) && writer.Write(xde.file) === k.IFSelect_ReturnStatus.IFSelect_RetDone;
     if (!done) throw new Error("STEP export failed in the kernel");
-    const bytes = Buffer.from(k.FS.readFile(xde.file) as Uint8Array);
+    const bytes = basicAlphabet(k.FS.readFile(xde.file) as Uint8Array);
     failed = false;
     return bytes;
   } finally {
