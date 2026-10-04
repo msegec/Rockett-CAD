@@ -1,5 +1,6 @@
 import { CHORD_FRACTION } from "../kernel/surfaceMesh.js";
 import type { Move, Section, Xyz } from "../shared/ir.js";
+import { toolRefusal } from "../shared/operations.js";
 import type { Box, Setup } from "../shared/setup.js";
 import type { Preset, Tool } from "../shared/tools.js";
 import {
@@ -31,8 +32,8 @@ const EPSILON = 1e-9;
 const TOO_MANY = `parallel needs over ${MAX_SAMPLES} drop cutter samples`;
 
 function checked({ setup, tool, preset, angle, mesh }: ParallelInput) {
-  if (tool.kind !== "ball")
-    throw new RangeError("parallel finishing takes a ball tool");
+  const refusal = toolRefusal("rockett.cam.parallel", tool.kind);
+  if (refusal) throw new RangeError(refusal);
   const radius = tool.diameter / 2;
   if (!(radius > 0)) throw new RangeError("tool diameter must be above 0");
   if (!(setup.tolerance > 0 && setup.tolerance < radius))

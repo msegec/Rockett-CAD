@@ -12,6 +12,7 @@ import {
 } from "clipper2-ts";
 import type { RegionLoop, Segment } from "../kernel/regions.js";
 import { arcSweep, type Move, type Xy, type Xyz } from "../shared/ir.js";
+import { toolRefusal } from "../shared/operations.js";
 import type { Box, Setup } from "../shared/setup.js";
 import {
   validatePreset,
@@ -156,10 +157,8 @@ export function checkCut(operation: string, cut: Cut) {
   const { setup, stock, bottom, tool, preset } = cut;
   const problems = [...validateTool(tool), ...validatePreset(preset)];
   if (problems.length) throw new RangeError(problems.join("; "));
-  if (tool.kind !== "flat" && tool.kind !== "bull")
-    throw new RangeError(
-      `${operation} needs a flat or bull end mill, not a ${tool.kind}`,
-    );
+  const refusal = toolRefusal(`rockett.cam.${operation}`, tool.kind);
+  if (refusal) throw new RangeError(refusal);
   if (!(setup.clearance > 0 && setup.safeHeight >= setup.clearance))
     throw new RangeError(
       "clearance must be above 0 and safe height at least the clearance",

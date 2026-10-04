@@ -240,6 +240,14 @@ describe("validateProgram", () => {
     p.sections.push({ ...p.sections[0]!, toolId: "t9" });
     expect(validateProgram(p)).toEqual(["sections[1].toolId t9 is unknown"]);
   });
+
+  it("rejects duplicate tool ids and tool numbers", () => {
+    const tools = [tool, { ...tool, number: 2 }, { ...tool, id: "t2" }];
+    expect(validateProgram({ ...program([]), tools })).toEqual([
+      "tools[1].id t1 is a duplicate",
+      "tools[2].number 1 is a duplicate",
+    ]);
+  });
 });
 
 describe("programStats", () => {

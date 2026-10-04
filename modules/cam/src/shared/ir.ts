@@ -131,10 +131,20 @@ function moveProblems(move: Move, at: Xyz | undefined, path: string) {
   return problems;
 }
 
+function duplicates({ tools }: Program, key: "id" | "number"): string[] {
+  return tools.flatMap((tool, i) =>
+    tools.findIndex((each) => each[key] === tool[key]) < i
+      ? [`tools[${i}].${key} ${tool[key]} is a duplicate`]
+      : [],
+  );
+}
+
 export function validateProgram(program: Program): string[] {
   const tools = new Set(program.tools.map((tool) => tool.id));
   return [
     ...nonFinite(program, ""),
+    ...duplicates(program, "id"),
+    ...duplicates(program, "number"),
     ...program.sections
       .map((section, s) => ({ section, s }))
       .filter(({ section }) => !tools.has(section.toolId))

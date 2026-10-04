@@ -1,4 +1,5 @@
 import type { Move, Section, Xy } from "../shared/ir.js";
+import { toolRefusal } from "../shared/operations.js";
 import type { Box, Setup } from "../shared/setup.js";
 import type { Preset, Tool } from "../shared/tools.js";
 import {
@@ -107,10 +108,9 @@ const free = (c: Probe, p: Xy) => height(c, p) <= c.z;
 function shape(tool: Tool) {
   const radius = tool.diameter / 2;
   if (!(radius > 0)) throw new RangeError("tool diameter must be above 0");
-  if (tool.kind === "flat") return { radius, corner: 0 };
   if (tool.kind === "ball") return { radius, corner: radius };
   if (tool.kind === "bull") return { radius, corner: tool.cornerRadius };
-  throw new RangeError("waterline takes flat, ball and bull tools");
+  return { radius, corner: 0 };
 }
 
 function spacing(radius: number, corner: number, residual: number) {
@@ -360,6 +360,8 @@ function levels(
 
 function checked(input: WaterlineInput) {
   const { setup, preset, angle } = input;
+  const refusal = toolRefusal("rockett.cam.waterline", input.tool.kind);
+  if (refusal) throw new RangeError(refusal);
   if (!(preset.stepdown > 0)) throw new RangeError("stepdown must be above 0");
   if (!(angle >= 0 && angle < 90))
     throw new RangeError("wall angle must be at least 0 and below 90 degrees");

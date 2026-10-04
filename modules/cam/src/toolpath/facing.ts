@@ -1,4 +1,5 @@
 import type { Move, Section, Xyz } from "../shared/ir.js";
+import { toolRefusal } from "../shared/operations.js";
 import type { Box, Setup } from "../shared/setup.js";
 import type { Preset, Tool } from "../shared/tools.js";
 import { depthLevels, steps } from "./geometry.js";
@@ -13,6 +14,8 @@ export type FacingInput = {
 };
 
 function rows({ stock, tool, preset }: FacingInput): number[] {
+  const refusal = toolRefusal("rockett.cam.facing", tool.kind);
+  if (refusal) throw new RangeError(refusal);
   const radius = tool.diameter / 2;
   const stepover = preset.stepoverFraction * tool.diameter;
   if (!(preset.stepoverFraction > 0 && preset.stepoverFraction <= 1))
