@@ -57,6 +57,7 @@ async function projectView(id: string): Promise<ProjectView> {
   };
   return {
     get: () => open,
+    selection: () => [],
     subscribe: () => () => {},
     read: () => Promise.reject(new Error("read is not used here")),
     async mutate(route, body) {

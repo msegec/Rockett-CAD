@@ -14,9 +14,12 @@ import {
   registerSettings,
   resolveSettings,
   SETTINGS,
+  ValidationError,
+  type FaceRef,
   type LayerValues,
   type ModuleInfo,
 } from "@rockett/shared";
+import { signAt } from "../api/featureRoutes.js";
 import { registerImporter } from "../api/importers.js";
 import { registerRouteModule } from "../api/routeModules.js";
 import { registerExporter } from "../geometry/exporters.js";
@@ -24,8 +27,13 @@ import { registerFeatureKind } from "../geometry/featureKinds.js";
 import type { KernelClient } from "../kernel/client.js";
 import type { FolderStore } from "../store/folderStore.js";
 import { moduleUserData } from "../store/moduleData.js";
-import type { ProjectStore } from "../store/projectStore.js";
-import { moduleBodies, type BodyKernel } from "./bodies.js";
+import { StoreError, type ProjectStore } from "../store/projectStore.js";
+import {
+  canView,
+  finalModel,
+  moduleBodies,
+  type BodyKernel,
+} from "./bodies.js";
 import { moduleFiles } from "./files.js";
 
 type Kernel = Pick<KernelClient, "moduleJob"> & BodyKernel;
@@ -124,6 +132,31 @@ function enabled(moduleId: string, app: LayerValues) {
   return resolveSettings({ app }).values[key]?.value !== false;
 }
 
+const signFaces =
+  (
+    kernel: Kernel,
+    store: ProjectStore,
+    folders: FolderStore,
+  ): ServerContext["signFaces"] =>
+  async (projectId, user, refs) => {
+    if (!(await canView(store, folders, user, projectId)))
+      throw new StoreError("project not found", "not_found");
+    const doc = finalModel(await store.load(projectId));
+    const faces = refs.map(({ bodyId, faceName }): FaceRef => ({
+      kind: "face",
+      bodyId,
+      faceName,
+    }));
+    await signAt(kernel, doc, doc.timelinePosition, faces);
+    return faces.map(({ kind, bodyId, faceName, sig }) => {
+      if (!sig)
+        throw new ValidationError(
+          `face ${faceName} of body ${bodyId} is not in the model`,
+        );
+      return { kind, bodyId, faceName, sig };
+    });
+  };
+
 async function load(
   module: HostModule,
   own: Dispose[],
@@ -159,6 +192,7 @@ async function load(
         return kernel.version();
       },
       bodies: moduleBodies(kernel, store, folders),
+      signFaces: signFaces(kernel, store, folders),
     });
   } catch (error) {
     disposeAll(own.splice(0));

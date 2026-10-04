@@ -14,6 +14,7 @@ import {
   type User,
   unsignedRefs,
 } from "@rockett/shared";
+import type { KernelClient } from "../kernel/client.js";
 import { StoreError } from "../store/projectStore.js";
 import { pruneViews } from "../store/viewStore.js";
 import {
@@ -37,6 +38,23 @@ function retargets(patch: object): boolean {
   return !("targets" in patch) && !keepsTargets(patch);
 }
 
+export async function signAt(
+  kernel: Pick<KernelClient, "stateQuery">,
+  doc: CadDocument,
+  index: number,
+  refs: Array<FaceRef | EdgeRef>,
+) {
+  const sigs = await kernel.stateQuery(doc, {
+    kind: "sign",
+    position: index,
+    refs,
+  });
+  refs.forEach((ref, i) => {
+    const sig = sigs[i];
+    if (sig) ref.sig = sig;
+  });
+}
+
 function featureEdits(context: ApiRoutes) {
   const { kernel, store } = context;
   async function pinned(
@@ -54,21 +72,11 @@ function featureEdits(context: ApiRoutes) {
     startFirst(doc.features[index]!);
   }
 
-  async function sign(
+  const sign = (
     doc: CadDocument,
     index: number,
     refs: Array<FaceRef | EdgeRef>,
-  ) {
-    const sigs = await kernel.stateQuery(doc, {
-      kind: "sign",
-      position: index,
-      refs,
-    });
-    refs.forEach((ref, i) => {
-      const sig = sigs[i];
-      if (sig) ref.sig = sig;
-    });
-  }
+  ) => signAt(kernel, doc, index, refs);
 
   async function signed(
     doc: CadDocument,

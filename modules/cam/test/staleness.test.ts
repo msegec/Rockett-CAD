@@ -159,6 +159,7 @@ beforeAll(async () => {
     userData: () => ({ read: async () => null, write: async () => null! }),
     files: moduleFiles(storage, "rockett.cam"),
     kernelVersion: null,
+    signFaces: async () => [],
     bodies: moduleBodies(kernel, store, new FolderStore(storage)),
   });
 }, 120_000);

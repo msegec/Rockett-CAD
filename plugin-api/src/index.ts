@@ -3,6 +3,7 @@ import type { Group, Object3D } from "three";
 import type {
   BodyPayload,
   CadDocument,
+  FaceRef as CoreFaceRef,
   FeatureStatus,
   Health,
   PathParams,
@@ -25,7 +26,11 @@ export type {
   User,
 } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.2.0";
+export const PLUGIN_API_VERSION = "0.3.0";
+
+export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
+
+export type SignedFaceRef = FaceRef & Required<Pick<CoreFaceRef, "sig">>;
 
 export type Dispose = () => void;
 
@@ -155,6 +160,11 @@ export interface ServerContext {
   readonly files: ModuleFiles;
   readonly kernelVersion: Health["kernelVersion"];
   bodies(projectId: string, user: User): Promise<ServerBody[]>;
+  signFaces(
+    projectId: string,
+    user: User,
+    refs: readonly FaceRef[],
+  ): Promise<SignedFaceRef[]>;
 }
 
 export interface Anchored {
@@ -252,6 +262,7 @@ export type ProjectRoute = Route<`/projects/:id/${string}`>;
 
 export interface ProjectView {
   get(): OpenProject;
+  selection(): readonly FaceRef[];
   subscribe(listener: () => void): Dispose;
   read<R extends ProjectRoute>(
     route: R,

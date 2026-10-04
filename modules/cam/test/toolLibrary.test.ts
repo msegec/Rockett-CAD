@@ -128,6 +128,7 @@ beforeAll(async () => {
       list: async () => [],
     },
     kernelVersion: null,
+    signFaces: async () => [],
     bodies: async () => [],
   };
   await cam.activate(context);

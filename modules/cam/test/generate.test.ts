@@ -328,6 +328,7 @@ async function mounted(r: Awaited<ReturnType<typeof rig>>) {
     userData: () => ({ read: async () => null, write: async () => null! }),
     files: r.files,
     kernelVersion: null,
+    signFaces: async () => [],
     bodies: r.context.bodies,
   });
   const run = (at: string, doc: CadDocument, sent: unknown) =>

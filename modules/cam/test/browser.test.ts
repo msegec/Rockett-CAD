@@ -198,6 +198,7 @@ beforeAll(async () => {
     userData: () => ({ read: async () => null, write: async () => null! }),
     files,
     kernelVersion: null,
+    signFaces: async () => [],
     bodies: async () => {
       modelReads++;
       return [body("b1"), body("b2")];
@@ -230,6 +231,7 @@ function projectView(data: unknown = camData) {
     routes.get(path)!(doc, { params: { id }, ...req }, { user: mark });
   const view: ProjectView = {
     get: () => open,
+    selection: () => [],
     subscribe: () => () => {},
     read: (route, params) =>
       routes.get(route.path)!(

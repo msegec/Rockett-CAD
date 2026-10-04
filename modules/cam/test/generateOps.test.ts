@@ -234,6 +234,7 @@ async function route() {
     userData: () => ({ read: async () => null, write: async () => null! }),
     files,
     kernelVersion: null,
+    signFaces: async () => [],
     bodies: async () => [body],
   });
   return (camData: CamData, operationId: string) =>

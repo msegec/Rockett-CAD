@@ -223,6 +223,7 @@ function fakeProject() {
   const reads: string[] = [];
   const project: ProjectView = {
     get: () => open,
+    selection: () => [],
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

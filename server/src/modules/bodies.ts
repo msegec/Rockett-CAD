@@ -2,6 +2,7 @@ import type { ServerContext } from "@rockett/plugin-api";
 import {
   Placement,
   resolveDocumentParameters,
+  type CadDocument,
   type FeatureStatus,
   type User,
 } from "@rockett/shared";
@@ -25,7 +26,7 @@ const problem = (status: FeatureStatus) =>
   status.status === "cancelled" ||
   (status.refs?.length ?? 0) > 0;
 
-async function canView(
+export async function canView(
   store: ProjectStore,
   folders: FolderStore,
   user: User,
@@ -39,6 +40,11 @@ async function canView(
   }
 }
 
+export const finalModel = (doc: CadDocument): CadDocument => ({
+  ...doc,
+  timelinePosition: doc.features.length,
+});
+
 export function moduleBodies(
   kernel: BodyKernel,
   store: ProjectStore,
@@ -47,8 +53,7 @@ export function moduleBodies(
   return async (projectId, user) => {
     if (!(await canView(store, folders, user, projectId)))
       throw new StoreError("project not found", "not_found");
-    const stored = await store.load(projectId);
-    const doc = { ...stored, timelinePosition: stored.features.length };
+    const doc = finalModel(await store.load(projectId));
     const evaluation = await kernel.evaluate(doc);
     const { bodies, featureStatuses } = evaluation;
     if (bodies.length === 0) return [];

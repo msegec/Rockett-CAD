@@ -3,6 +3,7 @@ import type {
   ClientContext,
   ClientUi,
   Dispose,
+  FaceRef,
   Layer,
   NumberFieldProps,
   OpenProject,
@@ -130,6 +131,10 @@ const changed = (now: Viewed, before: Viewed) =>
 
 let seen: Viewed = { projectId: null, document: null, evaluation: null };
 let open: OpenProject = { projectId: null, document: null, bodies: [] };
+let picked: { from: State["selection"]; faces: readonly FaceRef[] } = {
+  from: [],
+  faces: [],
+};
 
 const project: ProjectView = {
   get() {
@@ -145,9 +150,21 @@ const project: ProjectView = {
     open = { projectId, document, bodies };
     return open;
   },
+  selection() {
+    const { selection } = useStore.getState();
+    if (selection === picked.from) return picked.faces;
+    const faces = selection.flatMap((s) =>
+      s.kind === "face"
+        ? [{ kind: s.kind, bodyId: s.bodyId, faceName: s.faceName }]
+        : [],
+    );
+    picked = { from: selection, faces };
+    return faces;
+  },
   subscribe: (listener) =>
     useStore.subscribe((now, before) => {
-      if (changed(now, before)) listener();
+      if (changed(now, before) || now.selection !== before.selection)
+        listener();
     }),
   async read(route, params) {
     const { projectId } = useStore.getState();
@@ -239,8 +256,14 @@ function moduleContext(own: Dispose[], moduleId: string) {
     <A extends unknown[]>(register: (...args: A) => Dispose) =>
     (...args: A) => {
       const dispose = register(...args);
-      own.push(dispose);
-      return dispose;
+      const release = () => {
+        const at = own.indexOf(release);
+        if (at < 0) return;
+        own.splice(at, 1);
+        dispose();
+      };
+      own.push(release);
+      return release;
     };
   const shown = hideable(own, moduleId);
   const command = shown(registerCommand);
