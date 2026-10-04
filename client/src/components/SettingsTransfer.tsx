@@ -5,6 +5,7 @@ import {
   type LayerValues,
 } from "@rockett/shared";
 import { saveDownload, send } from "../api";
+import { readTextFile } from "../download";
 import { loadUserSettings, useSettings } from "../settings";
 import { useStore } from "../store";
 import { confirm } from "./ConfirmPanel";
@@ -28,13 +29,14 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 async function readSettingsFile(file: File): Promise<LayerValues> {
-  if (file.size > SETTINGS_IMPORT_MAX_BYTES)
-    throw new Error(
-      `This file is over the ${SETTINGS_IMPORT_MAX_BYTES / 1024 / 1024} MB settings file limit.`,
-    );
+  const text = await readTextFile(
+    file,
+    SETTINGS_IMPORT_MAX_BYTES,
+    "settings file",
+  );
   let parsed: unknown;
   try {
-    parsed = JSON.parse(await file.text());
+    parsed = JSON.parse(text);
   } catch {
     throw new Error("This file is not JSON.");
   }

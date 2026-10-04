@@ -359,13 +359,23 @@ module, in load order:
   core edit, and applies the returned document and history. A route that is
   not a document edit, or no open project, rejects.
 - `ui` passes the core `DraggablePanel`, `DialogFooter`, `NumField`,
-  `LengthField`, `AngleField`, `SelectField` and `CheckField`, so a module
-  dialog uses the KIT fields. `LengthField` takes millimetres and shows the
-  user's length unit. `ui.openPanel(id)` and `ui.closePanel(id)` open and
-  close a panel through the core panel state.
+  `LengthField`, `AngleField`, `SelectField`, `CheckField` and `TextField`,
+  so a module dialog uses the KIT fields. `LengthField` takes millimetres
+  and shows the user's length unit. `ui.openPanel(id)` and
+  `ui.closePanel(id)` open and close a panel through the core panel state.
 - `ui.confirm(message)` asks through the core Confirm panel and resolves
   true on OK, false on Cancel or Escape. A newer confirm answers the open
   one false.
+- `ui.download({ fileName, data, type })` saves `data` as a file named
+  `fileName` of MIME `type` through the core download.
+- `ui.pickFile({ accept, maxBytes })` opens the browser file picker for
+  `accept` and resolves `{ name, text }`, or `null` on Cancel. A file over
+  `maxBytes` rejects before it is read, stating the limit exactly: "This
+  file is over the 2 KB file limit." or "over the 1000 B file limit."
+  `maxBytes` is capped at `MODULE_DATA_MAX_BYTES`, 8 MB, the module user
+  data limit; a `maxBytes` of 0, below 0 or NaN rejects.
+- Where the browser lacks the file input `cancel` event, a cancelled pick
+  never settles.
 - `request(method, path, body?)` calls the module's own user routes under
   `/m/<moduleId>/`, with the dots of the id as slashes: `rockett.cam`
   sending `"tools"` reaches `/m/rockett/cam/tools`. It goes through the core
@@ -433,4 +443,4 @@ package that understates its expanded sizes fails as 400 at evaluation.
 | Tool targets                          | `MAX_TARGETS`, `shared/src/schema/features.ts`                                      |
 | Previews, jobs, timeouts, size search | `server/src/tunables.ts`                                                            |
 | Settings import                       | `SETTINGS_IMPORT_MAX_BYTES`; nodes and depth in `server/src/store/settingsStore.ts` |
-| Module user data file                 | `MODULE_DATA_MAX_BYTES`, `server/src/store/moduleData.ts`                           |
+| Module user data file and file pick   | `MODULE_DATA_MAX_BYTES`, `shared/src/units.ts`                                      |

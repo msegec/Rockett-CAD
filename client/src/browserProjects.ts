@@ -1,5 +1,6 @@
 import {
   createEmptyDocument,
+  formatSize,
   PROJECT_FILE_FORMAT,
   PROJECT_FILE_LIMIT_MB,
   PROJECT_FILE_VERSION,
@@ -8,6 +9,8 @@ import {
   type ProjectFile,
 } from "@rockett/shared";
 import { api } from "./api";
+
+export { formatSize };
 
 export interface BrowserProject {
   key: string;
@@ -99,14 +102,6 @@ function record(
     document,
     assets,
   };
-}
-
-export function formatSize(bytes: number): string {
-  const units = ["B", "KB", "MB", "GB"];
-  let n = bytes;
-  let unit = 0;
-  for (; n >= 1024 && unit < units.length - 1; unit++) n /= 1024;
-  return unit === 0 ? `${n} B` : `${n.toFixed(1)} ${units[unit]}`;
 }
 
 export interface StorageLine {

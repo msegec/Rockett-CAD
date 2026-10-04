@@ -24,6 +24,7 @@ import {
 import { iconOf, registerModuleIcon } from "../icons";
 import { registerSelectionKind } from "../selection/kinds";
 import { confirm } from "../components/ConfirmPanel";
+import { pickFile, saveDownload } from "../download";
 import { DraggablePanel } from "../components/DraggablePanel";
 import { DialogFooter } from "../components/form/DialogFooter";
 import {
@@ -32,6 +33,7 @@ import {
   LengthField,
   NumField,
   SelectField,
+  TextField,
 } from "../components/form/fields";
 import { useSetting } from "../settings";
 import {
@@ -160,9 +162,13 @@ const ui: ClientUi = {
   AngleField,
   SelectField,
   CheckField,
+  TextField,
   openPanel,
   closePanel,
   confirm,
+  download: ({ fileName, data, type }) =>
+    saveDownload({ blob: new Blob([data], { type }), fileName }),
+  pickFile,
 };
 
 const ROUTE_PATH = /^[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*$/;

@@ -1,12 +1,12 @@
 import path from "node:path";
 import type { UserData, UserDataEntry } from "@rockett/plugin-api";
-import type { User } from "@rockett/shared";
+import { MODULE_DATA_MAX_BYTES, type User } from "@rockett/shared";
 import { etag, StoreError } from "./jsonStore.js";
 import { ID_RE } from "./manifestStore.js";
 import { ProjectQueue } from "./projectQueue.js";
 import { readFirst, type Storage } from "./storage.js";
 
-export const MODULE_DATA_MAX_BYTES = 8 * 1024 * 1024;
+export { MODULE_DATA_MAX_BYTES };
 
 type Stored = { version: number; data: unknown };
 

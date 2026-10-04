@@ -119,6 +119,40 @@ export function AxisField({
   );
 }
 
+export function TextField({
+  label,
+  value,
+  error,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  error?: string | null;
+  disabled?: boolean;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <>
+      <label className="field">
+        <span>{label}</span>
+        <input
+          type="text"
+          aria-invalid={!!error}
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </label>
+      {error && (
+        <span className="field-hint" role="alert">
+          {error}
+        </span>
+      )}
+    </>
+  );
+}
+
 export function CheckField({
   label,
   value,

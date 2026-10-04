@@ -8,6 +8,7 @@ import {
   type UserParameter,
 } from "@rockett/shared";
 import { api } from "../api";
+import { TextField } from "./form/fields";
 import { useStore } from "../store";
 import { registerPanel, togglePanel } from "../shell/panels";
 import { confirm } from "./ConfirmPanel";
@@ -73,40 +74,6 @@ export function checkParameters(rows: UserParameter[]): Checked[] {
     });
     return { name: null, expression, value };
   });
-}
-
-function TextField({
-  label,
-  value,
-  error,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  error?: string | null;
-  disabled: boolean;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <>
-      <label className="field">
-        <span>{label}</span>
-        <input
-          type="text"
-          aria-invalid={!!error}
-          value={value}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </label>
-      {error && (
-        <span className="field-hint" role="alert">
-          {error}
-        </span>
-      )}
-    </>
-  );
 }
 
 const blank = (n: number): UserParameter => ({

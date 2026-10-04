@@ -56,6 +56,19 @@ export function formatAngle(deg: number, digits: number): string {
 }
 
 export const MB = 1024 * 1024;
+export const MODULE_DATA_MAX_BYTES = 8 * MB;
+
+const SIZE_UNITS = ["B", "KB", "MB", "GB"] as const;
+
+export function formatSize(bytes: number, exact = false): string {
+  const fits = (unit: number) =>
+    bytes >= 1024 ** unit && (!exact || bytes % 1024 ** unit === 0);
+  let unit = 0;
+  while (unit < SIZE_UNITS.length - 1 && fits(unit + 1)) unit++;
+  const n = bytes / 1024 ** unit;
+  const text = unit === 0 || exact ? String(n) : n.toFixed(1);
+  return `${text} ${SIZE_UNITS[unit]}`;
+}
 export const MINUTE = 60 * 1000;
 export const HOUR = 60 * MINUTE;
 export const DAY = 24 * HOUR;

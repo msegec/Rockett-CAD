@@ -286,9 +286,21 @@ export interface ClientUi {
     value: boolean;
     onChange: (value: boolean) => void;
   }>;
+  TextField: ComponentType<{
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    error?: string | null;
+    disabled?: boolean;
+  }>;
   openPanel(id: string): void;
   closePanel(id: string): void;
   confirm(message: string): Promise<boolean>;
+  download(file: { fileName: string; data: BlobPart; type: string }): void;
+  pickFile(request: {
+    accept: string;
+    maxBytes: number;
+  }): Promise<{ name: string; text: string } | null>;
 }
 
 export interface ClientContext {
