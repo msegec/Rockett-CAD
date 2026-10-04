@@ -282,7 +282,7 @@ key grammar, so removed plugin values survive:
   (`BRepGProp`). Distance and angle come only for exactly two refs. A
   duplicate ref is resolved once per request.
 - Writers: `server/src/geometry/exporters.ts`, `server/src/geometry/xde.ts`
-  (STEP), `server/src/geometry/dxf.ts`.
+  (STEP and GLB), `server/src/geometry/dxf.ts`.
 
 ## Extension points
 

@@ -28,8 +28,9 @@ a test that loads the previous schema.
   `shared/src/features/importStep.ts`.
 - The store sets `revision` to the stored value plus one on every write:
   `server/src/store/projectStore.ts`.
-- STEP, IGES and BREP bytes live in the project blob store under their
-  sha256 (`server/src/store/blobStore.ts`). The feature holds `blob`.
+- STEP, IGES, BREP, STL, OBJ and 3MF bytes live in the project blob store
+  under their sha256 (`server/src/store/blobStore.ts`). The feature holds
+  `blob`.
 - `extensions` values keep their `{ version, data }` envelope. The server
   never reads `data`.
 - A feature is a `CoreFeature` or an `ExtensionFeature`, whose dotted
@@ -528,16 +529,17 @@ the global origin, so a sketch rides its face. Construction plane methods:
 `server/src/geometry/tessellate.ts`, `server/src/geometry/edgeCurve.ts` and
 `server/src/geometry/mesh.ts`. Every face triangle range, edge polyline and
 vertex carries its persistent name, so selection is topology, never a triangle
-index. The viewport and STL export both mesh through `meshShape`, which meshes
-only faces without an exact triangle. Export formats:
+index. The viewport meshes through `meshShape`, which meshes only faces
+without an exact triangle. Export meshes a copy through `meshCopy`, which
+skips BRepMesh only when every face has one. Export formats:
 `server/src/geometry/exporters.ts`.
 
 Under naming version 2, a closed single-part mesh import stays a mesh body
 (`server/src/geometry/meshBody.ts`). It draws from its triangles, one face
 per triangle named `x{n}` as version 2 names unnamed faces, with no edges or
-vertices, and sews into a solid only when a feature reads its shape. The
-solid keeps each triangle's name. Version 1 documents and open or
-multi-part meshes sew on import. An import over 1,000,000 triangles is
+vertices, and sews into a solid only when a feature, an export or a
+measurement reads its shape. The solid keeps each triangle's name. Version 1
+documents and open or multi-part meshes sew on import. An import over 1,000,000 triangles is
 refused before any meshing, and the import read budget bounds file bytes.
 
 ## Naming upgrade

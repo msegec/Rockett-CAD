@@ -7,7 +7,7 @@ from the parametric document is the geometry.
 Browser UI (React)
    ↓ selection, tool state, dialogs
 3D viewport (three.js)
-   ↓ REST (JSON)
+   ↓ REST (JSON; meshes as binary)
 Parametric document (shared TypeScript schema)
    ↓
 Geometry service (Node.js, regeneration engine + caches)
