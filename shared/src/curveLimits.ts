@@ -11,6 +11,7 @@ import {
   type Curve,
   type XY,
 } from "./sketchCurves.js";
+import { LINEAR_TOL } from "./tolerance.js";
 
 export const SPLINE_UNSUPPORTED = "This tool does not support splines yet.";
 export const CONTACT_UNSUPPORTED =
@@ -30,7 +31,7 @@ export function refuseUnsupported<E extends SketchEntity>(
   if (unsupported(e)) throw new Error(refusal(e));
 }
 
-function endsOf(c: Curve): XY[] {
+export function endsOf(c: Curve): XY[] {
   switch (c.kind) {
     case "line":
       return [
@@ -43,8 +44,11 @@ function endsOf(c: Curve): XY[] {
       return [];
     case "ellipse":
       return c.span ? [c.span.s, c.span.e] : [];
-    case "spline":
-      return c.periodic ? [] : [c.poles[0]!, c.poles.at(-1)!];
+    case "spline": {
+      const [[x, y], [ex, ey]] = [c.poles[0]!, c.poles.at(-1)!];
+      const closed = c.periodic || Math.hypot(ex - x, ey - y) < LINEAR_TOL;
+      return closed ? [] : [c.poles[0]!, c.poles.at(-1)!];
+    }
   }
 }
 
@@ -83,7 +87,7 @@ function touches(s: Spline, c: Curve): boolean {
   const g = (u: number) => gap(bsplinePoint(s, u));
   const us = bsplineParams(s, ARC_SEGMENTS);
   const gs = us.map(g);
-  const ends = [...endsOf(s), ...endsOf(c)];
+  const ends = endsOf(s);
   return gs.some((v, i) => {
     if (v > (gs[i - 1] ?? Infinity) || v > (gs[i + 1] ?? Infinity))
       return false;
@@ -107,22 +111,27 @@ export function crossingCurves(curves: Curve[], lines = false): Set<string> {
   return out;
 }
 
-export function crossingEllipses(entities: SketchEntity[]): string[] {
-  const all = sketchCurves(entities);
-  const crossing = crossingCurves(all);
-  return all
-    .filter((c) => c.kind === "ellipse" && crossing.has(c.id))
-    .map((c) => c.id);
+const CONTACT = {
+  ellipse: ["Ellipse", "touches another curve"],
+  spline: ["Spline", "touches another curve away from its end poles"],
+} as const;
+
+function crossingOf(curves: Curve[]): Map<Unsupported["kind"], string[]> {
+  const crossing = crossingCurves(curves);
+  const out = new Map<Unsupported["kind"], string[]>();
+  for (const c of curves)
+    if ((c.kind === "ellipse" || c.kind === "spline") && crossing.has(c.id))
+      out.set(c.kind, [...(out.get(c.kind) ?? []), c.id]);
+  return out;
 }
 
+export const crossingEllipses = (entities: SketchEntity[]) =>
+  crossingOf(sketchCurves(entities)).get("ellipse") ?? [];
+
 export function regionWarning(entities: SketchEntity[]): string | undefined {
-  const ellipses = crossingEllipses(entities);
-  const splines = sketchCurves(entities).filter((c) => c.kind === "spline");
-  const lines = [
-    ellipses.length &&
-      `Ellipse ${ellipses.join(", ")} touches another curve and forms no region. Move it clear to use it.`,
-    splines.length &&
-      `Spline ${splines.map((c) => c.id).join(", ")} forms no region yet.`,
-  ].filter(Boolean);
+  const lines = [...crossingOf(sketchCurves(entities))].map(
+    ([kind, ids]) =>
+      `${CONTACT[kind][0]} ${ids.join(", ")} ${CONTACT[kind][1]} and forms no region. Move it clear to use it.`,
+  );
   return lines.length ? lines.join(" ") : undefined;
 }

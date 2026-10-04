@@ -1,4 +1,4 @@
-import { crossingCurves } from "./curveLimits.js";
+import { crossingCurves, endsOf } from "./curveLimits.js";
 import { ARC_SEGMENTS } from "./curveSampling.js";
 import type { SketchEntity, SketchPoint } from "./model.js";
 import {
@@ -11,12 +11,8 @@ import {
   spanParam,
   SPLIT_TOL,
   TAU,
-  type Arc,
-  type Circle,
+  type Curve,
   type Detection,
-  type Ellipse,
-  type Line,
-  type Round,
   type XY,
 } from "./sketchCurves.js";
 import { LINEAR_TOL } from "./tolerance.js";
@@ -89,20 +85,7 @@ export function profileIdFor(outerIds: string[], holeIds: string[][]): string {
   return "p" + fnv(canon);
 }
 
-type Open = Line | Round | Ellipse;
-
-const endless = (c: Open): c is Circle | Ellipse =>
-  c.kind === "circle" || (c.kind === "ellipse" && !c.span);
-
-const endsOf = (c: Line | Arc | Ellipse): [XY, XY] =>
-  c.kind === "line"
-    ? [
-        [c.x1, c.y1],
-        [c.x2, c.y2],
-      ]
-    : c.kind === "arc"
-      ? [c.s, c.e]
-      : [c.span!.s, c.span!.e];
+const endless = (c: Curve) => endsOf(c).length === 0;
 
 interface Cut {
   n: number;
@@ -111,14 +94,15 @@ interface Cut {
 
 interface Arrangement {
   nodes: XY[];
-  curves: Open[];
+  curves: Curve[];
   ends: [number, number][];
   cuts: Cut[][];
   crossing: Set<string>;
 }
 
-function cutsOn(c: Open, nodes: XY[], [from, to]: [number, number]): Cut[] {
+function cutsOn(c: Curve, nodes: XY[], [from, to]: [number, number]): Cut[] {
   const cuts: Cut[] = [];
+  if (c.kind === "spline") return cuts;
   nodes.forEach(([x, y], n) => {
     if (n === from || n === to) return;
     if (c.kind === "line") {
@@ -161,19 +145,19 @@ function arrange(
     nodes.push([x, y]);
     return nodes.length - 1;
   };
-  const curves: Open[] = [];
+  const curves: Curve[] = [];
   const ends: [number, number][] = [];
   const all = sketchCurves(entities);
   const crossing = crossingCurves(all, mode === "legacy");
   for (const c of all) {
-    if (c.kind === "spline" || (crossing.has(c.id) && c.kind === "ellipse"))
+    if (crossing.has(c.id) && (c.kind === "ellipse" || c.kind === "spline"))
       continue;
     if (endless(c)) {
       curves.push(c);
       ends.push([-1, -1]);
       continue;
     }
-    const [s, e] = endsOf(c);
+    const [s, e] = endsOf(c) as [XY, XY];
     const from = nodeFor(s[0], s[1], LINEAR_TOL);
     const to = nodeFor(e[0], e[1], LINEAR_TOL);
     if (from === to) continue;
@@ -248,10 +232,10 @@ interface Loop {
 
 function piecesOf(arr: Arrangement): {
   pieces: Piece[];
-  whole: (Circle | Ellipse)[];
+  whole: Curve[];
 } {
   const pieces: Piece[] = [];
-  const whole: (Circle | Ellipse)[] = [];
+  const whole: Curve[] = [];
   const at = (n: number) => arr.nodes[n]!;
   arr.curves.forEach((c, i) => {
     const cuts = arr.cuts[i]!;
@@ -279,7 +263,9 @@ function piecesOf(arr: Arrangement): {
             ? [a[0], a[1], b[0], b[1]]
             : c.kind === "ellipse"
               ? sampleEllipse(c, a, b)
-              : sampleArc(c.cx, c.cy, a[0], a[1], b[0], b[1]),
+              : c.kind === "spline"
+                ? curveSamples(c)
+                : sampleArc(c.cx, c.cy, a[0], a[1], b[0], b[1]),
         ...(split && { trim: [a[0], a[1], b[0], b[1]] }),
       });
     }
@@ -367,12 +353,13 @@ function faceLoops(pieces: Piece[]): Loop[] {
   return loops;
 }
 
-function closedLoop(c: Circle | Ellipse): Loop {
+function closedLoop(c: Curve): Loop {
   const polygon = curveSamples(c, ARC_SEGMENTS * 2).slice(0, -2);
+  const signed = polygonArea(polygon);
   return {
-    curves: [{ entityId: c.id, reversed: false }],
+    curves: [{ entityId: c.id, reversed: signed < 0 }],
     polygon,
-    area: Math.abs(polygonArea(polygon)),
+    area: Math.abs(signed),
   };
 }
 

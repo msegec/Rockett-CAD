@@ -408,11 +408,8 @@ function lineEllipse(l: Line, e: Ellipse, mode: Detection): XY[] {
     .filter((x) => inSpan(e, x));
 }
 
-export function meet(
-  a: Line | Round | Ellipse,
-  b: Line | Round | Ellipse,
-  mode: Detection,
-): XY[] {
+export function meet(a: Curve, b: Curve, mode: Detection): XY[] {
+  if (a.kind === "spline" || b.kind === "spline") return [];
   if (a.kind === "ellipse" || b.kind === "ellipse") {
     if (a.kind === "line") return lineEllipse(a, b as Ellipse, mode);
     if (b.kind === "line") return lineEllipse(b, a as Ellipse, mode);

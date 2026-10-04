@@ -491,12 +491,17 @@ input bound, not a tolerance.
   SPLINE whose normal is Z, passing scale only to `sketchBuilder`. An open
   spline is clamped, so its end poles are its ends and share the points of
   touching curves; a periodic one closes on itself. Dragging a pole moves the
-  curve through the generic point paths. A spline forms no region yet and the
-  sketch warns (`regionWarning` in `shared/src/curveLimits.ts`). Trim,
-  extend, offset, dimensions, relations and sweep paths refuse it, and trim
-  refuses a curve that touches it away from either curve's ends. That contact
-  test samples each knot span and refines the nearest gap; it is not an exact
-  intersection. DXF export samples it: `shared/test/spline.test.ts`.
+  curve through the generic point paths. Open splines join other curves at
+  their ends to form regions, and an end pole may cut a line or arc. A
+  periodic spline, or a clamped one whose end poles meet, closes alone like a
+  circle, with no ends. A curve touching a spline off its ends removes the
+  spline from regions and the sketch warns (`regionWarning` in
+  `shared/src/curveLimits.ts`); trim refuses both curves. That contact test
+  samples each knot span and refines the nearest gap; it is not an exact
+  intersection. `pieceEdge` builds the exact `Geom_BSplineCurve` edge, so
+  sides name after the spline and solids keep its exact data. Trim, extend,
+  offset, dimensions, relations and sweep paths refuse it. DXF export samples
+  it, since the R12 writer has no SPLINE entity: `shared/test/spline.test.ts`.
 
 ## Frame conventions
 

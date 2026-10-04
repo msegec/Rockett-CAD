@@ -9,8 +9,8 @@ import {
 import { regionWarning } from "../src/curveLimits.js";
 import { dxfSplines, importDxf } from "../src/importDxf.js";
 import type { SketchEntity } from "../src/model.js";
-import { detectProfiles } from "../src/profiles.js";
-import { curveSamples, sketchCurves } from "../src/sketchCurves.js";
+import { curveHits, detectProfiles } from "../src/profiles.js";
+import { curveSamples, sketchCurves, type XY } from "../src/sketchCurves.js";
 import { extendSketch, offsetSketch } from "../src/sketchModify.js";
 import { moveSketchSelection } from "../src/sketchTransform.js";
 import { trimmable, trimSketch } from "../src/sketchTrim.js";
@@ -315,6 +315,80 @@ describe("dxfSplines", () => {
   });
 });
 
+const curvesIn = (p: { outer: { entityId: string }[] }) =>
+  new Set(p.outer.map((c) => c.entityId));
+
+const entitiesOf = (id: string, s: BSpline): SketchEntity[] => {
+  const ids = s.poles.map((_, i) => `${id}p${i}`);
+  return [
+    ...s.poles.map(([x, y], i): SketchEntity => ({
+      id: ids[i]!,
+      kind: "point",
+      x,
+      y,
+    })),
+    {
+      id,
+      kind: "spline",
+      degree: s.degree,
+      poles: ids,
+      ...(s.weights && { weights: s.weights }),
+      knots: s.knots,
+      multiplicities: s.multiplicities,
+      ...(s.periodic && { periodic: true }),
+    },
+  ];
+};
+const turned = (s: BSpline, k: number, r: number): BSpline => {
+  const [c, n] = [
+    Math.round(Math.cos((k * Math.PI) / 2)),
+    Math.round(Math.sin((k * Math.PI) / 2)),
+  ];
+  return {
+    ...s,
+    poles: s.poles.map(([x, y]): XY => [
+      r * (x * c - y * n),
+      r * (x * n + y * c),
+    ]),
+  };
+};
+const ring = (r: number): SketchEntity[] => {
+  const points = new Map<string, SketchEntity>();
+  const curves = [0, 1, 2, 3].map((k): SketchEntity => {
+    const { poles, weights, knots, multiplicities } = turned(quarter, k, r);
+    const ids = poles.map(([x, y]) => {
+      const id = `r${x}_${y}`;
+      points.set(id, { id, kind: "point", x, y });
+      return id;
+    });
+    return {
+      id: `q${k}`,
+      kind: "spline",
+      degree: 2,
+      poles: ids,
+      weights: weights!,
+      knots,
+      multiplicities,
+    };
+  });
+  return [...points.values(), ...curves];
+};
+const near = (actual: number, expected: number, tol = 2e-3) =>
+  expect(Math.abs(actual - expected) / expected).toBeLessThan(tol);
+const parabola = (height: number): SketchEntity[] => [
+  ...entitiesOf("arch", {
+    degree: 2,
+    poles: [
+      [0, 0],
+      [5, height],
+      [10, 0],
+    ],
+    knots: [0, 1],
+    multiplicities: [3, 3],
+  }),
+  { id: "base", kind: "line", p1: "archp2", p2: "archp0" },
+];
+
 function line(x1 = 0, y1 = 0, x2 = 1, y2 = 0): Pair[] {
   return [
     [0, "LINE"],
@@ -419,16 +493,13 @@ describe("spline sketch entity", () => {
       expect(Math.hypot(flat[i]!, flat[i + 1]!)).toBeCloseTo(1, 12);
   });
 
-  it("forms no region and warns, while the lines around it still do", () => {
+  it("forms no region from an open spline with free ends, while the lines around it still do", () => {
     const entities = imported(arch, ...square(-20, -20, 60));
     const s = splineOf(entities);
     const profiles = detectProfiles(entities);
     expect(profiles).toHaveLength(1);
     expect(JSON.stringify(profiles)).not.toContain(s.id);
-    expect(regionWarning(entities)).toMatch(
-      new RegExp(`Spline ${s.id} forms no region yet`),
-    );
-    expect(regionWarning(imported(...square(0, 0, 5)))).toBeUndefined();
+    expect(regionWarning(entities)).toBeUndefined();
   });
 
   it("refuses to trim the spline or a curve it crosses", () => {
@@ -488,5 +559,103 @@ describe("spline sketch entity", () => {
       [10, 9],
       [15, 1],
     ]);
+  });
+
+  describe("spline profiles", () => {
+    it("joins open rational splines at their end poles into an exact disc", () => {
+      const entities = ring(10);
+      expect(entities.filter((e) => e.kind === "point")).toHaveLength(8);
+      const profiles = detectProfiles(entities);
+      expect(profiles).toHaveLength(1);
+      expect(curvesIn(profiles[0]!)).toEqual(new Set(["q0", "q1", "q2", "q3"]));
+      near(profiles[0]!.area, Math.PI * 100);
+      const poly = profiles[0]!.polygon;
+      for (let i = 0; i < poly.length; i += 2)
+        expect(Math.hypot(poly[i]!, poly[i + 1]!)).toBeCloseTo(10, 9);
+      expect(regionWarning(entities)).toBeUndefined();
+    });
+
+    it("closes a periodic spline alone and nests it as a hole", () => {
+      const disc: BSpline = {
+        degree: 2,
+        poles: [
+          [5, 0],
+          [5, 5],
+          [0, 5],
+          [-5, 5],
+          [-5, 0],
+          [-5, -5],
+          [0, -5],
+          [5, -5],
+        ],
+        weights: [1, R, 1, R, 1, R, 1, R],
+        knots: [0, 1, 2, 3, 4],
+        multiplicities: [2, 2, 2, 2, 2],
+        periodic: true,
+      };
+      const entities = [
+        ...entitiesOf("disc", disc),
+        ...importDxf(dxf(square(-15, -15, 30))).entities,
+      ];
+      const profiles = detectProfiles(entities);
+      expect(profiles).toHaveLength(2);
+      const plate = profiles.find((p) => p.holes.length > 0);
+      const hole = profiles.find((p) => p.holes.length === 0);
+      expect(curvesIn(hole!)).toEqual(new Set(["disc"]));
+      expect(plate!.holes).toEqual([[{ entityId: "disc", reversed: false }]]);
+      near(hole!.area, Math.PI * 25);
+      near(plate!.area, 900 - Math.PI * 25, 1e-3);
+    });
+
+    it("closes a clamped spline whose end poles meet", () => {
+      const profiles = detectProfiles(entitiesOf("loop", circle));
+      expect(profiles).toHaveLength(1);
+      expect(curvesIn(profiles[0]!)).toEqual(new Set(["loop"]));
+      near(profiles[0]!.area, Math.PI * 4);
+    });
+
+    it("follows a moved pole: a parabola over its chord has area base x height / 3", () => {
+      for (const height of [8, 14]) {
+        const profiles = detectProfiles(parabola(height));
+        expect(profiles).toHaveLength(1);
+        expect(curvesIn(profiles[0]!)).toEqual(new Set(["arch", "base"]));
+        near(profiles[0]!.area, (10 * height) / 3);
+      }
+    });
+
+    it("cuts a line at a spline end pole inside its span", () => {
+      const entities = imported(arch, line(-5, 0, 15, 0));
+      const profiles = detectProfiles(entities);
+      expect(profiles).toHaveLength(1);
+      near(profiles[0]!.area, 80 / 3);
+      const l = entities.find((e) => e.kind === "line")!;
+      expect(
+        curveHits(entities)
+          .get(l.id)
+          ?.map((h) => [h.x, h.y]),
+      ).toEqual([
+        [0, 0],
+        [10, 0],
+      ]);
+      const s = splineOf(entities);
+      if (s.kind !== "spline") throw new Error("not a spline");
+      const trimmed = trimSketch(entities, [], l.id, { x: 12, y: 0 });
+      expect(trimmed.constraints).toContainEqual(
+        expect.objectContaining({ type: "coincident", b: s.poles[2] }),
+      );
+    });
+
+    it("warns and forms no region when a curve touches the spline away from its end poles", () => {
+      const touching = [
+        ...parabola(8),
+        { id: "mid", kind: "point", x: 5, y: 0 } as SketchEntity,
+        { id: "top", kind: "point", x: 5, y: 4 } as SketchEntity,
+        { id: "post", kind: "line", p1: "mid", p2: "top" } as SketchEntity,
+      ];
+      expect(detectProfiles(touching)).toEqual([]);
+      expect(regionWarning(touching)).toBe(
+        "Spline arch touches another curve away from its end poles and forms no region. Move it clear to use it.",
+      );
+    });
   });
 });

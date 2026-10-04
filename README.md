@@ -29,6 +29,7 @@ everything downstream against persistent topology references.
 - **Project, trim and extend**: link model edges into a sketch, trim curve pieces by click or drag (T), extend curves to boundaries.
 - **Insert DXF and SVG**: bring DXF lines, arcs, circles, ellipses, splines and points, or SVG paths and shapes, into the sketch as editable geometry.
 - **Ellipses**: draw or import from DXF, including elliptical arcs; constrain tangent lines, project tilted circles, extrude exactly.
+- **Splines**: import exact DXF splines, drag their poles, extrude closed spline loops and holes exactly.
 - **Edit in place**: history rolls back while editing; Finish Sketch restores it, or Extrude opens with the selected region.
 
 ### Model

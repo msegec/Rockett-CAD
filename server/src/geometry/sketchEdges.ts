@@ -130,6 +130,51 @@ function ellipseEdge(
   );
 }
 
+function splineEdge(
+  frame: PlaneFrame,
+  s: Extract<SketchCurve, { kind: "spline" }>,
+  snap: Snap,
+  reversed: boolean,
+): Shape {
+  const k = getKernel();
+  const last = s.poles.length - 1;
+  const ends = (i: number) => !s.periodic && (i === 0 || i === last);
+  return acquire(
+    scoped((own) => {
+      const reals = (values: number[]) => {
+        const out = own(new k.TColStd_Array1OfReal_2(1, values.length));
+        values.forEach((v, i) => out.SetValue_1(i + 1, v));
+        return out;
+      };
+      const poles = own(new k.TColgp_Array1OfPnt_2(1, s.poles.length));
+      s.poles.forEach(([u, v], i) => {
+        const at = ends(i) ? snap(u, v) : ([u, v] as UV);
+        poles.SetValue_1(i + 1, own(pnt(...uvTo3d(frame, ...at))));
+      });
+      const mults = own(new k.TColStd_Array1OfInteger_2(1, s.knots.length));
+      s.multiplicities.forEach((m, i) => mults.SetValue_1(i + 1, m));
+      const knots = reals(s.knots);
+      const periodic = s.periodic ?? false;
+      const curve = s.weights
+        ? new k.Geom_BSplineCurve_2(
+            poles,
+            reals(s.weights),
+            knots,
+            mults,
+            s.degree,
+            periodic,
+            true,
+          )
+        : new k.Geom_BSplineCurve_1(poles, knots, mults, s.degree, periodic);
+      const handle = own(new k.Handle_Geom_Curve_2(curve));
+      const edge = own(own(new k.BRepBuilderAPI_MakeEdge_24(handle)).Edge());
+      return own.keep(
+        reversed ? own(k.TopoDS.Edge_1(own(edge.Reversed()))) : edge,
+      );
+    }),
+  );
+}
+
 export function pieceEdge(
   frame: PlaneFrame,
   curve: SketchCurve,
@@ -147,7 +192,7 @@ export function pieceEdge(
     return ellipseEdge(frame, curve, ends && cut(ends), piece.reversed);
   }
   if (curve.kind === "spline")
-    throw new Error(`Spline ${curve.id} forms no profile edge yet.`);
+    return splineEdge(frame, curve, snap, piece.reversed);
   if (curve.kind === "circle") {
     if (!t) return circleEdge(frame, [curve.cx, curve.cy], curve.r);
     const [s, e] = cut(t);
