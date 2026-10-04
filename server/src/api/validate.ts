@@ -1,11 +1,14 @@
 import {
   documentSchema,
+  featureModule,
   featureSpec,
   parse,
+  unloadedFeatureSchema,
   ValidationError,
   type CadDocument,
   type Feature,
 } from "@rockett/shared";
+import { MODULE_DATA_MAX_BYTES } from "../store/moduleData.js";
 
 export function record(v: unknown, label: string): void {
   if (typeof v !== "object" || v === null || Array.isArray(v)) {
@@ -45,11 +48,23 @@ export function validateBuilt(f: Feature): void {
   }
 }
 
+function validateStored(f: Feature): void {
+  record(f, "feature");
+  const unloaded =
+    typeof f.type === "string" && !featureSpec(f.type) && featureModule(f.type);
+  if (!unloaded) return validateFeature(f);
+  const { params } = parse(unloadedFeatureSchema, f, "feature");
+  if (Buffer.byteLength(JSON.stringify(params)) > MODULE_DATA_MAX_BYTES)
+    throw new ValidationError(
+      `${f.type} params are over ${MODULE_DATA_MAX_BYTES / 1024 / 1024} MiB`,
+    );
+}
+
 export function validateDocument(doc: CadDocument): void {
   parse(documentSchema, doc);
   const ids = new Set<string>();
   for (const f of doc.features) {
-    validateFeature(f);
+    validateStored(f);
     if (ids.has(f.id))
       throw new ValidationError(`duplicate feature id ${f.id}`);
     ids.add(f.id);

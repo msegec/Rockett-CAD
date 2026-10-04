@@ -211,6 +211,44 @@ it("lets the registered feature schema authorize extension numeric inputs and re
   }
 });
 
+it("leaves a binding on a missing module's feature unresolved with its stored value", () => {
+  const release = registerExtensionSpec({
+    type: "acme.gear",
+    label: "Gear",
+    version: 1,
+    params: Type.Object({ teeth: Type.Number({ parameterUnit: "mm" }) }),
+  });
+  const doc = createEmptyDocument("missing", "Missing");
+  doc.parameters = [parameter("n", "24 mm")];
+  doc.features = [
+    {
+      id: "gear",
+      type: "acme.gear",
+      name: "Gear",
+      suppressed: false,
+      version: 1,
+      params: { teeth: 12 },
+    },
+  ];
+  doc.timelinePosition = 1;
+  doc.parameterBindings = [
+    { featureId: "gear", path: "/params/teeth", expression: "n" },
+  ];
+  try {
+    expect(resolveDocumentParameters(doc).features[0]).toMatchObject({
+      params: { teeth: 24 },
+    });
+  } finally {
+    release();
+  }
+  expect(parse(documentSchema, doc)).toBe(doc);
+  expect(resolveDocumentParameters(doc).features[0]).toMatchObject({
+    params: { teeth: 12 },
+  });
+  doc.parameterBindings[0]!.expression = "unknown";
+  expect(() => parse(documentSchema, doc)).toThrow();
+});
+
 it("moves bindings with the items they name and drops bindings of removed items", () => {
   const before = {
     id: "s",

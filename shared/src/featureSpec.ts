@@ -1,4 +1,4 @@
-import type { TProperties, TSchema } from "typebox";
+import { Type, type TProperties, type TSchema } from "typebox";
 import type {
   AxisRef,
   CadDocument,
@@ -12,10 +12,12 @@ import type {
   PointRef,
   ProfileRef,
 } from "./model.js";
-import { createRegistry } from "./registry.js";
+import { createRegistry, REGISTRY_ID } from "./registry.js";
 import {
   extensionFeatureSchema,
   FEATURE_SCHEMAS,
+  featureIdSchema,
+  featureNameSchema,
 } from "./schema/coreFeatures.js";
 import { parse } from "./schema/validation.js";
 
@@ -62,9 +64,27 @@ function specOf(type: string): FeatureSpec {
   return spec;
 }
 
+export const CORE_NAMESPACES = ["design", "sketch", "inspect", "asm"];
+
+export function featureModule(type: string): string | undefined {
+  const namespace = REGISTRY_ID.exec(type)?.[1];
+  if (!namespace || CORE_NAMESPACES.includes(namespace)) return undefined;
+  return type.slice(0, type.lastIndexOf("."));
+}
+
 export function featureRefs(f: Feature): FeatureRef[] {
+  if (!featureSpec(f.type) && featureModule(f.type)) return [];
   return specOf(f.type).refs(f);
 }
+
+export const unloadedFeatureSchema = Type.Object({
+  id: featureIdSchema,
+  type: Type.String({ pattern: REGISTRY_ID.source }),
+  name: featureNameSchema,
+  suppressed: Type.Boolean(),
+  version: Type.Integer({ minimum: 0 }),
+  params: Type.Unknown(),
+});
 
 export function featureInputs(f: Feature) {
   const bodies = new Set<string>();

@@ -7,7 +7,7 @@ import type {
   UserParameter,
 } from "./model.js";
 import { evaluateExpression, type Scalar } from "./expressions.js";
-import { featureSpec } from "./featureSpec.js";
+import { featureModule, featureSpec } from "./featureSpec.js";
 import { FEATURE_SCHEMAS } from "./schema/coreFeatures.js";
 import { ANGLE_TO_DEGREES, UNIT_TO_MM } from "./units.js";
 
@@ -161,6 +161,10 @@ export function resolveDocumentParameters(
         (Object.hasOwn(FEATURE_SCHEMAS, feature.type)
           ? FEATURE_SCHEMAS[feature.type as keyof typeof FEATURE_SCHEMAS]
           : undefined));
+    if (feature && !schema && featureModule(feature.type)) {
+      evaluateExpression(binding.expression, values);
+      continue;
+    }
     if (
       !feature ||
       !schema ||

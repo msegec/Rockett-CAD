@@ -1,4 +1,4 @@
-import { createRegistry, type Feature } from "@rockett/shared";
+import { createRegistry, featureModule, type Feature } from "@rockett/shared";
 import {
   cloneState,
   unrecorded,
@@ -36,7 +36,14 @@ export function evaluateFeature(
   sources: Sources = new Map(),
 ): FeatureOutcome | void {
   const kind = featureKind(feature.type);
-  if (!kind) throw new Error(`unknown feature type ${feature.type}`);
+  if (!kind) {
+    const missing = featureModule(feature.type);
+    throw new Error(
+      missing
+        ? `Requires module ${missing}`
+        : `unknown feature type ${feature.type}`,
+    );
+  }
   const previous = { ...state };
   Object.assign(state, cloneState(state));
   try {

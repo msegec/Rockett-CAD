@@ -1,10 +1,10 @@
 import { Type, type Static } from "typebox";
+import { CORE_NAMESPACES } from "./featureSpec.js";
 import { REGISTRY_ID } from "./registry.js";
 import { NAME_LENGTH } from "./schema/coreFeatures.js";
 import { parse, ValidationError } from "./schema/validation.js";
 import { SETTING_KEY } from "./settings.js";
 
-const CORE_NAMESPACES = ["design", "sketch", "inspect", "asm"];
 const API_RANGE = /^\^(\d+)\.(\d+)$/;
 const HOST_VERSION = /^(\d+)\.(\d+)\.\d+$/;
 const SPDX_ID = "[A-Za-z0-9][A-Za-z0-9.+-]*";
