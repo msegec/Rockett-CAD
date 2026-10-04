@@ -16,6 +16,7 @@ function faceMaterial(color: string | undefined, dimmed: boolean) {
     opacity: dimmed ? DIMMED_OPACITY : 1,
   });
   if (color === undefined) material.userData.themeToken = "body";
+  else material.userData.userColor = color;
   return material;
 }
 

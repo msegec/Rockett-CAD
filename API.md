@@ -188,8 +188,8 @@ in the same edit.
   comes back as `HeldBodyPayload`: `server/src/api/heldMeshes.ts`.
 - `BodyPayload.color` is the body's stored `bodyMeta` colour, else the
   `#rrggbb` a STEP file gave it, kept per body id through later features
-  (`EvalState.imported`). A held body omits it; a client holding the mesh
-  reads a stored colour from `document.bodyMeta`.
+  (`EvalState.imported`). A held body's stub carries it too, and a refill
+  takes colour from the stub, never from the held mesh.
 - `PUT /projects/:id/bodies/:bodyId` sends exactly one of `name` or `color`,
   each its own undo step. `color` is lowercase `#rrggbb`, or `null` to clear
   it. Anything else, an unknown key included, is a 400; a body id that is not

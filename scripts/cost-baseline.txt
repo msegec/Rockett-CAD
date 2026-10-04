@@ -1,16 +1,16 @@
-client/src/api.ts 647
-client/src/components/ControlsHelp.tsx ControlsHelp 85
-client/src/components/DraggablePanel.tsx DraggablePanel 130
+client/src/api.ts 645
+client/src/components/ControlsHelp.tsx ControlsHelp 82
+client/src/components/DraggablePanel.tsx DraggablePanel 125
 client/src/components/FeatureDialog.tsx DialogBody 104
 client/src/components/ModelTree.tsx 546
-client/src/components/ModelTree.tsx ModelTree 408
+client/src/components/ModelTree.tsx ModelTree 407
 client/src/components/ProjectItems.tsx 535
 client/src/components/ProjectItems.tsx BrowserItems 110
 client/src/components/ProjectItems.tsx ItemRow 97
 client/src/components/ProjectItems.tsx ProjectItems 180
 client/src/components/ProjectList.tsx ProjectList 110
 client/src/components/ShareDialog.tsx ShareDialog 122
-client/src/components/SketchOffsetPanel.tsx SketchOffsetPanel 169
+client/src/components/SketchOffsetPanel.tsx SketchOffsetPanel 161
 client/src/components/Timeline.tsx Timeline 159
 client/src/components/UsersPage.tsx AddUserForm 90
 client/src/components/UsersPage.tsx UserRow 85
@@ -28,16 +28,15 @@ client/src/sketchEditing.ts sketchActions 226
 client/src/sketchEdits.ts sketchEdits 166
 client/src/sketchTools.ts 1041
 client/src/store.ts 503
-client/src/store.ts useStore 262
-client/src/three/CadViewport.ts 902
-client/src/three/CadViewport.ts buildBody 86
+client/src/store.ts useStore 261
+client/src/three/CadViewport.ts 789
 client/src/three/ViewCube.ts constructor 83
 client/src/three/revolveGhost.ts buildRevolveGhost 99
 client/src/three/toolPreview.ts updateToolPreview 147
 server/src/api/jobRoutes.ts createJobRoutes 119
 server/src/geometry/blend.ts built 209
 server/src/geometry/blend.ts chamferByEnvelope 219
-server/src/geometry/engine.ts 549
+server/src/geometry/engine.ts 548
 server/src/geometry/features.ts 1016
 server/src/store/projectStore.ts 520
 shared/src/routes.ts 509

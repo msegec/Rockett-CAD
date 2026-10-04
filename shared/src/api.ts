@@ -90,7 +90,10 @@ export interface BodyPayload {
   bbox: { min: Vec3; max: Vec3 };
 }
 
-export type HeldBodyPayload = Pick<BodyPayload, "bodyId" | "name" | "meshKey">;
+export type HeldBodyPayload = Pick<
+  BodyPayload,
+  "bodyId" | "name" | "meshKey" | "color"
+>;
 
 export interface HeldMeshes {
   held?: string[];

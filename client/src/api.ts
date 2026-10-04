@@ -7,6 +7,7 @@ import {
   TX_HEADER,
   type ApiErrorBody,
   type ApiErrorCode,
+  type BodyEdit,
   type BodyPayload,
   type CadDocument,
   type EdgeRef,
@@ -378,7 +379,8 @@ function refill(evaluation: WireEvaluateResult, held: Held): EvaluateResult {
       if ("positions" in body) return body;
       const mesh = held.get(body.meshKey);
       if (!mesh) throw new Error(`The server omitted mesh ${body.meshKey}`);
-      return { ...mesh, ...body };
+      const { color: _held, ...shape } = mesh;
+      return { ...shape, ...body };
     }),
   };
 }
@@ -582,12 +584,8 @@ export const api = {
     send(ROUTES.createCheckpoint, { id }, { body: { label } }),
   restoreHistory: (id: string, snapshot: string) =>
     holding(ROUTES.restoreHistory, { id }, { snapshot }),
-  updateBody: (
-    id: string,
-    bodyId: string,
-    patch: { name: string },
-    tx?: string,
-  ) => holding(ROUTES.updateBody, { id, bodyId }, patch, { tx }),
+  updateBody: (id: string, bodyId: string, patch: BodyEdit, tx?: string) =>
+    holding(ROUTES.updateBody, { id, bodyId }, patch, { tx }),
   updateGroups: (id: string, groups: TreeGroup[], tx?: string) =>
     holding(ROUTES.updateGroups, { id }, { groups }, { tx }),
   stageNamingUpgrade: (id: string, accept: NamingDecision[] = []) =>

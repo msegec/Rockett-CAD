@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Active } from "./commands/active";
 import type {
+  BodyEdit,
   CadDocument,
   EvaluateResult,
   Feature,
@@ -85,7 +86,7 @@ export interface State extends SketchActions, SketchEdits, PreviewActions {
   renameFeature: (fid: string, name: string) => Promise<void>;
   renameProject: (name: string) => Promise<void>;
   rollTimeline: (position: number) => Promise<void>;
-  setBodyMeta: (bodyId: string, patch: { name: string }) => Promise<void>;
+  setBodyMeta: (bodyId: string, patch: BodyEdit) => Promise<void>;
   setVisible: (shown: Visibility) => Promise<void>;
   moveCamera: (camera: ViewCamera) => void;
 }
@@ -461,9 +462,8 @@ export const useStore = create<State>((set, get) => ({
   },
 
   async setBodyMeta(bodyId, patch) {
-    const { document } = get();
-    if (!document) return;
-    await get().mutate((tx) => api.updateBody(document.id, bodyId, patch, tx));
+    const id = get().document?.id;
+    if (id) await get().mutate((tx) => api.updateBody(id, bodyId, patch, tx));
   },
 
   async setVisible(shown) {

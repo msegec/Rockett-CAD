@@ -43,6 +43,7 @@ type Kind = TreeGroup["kind"];
 type Row = { id: string };
 type Renamed = Row & { startRename(id: string): void };
 type Rows = { kind: Kind; ids: string[]; startRename(id: string): void };
+type Coloured = Row & { pickColour(id: string): void };
 type FeatureRow = Row & { feature: Feature };
 type SketchPick = Row & { entityId: string; curve: boolean };
 type Picked = { sel: Selection };
@@ -54,7 +55,7 @@ export interface MenuTargets {
   "design.tree.canvas": FeatureRow;
   "design.tree.sketch": Renamed;
   "design.tree.sketches": Rows;
-  "design.tree.body": Renamed & Rows;
+  "design.tree.body": Renamed & Rows & Coloured;
   "design.tree.bodies": Rows;
   "design.tree.groupRow": Renamed & Rows & { members: Selection[] };
   "design.timeline.chip": FeatureRow &
@@ -216,6 +217,12 @@ const FACE_FEATURES: [string, string, FeatureType][] = [
 for (const command of [
   menuCommand<Renamed>("design.menu.rename", "Rename", ({ target }) =>
     target.startRename(target.id),
+  ),
+  menuCommand<Coloured>("design.menu.colour", "Colour…", ({ target }) =>
+    target.pickColour(target.id),
+  ),
+  menuCommand<Row>("design.menu.resetColour", "Reset colour", (s) =>
+    s.setBodyMeta(s.target.id, { color: null }),
   ),
   menuCommand<Row>("design.menu.deleteFeature", "Delete", (s) =>
     s.deleteFeature(s.target.id),
@@ -388,6 +395,11 @@ place("design.tree.sketches", [
 place("design.tree.body", [
   "design.menu.moveBodies",
   "design.menu.rename",
+  "design.menu.colour",
+  {
+    command: "design.menu.resetColour",
+    when: (s) => s.document?.bodyMeta[s.target.id]?.color !== undefined,
+  },
   "design.menu.showHide",
   "design.menu.isolate",
   "design.menu.showAllBodies",

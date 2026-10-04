@@ -57,6 +57,7 @@ export function applyThemeToScene(
     for (const material of materials) {
       if (!(material instanceof THREE.Material) || !hasColor(material))
         continue;
+      if (material.userData.userColor !== undefined) continue;
       const explicit =
         (object.userData.themeToken as ThemeColor | undefined) ??
         (material.userData.themeToken as ThemeColor | undefined);

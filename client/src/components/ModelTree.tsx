@@ -29,6 +29,7 @@ import {
   alignCameraToActiveSketch as alignToSketch,
 } from "../viewportRef";
 import { openFeatureEditor } from "./Timeline";
+import { useBodyColour } from "./BodyColourInput";
 import { SurfaceMenu } from "./ContextMenu";
 import { RenameInput } from "./RenameInput";
 import { pickLabel } from "./form/fields";
@@ -142,8 +143,6 @@ export const ModelTree = memo(function ModelTree() {
   const evaluation = useStore((s) => s.evaluation);
   const view = useStore((s) => s.view);
   const selection = useStore((s) => s.selection);
-  const toggleSelection = useStore((s) => s.toggleSelection);
-  const setBodyMeta = useStore((s) => s.setBodyMeta);
   const anchor = useRef<Selection | null>(null);
   const [originVisible, setOriginVisible] = useState(true);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -154,6 +153,7 @@ export const ModelTree = memo(function ModelTree() {
     surface: Surface;
     target: MenuTargets[Surface];
   } | null>(null);
+  const [colourInput, pickColour] = useBodyColour(treeMenu);
   const latest = useRef<BodyActions | null>(null);
   const bodyActions = useMemo(
     (): BodyActions => ({
@@ -185,7 +185,7 @@ export const ModelTree = memo(function ModelTree() {
     e: React.MouseEvent,
     sel: Selection,
     order: Selection[],
-    plain = () => toggleSelection(sel, false),
+    plain = () => useStore.getState().toggleSelection(sel, false),
   ) => {
     const range = e.shiftKey;
     const additive = e.ctrlKey || e.metaKey;
@@ -306,10 +306,9 @@ export const ModelTree = memo(function ModelTree() {
 
   const shown = (kind: Kind, ids: string[]) =>
     anyShown({ document: document_, evaluation, view }, kind, ids);
-  const startRename = setRenaming;
   const rowsMenu = (e: React.MouseEvent, kind: Kind, id: string) => {
     const ids = chosen(kind, id);
-    const target = { id, kind, ids, startRename };
+    const target = { id, kind, ids, startRename: setRenaming, pickColour };
     if (ids.length > 1) openMenu(e, PLURAL[kind], target);
     else if (kind === "body") openMenu(e, "design.tree.body", target);
     else openMenu(e, "design.tree.sketch", target);
@@ -332,7 +331,7 @@ export const ModelTree = memo(function ModelTree() {
                 kind: group.kind,
                 ids: group.members,
                 members: items.map(selOf),
-                startRename,
+                startRename: setRenaming,
               })
             }
           >
@@ -417,7 +416,7 @@ export const ModelTree = memo(function ModelTree() {
     show: (bodyId, visible) => void setBodiesVisible({ [bodyId]: visible }),
     commit: (bodyId, name) => {
       setRenaming(null);
-      void setBodyMeta(bodyId, { name });
+      void useStore.getState().setBodyMeta(bodyId, { name });
     },
     cancel: () => setRenaming(null),
   };
@@ -541,6 +540,7 @@ export const ModelTree = memo(function ModelTree() {
       {treeMenu && (
         <SurfaceMenu {...treeMenu} onClose={() => setTreeMenu(null)} />
       )}
+      {colourInput}
     </div>
   );
 });

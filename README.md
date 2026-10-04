@@ -37,6 +37,7 @@ everything downstream against persistent topology references.
 - **Tool targets**: join, cut and intersect act on bodies you pick from the list or by click; Auto takes visible ones.
 - **Modify**: fillet, chamfer (equal, two distances, or distance and angle), shell, combine, split and press/pull bodies.
 - **Move**: translate bodies, turn them about an axis, edge or sketch line, or add the moved copy as a new body.
+- **Body colours**: right-click a body in the model tree to pick its colour or reset it; theme changes keep chosen colours.
 - **Tangent chains**: fillet and chamfer take edges, faces or features and follow smooth connected edges, on one or several bodies.
 - **Box select**: drag from empty space; left to right takes what lies inside, right to left what the box touches.
 - **Size hints**: fillet, chamfer, shell, inward Offset Face, cut depth and pattern spacing show the size that builds for your picks.

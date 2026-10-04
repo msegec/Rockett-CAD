@@ -28,6 +28,7 @@ function withoutHeld(
             bodyId: body.bodyId,
             name: body.name,
             meshKey: body.meshKey,
+            ...(body.color && { color: body.color }),
           }
         : body,
     ),
