@@ -1,7 +1,7 @@
 import type { Feature, NamingVersion } from "./model.js";
 import type { ParameterUnit } from "./parameters.js";
 
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
 
 export interface UserParameter {
   name: string;
@@ -18,6 +18,12 @@ export interface ParameterBinding {
 
 export interface BodyMeta {
   name: string;
+  color?: string;
+}
+
+export interface BodyEdit {
+  name?: string;
+  color?: string | null;
 }
 
 export function bodyName(

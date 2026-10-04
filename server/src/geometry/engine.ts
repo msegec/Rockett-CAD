@@ -343,8 +343,9 @@ class DocumentEngine {
       let js = 0;
       for (const bytes of this.held.values()) js += bytes.byteLength;
       for (const body of state.bodies.values()) {
-        const { name: seed, color } = state.imported.get(body.bodyId) ?? {};
-        const name = doc.bodyMeta[body.bodyId]?.name ?? seed ?? body.bodyId;
+        const seed = state.imported.get(body.bodyId);
+        const meta = doc.bodyMeta[body.bodyId];
+        const { name = body.bodyId, color } = { ...seed, ...meta };
         const { payload, bytes } = this.tessellated(body, name);
         bodies.push({ ...payload, name, ...(color && { color }) });
         js += bytes;
@@ -356,9 +357,8 @@ class DocumentEngine {
       this.js = js + payloadBytes(sketches);
 
       const planes: ConstructionPlanePayload[] = [];
-      for (const [featureId, p] of state.planes) {
+      for (const [featureId, p] of state.planes)
         planes.push({ featureId, frame: p.frame, size: p.size });
-      }
 
       return {
         bodies,

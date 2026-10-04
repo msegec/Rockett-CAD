@@ -3,6 +3,7 @@ import type { SignInStep, TotpEnrolment, User } from "./auth.js";
 import type { HealthResponse } from "./health.js";
 export type { Health, HealthResponse } from "./health.js";
 import type {
+  BodyEdit,
   CadDocument,
   EdgeRef,
   Feature,
@@ -41,7 +42,11 @@ import { MEASURE_MAX_REFS, VIEW_VERSION } from "./api.js";
 import { VIEW_PROJECTION } from "./settings.js";
 import { edgeRef, faceRef, groupsSchema, vec3 } from "./schema/features.js";
 import { bodyIdSchema } from "./schema/coreFeatures.js";
-import { namingUpgradeBody } from "./schema/documents.js";
+import {
+  bodyEditBody,
+  heldMeshKeys as held,
+  namingUpgradeBody,
+} from "./schema/documents.js";
 import { parameterStateSchema } from "./schema/parameters.js";
 import { CHECKPOINT_ROUTES, snapshotHash } from "./schema/history.js";
 import {
@@ -204,7 +209,6 @@ const measureRef = Type.Union([
 ]);
 
 const viewIds = Type.Array(Type.String({ minLength: 1 }));
-const held = Type.Optional(Type.Array(Type.String()));
 const parameterEditBody = Type.Object(
   { ...parameterStateSchema, held },
   { additionalProperties: false },
@@ -407,16 +411,10 @@ export const ROUTES = {
     ),
     "document",
   ),
-  updateBody: route<{ name: string } & HeldMeshes, WireMutationResponse>()(
+  updateBody: route<BodyEdit & HeldMeshes, WireMutationResponse>()(
     "PUT",
     "/projects/:id/bodies/:bodyId",
-    Type.Object(
-      {
-        name: Type.String(),
-        held,
-      },
-      { additionalProperties: false },
-    ),
+    bodyEditBody,
     "document",
   ),
   updateGroups: route<

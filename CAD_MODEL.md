@@ -83,7 +83,9 @@ and `compareNames` in `shared/src/topoRefs.ts`.
   ` (2)`, ` (3)`, with control characters removed and capped at 200
   characters; any other body, or a STEP name that is empty or OCCT's default
   `Open CASCADE STEP translator {version} {n}`, takes `BodyN` from
-  `counters.body`. Visibility lives in the user
+  `counters.body`. Schema 31 adds an optional `bodyMeta` `color`, lowercase
+  `#rrggbb`, which wins over a STEP colour in evaluation; an earlier
+  document migrates unchanged. Visibility lives in the user
   view; see [API.md](API.md), View state. `document.groups` never reaches
   evaluation.
 

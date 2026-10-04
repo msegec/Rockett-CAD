@@ -33,6 +33,8 @@ export const groupsSchema = Type.Refine(
   () => "has a repeated group id or a member in more than one group",
 );
 
+const bodyColorSchema = Type.String({ pattern: "^#[0-9a-f]{6}$" });
+
 export const documentSchema = Type.Refine(
   Type.Object({
     schemaVersion: Type.Literal(SCHEMA_VERSION),
@@ -53,7 +55,13 @@ export const documentSchema = Type.Refine(
     features: Type.Array(Type.Unknown()),
     ...parameterStateSchema,
     timelinePosition: Type.Integer({ minimum: 0 }),
-    bodyMeta: Type.Record(Type.String(), Type.Object({ name: Type.String() })),
+    bodyMeta: Type.Record(
+      Type.String(),
+      Type.Object({
+        name: Type.String(),
+        color: Type.Optional(bodyColorSchema),
+      }),
+    ),
     counters: Type.Record(Type.String(), Type.Integer({ minimum: 0 })),
     groups: groupsSchema,
     extensions: Type.Record(
@@ -71,6 +79,21 @@ export const documentSchema = Type.Refine(
   (doc) =>
     doc.timelinePosition <= doc.features.length && validParameterState(doc),
   () => "has invalid parameters, bindings or timelinePosition",
+);
+
+export const heldMeshKeys = Type.Optional(Type.Array(Type.String()));
+
+export const bodyEditBody = Type.Refine(
+  Type.Object(
+    {
+      name: Type.Optional(Type.String()),
+      color: Type.Optional(Type.Union([bodyColorSchema, Type.Null()])),
+      held: heldMeshKeys,
+    },
+    { additionalProperties: false },
+  ),
+  (edit) => "name" in edit !== "color" in edit,
+  () => "must send name or color, not both",
 );
 
 export const namingUpgradeBody = Type.Object({

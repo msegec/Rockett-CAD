@@ -42,11 +42,22 @@ export const bodyRoutes: RouteModule = {
     });
 
     api.projectMutation(ROUTES.updateBody, async (doc, req) => {
-      const meta = doc.bodyMeta[req.params.bodyId];
-      if (!meta) throw new StoreError("body not found", "not_found");
-      const label = `Rename ${meta.name}`;
-      meta.name = req.body.name.slice(0, NAME_LENGTH);
-      return { label };
+      const { bodyId } = req.params;
+      if (!Object.hasOwn(doc.bodyMeta, bodyId))
+        throw new StoreError("body not found", "not_found");
+      const meta = doc.bodyMeta[bodyId]!;
+      const { name, color } = req.body;
+      if (name !== undefined) {
+        const label = `Rename ${meta.name}`;
+        meta.name = name.slice(0, NAME_LENGTH);
+        return { label };
+      }
+      if (color === null) {
+        delete meta.color;
+        return { label: `Clear colour of ${meta.name}` };
+      }
+      meta.color = color!;
+      return { label: `Colour ${meta.name}` };
     });
   },
 };

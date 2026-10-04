@@ -186,9 +186,14 @@ in the same edit.
 - Mutations answer `WireMutationResponse` (`shared/src/routes.ts`).
 - A request may send `held` (`HeldMeshes`); a body whose `meshKey` is held
   comes back as `HeldBodyPayload`: `server/src/api/heldMeshes.ts`.
-- `BodyPayload.color` is the `#rrggbb` a STEP file gave the body, kept per
-  body id through later features (`EvalState.imported`). A held body omits
-  it and takes the held mesh's.
+- `BodyPayload.color` is the body's stored `bodyMeta` colour, else the
+  `#rrggbb` a STEP file gave it, kept per body id through later features
+  (`EvalState.imported`). A held body omits it; a client holding the mesh
+  reads a stored colour from `document.bodyMeta`.
+- `PUT /projects/:id/bodies/:bodyId` sends exactly one of `name` or `color`,
+  each its own undo step. `color` is lowercase `#rrggbb`, or `null` to clear
+  it. Anything else, an unknown key included, is a 400; a body id that is not
+  an own key of `bodyMeta` is a 404.
 - A STEP `importStep` status carries `importTree`: each assembly and part
   instance with its name, its `path` of child indices from the file's roots
   and, for a part, the body ids its solids became. It is derived on every
