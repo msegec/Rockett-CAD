@@ -30,6 +30,11 @@ const hashOf = (body: LayerBody) => body.mesh?.hash ?? body.meshKey;
 const decoded = (body: LayerBody): body is BodyPayload =>
   body.positions !== undefined;
 
+function meshOf(p: BodyPayload): BodyMesh {
+  const { positions, normals, indices, faces, edges, vertices, bbox } = p;
+  return { positions, normals, indices, faces, edges, vertices, bbox };
+}
+
 function paint(material: THREE.MeshStandardMaterial, color?: string) {
   material.userData.themeToken = color === undefined ? "body" : undefined;
   material.color.set(color ?? themeColor("body"));
@@ -177,7 +182,9 @@ export class BodyLayer {
 
   private update(built: BodyObjects, body: LayerBody) {
     if (built.payload.color !== body.color) paint(built.material, body.color);
-    built.payload = decoded(body) ? body : { ...built.payload, ...body };
+    built.payload = decoded(body)
+      ? body
+      : { ...meshOf(built.payload), ...body };
     built.group.visible = !this.hidden.has(body.bodyId);
   }
 
@@ -222,10 +229,8 @@ export class BodyLayer {
     this.active++;
     const path = pathFor(ROUTES.mesh, { id: scope.id, hash });
     request<BodyMesh>(ROUTES.mesh.method, path, { signal: scope.stop.signal })
-      .then(
-        (mesh) => this.arrive(scope, hash, mesh),
-        () => scope.fetching.delete(hash),
-      )
+      .then((mesh) => this.arrive(scope, hash, mesh))
+      .catch(() => scope.fetching.delete(hash))
       .finally(() => {
         this.active--;
         this.pump();
