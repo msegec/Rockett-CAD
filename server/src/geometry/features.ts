@@ -96,7 +96,7 @@ import { ShapeMap } from "./shapeMap.js";
 
 import { V, frameFromPlane, offsetFrame, uvTo3d } from "./frames.js";
 import { geometryNames } from "./signature.js";
-import { curveInfo } from "./edgeCurve.js";
+import { exactCurve } from "./edgeCurve.js";
 import { readImport } from "./importers.js";
 import { placeImport } from "./stepImport.js";
 import { type EvalContext } from "./featureKinds.js";
@@ -256,7 +256,7 @@ export function evalSketch(
         `Projected edge ${ref.edgeName} is missing. Restore its source or delete and re-project the reference.`,
       );
     const projected = projectEdge(
-      curveInfo(edge),
+      exactCurve(edge),
       frame,
       entity.id,
       ref,

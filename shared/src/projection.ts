@@ -2,9 +2,16 @@ import type { EdgeRef, SketchEntity } from "./model.js";
 import type { EdgeInfo, ExactCurve, PlaneFrame, Vec3 } from "./api.js";
 import { sketchBuilder, type SketchBuilder } from "./sketchBuilder.js";
 import { TAU, type XY } from "./sketchCurves.js";
+import { LINEAR_TOL } from "./tolerance.js";
 
 type Conic = Extract<EdgeInfo["curve"], { type: "circle" | "ellipse" }>;
 type Copyable = Exclude<ExactCurve, { type: "other" }>;
+type SpaceSpline = Extract<ExactCurve, { type: "bspline" }>;
+
+const TO_POINT =
+  "This edge projects to a point. Choose an edge visible in the sketch plane.";
+const EDGE_ON =
+  "This edge is seen edge-on and projects to a line. Choose an edge visible in the sketch plane.";
 
 const dot = (a: readonly number[], b: readonly number[]) =>
   a.reduce((v, x, i) => v + x * b[i]!, 0);
@@ -75,9 +82,9 @@ function arcEnds(curve: Conic, uv: (p: Vec3) => XY, forward: boolean) {
 const inPlane = (frame: PlaneFrame) => (w: Vec3) =>
   [dot(w, frame.xAxis), dot(w, frame.yAxis)] as XY;
 
-/** Exact orthogonal projection of supported analytic edges, with stable child IDs. */
+/** Exact orthogonal projection of supported analytic and B-spline edges, with stable child IDs. */
 export function projectEdge(
-  curve: EdgeInfo["curve"],
+  curve: ExactCurve,
   frame: PlaneFrame,
   id: string,
   projection: EdgeRef,
@@ -88,10 +95,7 @@ export function projectEdge(
   if (curve.type === "line") {
     const a = uv(curve.a),
       b = uv(curve.b);
-    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-7)
-      throw new Error(
-        "This edge projects to a point. Choose an edge visible in the sketch plane.",
-      );
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-7) throw new Error(TO_POINT);
     return [
       point("a", a),
       point("b", b),
@@ -100,9 +104,47 @@ export function projectEdge(
   }
   if (curve.type === "other")
     throw new Error(
-      "Project supports straight edges, circles, ellipses and their arcs.",
+      "Project supports straight edges, circles, ellipses, their arcs and B-splines.",
     );
+  if (curve.type === "bspline") return projectSpline(curve, frame, common);
   return projectConic(curve, frame, common);
+}
+
+function spread(points: readonly number[][]): [number, number] {
+  const rel = points.map((p) => p.map((v, i) => v - points[0]![i]!));
+  const far = rel.reduce((a, b) => (dot(b, b) > dot(a, a) ? b : a));
+  const reach = Math.sqrt(dot(far, far));
+  if (reach < LINEAR_TOL) return [reach, 0];
+  const off = (r: number[]) => dot(r, r) - (dot(r, far) / reach) ** 2;
+  return [reach, Math.sqrt(Math.max(0, ...rel.map(off)))];
+}
+
+function projectSpline(
+  curve: SpaceSpline,
+  frame: PlaneFrame,
+  common: Common,
+): SketchEntity[] {
+  const { id } = common;
+  const [uv, point] = [planeUv(frame), pointEntity(id)];
+  const flat = curve.poles.map(uv);
+  const [reach, off] = spread(flat);
+  if (reach < LINEAR_TOL) throw new Error(TO_POINT);
+  if (off < LINEAR_TOL && spread(curve.poles)[1] >= LINEAR_TOL)
+    throw new Error(EDGE_ON);
+  const { degree, weights, knots, multiplicities, periodic } = curve;
+  return [
+    ...flat.map((p, i) => point(`p${i}`, p)),
+    {
+      ...common,
+      kind: "spline",
+      degree,
+      poles: flat.map((_, i) => `${id}:p${i}`),
+      ...(weights && { weights }),
+      knots,
+      multiplicities,
+      ...(periodic && { periodic }),
+    },
+  ];
 }
 
 function projectConic(
@@ -138,10 +180,7 @@ function projectConic(
   }
   const [u, v] = semiAxes(curve).map(inPlane(frame)) as [XY, XY];
   const turn = u[0] * v[1] - u[1] * v[0];
-  if (Math.abs(turn) < 1e-9 * (dot(u, u) + dot(v, v)))
-    throw new Error(
-      "This edge is seen edge-on and projects to a line. Choose an edge visible in the sketch plane.",
-    );
+  if (Math.abs(turn) < 1e-9 * (dot(u, u) + dot(v, v))) throw new Error(EDGE_ON);
   const t = Math.atan2(2 * dot(u, v), dot(u, u) - dot(v, v)) / 2;
   const at = (k: number): XY => [
     c[0] + u[0] * Math.cos(t + k) + v[0] * Math.sin(t + k),

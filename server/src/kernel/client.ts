@@ -45,7 +45,7 @@ import {
   withNamingVersion,
 } from "../geometry/naming.js";
 import { resolveRefs } from "../geometry/resolve.js";
-import { curveInfo } from "../geometry/edgeCurve.js";
+import { exactCurve } from "../geometry/edgeCurve.js";
 import { faceDrawing } from "../geometry/dxf.js";
 import { signRefs } from "../geometry/signature.js";
 import { planNamingUpgrade } from "../geometry/upgradeNaming.js";
@@ -191,7 +191,7 @@ const ANSWERS: {
         );
       return asValidation(() =>
         projectEdge(
-          curveInfo(edge),
+          exactCurve(edge),
           resolvePlaneFrame(state, plane),
           entityId,
           ref,

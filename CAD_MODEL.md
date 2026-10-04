@@ -429,13 +429,17 @@ input bound, not a tolerance.
   circles, ellipses and arcs, and B-spline edges, rational, trimmed or periodic,
   as splines with exact poles, weights and knots. A copy has no projection or
   link: source changes move only the plane. Other curves refuse with
-  `boundary-not-copied` unless the add sets `emptySketch`. Project links and
-  refuses B-splines. Reference import never samples; DXF export does.
+  `boundary-not-copied` unless the add sets `emptySketch`. Project links
+  instead. Reference import never samples; DXF export does.
 - Projections (`shared/src/projection.ts`) keep child ids `:a`, `:b` across
   regeneration. A missing source fails the sketch rather
   than keep stale points. A circle parallel to the sketch stays a circle or
   arc. A tilted circle or an ellipse projects to an exact ellipse with ids
   `:c`, `:m`, `:n`, plus `:a`, `:b` for an arc; an edge seen edge-on refuses.
+  A B-spline edge projects to a spline whose poles `:p0` onward are the
+  projected poles, with weights, knots and periodicity unchanged, since a
+  parallel projection is affine. A curved one whose poles fall on a line
+  refuses as edge-on; one whose poles meet at a point refuses as a point.
   Edge signatures still record an elliptical edge as `other`.
 - A sketch arc runs counter-clockwise from `start` to `end` about `center`.
   The solver holds both ends at one radius.
