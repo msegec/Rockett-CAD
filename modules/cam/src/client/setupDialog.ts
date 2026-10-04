@@ -159,6 +159,16 @@ export function setupDialog({ ui, project }: ClientContext) {
         onChange: (index) =>
           edit({ wcs: { ...wcs, offsetIndex: Number(index) } }),
       }),
+      h(ui.LengthField, {
+        label: "Safe height",
+        value: setup.safeHeight,
+        onChange: (safeHeight) => edit({ safeHeight }),
+      }),
+      h(ui.LengthField, {
+        label: "Clearance",
+        value: setup.clearance,
+        onChange: (clearance) => edit({ clearance }),
+      }),
     );
     const footer = h(ui.DialogFooter, {
       onOk: save,

@@ -4,6 +4,7 @@ import {
   CAM_VERSION,
   migrateCam,
   saveCam,
+  signRoute,
 } from "./src/shared/document.js";
 import { mountGenerate } from "./src/server/generate.js";
 import { mountLibrary } from "./src/server/library.js";
@@ -29,6 +30,13 @@ export default defineServerModule({
             data: req.body,
           };
           return { label: "Edit CAM data" };
+        });
+        api.projectRoute(signRoute, async (_doc, { params }, { user }) => {
+          const { id, bodyId, faceName } = params;
+          const [signed] = await context.signFaces(id, user, [
+            { kind: "face", bodyId, faceName },
+          ]);
+          return signed;
         });
         mountLibrary(api, userData);
         mountGenerate(api, context);

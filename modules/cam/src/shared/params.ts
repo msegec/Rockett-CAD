@@ -3,24 +3,38 @@ import { Value } from "typebox/value";
 
 const vector = Type.Tuple([Type.Number(), Type.Number(), Type.Number()]);
 
-export const faceRefSchema = Type.Object({
-  kind: Type.Literal("face"),
-  bodyId: Type.String({ minLength: 1 }),
-  faceName: Type.String(),
-  sig: Type.Object({ type: Type.String(), point: vector, direction: vector }),
-});
+const faceRef = (title: string) =>
+  Type.Object(
+    {
+      kind: Type.Literal("face"),
+      bodyId: Type.String({ minLength: 1 }),
+      faceName: Type.String(),
+      sig: Type.Object({
+        type: Type.String(),
+        point: vector,
+        direction: vector,
+      }),
+    },
+    { title },
+  );
 
-export type FaceRef = Static<typeof faceRefSchema>;
+export type FaceRef = Static<ReturnType<typeof faceRef>>;
 
 export const contourParams = Type.Object({
-  face: faceRefSchema,
-  side: Type.Union([Type.Literal("outside"), Type.Literal("inside")]),
-  bottomOffset: Type.Number(),
+  face: faceRef("Face"),
+  side: Type.Union(
+    [
+      Type.Literal("outside", { title: "Outside" }),
+      Type.Literal("inside", { title: "Inside" }),
+    ],
+    { title: "Side" },
+  ),
+  bottomOffset: Type.Number({ title: "Bottom offset", parameterUnit: "mm" }),
 });
 
 export const pocketParams = Type.Object({
-  floor: faceRefSchema,
-  rampAngle: Type.Number(),
+  floor: faceRef("Floor"),
+  rampAngle: Type.Number({ title: "Ramp angle", parameterUnit: "deg" }),
 });
 
 export function paramsOf<S extends TSchema>(

@@ -14,7 +14,11 @@ import {
   type StockSetup,
 } from "../shared/setup.js";
 
-export type DialogSetup = Pick<Setup, "id" | "name"> & StockSetup;
+export type DialogSetup = Pick<
+  Setup,
+  "id" | "name" | "safeHeight" | "clearance"
+> &
+  StockSetup;
 
 export const camRead = ({ document }: OpenProject): CamRead =>
   migrateCam(document?.extensions[CAM_EXTENSION]);
@@ -42,6 +46,8 @@ export function newSetup(project: OpenProject): DialogSetup {
       offsetIndex: 1,
       machine: { kind: "unknown" },
     },
+    safeHeight: 15,
+    clearance: 3,
   };
 }
 
@@ -63,6 +69,21 @@ export const editCam = async (
   view: ProjectView,
   edit: (data: CamData) => CamData,
 ) => view.mutate(saveCam, edit(camData(view.get())));
+
+type Operation = NonNullable<CamData["setups"][number]["operations"]>[number];
+
+export const withOperations = (
+  data: CamData,
+  setupId: string,
+  change: (operations: Operation[]) => Operation[],
+): CamData => ({
+  ...data,
+  setups: data.setups.map((setup) =>
+    setup.id === setupId
+      ? { ...setup, operations: change(setup.operations ?? []) }
+      : setup,
+  ),
+});
 
 export const saveSetup = (view: ProjectView, setup: DialogSetup) =>
   editCam(view, (data) => ({ ...data, setups: [...data.setups, setup] }));

@@ -28,7 +28,7 @@ import {
   type SectionTime,
 } from "../shared/time.js";
 import { banner, empty, libraryOf, reason, row, tree } from "./libraryParts.js";
-import { camRead, editCam } from "./setup.js";
+import { camRead, editCam, withOperations } from "./setup.js";
 import type { Selection, ToolpathPreview } from "./toolpaths.js";
 
 type Setup = CamData["setups"][number];
@@ -69,19 +69,6 @@ function moved<T extends { id: string }>(
   next.splice(to, 0, list[from]!);
   return next;
 }
-
-const withOperations = (
-  data: CamData,
-  setupId: string,
-  change: (operations: Operation[]) => Operation[],
-): CamData => ({
-  ...data,
-  setups: data.setups.map((setup) =>
-    setup.id === setupId
-      ? { ...setup, operations: change(setup.operations ?? []) }
-      : setup,
-  ),
-});
 
 export const moveSetup = (view: ProjectView, setupId: string, by: Step) =>
   editCam(view, (data) => ({

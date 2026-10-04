@@ -164,6 +164,8 @@ describe("setup dialog save", () => {
         origin: { kind: "stockCorner", x: "min", y: "min", z: "max" },
         offsetIndex: 1,
       },
+      safeHeight: 15,
+      clearance: 3,
     });
     expect((await load(doc.id)).extensions[CAM_EXTENSION]).toEqual({
       version: 1,

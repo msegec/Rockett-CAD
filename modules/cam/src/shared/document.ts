@@ -1,6 +1,6 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
-import type { CadDocument, Route } from "@rockett/plugin-api";
+import type { CadDocument, Route, SignedFaceRef } from "@rockett/plugin-api";
 import type { Program } from "./ir.js";
 import { presetSchema, toolSchema } from "./tools.js";
 
@@ -175,6 +175,15 @@ export const programRoute: Route<
 > = {
   method: "GET",
   path: "/projects/:id/m/rockett/cam/setups/:setupId/operations/:operationId/program",
+};
+
+export const signRoute: Route<
+  "/projects/:id/m/rockett/cam/bodies/:bodyId/faces/:faceName/sig",
+  unknown,
+  SignedFaceRef
+> = {
+  method: "GET",
+  path: "/projects/:id/m/rockett/cam/bodies/:bodyId/faces/:faceName/sig",
 };
 
 export type CamRead =

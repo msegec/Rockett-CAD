@@ -1,5 +1,10 @@
 import { defineClientModule } from "@rockett/plugin-api";
 import { manufactureBrowser } from "./src/client/browser.js";
+import {
+  dialogPanel,
+  OPERATION_DIALOGS,
+  operationDialog,
+} from "./src/client/opDialog.js";
 import { SETUP_PANEL, setupDialog } from "./src/client/setupDialog.js";
 import { stockLayer } from "./src/client/stockLayer.js";
 import { TOOL_PANEL, toolPanel } from "./src/client/toolPanel.js";
@@ -11,6 +16,7 @@ import {
 
 const MANUFACTURE = "rockett.cam.manufacture";
 const SETUP_GROUP = "rockett.cam.group.setup";
+const MILL_GROUP = "rockett.cam.group.mill";
 
 export default defineClientModule({
   activate(context) {
@@ -55,6 +61,28 @@ export default defineClientModule({
       when: (_state, open) => open.includes(TOOL_PANEL),
       component: toolPanel(context),
     });
+    register.toolbarGroup({
+      id: MILL_GROUP,
+      label: "MILL",
+      context: MANUFACTURE,
+      after: "rockett.cam.group.plan",
+    });
+    for (const op of OPERATION_DIALOGS) {
+      const panel = dialogPanel(op);
+      register.command({
+        id: op.type,
+        label: op.label,
+        group: MILL_GROUP,
+        icon: op.icon,
+        run: () => ui.openPanel(panel),
+      });
+      register.panel({
+        id: panel,
+        title: op.label,
+        when: (_state, open) => open.includes(panel),
+        component: operationDialog(context, op),
+      });
+    }
     register.layer(stockLayer(project, preview));
     register.layer(toolpathLayer(preview));
   },
