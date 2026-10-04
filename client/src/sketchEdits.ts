@@ -172,7 +172,7 @@ export function sketchEdits(
       if (imported.entities.length === 0) {
         set({
           error:
-            `This ${format} file has no lines, arcs, circles, ellipses or points to insert. ${skipped}`.trim(),
+            `This ${format} file has no lines, arcs, circles, ellipses, splines or points to insert. ${skipped}`.trim(),
         });
         return;
       }

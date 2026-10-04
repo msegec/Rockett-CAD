@@ -1,4 +1,6 @@
-import { ARC_SEGMENTS, least, type XY } from "./sketchCurves.js";
+import { ARC_SEGMENTS, least } from "./curveSampling.js";
+import type { SketchPoint, SketchSpline } from "./model.js";
+import type { XY } from "./sketchCurves.js";
 import { LINEAR_TOL } from "./tolerance.js";
 
 export type BSpline = {
@@ -9,6 +11,8 @@ export type BSpline = {
   multiplicities: number[];
   periodic?: boolean;
 };
+
+export type Spline = BSpline & { id: string; kind: "spline" };
 
 const MAX_DEGREE = 25;
 const PERIOD_TOL = 1e-9;
@@ -97,7 +101,7 @@ export function bsplinePoint(s: BSpline, u: number): XY {
   return [x! / w!, y! / w!];
 }
 
-function bsplineParams(s: BSpline, segments: number): number[] {
+export function bsplineParams(s: BSpline, segments: number): number[] {
   const out = [s.knots[0]!];
   for (let i = 1; i < s.knots.length; i++) {
     const [a, b] = [s.knots[i - 1]!, s.knots[i]!];
@@ -122,6 +126,27 @@ export function bsplineDistance(s: BSpline, x: number, y: number): number {
   const lo = us[best - 1] ?? (s.periodic ? us.at(-2)! - period : us[0]!);
   const hi = us[best + 1] ?? (s.periodic ? us[1]! + period : us.at(-1)!);
   return Math.min(gaps[best]!, gap(least(gap, lo, hi)));
+}
+
+export function splineCurve(
+  e: SketchSpline,
+  points: ReadonlyMap<string, SketchPoint>,
+): Spline[] {
+  const poles = e.poles.map((id) => points.get(id));
+  if (!poles.every((p) => p !== undefined)) return [];
+  const { id, degree, weights, knots, multiplicities, periodic } = e;
+  return [
+    {
+      id,
+      kind: "spline",
+      degree,
+      poles: poles.map((p): XY => [p.x, p.y]),
+      ...(weights && { weights }),
+      knots,
+      multiplicities,
+      ...(periodic && { periodic }),
+    },
+  ];
 }
 
 function runs(values: number[]): [number[], number[]] {

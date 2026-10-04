@@ -27,7 +27,7 @@ everything downstream against persistent topology references.
 - **Offsets**: offset a curve or chain, then change its distance later from the badge in the sketch.
 - **Move and copy**: move, rotate, mirror or pattern selected sketch geometry with its constraints; links outside the selection are counted and removed.
 - **Project, trim and extend**: link model edges into a sketch, trim curve pieces by click or drag (T), extend curves to boundaries.
-- **Insert DXF and SVG**: bring DXF lines, arcs, circles, ellipses and points, or SVG paths and shapes, into the open sketch as editable geometry.
+- **Insert DXF and SVG**: bring DXF lines, arcs, circles, ellipses, splines and points, or SVG paths and shapes, into the sketch as editable geometry.
 - **Ellipses**: draw or import from DXF, including elliptical arcs; constrain tangent lines, project tilted circles, extrude exactly.
 - **Edit in place**: history rolls back while editing; Finish Sketch restores it, or Extrude opens with the selected region.
 

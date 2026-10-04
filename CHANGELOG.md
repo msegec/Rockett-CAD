@@ -165,6 +165,8 @@ release workflow remain under development.
 - Schema 35: Fillet may round only the edges between two face or feature
   picks, and may vary its radius from a start to an end radius; earlier
   fillets load and build unchanged.
+- Schema 36: sketches may hold splines, imported from DXF with their exact
+  degree, poles, weights and knots; earlier documents load unchanged.
 
 ### Known limits
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { importDxf } from "../src/importDxf.js";
 import type { SketchEntity, SketchFeature, SketchPoint } from "../src/model.js";
-import { crossingEllipses, detectProfiles } from "../src/profiles.js";
+import { crossingEllipses } from "../src/curveLimits.js";
+import { detectProfiles } from "../src/profiles.js";
 import { solveSketch } from "../src/solver.js";
 import {
   extendSketch,

@@ -1,10 +1,16 @@
+import {
+  bsplineDistance,
+  sampleBSpline,
+  splineCurve,
+  type Spline,
+} from "./bspline.js";
+import { ARC_SEGMENTS, least } from "./curveSampling.js";
 import type { SketchEntity, SketchPoint } from "./model.js";
 import { LINEAR_TOL } from "./tolerance.js";
 
 export const SPLIT_TOL = 1e-4;
 export const ELLIPSE_AXIS_TOL = 1e-4;
 export const ELLIPSE_UNSUPPORTED = "This tool does not support ellipses yet.";
-export const ARC_SEGMENTS = 24;
 export const TAU = Math.PI * 2;
 
 export function arcAngles(
@@ -79,7 +85,7 @@ export type Ellipse = {
   uy: number;
   span?: Span;
 };
-export type Curve = Line | Arc | Circle | Ellipse;
+export type Curve = Line | Arc | Circle | Ellipse | Spline;
 export type Round = Arc | Circle;
 type At = { x: number; y: number };
 
@@ -97,6 +103,8 @@ export function entityPointIds(e: SketchEntity): string[] {
       return [e.center, e.major, e.minor, e.start, e.end].filter(
         (id): id is string => id !== undefined,
       );
+    case "spline":
+      return e.poles;
   }
 }
 
@@ -198,6 +206,7 @@ export function sampleEllipse(
 
 export function curveSamples(c: Curve, segments = ARC_SEGMENTS): number[] {
   if (c.kind === "line") return [c.x1, c.y1, c.x2, c.y2];
+  if (c.kind === "spline") return sampleBSpline(c, segments);
   if (c.kind === "arc")
     return sampleArc(c.cx, c.cy, c.s[0], c.s[1], c.e[0], c.e[1], segments);
   if (c.kind === "ellipse" && c.span)
@@ -215,6 +224,7 @@ export function curveSamples(c: Curve, segments = ARC_SEGMENTS): number[] {
 }
 
 export function curveDistance(c: Curve, x: number, y: number): number {
+  if (c.kind === "spline") return bsplineDistance(c, x, y);
   if (c.kind === "ellipse" && !inSpan(c, [x, y]))
     return Math.min(
       Math.hypot(x - c.span!.s[0], y - c.span!.s[1]),
@@ -233,7 +243,6 @@ export function curveDistance(c: Curve, x: number, y: number): number {
 }
 
 const CROSSING_SAMPLES = 256;
-const GOLDEN = (Math.sqrt(5) - 1) / 2;
 
 function along(c: Round | Ellipse): (t: number) => XY {
   if (c.kind === "ellipse") {
@@ -245,15 +254,6 @@ function along(c: Round | Ellipse): (t: number) => XY {
     const a = a0 + (a1 - a0) * t;
     return [c.cx + c.r * Math.cos(a), c.cy + c.r * Math.sin(a)];
   };
-}
-
-export function least(f: (t: number) => number, lo: number, hi: number) {
-  for (let i = 0; i < 60; i++) {
-    const [m1, m2] = [hi - GOLDEN * (hi - lo), lo + GOLDEN * (hi - lo)];
-    if (f(m1) < f(m2)) hi = m2;
-    else lo = m1;
-  }
-  return (lo + hi) / 2;
 }
 
 const endsOfCurve = (c: Curve): XY[] =>
@@ -279,6 +279,7 @@ function touches(e: Ellipse, c: Curve, lines: boolean): boolean {
     const hi = Math.max(Math.hypot(...p), Math.hypot(...q));
     return lo <= 1 + tol && hi >= 1 - tol;
   }
+  if (c.kind === "spline") return false;
   const at = along(c);
   const rise = (t: number) => Math.hypot(...local(at(t))) - 1;
   const gap = (t: number) => Math.abs(rise(t));
@@ -315,7 +316,7 @@ export type Detection = "current" | "legacy" | "trim";
 
 const interior = (t: number) => t > 0 && t < 1;
 
-function onRound(c: Round, x: number, y: number): boolean {
+export function onRound(c: Round, x: number, y: number): boolean {
   if (c.kind === "circle") return true;
   let ang = Math.atan2(y - c.cy, x - c.cx);
   while (ang <= c.a0) ang += TAU;
@@ -478,7 +479,8 @@ export function sketchCurves(
           cy: c.y,
           r: e.radius,
         });
-    } else if (e.kind === "ellipse") {
+    } else if (e.kind === "spline") curves.push(...splineCurve(e, points));
+    else if (e.kind === "ellipse") {
       const [c, m, n, s, end] = entityPointIds(e).map((id) => points.get(id));
       if (!c || !m || !n) continue;
       const axes = ellipseAxes(c, m, n);

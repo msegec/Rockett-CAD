@@ -24,8 +24,9 @@ import { finishJoin, warned } from "./booleanNaming.js";
  */
 
 import {
-  crossingEllipses,
   detectProfiles,
+  regionWarning,
+  unsupported,
   findProfile,
   solveSketch,
   settledEntities,
@@ -281,11 +282,8 @@ export function evalSketch(
     dof: solved.dof,
     profiles: detectProfiles(placed),
   });
-  const crossing = crossingEllipses(placed);
-  if (crossing.length)
-    return {
-      warning: `Ellipse ${crossing.join(", ")} touches another curve and forms no region. Move it clear to use it.`,
-    };
+  const warning = regionWarning(placed);
+  if (warning) return { warning };
 }
 
 /** Build prism tool(s) for extrude-like features. */
@@ -623,8 +621,8 @@ function orderOpenChain(
   const ends = new Map<SketchEntity, [number, number][]>();
   const at = new Map<[number, number], SketchEntity[]>();
   for (const e of entities) {
-    if (e.kind === "ellipse" && !e.construction)
-      throw new Error("A sweep path cannot use an ellipse yet.");
+    if (unsupported(e) && !e.construction)
+      throw new Error(`A sweep path cannot use the ${e.kind} ${e.id} yet.`);
     if ((e.kind !== "line" && e.kind !== "arc") || e.construction) continue;
     const ids = e.kind === "line" ? [e.p1, e.p2] : [e.start, e.end];
     const keys = ids.map((id) => {

@@ -16,7 +16,8 @@ import {
   roundedLength,
   newId,
   extendSketch,
-  ELLIPSE_UNSUPPORTED,
+  refusal,
+  unsupported,
   trimPiece,
   trimPieces,
   trimmable,
@@ -1781,8 +1782,7 @@ export function ViewportView({
         }
         const sel = r.selection as any;
         const ent = draft.entities.find((x) => x.id === sel.entityId);
-        if (ent?.kind === "ellipse") s.setError(ELLIPSE_UNSUPPORTED);
-        if (!ent || ent.kind === "ellipse") return;
+        if (!ent || unsupported(ent)) return ent && s.setError(refusal(ent));
         const target: tools.DimTarget = { kind: ent.kind, id: ent.id };
         if (ent.kind === "line" && (e.ctrlKey || e.metaKey)) {
           ts.dimTargets = [target];
@@ -1881,8 +1881,8 @@ export function ViewportView({
     const draft = s.draftSketch;
     if (!draft) return;
     const ent = draft.entities.find((x) => x.id === entityId);
-    if (ent?.kind === "ellipse") s.setError(ELLIPSE_UNSUPPORTED);
-    if (!ent || ent.kind === "point" || ent.kind === "ellipse") return;
+    if (unsupported(ent)) return s.setError(refusal(ent));
+    if (!ent || ent.kind === "point") return;
     if (ent.kind === "line") {
       const dims = tools.lineDimensions(
         entityId,

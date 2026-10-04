@@ -146,6 +146,8 @@ export function pieceEdge(
     const ends = t ?? span;
     return ellipseEdge(frame, curve, ends && cut(ends), piece.reversed);
   }
+  if (curve.kind === "spline")
+    throw new Error(`Spline ${curve.id} forms no profile edge yet.`);
   if (curve.kind === "circle") {
     if (!t) return circleEdge(frame, [curve.cx, curve.cy], curve.r);
     const [s, e] = cut(t);

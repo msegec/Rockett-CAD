@@ -1,17 +1,6 @@
 import type { Static } from "typebox";
 import type { FEATURE_SCHEMAS } from "./schema/features.js";
 
-/**
- * Rockett CAD — parametric document model.
- *
- * This schema is the single source of truth for a project. It stores the
- * feature timeline, sketches (with constraints), and references — never
- * final tessellated geometry. Geometry is always regenerated from this model.
- *
- * Schema versioning: bump SCHEMA_VERSION and add a migration in
- * server/src/store/migrations.ts whenever the shape of this model changes.
- */
-
 export type NamingVersion = 1 | 2;
 
 export interface FaceRef {
@@ -91,9 +80,7 @@ export interface SketchPoint {
   kind: "point";
   x: number;
   y: number;
-  /** True when the point only exists as construction/reference geometry. */
   construction?: boolean;
-  /** Projected/external reference — position is driven, not solved. */
   external?: boolean;
 }
 
@@ -141,16 +128,30 @@ export interface SketchEllipse {
   external?: boolean;
 }
 
+export interface SketchSpline {
+  projection?: EdgeRef;
+  id: string;
+  kind: "spline";
+  degree: number;
+  poles: string[];
+  weights?: number[];
+  knots: number[];
+  multiplicities: number[];
+  periodic?: boolean;
+  construction?: boolean;
+  external?: boolean;
+}
+
 export type SketchEntity =
-  SketchPoint | SketchLine | SketchCircle | SketchArc | SketchEllipse;
+  | SketchPoint
+  | SketchLine
+  | SketchCircle
+  | SketchArc
+  | SketchEllipse
+  | SketchSpline;
 
 interface ConstraintBase {
   id: string;
-  /**
-   * User-dragged label position for dimensional constraints, stored as a
-   * sketch-UV offset from the default anchor. Display metadata only — the
-   * solver ignores it.
-   */
   labelOffset?: [number, number];
 }
 
@@ -178,7 +179,6 @@ export type DimensionConstraint =
       type: "distance";
       a: string; // point id
       b: string; // point id
-      /** null → direct distance; "x"/"y" → axis-aligned distance */
       axis: "x" | "y" | null;
       value: number; // mm
     })

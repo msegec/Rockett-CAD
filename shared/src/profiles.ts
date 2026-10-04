@@ -1,7 +1,7 @@
+import { crossingCurves } from "./curveLimits.js";
+import { ARC_SEGMENTS } from "./curveSampling.js";
 import type { SketchEntity, SketchPoint } from "./model.js";
 import {
-  ARC_SEGMENTS,
-  crossingIds,
   curveDistance,
   curveSamples,
   meet,
@@ -164,9 +164,10 @@ function arrange(
   const curves: Open[] = [];
   const ends: [number, number][] = [];
   const all = sketchCurves(entities);
-  const crossing = crossingIds(all, mode === "legacy");
+  const crossing = crossingCurves(all, mode === "legacy");
   for (const c of all) {
-    if (crossing.has(c.id) && c.kind === "ellipse") continue;
+    if (c.kind === "spline" || (crossing.has(c.id) && c.kind === "ellipse"))
+      continue;
     if (endless(c)) {
       curves.push(c);
       ends.push([-1, -1]);
@@ -186,14 +187,6 @@ function arrange(
   for (const p of points) nodeFor(p.x, p.y, SPLIT_TOL);
   const cuts = curves.map((c, i) => cutsOn(c, nodes, ends[i]!));
   return { nodes, curves, ends, cuts, crossing };
-}
-
-export function crossingEllipses(entities: SketchEntity[]): string[] {
-  const all = sketchCurves(entities);
-  const crossing = crossingIds(all);
-  return all
-    .filter((c) => c.kind === "ellipse" && crossing.has(c.id))
-    .map((c) => c.id);
 }
 
 export function curveHits(

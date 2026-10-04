@@ -4,7 +4,8 @@ import {
   type SketchEntity,
   type SketchPoint,
 } from "./model.js";
-import { ELLIPSE_UNSUPPORTED, entityPointIds, TAU } from "./sketchCurves.js";
+import { refuseUnsupported } from "./curveLimits.js";
+import { entityPointIds, TAU } from "./sketchCurves.js";
 import { constraintEntityRefs } from "./sketchTransform.js";
 
 type XY = { x: number; y: number };
@@ -19,7 +20,7 @@ const constructionOf = (e: Curve) =>
   e.construction === undefined ? {} : { construction: e.construction };
 
 function geometry(e: Curve, entities: SketchEntity[]) {
-  if (e.kind === "ellipse") throw new Error(ELLIPSE_UNSUPPORTED);
+  refuseUnsupported(e);
   const p = (id: string) => {
     const point = entities.find((x) => x.id === id);
     if (!point || point.kind !== "point")
@@ -55,7 +56,6 @@ function geometry(e: Curve, entities: SketchEntity[]) {
 }
 type Geometry = ReturnType<typeof geometry>;
 
-/** Analytic intersections; caller decides which curves are bounded. */
 function intersections(a: Geometry, b: Geometry): XY[] {
   if (a.e.kind === "line" && b.e.kind === "line") {
     const d = sub(a.b, a.a),
@@ -113,7 +113,7 @@ export function extendSketch(
     );
   if (entity.kind === "circle")
     throw new Error("A full circle has no endpoint to extend.");
-  if (entity.kind === "ellipse") throw new Error(ELLIPSE_UNSUPPORTED);
+  refuseUnsupported(entity);
   const g = geometry(entity, entities);
   const hits: XY[] = [];
   for (const other of entities) {

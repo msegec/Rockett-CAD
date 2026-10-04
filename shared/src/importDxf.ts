@@ -219,6 +219,10 @@ function addEntity(sketch: SketchBuilder, record: DxfRecord): boolean {
       const ends: [XY, XY] = mirror > 0 ? [at(t0), at(t1)] : [at(t1), at(t0)];
       return sketch.ellipse(c, major, ratio, construction, ends);
     }
+    case "SPLINE": {
+      const spline = mirror !== null && splineOf(record, 1);
+      return typeof spline === "object" && sketch.spline(spline, construction);
+    }
     case "LWPOLYLINE": {
       const vertices: Vertex[] = [];
       for (const [code, value] of record.pairs) {

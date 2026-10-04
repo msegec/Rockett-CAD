@@ -1,3 +1,4 @@
+import { bsplineProblem, splineCurve } from "../bspline.js";
 import { refAt, registerCoreSpec } from "../featureSpec.js";
 import type { SketchConstraint, SketchFeature } from "../model.js";
 import { ValidationError } from "../schema/index.js";
@@ -41,6 +42,9 @@ function sketchReferences(f: SketchFeature): void {
       throw new ValidationError(`Missing endpoint on sketch entity ${e.id}`);
     if (e.kind !== "point" && e.projection && !e.external)
       throw new ValidationError("projected curves must be external");
+    const problem =
+      e.kind === "spline" && bsplineProblem(splineCurve(e, points)[0]!);
+    if (problem) throw new ValidationError(`Spline ${e.id}: ${problem}`);
     if (e.kind !== "ellipse") continue;
     const [c, m, n] = refs.map((id) => points.get(id)!);
     const { a, b } = ellipseAxes(c!, m!, n!);
@@ -64,9 +68,12 @@ function sketchReferences(f: SketchFeature): void {
     (c.type === "tangent" && [c.a, c.b].some((id) => kinds.get(id) === "line"));
   for (const c of f.constraints)
     for (const id of constraintEntityRefs(c))
-      if (kinds.get(id) === "ellipse" && !held(c))
+      if (
+        kinds.get(id) === "spline" ||
+        (kinds.get(id) === "ellipse" && !held(c))
+      )
         throw new ValidationError(
-          `${c.type} constraints cannot reference ellipse ${id} yet`,
+          `${c.type} constraints cannot reference ${kinds.get(id)} ${id} yet`,
         );
 }
 

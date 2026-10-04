@@ -6,6 +6,7 @@ import {
   addSketchConstraints,
   constraintFor,
   sketchSelectionIds,
+  splineRefusal,
   type RelationType,
 } from "../sketchRelations";
 
@@ -25,6 +26,8 @@ export const constraintCommands: Command[] = [
     explainsRefusal: true,
     enabled: (s) =>
       !!chosen(s, type) ||
+      (!!s.draftSketch &&
+        splineRefusal(s.draftSketch, sketchSelectionIds(s.selection))) ||
       `Selection doesn't match the ${type} constraint: check the tooltip`,
     run: (s) => {
       const c = chosen(s, type);

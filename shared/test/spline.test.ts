@@ -6,7 +6,14 @@ import {
   sampleBSpline,
   type BSpline,
 } from "../src/bspline.js";
+import { regionWarning } from "../src/curveLimits.js";
 import { dxfSplines, importDxf } from "../src/importDxf.js";
+import type { SketchEntity } from "../src/model.js";
+import { detectProfiles } from "../src/profiles.js";
+import { curveSamples, sketchCurves } from "../src/sketchCurves.js";
+import { extendSketch, offsetSketch } from "../src/sketchModify.js";
+import { moveSketchSelection } from "../src/sketchTransform.js";
+import { trimmable, trimSketch } from "../src/sketchTrim.js";
 
 type Pair = [number, string | number];
 
@@ -220,7 +227,6 @@ describe("dxfSplines", () => {
       splineRecord(2, [0, 0, 0, 1, 1, 1], quarter.poles, [1, R, 1]),
     ]);
     expect(dxfSplines(text)).toEqual({ splines: [quarter], skipped: [] });
-    expect(importDxf(text).skipped).toBe(1);
   });
 
   it("scales poles by the drawing units", () => {
@@ -309,12 +315,178 @@ describe("dxfSplines", () => {
   });
 });
 
-function line(): Pair[] {
+function line(x1 = 0, y1 = 0, x2 = 1, y2 = 0): Pair[] {
   return [
     [0, "LINE"],
-    [10, 0],
-    [20, 0],
-    [11, 1],
-    [21, 0],
+    [10, x1],
+    [20, y1],
+    [11, x2],
+    [21, y2],
   ];
 }
+
+describe("spline sketch entity", () => {
+  const square = (x: number, y: number, size: number): Pair[][] => [
+    line(x, y, x + size, y),
+    line(x + size, y, x + size, y + size),
+    line(x + size, y + size, x, y + size),
+    line(x, y + size, x, y),
+  ];
+  const arch = splineRecord(
+    2,
+    [0, 0, 0, 1, 1, 1],
+    [
+      [0, 0],
+      [5, 8],
+      [10, 0],
+    ],
+  );
+  const imported = (...records: Pair[][]) => {
+    const { entities, skipped } = importDxf(dxf(records));
+    expect(skipped).toBe(0);
+    return entities;
+  };
+  const splineOf = (entities: SketchEntity[]) =>
+    entities.find((e) => e.kind === "spline")!;
+  const at = (entities: SketchEntity[], id: string) => {
+    const p = entities.find((e) => e.id === id);
+    return p?.kind === "point" ? [p.x, p.y] : undefined;
+  };
+
+  it("imports a SPLINE as poles that share the ends of touching lines", () => {
+    const entities = imported(
+      splineRecord(2, [0, 0, 0, 1, 1, 1], quarter.poles, [1, R, 1]),
+      line(0, 1, -1, 1),
+    );
+    const s = splineOf(entities);
+    expect(s).toMatchObject({
+      kind: "spline",
+      degree: 2,
+      weights: [1, R, 1],
+      knots: [0, 1],
+      multiplicities: [3, 3],
+    });
+    if (s.kind !== "spline") throw new Error("not a spline");
+    expect(s.poles.map((id) => at(entities, id))).toEqual(quarter.poles);
+    const l = entities.find((e) => e.kind === "line");
+    expect(l?.kind === "line" && l.p1).toBe(s.poles[2]);
+  });
+
+  it("imports a periodic SPLINE with its flag and scales poles once", () => {
+    const poles = [...periodic.poles, ...periodic.poles.slice(0, 3)];
+    const weights = [...periodic.weights!, ...periodic.weights!.slice(0, 3)];
+    const knots = Array.from({ length: 13 }, (_, i) => i);
+    const { entities } = importDxf(
+      dxf(
+        [splineRecord(3, knots, poles, weights, [[70, 15]])],
+        [
+          [9, "$INSUNITS"],
+          [70, 1],
+        ],
+      ),
+    );
+    const s = splineOf(entities);
+    expect(s).toMatchObject({ periodic: true, knots: periodic.knots });
+    if (s.kind !== "spline") throw new Error("not a spline");
+    expect(s.poles.map((id) => at(entities, id))).toEqual(
+      periodic.poles.map(([x, y]) => [x * 25.4, y * 25.4]),
+    );
+  });
+
+  it("skips a SPLINE whose plane is not the drawing plane", () => {
+    const tilted = splineRecord(
+      1,
+      [0, 0, 1, 1],
+      quarter.poles.slice(0, 2),
+      [],
+      [
+        [210, 1],
+        [220, 0],
+        [230, 0],
+      ],
+    );
+    expect(importDxf(dxf([tilted])).skipped).toBe(1);
+  });
+
+  it("samples the exact curve for drawing", () => {
+    const entities = imported(
+      splineRecord(2, [0, 0, 0, 1, 1, 1], quarter.poles, [1, R, 1]),
+    );
+    const [curve] = sketchCurves(entities);
+    const flat = curveSamples(curve!, 12);
+    expect(flat.length).toBe(26);
+    for (let i = 0; i < flat.length; i += 2)
+      expect(Math.hypot(flat[i]!, flat[i + 1]!)).toBeCloseTo(1, 12);
+  });
+
+  it("forms no region and warns, while the lines around it still do", () => {
+    const entities = imported(arch, ...square(-20, -20, 60));
+    const s = splineOf(entities);
+    const profiles = detectProfiles(entities);
+    expect(profiles).toHaveLength(1);
+    expect(JSON.stringify(profiles)).not.toContain(s.id);
+    expect(regionWarning(entities)).toMatch(
+      new RegExp(`Spline ${s.id} forms no region yet`),
+    );
+    expect(regionWarning(imported(...square(0, 0, 5)))).toBeUndefined();
+  });
+
+  it("refuses to trim the spline or a curve it crosses", () => {
+    const entities = imported(arch, line(5, -5, 5, 10), line(20, 0, 30, 0));
+    const s = splineOf(entities);
+    const crossing = entities.filter((e) => e.kind === "line")[0]!;
+    const clear = entities.filter((e) => e.kind === "line")[1]!;
+    expect(trimmable(entities, s)).toBe(false);
+    expect(trimmable(entities, crossing)).toBe(false);
+    expect(trimmable(entities, clear)).toBe(true);
+    expect(() => trimSketch(entities, [], s.id, { x: 5, y: 4 })).toThrow(
+      /does not support splines/,
+    );
+    expect(() => trimSketch(entities, [], crossing.id, { x: 5, y: 8 })).toThrow(
+      /splines/,
+    );
+  });
+
+  it("keeps a curve that only meets the spline at its end trimmable", () => {
+    const entities = imported(arch, line(10, 0, 20, 0), line(15, -5, 15, 5));
+    const joined = entities.find(
+      (e) => e.kind === "line" && at(entities, e.p1)?.[0] === 10,
+    )!;
+    expect(trimmable(entities, joined)).toBe(true);
+  });
+
+  it("refuses to extend or offset the spline, and to extend beside it", () => {
+    const entities = imported(arch, line(20, 0, 30, 0));
+    const s = splineOf(entities);
+    const l = entities.find((e) => e.kind === "line")!;
+    expect(() => extendSketch(entities, [], s.id, { x: 0, y: 0 })).toThrow(
+      /does not support splines/,
+    );
+    expect(() => offsetSketch(entities, [], s.id, 1)).toThrow(/spline/i);
+    expect(() => extendSketch(entities, [], l.id, { x: 20, y: 0 })).toThrow(
+      /does not support splines/,
+    );
+  });
+
+  it("copies a spline onto fresh poles", () => {
+    const entities = imported(arch);
+    const s = splineOf(entities);
+    const { entities: after } = moveSketchSelection(entities, [], [s.id], {
+      dx: 5,
+      dy: 1,
+      angle: 0,
+      pivot: null,
+      copy: true,
+      bound: [],
+    });
+    const copy = after.find((e) => e.kind === "spline" && e.id !== s.id);
+    if (copy?.kind !== "spline" || s.kind !== "spline")
+      throw new Error("no copy");
+    expect(copy.poles.some((id) => s.poles.includes(id))).toBe(false);
+    expect(copy.poles.map((id) => at(after, id))).toEqual([
+      [5, 1],
+      [10, 9],
+      [15, 1],
+    ]);
+  });
+});

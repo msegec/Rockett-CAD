@@ -413,6 +413,10 @@ input bound, not a tolerance.
 ## Sketches
 
 - The solver is `shared/src/solver.ts`: `shared/test/solver.test.ts`.
+- An `external` point is projected or linked geometry: its position is driven,
+  never solved. A dimension's `labelOffset` is a sketch UV offset from its
+  default anchor, for display only; the solver ignores it. A `distance` with
+  `axis: null` measures directly, and `"x"` or `"y"` measures along that axis.
 - A profile id hashes its bounding entity ids. `findProfile` in
   `shared/src/profiles.ts` still finds ids saved before tangent splitting
   (DEC-101): `shared/test/profiles.test.ts`.
@@ -479,8 +483,20 @@ input bound, not a tolerance.
   order. `dxfSplines` in `shared/src/importDxf.ts` reads SPLINE records
   into that form; a closed SPLINE whose last `degree` poles repeat its first
   becomes periodic. Fit-point-only, unclamped open and malformed records are
-  skipped with a reason. `importDxf` still counts every SPLINE as skipped:
-  `shared/test/spline.test.ts`.
+  skipped with a reason: `shared/test/spline.test.ts`.
+- Schema 36 adds the sketch `spline`: `degree`, `poles` as point ids,
+  optional `weights`, `knots`, `multiplicities` and optional `periodic`.
+  Validation refuses what `bsplineProblem` refuses, and constraints on the
+  curve itself; constraints on its poles stay. `importDxf` builds one from a
+  SPLINE whose normal is Z, passing scale only to `sketchBuilder`. An open
+  spline is clamped, so its end poles are its ends and share the points of
+  touching curves; a periodic one closes on itself. Dragging a pole moves the
+  curve through the generic point paths. A spline forms no region yet and the
+  sketch warns (`regionWarning` in `shared/src/curveLimits.ts`). Trim,
+  extend, offset, dimensions, relations and sweep paths refuse it, and trim
+  refuses a curve that touches it away from either curve's ends. That contact
+  test samples each knot span and refines the nearest gap; it is not an exact
+  intersection. DXF export samples it: `shared/test/spline.test.ts`.
 
 ## Frame conventions
 

@@ -4,19 +4,20 @@ import {
   type SketchEllipse,
   type SketchEntity,
   type SketchPoint,
+  type SketchSpline,
 } from "./model.js";
-import { curveHits, type CurveHit } from "./profiles.js";
 import {
-  arcAngles,
-  ELLIPSE_UNSUPPORTED,
-  entityPointIds,
-  sampleArc,
-} from "./sketchCurves.js";
+  CONTACT_UNSUPPORTED,
+  refuseUnsupported,
+  unsupported,
+} from "./curveLimits.js";
+import { curveHits, type CurveHit } from "./profiles.js";
+import { arcAngles, entityPointIds, sampleArc } from "./sketchCurves.js";
 import type { SketchModification } from "./sketchModify.js";
 import { constraintEntityRefs } from "./sketchTransform.js";
 
 type XY = { x: number; y: number };
-type Curve = Exclude<SketchEntity, SketchPoint | SketchEllipse>;
+type Curve = Exclude<SketchEntity, SketchPoint | SketchEllipse | SketchSpline>;
 
 export interface TrimTarget {
   entityId: string;
@@ -54,7 +55,7 @@ function hitMap(entities: SketchEntity[]): Map<string, CurveHit[]> {
 
 function hitsOn(entities: SketchEntity[], curve: Curve): CurveHit[] {
   const found = hitMap(entities).get(curve.id);
-  if (!found) throw new Error(ELLIPSE_UNSUPPORTED);
+  if (!found) throw new Error(CONTACT_UNSUPPORTED);
   return found;
 }
 
@@ -65,7 +66,7 @@ export function trimmable(
   return (
     !!e &&
     e.kind !== "point" &&
-    e.kind !== "ellipse" &&
+    !unsupported(e) &&
     !e.external &&
     hitMap(entities).has(e.id)
   );
@@ -81,7 +82,7 @@ function curveIn(entities: SketchEntity[], id: string): Curve {
   const curve = entities.find((e) => e.id === id);
   if (!curve || curve.kind === "point")
     throw new Error("Choose a sketch curve.");
-  if (curve.kind === "ellipse") throw new Error(ELLIPSE_UNSUPPORTED);
+  refuseUnsupported(curve);
   return curve;
 }
 

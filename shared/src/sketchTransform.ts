@@ -190,6 +190,8 @@ function renamed(
         ...(e.start && { start: to(e.start) }),
         ...(e.end && { end: to(e.end) }),
       };
+    case "spline":
+      return { ...e, poles: e.poles.map(to) };
   }
 }
 

@@ -108,7 +108,7 @@ function entityPairs(entities: readonly SketchEntity[]) {
       out.push(...head("LINE"), ...xyz(at(e.p1)), ...xyz(at(e.p2), 11));
     if (e.kind === "circle")
       out.push(...head("CIRCLE"), ...xyz(at(e.center)), [40, real(e.radius)]);
-    if (e.kind === "ellipse")
+    if (e.kind === "ellipse" || e.kind === "spline")
       for (const curve of sketchCurves([e, ...points.values()], true))
         out.push(
           ...polylinePairs(

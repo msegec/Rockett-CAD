@@ -1,4 +1,10 @@
-import { newId, type SketchEntity, type SketchPoint } from "./model.js";
+import type { BSpline } from "./bspline.js";
+import {
+  newId,
+  type SketchEntity,
+  type SketchPoint,
+  type SketchSpline,
+} from "./model.js";
 import { LINEAR_TOL } from "./tolerance.js";
 
 export interface SketchImport {
@@ -59,9 +65,34 @@ function pointPool(entities: SketchEntity[], scale: number) {
   return { apart, point, endpoint };
 }
 
+function splineOn(
+  { point, endpoint }: ReturnType<typeof pointPool>,
+  s: BSpline,
+  construction: boolean,
+): SketchSpline {
+  const { degree, weights, knots, multiplicities, periodic } = s;
+  const last = s.poles.length - 1;
+  return {
+    id: newId("sp"),
+    kind: "spline",
+    degree,
+    poles: s.poles.map((p, i) =>
+      !periodic && (i === 0 || i === last)
+        ? endpoint(p, construction)
+        : point(p, construction).id,
+    ),
+    ...(weights && { weights }),
+    knots,
+    multiplicities,
+    ...(periodic && { periodic }),
+    ...flag(construction),
+  };
+}
+
 export function sketchBuilder(scale = 1) {
   const entities: SketchEntity[] = [];
-  const { apart, point, endpoint } = pointPool(entities, scale);
+  const pool = pointPool(entities, scale);
+  const { apart, point, endpoint } = pool;
   return {
     entities,
     point(at: XY, construction = false) {
@@ -113,6 +144,10 @@ export function sketchBuilder(scale = 1) {
         }),
         ...flag(construction),
       });
+      return true;
+    },
+    spline(s: BSpline, construction = false) {
+      entities.push(splineOn(pool, s, construction));
       return true;
     },
     arc(c: XY, s: XY, e: XY, construction = false) {

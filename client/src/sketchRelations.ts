@@ -3,6 +3,7 @@ import {
   entityPointIds,
   newId,
   sketchCurves,
+  SPLINE_UNSUPPORTED,
   type SketchConstraint,
   type SketchEntity,
 } from "@rockett/shared";
@@ -99,18 +100,23 @@ function classify(draft: Draft, ids: string[]) {
       return k === "circle" || k === "arc";
     }),
     ellipses: ids.filter((id) => find(id)?.kind === "ellipse"),
+    splines: ids.filter((id) => find(id)?.kind === "spline"),
   };
 }
+
+export const splineRefusal = (draft: Draft, ids: string[]) =>
+  classify(draft, ids).splines.length > 0 && SPLINE_UNSUPPORTED;
 
 export function constraintFor(
   draft: Draft,
   ids: string[],
   type: RelationType,
 ): SketchConstraint | null {
-  const { find, own, points, lines, circleLikes, ellipses } = classify(
+  const { find, own, points, lines, circleLikes, ellipses, splines } = classify(
     draft,
     ids,
   );
+  if (splines.length) return null;
   const [point, point2] = points;
   const [line, line2] = lines;
   const [circle, circle2] = circleLikes;
