@@ -8,12 +8,19 @@ import {
   vertices,
   planarFacePlane,
   pnt,
-  progress,
   type Shape,
   type Own,
 } from "./kernel.js";
 import { vertexPoint } from "./featureState.js";
 import { V } from "./frames.js";
+import {
+  cylinderOf,
+  section,
+  sectionCarrier,
+  surfaceGap,
+} from "./blendSides.js";
+import { nativeBoundaryCurves } from "./nativeBoundaryCurves.js";
+import { originalCarrierMetric } from "./originalCarrierMetric.js";
 import { moduleSphereCorner } from "./sphereFilletCorner.js";
 import type { FilletEnd } from "./filletBoundaries.js";
 
@@ -23,19 +30,6 @@ export type GuidePatch = {
   points: [Vec3, Vec3];
   neighbors: Shape[];
 };
-
-function section(a: Shape, b: Shape, own: Own) {
-  const k = getKernel(),
-    operation = own(new k.BRepAlgoAPI_Section_3(a, b, false));
-  operation.Approximation(true);
-  operation.ComputePCurveOn1(true);
-  operation.ComputePCurveOn2(true);
-  operation.SetNonDestructive(true);
-  operation.Build(progress());
-  if (!operation.IsDone())
-    throw new Error("the fillet end curves could not be built");
-  return edges(own(operation.Shape())).map(own);
-}
 
 function planeStrip(domain: any) {
   return domain.GetType() === getKernel().GeomAbs_SurfaceType.GeomAbs_Plane;
@@ -103,16 +97,11 @@ function sourceCarrier(source: Shape, patch: GuidePatch, own: Own) {
       new k.BRepBuilderAPI_MakeFace_8(surface, k.BRep_Tool.Tolerance_1(source)),
     );
   } else if (domain.GetType() === k.GeomAbs_SurfaceType.GeomAbs_Cylinder) {
-    const cylinder = own(domain.Cylinder()),
-      axis = own(cylinder.Axis()),
-      centre = own(axis.Location()),
-      direction = own(axis.Direction());
-    const origin: Vec3 = [centre.X(), centre.Y(), centre.Z()],
-      normal: Vec3 = [direction.X(), direction.Y(), direction.Z()];
+    const { origin, axis } = cylinderOf(source, own)!;
     const axial = vertices(patch.face)
       .map(own)
       .map(vertexPoint)
-      .map((point) => V.dot(V.sub(point, origin), normal));
+      .map((point) => V.dot(V.sub(point, origin), axis));
     make = own(
       new k.BRepBuilderAPI_MakeFace_14(
         surface,
@@ -134,13 +123,10 @@ function sourceCarrier(source: Shape, patch: GuidePatch, own: Own) {
 function moduleCap(patch: GuidePatch, old: Shape, own: Own) {
   const k = getKernel(),
     domain = own(new k.BRepAdaptor_Surface_2(patch.face, true)),
-    cylinder = own(domain.Cylinder()),
-    axis = own(cylinder.Axis()),
-    centre = own(axis.Location()),
-    direction = own(axis.Direction());
-  const origin: Vec3 = [centre.X(), centre.Y(), centre.Z()],
-    normal: Vec3 = [direction.X(), direction.Y(), direction.Z()];
-  const vOf = (point: Vec3) => V.dot(V.sub(point, origin), normal);
+    cylinder = cylinderOf(patch.face, own);
+  if (!cylinder) throw new Error("the fillet corner support is not a cylinder");
+  const vOf = (point: Vec3) =>
+    V.dot(V.sub(point, cylinder.origin), cylinder.axis);
   const other = vertices(patch.edge)
     .map(own)
     .find((v) => !v.IsSame(old));
@@ -366,7 +352,55 @@ function terminalForGuide(
     throw new Error("the finite fillet endpoint is duplicated");
   return matches[0]
     ? finiteFilletEnd(sourceFaces, patch, index, old, matches[0].out, own)
-    : terminalBoundary(sourceFaces, patch, index, old, own);
+    : grownTerminal(
+        terminalBoundary(sourceFaces, patch, index, old, own),
+        patch,
+        own,
+      );
+}
+
+function grownTerminal(end: FilletEnd, patch: GuidePatch, own: Own) {
+  const k = getKernel(),
+    curves = nativeBoundaryCurves(own);
+  const growth = patch.neighbors
+    .filter((neighbor) => !planarFacePlane(neighbor))
+    .flatMap((neighbor) => {
+      const gap = surfaceGap(neighbor, own);
+      const touching = end.boundary.flatMap(({ edge, source }) =>
+        vertices(edge)
+          .map(own)
+          .filter(
+            (vertex) =>
+              gap(vertexPoint(vertex)) <= k.BRep_Tool.Tolerance_2(edge),
+          )
+          .map((contact) => ({ contact, source })),
+      );
+      const { contact, source } = touching[0] ?? {};
+      if (touching.length !== 1 || !contact || !source)
+        throw new Error("the chamfer end has no single curved contact");
+      const carried = edges(neighbor)
+        .map(own)
+        .some(
+          (edge) =>
+            !edge.IsSame(patch.edge) &&
+            vertices(edge)
+              .map(own)
+              .some((vertex) => vertex.IsSame(end.old)) &&
+            originalCarrierMetric(edge, own)(contact) <=
+              k.BRep_Tool.Tolerance_2(edge) + k.BRep_Tool.Tolerance_3(contact),
+        );
+      if (carried) return [];
+      const arc = sectionCarrier(
+        neighbor,
+        sourceCarrier(source, patch, own),
+        [end.old, contact],
+        own,
+      );
+      const edge = curves.carrierEdge(arc, end.old, contact);
+      curves.transfer(arc, edge, neighbor);
+      return [{ edge, source, neighbor }];
+    });
+  return growth.length ? { ...end, growth } : end;
 }
 function guideAxis(patch: GuidePatch) {
   return V.normalize(V.sub(patch.points[1], patch.points[0]));

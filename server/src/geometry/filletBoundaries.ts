@@ -19,6 +19,7 @@ export type FilletEnd = {
   old: Shape;
   boundary: { edge: Shape; source: Shape | null }[];
   sourceEdits?: { face: Shape; edge: Shape; replacement: Shape[] }[];
+  growth?: { edge: Shape; source: Shape; neighbor: Shape }[];
   termination?: {
     face: Shape;
     segments: {
@@ -78,7 +79,9 @@ function originalCarrierContact(
   if (
     !matches.length &&
     graph.some((patch) =>
-      patch.endSeams.some((end) => end.old.IsSame(vertex) && end.termination),
+      patch.endSeams.some(
+        (end) => end.old.IsSame(vertex) && (end.termination || end.growth),
+      ),
     )
   )
     return vertex;
@@ -151,7 +154,7 @@ function attachCaps(
             .map(own)
             .some((v) => v.IsSame(end.old)),
         );
-        assert.equal(incident.length, 2);
+        assert.equal(incident.length, end.growth ? 1 : 2);
         const ends = vertices(part.edge).map(own);
         const insertion = incident[0];
         assert(insertion);
@@ -167,6 +170,11 @@ function attachCaps(
         assert(attached);
         const seam = orient(part.edge, attached);
         insertion.replacement.push(seam);
+        insertion.replacement.push(
+          ...(end.growth ?? [])
+            .filter((grown) => grown.source.IsSame(face))
+            .map((grown) => grown.edge),
+        );
       }
 }
 
@@ -246,6 +254,20 @@ function attachSourceEdits(
         }
 }
 
+function guideReplacement(
+  guide: Graph[number],
+  face: Shape,
+  start: Shape,
+  curves: Curves,
+) {
+  const match = guide.neighbors.find((n) => n.face.IsSame(face));
+  assert(match);
+  const grown = guide.endSeams.flatMap((end) =>
+    (end.growth ?? []).filter((part) => part.neighbor.IsSame(face)),
+  );
+  return [curves.orient(match.edge, start), ...grown.map((part) => part.edge)];
+}
+
 function sourceBoundaries(
   sourceFaces: Shape[],
   graph: Graph,
@@ -266,11 +288,14 @@ function sourceBoundaries(
     const edits = oldEdges.flatMap((old) => {
       const guide = graph.find((p) => p.edge.IsSame(old));
       if (guide) {
-        const match = guide.neighbors.find((n) => n.face.IsSame(face));
-        assert(match);
         const start = mapped(beginning(old), face);
         assert(start);
-        return [{ edge: old, replacement: [orient(match.edge, start)] }];
+        return [
+          {
+            edge: old,
+            replacement: guideReplacement(guide, face, start, curves),
+          },
+        ];
       }
       const native = nativeContacts.filter(
         (contact) => contact.face.IsSame(face) && contact.old.IsSame(old),

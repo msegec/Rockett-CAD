@@ -4,7 +4,8 @@ import { nativeOtherEnds, nativeSourceEnd } from "./nativeOtherEnds.js";
 import { mixedFilletHistory } from "./mixedFilletHistory.js";
 import { contourEndReferences } from "./blendEnds.js";
 import { LINEAR_TOL, type Vec3, type EdgeRef } from "@rockett/shared";
-import { filletBetweenPlanes, type PlaneSide } from "./blendModule.js";
+import { filletBetweenPlanes } from "./blendModule.js";
+import { planeSides, type PlanarSide } from "./blendSides.js";
 import { rejectSewnBlend } from "./blendValidity.js";
 import { NoCorner, vertexPoint, type ToolResult } from "./featureState.js";
 import { V } from "./frames.js";
@@ -17,7 +18,6 @@ import {
   explore,
   getKernel,
   scoped,
-  planarFacePlane,
   progress,
   vec,
   type Shape,
@@ -25,12 +25,10 @@ import {
 } from "./kernel.js";
 import { blendFaceName, finalizeNames, type NamedBody } from "./naming.js";
 import { ShapeMap } from "./shapeMap.js";
-import { planeBoundarySample } from "./planeBoundary.js";
 import { planarFilletSurface } from "./planarFilletSurface.js";
 import { sharedFilletBoundaries } from "./filletBoundaries.js";
 import { filletEndCurves, type GuidePatch } from "./filletEndCurves.js";
 
-export type PlanarSide = PlaneSide & { face: Shape };
 export type BlendStrip = {
   kind: "fillet" | "chamfer";
   size: number;
@@ -42,12 +40,14 @@ export type BlendStrip = {
     bounds: ReturnType<typeof bboxOf>,
   ): Shape;
   accepts?(chain: { edge: Shape }[], sides: PlanarSide[][], own: Own): boolean;
+  sides(edge: Shape, original: Shape[], own: Own): PlanarSide[] | null;
 };
 
 function filletStrip(radius: number): BlendStrip {
   return {
     kind: "fillet",
     size: radius,
+    sides: planeSides,
     face(points, sides, axis, own, bounds) {
       const concave = sides.every(
         (side, i) => V.dot(side.into, sides[1 - i]!.normal) > 0,
@@ -68,34 +68,6 @@ function filletStrip(radius: number): BlendStrip {
       return planarFilletSurface(section, axis, radius, own, bounds).face;
     },
   };
-}
-
-function planeSides(
-  edge: Shape,
-  original: Shape[],
-  own: Own,
-): PlanarSide[] | null {
-  const k = getKernel();
-  const guide = own(new k.BRepAdaptor_Curve_2(edge));
-  if (guide.GetType() !== k.GeomAbs_CurveType.GeomAbs_Line) return null;
-  const neighboring = original.flatMap((face) => {
-    const occurrence = edges(face)
-      .map(own)
-      .find((e) => e.IsSame(edge));
-    return occurrence ? [{ face, occurrence }] : [];
-  });
-  if (neighboring.length !== 2) return null;
-  const sides: PlanarSide[] = [];
-  for (const { face, occurrence } of neighboring) {
-    const plane = planarFacePlane(face);
-    if (!plane) return null;
-    sides.push({
-      face,
-      normal: plane.normal,
-      into: planeBoundarySample(occurrence, plane.normal, own).into,
-    });
-  }
-  return sides;
 }
 
 function surfaces(
@@ -119,7 +91,7 @@ function surfaces(
       );
     const edge = occurrences[0]!;
 
-    const sides = planeSides(edge, source, own);
+    const sides = strip.sides(edge, source, own);
     if (!sides)
       throw new Error("the module guide must have two planar neighbors");
     const points: [Vec3, Vec3] = [
@@ -226,14 +198,14 @@ export function planarBlend(
   refs: EdgeRef[],
 ): ToolResult | null {
   const result = scoped((own) => {
-    const original = faces(body.shape).map(own),
-      eligibility = selected.map(({ edge }) => planeSides(edge, original, own));
-    if (eligibility.every((sides) => !sides)) return null;
+    const original = faces(body.shape).map(own);
+    const sides = selected.map(({ edge }) => strip.sides(edge, original, own));
+    if (sides.every((entry) => !entry)) return null;
     const topology = ownedFilletTopology(
       body,
       selected,
       original,
-      eligibility,
+      sides,
       strip,
       featureId,
       byName,
@@ -340,7 +312,7 @@ function ownedFilletTopology(
     const propagated = contourContinuations(contour, chosen, own);
     chosen.push(...propagated);
     eligibility.push(
-      ...propagated.map(({ edge }) => planeSides(edge, source, own)),
+      ...propagated.map(({ edge }) => strip.sides(edge, source, own)),
     );
   }
   const history = needsNative
@@ -390,7 +362,7 @@ function chamferChain(
   const propagated = contourContinuations(contour, chosen, own);
   chosen.push(...propagated);
   eligibility.push(
-    ...propagated.map(({ edge }) => planeSides(edge, source, own)),
+    ...propagated.map(({ edge }) => strip.sides(edge, source, own)),
   );
   const sides = eligibility.flatMap((entry) => (entry ? [entry] : []));
   return (

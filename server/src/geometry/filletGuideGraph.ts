@@ -9,7 +9,7 @@ import {
   type Own,
 } from "./kernel.js";
 import { vertexPoint } from "./featureState.js";
-import { V } from "./frames.js";
+import { sectionCarrier, surfaceGap } from "./blendSides.js";
 import type { FilletEnd } from "./filletBoundaries.js";
 import type { nativeBoundaryCurves } from "./nativeBoundaryCurves.js";
 export type Patch = { edge: Shape; face: Shape; points: [Vec3, Vec3] };
@@ -65,8 +65,7 @@ function guideNeighbor(
   const k = getKernel();
   const { beginning, ending, carrierEdge, transfer } = curves;
 
-  const plane = planarFacePlane(face);
-  assert(plane);
+  const gap = surfaceGap(face, own);
   const contacts = endSeams.map((end) => {
     const candidates = end.boundary
       .flatMap(({ edge }) => vertices(edge).map(own))
@@ -76,7 +75,7 @@ function guideNeighbor(
       )
       .filter(
         (v) =>
-          Math.abs(V.dot(V.sub(vertexPoint(v), plane.origin), plane.normal)) <=
+          gap(vertexPoint(v)) <=
           Math.max(
             ...end.boundary.map(({ edge }) => k.BRep_Tool.Tolerance_2(edge)),
           ),
@@ -95,18 +94,17 @@ function guideNeighbor(
           k.GeomAbs_CurveType.GeomAbs_Line &&
         vertices(e)
           .map(own)
-          .every(
-            (v) =>
-              Math.abs(
-                V.dot(V.sub(vertexPoint(v), plane.origin), plane.normal),
-              ) <= k.BRep_Tool.Tolerance_2(e),
-          ),
+          .every((v) => gap(vertexPoint(v)) <= k.BRep_Tool.Tolerance_2(e)),
     );
   assert.equal(lines.length, 1);
   const start = contacts.find((c) => c.old.IsSame(beginning(patch.edge))),
     finish = contacts.find((c) => c.old.IsSame(ending(patch.edge)));
   assert(start && finish);
-  const edge = carrierEdge(lines[0]!, start.new, finish.new);
-  transfer(lines[0]!, edge, patch.face);
+  const carrier = planarFacePlane(face)
+    ? lines[0]!
+    : sectionCarrier(patch.face, face, [start.new, finish.new], own);
+  const edge = carrierEdge(carrier, start.new, finish.new);
+  transfer(carrier, edge, patch.face);
+  if (carrier !== lines[0]) transfer(carrier, edge, face);
   return { face, contacts, edge, oldLine: lines[0]! };
 }

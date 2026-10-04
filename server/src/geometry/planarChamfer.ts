@@ -1,5 +1,6 @@
 import { LINEAR_TOL, type EdgeRef, type Vec3 } from "@rockett/shared";
 import { chamferSection } from "./blendModule.js";
+import { chamferSides } from "./blendSides.js";
 import { NoCorner, vertexPoint, type ToolResult } from "./featureState.js";
 import { V } from "./frames.js";
 import {
@@ -36,6 +37,7 @@ function chamferStrip(distance: number): BlendStrip {
   return {
     kind: "chamfer",
     size: distance,
+    sides: chamferSides,
     accepts(chain, sides, own) {
       const ends = chain.flatMap(({ edge }) => vertices(edge).map(own));
       return (
@@ -62,14 +64,7 @@ function chamferStrip(distance: number): BlendStrip {
     },
     face(points, sides, axis, own, bounds) {
       const k = getKernel();
-      const section = chamferSection(
-        points,
-        [
-          { ...sides[0], radius: 0 },
-          { ...sides[1], radius: 0 },
-        ],
-        distance,
-      );
+      const section = chamferSection(points, sides, distance);
       if (!section)
         throw new NoCorner(
           "no sharp corner to chamfer: the faces meet smoothly there",
