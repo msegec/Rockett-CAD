@@ -113,5 +113,9 @@ router checks project access first (`server/src/api/projectAccess.ts`).
   `server/src/tunables.ts`, a share of the host memory limit; the mesh limit
   is in `server/src/kernel/meshCache.ts`.
 - Viewport work never calls the kernel.
+- The viewport rebuilds a body's geometry only when its mesh hash changes. A
+  body sent without its mesh is fetched by hash, at most 6 at once, aborted
+  on a project switch and retried on the next sync:
+  `client/src/three/bodyObjects.ts`.
 - Sketch drags solve in the browser; API.md, Evaluation, says when a sketch
   write or evaluation solves.

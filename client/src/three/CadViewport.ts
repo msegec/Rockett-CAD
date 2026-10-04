@@ -24,12 +24,12 @@ import type { PreviewGhost, PreviewTint } from "../livePreview";
 import {
   pickThresholds,
   pickWithProviders,
-  type PickBody,
   type PickResult,
 } from "./pickProviders";
 import { clientRay } from "./screen";
 import { boxPick, type BoxMode, type ClientBox } from "./boxPick";
-import { clearGroup, disposeGroup, disposeObject } from "./dispose";
+import { BodyLayer, type LayerBody } from "./bodyObjects";
+import { clearGroup, disposeObject } from "./dispose";
 import { fillGhost } from "./ghostGeometry";
 import { type LayerHandle, sceneLayers } from "./sceneLayers";
 import {
@@ -104,11 +104,6 @@ export function uv3(frame: PlaneFrame, u: number, v: number): THREE.Vector3 {
   );
 }
 
-interface BodyObjects extends PickBody {
-  material: THREE.MeshStandardMaterial;
-  tint: THREE.MeshStandardMaterial | null;
-}
-
 export class CadViewport {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
@@ -120,8 +115,9 @@ export class CadViewport {
   zoom = 90;
 
   private container: HTMLElement;
-  private bodies = new Map<string, BodyObjects>();
   private bodyRoot = new THREE.Group();
+  private bodyLayer = new BodyLayer(this.bodyRoot, () => this.requestRender());
+  private bodies = this.bodyLayer.bodies;
   private ghostRoot = new THREE.Group();
   private ghosts = new Map<
     string,
@@ -224,7 +220,7 @@ export class CadViewport {
     window.removeEventListener("scroll", this.forgetRect, true);
     this.layers.dispose();
     clearGroup(this.scene);
-    this.bodies.clear();
+    this.bodyLayer.dispose();
     this.ghosts.clear();
     this.renderer.dispose();
     this.renderer.domElement.remove();
@@ -628,121 +624,12 @@ export class CadViewport {
     this.requestRender();
   }
 
-  syncBodies(payloads: BodyPayload[], hidden: ReadonlySet<string> = new Set()) {
-    const seen = new Set<string>();
-    for (const p of payloads) {
-      seen.add(p.bodyId);
-      const existing = this.bodies.get(p.bodyId);
-      if (existing && existing.payload.meshKey === p.meshKey) {
-        existing.payload = p;
-        existing.group.visible = !hidden.has(p.bodyId);
-        continue;
-      }
-      if (existing) {
-        this.bodyRoot.remove(existing.group);
-        disposeGroup(existing.group);
-        this.bodies.delete(p.bodyId);
-      }
-      const objs = this.buildBody(p);
-      this.bodies.set(p.bodyId, objs);
-      this.bodyRoot.add(objs.group);
-      objs.group.visible = !hidden.has(p.bodyId);
-    }
-    for (const [id, objs] of Array.from(this.bodies)) {
-      if (!seen.has(id)) {
-        this.bodyRoot.remove(objs.group);
-        disposeGroup(objs.group);
-        this.bodies.delete(id);
-      }
-    }
-    this.requestRender();
-  }
-
-  private buildBody(p: BodyPayload): BodyObjects {
-    const group = new THREE.Group();
-    group.userData.bodyId = p.bodyId;
-
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(p.positions, 3),
-    );
-    geom.setAttribute("normal", new THREE.Float32BufferAttribute(p.normals, 3));
-    geom.setIndex(p.indices);
-    const mat = new THREE.MeshStandardMaterial({
-      color: themeColor("body"),
-      metalness: BODY_APPEARANCE.metalness,
-      roughness: BODY_APPEARANCE.roughness,
-      polygonOffset: true,
-      polygonOffsetFactor: 1,
-      polygonOffsetUnits: 1,
-    });
-    mat.userData.themeToken = "body";
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.userData.bodyId = p.bodyId;
-    group.add(mesh);
-
-    const edgePts: number[] = [];
-    const edgeSegments: string[] = [];
-    for (const e of p.edges) {
-      for (let i = 0; i + 5 < e.polyline.length; i += 3) {
-        edgePts.push(
-          e.polyline[i]!,
-          e.polyline[i + 1]!,
-          e.polyline[i + 2]!,
-          e.polyline[i + 3]!,
-          e.polyline[i + 4]!,
-          e.polyline[i + 5]!,
-        );
-        edgeSegments.push(e.name);
-      }
-    }
-    const edgeGeom = new THREE.BufferGeometry();
-    edgeGeom.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(edgePts, 3),
-    );
-    const edges = new THREE.LineSegments(
-      edgeGeom,
-      new THREE.LineBasicMaterial({ color: themeColor("edge") }),
-    );
-    edges.userData.bodyId = p.bodyId;
-    group.add(edges);
-
-    const vertPts: number[] = [];
-    const vertexNames: string[] = [];
-    for (const v of p.vertices) {
-      vertPts.push(...v.position);
-      vertexNames.push(v.name);
-    }
-    const vertGeom = new THREE.BufferGeometry();
-    vertGeom.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(vertPts, 3),
-    );
-    const vertices = new THREE.Points(
-      vertGeom,
-      new THREE.PointsMaterial({
-        color: themeColor("edge"),
-        size: BODY_APPEARANCE.vertexSizePx,
-        sizeAttenuation: false,
-      }),
-    );
-    vertices.visible = false; // shown during vertex-relevant modes
-    vertices.userData.bodyId = p.bodyId;
-    group.add(vertices);
-
-    return {
-      group,
-      mesh,
-      material: mat,
-      tint: null,
-      edges,
-      edgeSegments,
-      vertices,
-      vertexNames,
-      payload: p,
-    };
+  syncBodies(
+    payloads: LayerBody[],
+    hidden: ReadonlySet<string> = new Set(),
+    projectId?: string,
+  ) {
+    this.bodyLayer.sync(payloads, hidden, projectId);
   }
 
   setBodyTints(tints: ReadonlyMap<string, PreviewTint>) {
