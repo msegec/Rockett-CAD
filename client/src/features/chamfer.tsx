@@ -4,15 +4,8 @@ import {
   first,
   type FeatureHandleDefinition,
 } from "../three/featureHandles";
-import { newId, type ChamferFeature, type ChamferType } from "@rockett/shared";
-import {
-  AngleField,
-  CheckField,
-  LengthField,
-  SelectField,
-  SelInfo,
-} from "../components/form/fields";
-import { useSetting } from "../settings";
+import { CHAMFER_TYPES, newId, type ChamferFeature } from "@rockett/shared";
+import { SelInfo } from "../components/form/fields";
 import { blendPicks } from "../commands/featureCommand";
 import { num } from "./inputs";
 import {
@@ -28,6 +21,7 @@ import {
   type InputParams,
 } from "./registry";
 import { TangentChainField } from "./tangentChain";
+import { BlendSizeFields } from "./blendSize";
 
 export type ChamferParams = InputParams<
   Pick<
@@ -76,58 +70,21 @@ function sizes(params: ChamferParams) {
   }
 }
 
-const TYPE_OPTIONS: [ChamferType, string][] = [
-  ["equalDistance", "Equal distance"],
-  ["twoDistances", "Two distances"],
-  ["distanceAngle", "Distance and angle"],
-];
-
 function ChamferForm({ params, setParams }: FeatureFormProps<ChamferParams>) {
-  const units = useSetting("units.length");
-  const size = sizes(params);
-  const two = size.chamferType === "twoDistances";
+  const { chamferType, distance, ...second } = sizes(params);
   return (
     <>
       <SelInfo label="Edges" input="edges" hint={blendHint} />
       <TangentChainField params={params} setParams={setParams} />
-      <SelectField
-        label="Type"
-        value={size.chamferType}
-        options={TYPE_OPTIONS}
-        onChange={(v) => setParams({ chamferType: v })}
-      />
-      <LengthField
-        label={two ? "Distance 1" : "Distance"}
-        units={units}
-        autoFocus
-        value={size.distance}
-        onChange={(v) => setParams({ distance: v })}
+      <BlendSizeFields
+        types={CHAMFER_TYPES}
+        size={{ type: chamferType, size: distance, ...second }}
+        label="Distance"
         bind="/distance"
+        onType={(v) => setParams({ chamferType: v })}
+        onSize={(v) => setParams({ distance: v })}
+        setParams={setParams}
       />
-      {size.distance2 !== undefined && (
-        <LengthField
-          label="Distance 2"
-          units={units}
-          value={size.distance2}
-          onChange={(v) => setParams({ distance2: v })}
-          bind="/distance2"
-        />
-      )}
-      {size.angle !== undefined && (
-        <AngleField
-          label="Angle"
-          value={size.angle}
-          onChange={(v) => setParams({ angle: v })}
-          bind="/angle"
-        />
-      )}
-      {size.flip !== undefined && (
-        <CheckField
-          label="Flip"
-          value={size.flip}
-          onChange={(v) => setParams({ flip: v })}
-        />
-      )}
     </>
   );
 }

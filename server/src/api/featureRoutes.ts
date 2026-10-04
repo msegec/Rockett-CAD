@@ -1,7 +1,6 @@
 import {
   bindingHolds,
-  CHAMFER_TYPE_FIELDS,
-  chamferOwns,
+  dropUnownedBlendFields,
   lacksTargets,
   nextFeatureName,
   parameterBindingsBody,
@@ -152,10 +151,7 @@ function updateFeatureRoute(context: ApiRoutes) {
         Reflect.deleteProperty(updated, "body");
       if ("direction" in patch && !("outsideThickness" in patch))
         Reflect.deleteProperty(updated, "outsideThickness");
-      if (updated.type === "chamfer" && "chamferType" in patch)
-        for (const key of CHAMFER_TYPE_FIELDS)
-          if (!(key in patch) && !chamferOwns(updated.chamferType, key))
-            Reflect.deleteProperty(updated, key);
+      dropUnownedBlendFields(updated, patch);
       validateFeature(updated);
       const { parameterBindings } = req.body;
       doc.parameterBindings =

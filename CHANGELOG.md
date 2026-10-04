@@ -158,6 +158,8 @@ release workflow remain under development.
   one; earlier documents load unchanged.
 - Schema 32: Fillet and Chamfer may pick faces and features as well as edges;
   earlier edge-only blends load and build unchanged.
+- Schema 33: Fillet stores its type, equal distance or two distances with a
+  flip; earlier fillets stay equal distance and build unchanged.
 
 ### Known limits
 

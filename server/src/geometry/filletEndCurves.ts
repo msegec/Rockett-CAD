@@ -40,10 +40,14 @@ function stripRun(domain: any, own: Own) {
   const k = getKernel(),
     torus = domain.GetType() === k.GeomAbs_SurfaceType.GeomAbs_Torus,
     plane = planeStrip(domain),
+    prism =
+      domain.GetType() === k.GeomAbs_SurfaceType.GeomAbs_SurfaceOfExtrusion,
     position = own(
-      own(
-        torus ? domain.Torus() : plane ? domain.Plane() : domain.Cylinder(),
-      ).Position(),
+      prism
+        ? new k.gp_Ax3_5(own(domain.Value(0, 0)), own(domain.Direction()))
+        : own(
+            torus ? domain.Torus() : plane ? domain.Plane() : domain.Cylinder(),
+          ).Position(),
     );
   const [u, v] = [
     [domain.FirstUParameter(), domain.LastUParameter()],

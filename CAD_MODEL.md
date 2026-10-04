@@ -286,6 +286,26 @@ body.
 - An edge-only blend passes its stored `edges` through unchanged. The size
   hint estimates from the derived edges.
 
+## Fillet types
+
+`moduleFillet` in `server/src/geometry/filletRoute.ts`.
+
+- Schema 33 adds `filletType`: `equalDistance` or `twoDistances`. An earlier
+  fillet migrates to `equalDistance` and builds as before.
+- `twoDistances` stores `distance2` and `flip`. `radius` is distance 1 and
+  lies on the measured face, chosen as Chamfer chooses it; `distance2` lies on
+  the other face. Equal distances build today's fillet.
+- Two distances build our own elliptical strip (`ellipticStrip.ts`), tangent
+  to both faces: the image of today's round fillet under the shear that keeps
+  each face and scales its tangent distance to distance 1 and distance 2. At
+  90 degrees it is a quarter ellipse with semi-axes distance 1 and distance 2.
+  The strip is an extruded exact ellipse, trimmed and sewn like KERN-034's
+  round strips, with exact ellipse ends on end faces.
+- Every picked or derived edge must be straight with flat faces at it and at
+  its ends, else "two-distance fillet works on straight edges between flat
+  faces". Two picked edges meeting at a corner mitre; three refuse. An edge
+  with a collinear neighbour refuses, picked or not.
+
 ## Chamfer
 
 `evalChamfer` in `server/src/geometry/blend.ts`.
@@ -306,9 +326,10 @@ body.
   edge of a selection. Face names and the selection are stable, so the
   choice survives re-evaluation. A tangent chain follows the measured face of
   its first edge (`chamferContour.ts`).
-- `chamferOwns` in `shared/src/schema/chamferFields.ts` says which of
-  `distance2`, `angle` and `flip` a type owns; an unknown type owns none. An
-  edit that sets `chamferType` drops the fields the new type does not own.
+- `shared/src/schema/chamferFields.ts` says which of `distance2`, `angle`
+  and `flip` a fillet or chamfer type owns; an unknown type owns none. An
+  edit that sets `filletType` or `chamferType` drops the fields the new type
+  does not own (`dropUnownedBlendFields`).
   An edit that sends no bindings, a preview included, drops the feature's
   stored bindings whose path no longer holds a number (`bindingHolds`, used
   by `server/src/api/featureRoutes.ts`), so the staged document still

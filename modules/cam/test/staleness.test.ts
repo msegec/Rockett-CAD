@@ -319,6 +319,7 @@ describe("GET .../setups/:setupId/status", () => {
         name: "round",
         suppressed: false,
         type: "fillet",
+        filletType: "equalDistance",
         edges: [{ kind: "edge", bodyId: "b:cube", edgeName: "missing" }],
         radius: 1,
       } as Feature);

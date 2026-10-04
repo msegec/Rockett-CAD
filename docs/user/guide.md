@@ -153,6 +153,11 @@ Fillet and Chamfer also take faces, which blend their sharp edges, and
 timeline features, which blend the sharp edges of the faces they made. A
 corner is refused: pick the edges or faces at it.
 
+Fillet's **Type** offers **Two distances** on straight edges between flat
+faces: Distance 1 and Distance 2 set where the round meets each face, and
+**Flip** swaps them. An edge at a curved face, a corner of three edges or a
+run of collinear edges is refused.
+
 A fillet that meets two earlier fillets can fail. This is a current
 limitation. Fillet the vertical edges before the top edges to avoid it.
 

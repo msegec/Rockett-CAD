@@ -1,15 +1,12 @@
 import { Type, type TProperties, type TSchema } from "typebox";
 import {
   CHAMFER_TYPES,
+  FILLET_TYPES,
   ORIGIN_AXES,
   REF_SIGNATURE_TYPES,
   SHELL_DIRECTIONS,
 } from "../model.js";
-import {
-  CHAMFER_TYPE_FIELDS,
-  chamferOwns,
-  type ChamferField,
-} from "./chamferFields.js";
+import { ownsExactly } from "./chamferFields.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
 export const MAX_DIM = 100_000;
@@ -385,7 +382,16 @@ const blend = <const T extends string, P extends TProperties>(
     () => "needs an edge, a face or a feature",
   );
 
-const fillet = blend("fillet", { radius: positive });
+const fillet = Type.Refine(
+  blend("fillet", {
+    filletType: Type.Enum([...FILLET_TYPES]),
+    radius: positive,
+    distance2: Type.Optional(positive),
+    flip: flag,
+  }),
+  ownsExactly("fillet"),
+  () => "needs a second distance and a flip exactly for two distances",
+);
 
 const chamfer = Type.Refine(
   blend("chamfer", {
@@ -401,10 +407,7 @@ const chamfer = Type.Refine(
     ),
     flip: flag,
   }),
-  (f: Partial<Record<ChamferField, unknown>> & { chamferType: string }) =>
-    CHAMFER_TYPE_FIELDS.every(
-      (key) => chamferOwns(f.chamferType, key) === (f[key] !== undefined),
-    ),
+  ownsExactly("chamfer"),
   () =>
     "needs a second distance and a flip exactly for two distances, and an angle and a flip exactly for distance and angle",
 );

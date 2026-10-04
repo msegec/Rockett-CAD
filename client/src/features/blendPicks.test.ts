@@ -26,7 +26,7 @@ afterEach(() => {
 describe.each(["fillet", "chamfer"] as const)("%s picks", (type) => {
   const sizes =
     type === "fillet"
-      ? { radius: 3 }
+      ? { filletType: "equalDistance", radius: 3 }
       : { chamferType: "equalDistance", distance: 2 };
   const stored = (picks: object) =>
     ({

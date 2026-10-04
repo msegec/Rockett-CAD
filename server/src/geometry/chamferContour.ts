@@ -2,11 +2,11 @@ import type { ChamferFeature } from "@rockett/shared";
 import { edges as edgesOf, faces as facesOf, type Shape } from "./kernel.js";
 import type { NamedBody } from "./naming.js";
 
-function measuredFace(
+export function measuredFace(
   body: NamedBody,
   edge: Shape,
   selected: { edge: Shape }[],
-  f: ChamferFeature,
+  f: Pick<ChamferFeature, "faces" | "flip">,
 ): Shape {
   const picked = new Set(
     f.faces?.filter((r) => r.bodyId === body.bodyId).map((r) => r.faceName),
@@ -26,7 +26,7 @@ function measuredFace(
       (a, b) => Number(picked.has(b.name)) - Number(picked.has(a.name)),
     );
   const side = sides[f.flip ? sides.length - 1 : 0];
-  if (!side) throw new Error("the chamfer edge has no face");
+  if (!side) throw new Error("the blend edge has no face");
   return side.face;
 }
 

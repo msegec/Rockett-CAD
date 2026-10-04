@@ -1,6 +1,5 @@
 import { nativeFillet } from "./nativeFillet.js";
-import { planarFillet } from "./planarFillet.js";
-import { cylinderFillet } from "./cylinderFillet.js";
+import { moduleFillet } from "./filletRoute.js";
 import { planarChamfer } from "./planarChamfer.js";
 import { addChamferContour } from "./chamferContour.js";
 import { blendNames } from "./blendNaming.js";
@@ -112,8 +111,7 @@ function filletBody(
     const byName = computeEdgeNames(body).byName;
     const sourceEdges = collectEdges(body, byName, refs, f.tangentChain);
     const result =
-      planarFillet(body, sourceEdges, f.radius, f.id, byName, refs) ??
-      cylinderFillet(body, sourceEdges, f.radius, f.id, byName, refs) ??
+      moduleFillet(body, sourceEdges, f, byName, refs) ??
       nativeFillet(body, sourceEdges, byName, refs, f);
     registerBodySolids(state, body.bodyId, result.shape, result.names);
   });

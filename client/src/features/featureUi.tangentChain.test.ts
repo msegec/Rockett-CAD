@@ -12,7 +12,7 @@ describe.each(["fillet", "chamfer"] as const)("%s tangent chain", (type) => {
   const stored = { ...base, id: `${type}Bare`, edges: [edge("e1")] };
   const bare: Feature =
     type === "fillet"
-      ? { ...stored, type, radius: 3 }
+      ? { ...stored, type, filletType: "equalDistance", radius: 3 }
       : { ...stored, type, chamferType: "equalDistance", distance: 2 };
 
   it("reopens a stored feature without tangentChain as false and writes false", () => {

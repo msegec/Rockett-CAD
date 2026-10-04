@@ -272,6 +272,14 @@ export const documentMigrations: Migrations<CadDocument> = {
     }),
     30: (doc) => doc,
     31: (doc) => doc,
+    32: (doc) => ({
+      ...doc,
+      features: (doc.features as Value[]).map((feature) =>
+        feature.type === "fillet"
+          ? Object.assign({ filletType: "equalDistance" }, feature)
+          : feature,
+      ),
+    }),
   },
   nested: extensionFeatures,
 };

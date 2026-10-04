@@ -73,6 +73,8 @@ export const CHAMFER_TYPES = [
   "distanceAngle",
 ] as const;
 export type ChamferType = (typeof CHAMFER_TYPES)[number];
+export const FILLET_TYPES = ["equalDistance", "twoDistances"] as const;
+export type FilletType = (typeof FILLET_TYPES)[number];
 export type OriginAxis = (typeof ORIGIN_AXES)[number];
 
 export type AxisRef =
@@ -302,7 +304,10 @@ export interface LoftFeature extends ToolFeatureBase {
 
 export interface FilletFeature extends BlendFeatureBase {
   type: "fillet";
+  filletType: FilletType;
   radius: number;
+  distance2?: number;
+  flip?: boolean;
 }
 
 export interface ChamferFeature extends BlendFeatureBase {
@@ -470,15 +475,7 @@ export type Feature = CoreFeature | ExtensionFeature;
 
 export type FeatureType = CoreFeature["type"];
 
-// ---------------------------------------------------------------------------
-// Document
-// ---------------------------------------------------------------------------
-
 export * from "./documents.js";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 let idCounter = 0;
 

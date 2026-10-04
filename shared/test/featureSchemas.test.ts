@@ -324,11 +324,18 @@ const fixtures: {
     valid: {
       ...base,
       type: "fillet",
+      filletType: "equalDistance",
       tangentChain: true,
       edges: [edge],
       radius: 1,
     },
-    invalid: { ...base, type: "fillet", edges: [edge], radius: 0 },
+    invalid: {
+      ...base,
+      type: "fillet",
+      filletType: "equalDistance",
+      edges: [edge],
+      radius: 0,
+    },
     path: "/radius",
   },
   chamfer: {

@@ -35,7 +35,7 @@ everything downstream against persistent topology references.
 
 - **Solid features**: extrude, revolve, sweep, loft, emboss and deboss from sketch profiles; extrude, revolve and ordered loft sections also take planar faces.
 - **Tool targets**: join, cut and intersect act on bodies you pick from the list or by click; Auto takes visible ones.
-- **Modify**: fillet, chamfer (equal, two distances, or distance and angle), shell, combine, split and press/pull bodies.
+- **Modify**: fillet and chamfer (equal, two distances, or chamfer distance and angle), shell, combine, split and press/pull bodies.
 - **Move**: translate bodies, turn them about an axis, edge or sketch line, or add the moved copy as a new body.
 - **Body colours**: right-click a body in the model tree to pick its colour or reset it; theme changes keep chosen colours.
 - **Tangent chains**: fillet and chamfer take edges, faces or features and follow smooth connected edges, on one or several bodies.

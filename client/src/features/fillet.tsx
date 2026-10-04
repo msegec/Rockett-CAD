@@ -4,9 +4,8 @@ import {
   first,
   type FeatureHandleDefinition,
 } from "../three/featureHandles";
-import { newId, type FilletFeature } from "@rockett/shared";
-import { LengthField, SelInfo } from "../components/form/fields";
-import { useSetting } from "../settings";
+import { FILLET_TYPES, newId, type FilletFeature } from "@rockett/shared";
+import { SelInfo } from "../components/form/fields";
 import { blendPicks } from "../commands/featureCommand";
 import { num } from "./inputs";
 import {
@@ -22,9 +21,19 @@ import {
   type InputParams,
 } from "./registry";
 import { TangentChainField } from "./tangentChain";
+import { BlendSizeFields } from "./blendSize";
 
 export type FilletParams = InputParams<
-  Pick<FilletFeature, "id" | "name" | "radius" | "tangentChain">
+  Pick<
+    FilletFeature,
+    | "id"
+    | "name"
+    | "radius"
+    | "tangentChain"
+    | "filletType"
+    | "distance2"
+    | "flip"
+  >
 >;
 
 const handle = {
@@ -34,19 +43,33 @@ const handle = {
   place: (input) => arrow(edgeRay(input.bodies, first(input, "edge"))),
 } satisfies FeatureHandleDefinition<FilletParams>;
 
+function sizes(params: FilletParams) {
+  const filletType = params.filletType ?? "equalDistance";
+  const radius = num(params, handle.param, handle.fallback);
+  return filletType === "equalDistance"
+    ? { filletType, radius }
+    : {
+        filletType,
+        radius,
+        distance2: num(params, "distance2", radius),
+        flip: params.flip ?? false,
+      };
+}
+
 function FilletForm({ params, setParams }: FeatureFormProps<FilletParams>) {
-  const units = useSetting("units.length");
+  const { filletType, radius, ...second } = sizes(params);
   return (
     <>
       <SelInfo label="Edges" input="edges" hint={blendHint} />
       <TangentChainField params={params} setParams={setParams} />
-      <LengthField
+      <BlendSizeFields
+        types={FILLET_TYPES}
+        size={{ type: filletType, size: radius, ...second }}
         label="Radius"
-        units={units}
-        autoFocus
-        value={num(params, handle.param, handle.fallback)}
-        onChange={(v) => setParams({ radius: v })}
         bind="/radius"
+        onType={(v) => setParams({ filletType: v })}
+        onSize={(v) => setParams({ radius: v })}
+        setParams={setParams}
       />
     </>
   );
@@ -70,7 +93,7 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
       name: params.name ?? "",
       suppressed: false,
       ...picks,
-      radius: num(params, handle.param, handle.fallback),
+      ...sizes(params),
       tangentChain: params.tangentChain ?? true,
     };
   },
@@ -78,7 +101,10 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
     params: {
       id: f.id,
       name: f.name,
+      filletType: f.filletType,
       radius: f.radius,
+      distance2: f.distance2,
+      flip: f.flip,
       tangentChain: f.tangentChain ?? false,
     },
     selection: blendSelection(f),

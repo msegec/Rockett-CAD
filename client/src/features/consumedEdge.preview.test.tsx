@@ -11,6 +11,7 @@ it("a consumed edge shows its number as soon as loadPreviewBase resolves, with n
   const fillet: FilletFeature = {
     id: "f1",
     type: "fillet",
+    filletType: "equalDistance",
     name: "Fillet1",
     suppressed: false,
     edges: [{ kind: "edge", bodyId: "b1", edgeName: "z00" }],
