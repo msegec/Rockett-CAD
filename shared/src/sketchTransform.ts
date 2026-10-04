@@ -10,6 +10,7 @@ import {
 import { ValidationError } from "./schema/index.js";
 import { curveSamples, entityPointIds, sketchCurves } from "./sketchCurves.js";
 import type { SketchModification } from "./sketchModify.js";
+import { LINEAR_TOL } from "./tolerance.js";
 
 type XY = { x: number; y: number };
 
@@ -99,12 +100,50 @@ function refuseFixed(
 
 const valueOf = (c: SketchConstraint) => ("value" in c ? c.value : undefined);
 
+interface Placement {
+  at: (p: XY) => XY;
+  turn: (degrees: number) => number;
+  flip: boolean;
+}
+
+function rigid(angle: number, pivot: XY, dx = 0, dy = 0): Placement {
+  const t = (angle * Math.PI) / 180;
+  const [cos, sin] = [Math.cos(t), Math.sin(t)];
+  return {
+    at: ({ x, y }) => {
+      const [u, v] = [x - pivot.x, y - pivot.y];
+      return {
+        x: pivot.x + u * cos - v * sin + dx,
+        y: pivot.y + u * sin + v * cos + dy,
+      };
+    },
+    turn: (d) => d + angle,
+    flip: false,
+  };
+}
+
+function reflection([a, b]: [XY, XY]): Placement {
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  const [ux, uy] = [(b.x - a.x) / length, (b.y - a.y) / length];
+  const twice = (Math.atan2(uy, ux) * 360) / Math.PI;
+  return {
+    at: ({ x, y }) => {
+      const [u, v] = [x - a.x, y - a.y];
+      const s = 2 * (u * ux + v * uy);
+      return { x: a.x + s * ux - u, y: a.y + s * uy - v };
+    },
+    turn: (d) => twice - d,
+    flip: true,
+  };
+}
+
 function turned(
   c: SketchConstraint,
-  angle: number,
+  p: Placement,
   direction: (line: string) => number,
 ): SketchConstraint | null {
-  if (normalizeDegrees(angle) === 0) return c;
+  const angle = p.turn(0);
+  if (!p.flip && normalizeDegrees(angle) === 0) return c;
   const quarter = Math.round(angle / 90);
   const square = Math.abs(angle - quarter * 90) < 1e-9;
   const odd = square && quarter % 2 !== 0;
@@ -119,8 +158,10 @@ function turned(
     if (!odd) return c;
     return { ...c, type: c.type === "horizontal" ? "vertical" : "horizontal" };
   }
-  if (c.type === "lineAngle")
-    return { ...c, value: normalizeDegrees(c.value + angle) };
+  if (c.type === "lineAngle") {
+    const off = c.axis === "y" ? 90 : 0;
+    return { ...c, value: normalizeDegrees(p.turn(c.value + off) - off) };
+  }
   if (c.type !== "distance" || !c.axis) return c;
   if (!square) return null;
   return odd ? { ...c, axis: c.axis === "x" ? "y" : "x" } : c;
@@ -152,10 +193,18 @@ function renamed(
   }
 }
 
-function copied(e: SketchEntity, ids: ReadonlyMap<string, string>) {
+function copied(
+  e: SketchEntity,
+  ids: ReadonlyMap<string, string>,
+  flip: boolean,
+) {
   const copy = { ...renamed(e, ids), id: ids.get(e.id)! };
   delete copy.external;
   if (copy.kind !== "point") delete copy.projection;
+  if ((copy.kind === "arc" || copy.kind === "ellipse") && flip) {
+    const { start, end } = copy;
+    if (start && end) Object.assign(copy, { start: end, end: start });
+  }
   return copy;
 }
 
@@ -179,34 +228,22 @@ function detached(
   return [...kept, ...added];
 }
 
-export function moveSketchSelection(
-  entities: SketchEntity[],
-  constraints: SketchConstraint[],
-  ids: readonly string[],
-  move: SketchMove,
-): SketchModification {
+function selectionGroup(entities: SketchEntity[], ids: readonly string[]) {
   const chosen = new Set(ids);
   const selected = entities.filter((e) => chosen.has(e.id));
-  if (!selected.length) throw new Error("Select sketch geometry to move.");
-  if (![move.dx, move.dy, move.angle].every(Number.isFinite))
-    throw new Error("Enter a number for each distance and the angle.");
-  if (!move.copy) refuseFixed(selected, entities, constraints);
+  if (!selected.length) throw new Error("Select sketch geometry.");
   const moving = new Set(selected.flatMap(entityPointIds));
   for (const e of selected) moving.add(e.id);
-  const group = entities.filter((e) => moving.has(e.id));
-  const pivot = move.pivot ?? boxCentre(group);
-  const t = (move.angle * Math.PI) / 180;
-  const [cos, sin] = [Math.cos(t), Math.sin(t)];
-  const place = (e: SketchEntity): SketchEntity => {
-    if (e.kind !== "point") return e;
-    const [x, y] = [e.x - pivot.x, e.y - pivot.y];
-    return {
-      ...e,
-      x: pivot.x + x * cos - y * sin + move.dx,
-      y: pivot.y + x * sin + y * cos + move.dy,
-    };
-  };
-  const placed = new Map(group.map((e) => [e.id, place(e)]));
+  return { selected, moving, group: entities.filter((e) => moving.has(e.id)) };
+}
+
+function placedGroup(group: SketchEntity[], p: Placement) {
+  const placed = new Map(
+    group.map((e): [string, SketchEntity] => [
+      e.id,
+      e.kind === "point" ? { ...e, ...p.at(e) } : e,
+    ]),
+  );
   const direction = (line: string) => {
     const l = placed.get(line);
     const [a, b] =
@@ -214,40 +251,178 @@ export function moveSketchSelection(
     if (a?.kind !== "point" || b?.kind !== "point") return 0;
     return normalizeDegrees((Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI);
   };
-  const copyIds = new Map(
-    move.copy ? group.map((e) => [e.id, newId(e.kind)]) : [],
-  );
+  return { placed, direction };
+}
+
+function copies(
+  entities: SketchEntity[],
+  constraints: SketchConstraint[],
+  ids: readonly string[],
+  placements: readonly Placement[],
+): SketchModification {
+  const { moving, group } = selectionGroup(entities, ids);
+  const left = new Set<string>();
+  const added: SketchEntity[] = [];
+  const carried: SketchConstraint[] = [];
+  for (const p of placements) {
+    const { placed, direction } = placedGroup(group, p);
+    const copyIds = new Map(group.map((e) => [e.id, newId(e.kind)]));
+    added.push(...group.map((e) => copied(placed.get(e.id)!, copyIds, p.flip)));
+    for (const c of constraints) {
+      const refs = constraintEntityRefs(c);
+      const inside = refs.filter((r) => moving.has(r)).length;
+      if (!inside) continue;
+      const next = inside === refs.length ? turned(c, p, direction) : null;
+      if (!next) left.add(c.id);
+      else if (next.type !== "fix")
+        carried.push(renamedConstraint(next, copyIds));
+    }
+  }
+  return {
+    entities: [...entities, ...added],
+    constraints: [...constraints, ...carried],
+    removedConstraints: left.size,
+  };
+}
+
+export function moveSketchSelection(
+  entities: SketchEntity[],
+  constraints: SketchConstraint[],
+  ids: readonly string[],
+  move: SketchMove,
+): SketchModification {
+  const { selected, moving, group } = selectionGroup(entities, ids);
+  if (![move.dx, move.dy, move.angle].every(Number.isFinite))
+    throw new Error("Enter a number for each distance and the angle.");
+  const pivot = move.pivot ?? boxCentre(group);
+  const p = rigid(move.angle, pivot, move.dx, move.dy);
+  if (move.copy) return copies(entities, constraints, ids, [p]);
+  refuseFixed(selected, entities, constraints);
+  const { placed, direction } = placedGroup(group, p);
   const bound = new Set(move.bound);
   let removed = 0;
   const kept: SketchConstraint[] = [];
-  const carried: SketchConstraint[] = [];
   for (const c of constraints) {
     const refs = constraintEntityRefs(c);
     const inside = refs.filter((r) => moving.has(r)).length;
     let next =
-      inside > 0 && inside === refs.length
-        ? turned(c, move.angle, direction)
-        : null;
-    if (next && !move.copy && bound.has(c.id) && valueOf(next) !== valueOf(c))
-      next = null;
-    if (inside > 0 && !next) removed++;
-    if (move.copy || inside === 0) kept.push(c);
-    if (next && !move.copy) kept.push(next);
-    else if (next && next.type !== "fix")
-      carried.push(renamedConstraint(next, copyIds));
+      inside > 0 && inside === refs.length ? turned(c, p, direction) : null;
+    if (next && bound.has(c.id) && valueOf(next) !== valueOf(c)) next = null;
+    if (inside === 0) kept.push(c);
+    else if (next) kept.push(next);
+    else removed++;
   }
-  if (move.copy)
-    return {
-      entities: [
-        ...entities,
-        ...group.map((e) => copied(placed.get(e.id)!, copyIds)),
-      ],
-      constraints: [...kept, ...carried],
-      removedConstraints: removed,
-    };
   return {
     entities: detached(entities, moving).map((e) => placed.get(e.id) ?? e),
     constraints: kept,
     removedConstraints: removed,
   };
+}
+
+export interface PatternDirection {
+  axis: "x" | "y" | { line: string };
+  count: number;
+  spacing: number;
+}
+
+export type SketchCopy =
+  | { kind: "mirror"; line: string }
+  | { kind: "rect"; first: PatternDirection; second: PatternDirection | null }
+  | { kind: "circ"; centre: XY; count: number; angle: number };
+
+const MAX_COPIES = 500;
+
+function lineEnds(entities: SketchEntity[], id: string): [XY, XY] {
+  const line = entities.find((e) => e.id === id);
+  const [a, b] =
+    line?.kind === "line"
+      ? [line.p1, line.p2].map((p) => entities.find((e) => e.id === p))
+      : [];
+  if (a?.kind !== "point" || b?.kind !== "point")
+    throw new Error("Pick a sketch line.");
+  if (Math.hypot(b.x - a.x, b.y - a.y) < LINEAR_TOL)
+    throw new Error("The picked line has no length.");
+  return [a, b];
+}
+
+function unit(entities: SketchEntity[], axis: PatternDirection["axis"]): XY {
+  if (axis === "x") return { x: 1, y: 0 };
+  if (axis === "y") return { x: 0, y: 1 };
+  const [a, b] = lineEnds(entities, axis.line);
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  return { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+}
+
+function quantity(...counts: number[]): number {
+  if (!counts.every((n) => Number.isInteger(n) && n >= 1))
+    throw new Error("Enter a whole number of 1 or more for each quantity.");
+  const total = counts.reduce((a, b) => a * b, 1) - 1;
+  if (total < 1) throw new Error("Set a quantity above 1.");
+  if (total > MAX_COPIES)
+    throw new Error(`Patterns make at most ${MAX_COPIES} copies.`);
+  return total;
+}
+
+function rectPlacements(
+  entities: SketchEntity[],
+  pattern: Extract<SketchCopy, { kind: "rect" }>,
+): Placement[] {
+  const dirs = [
+    pattern.first,
+    pattern.second ?? { ...pattern.first, count: 1 },
+  ];
+  if (!dirs.every((d) => Number.isFinite(d.spacing)))
+    throw new Error("Enter a number for each spacing.");
+  quantity(...dirs.map((d) => d.count));
+  const [u, v] = dirs.map((d) => unit(entities, d.axis));
+  const [one, two] = dirs;
+  const out: Placement[] = [];
+  for (let j = 0; j < two!.count; j++)
+    for (let i = 0; i < one!.count; i++) {
+      if (!i && !j) continue;
+      const [s, t] = [i * one!.spacing, j * two!.spacing];
+      out.push(
+        rigid(0, { x: 0, y: 0 }, s * u!.x + t * v!.x, s * u!.y + t * v!.y),
+      );
+    }
+  return out;
+}
+
+function circPlacements(
+  pattern: Extract<SketchCopy, { kind: "circ" }>,
+): Placement[] {
+  if (!Number.isFinite(pattern.angle))
+    throw new Error("Enter a number for the total angle.");
+  const total = quantity(pattern.count);
+  const full = Math.abs(Math.abs(pattern.angle) - 360) < 1e-9;
+  const step = pattern.angle / (full ? pattern.count : total);
+  return Array.from({ length: total }, (_, k) =>
+    rigid((k + 1) * step, pattern.centre),
+  );
+}
+
+export function copySketchSelection(
+  entities: SketchEntity[],
+  constraints: SketchConstraint[],
+  ids: readonly string[],
+  pattern: SketchCopy,
+): SketchModification {
+  switch (pattern.kind) {
+    case "mirror":
+      return copies(
+        entities,
+        constraints,
+        ids.filter((id) => id !== pattern.line),
+        [reflection(lineEnds(entities, pattern.line))],
+      );
+    case "rect":
+      return copies(
+        entities,
+        constraints,
+        ids,
+        rectPlacements(entities, pattern),
+      );
+    case "circ":
+      return copies(entities, constraints, ids, circPlacements(pattern));
+  }
 }

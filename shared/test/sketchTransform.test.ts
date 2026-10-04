@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   boundConstraintIds,
+  copySketchSelection,
   createEmptyDocument,
   editedEntities,
   movedBindings,
@@ -325,4 +326,201 @@ it("refuses to move a projected line and copies it as plain geometry", () => {
     expect(e.external).toBeUndefined();
     expect("projection" in e).toBe(false);
   }
+});
+
+const C = (id: string, center: string, radius: number): SketchEntity => ({
+  id,
+  kind: "circle",
+  center,
+  radius,
+});
+const hole = [P("o", 10, 5), C("hole", "o", 2)];
+const holeRadius: SketchConstraint[] = [
+  { id: "r", type: "radius", entity: "hole", value: 2 },
+];
+const circles = (entities: SketchEntity[]) =>
+  entities.flatMap((e) => (e.kind === "circle" ? [e] : []));
+const centres = (entities: SketchEntity[]) =>
+  circles(entities).map((c) => {
+    const { x, y } = point(entities, c.center);
+    return [Math.round(x * 1e9) / 1e9 + 0, Math.round(y * 1e9) / 1e9 + 0];
+  });
+const along = (entities: SketchEntity[], line: string) => {
+  const l = entities.find((e) => e.id === line) as { p1: string; p2: string };
+  const [a, b] = [point(entities, l.p1), point(entities, l.p2)];
+  return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+};
+
+describe("copySketchSelection", () => {
+  it("mirrors a circle at (10, 5) across the Y axis line to (-10, 5)", () => {
+    const axis = [
+      P("y0", 0, 0),
+      P("y1", 0, 10),
+      { ...L("axis", "y0", "y1"), construction: true },
+    ];
+    const entities = [...hole, ...axis];
+    const result = copySketchSelection(entities, holeRadius, ["hole"], {
+      kind: "mirror",
+      line: "axis",
+    });
+
+    expect(result.entities.slice(0, entities.length)).toEqual(entities);
+    expect(centres(result.entities)).toEqual([
+      [10, 5],
+      [-10, 5],
+    ]);
+    const [, copy] = circles(result.entities);
+    expect(copy!.radius).toBe(2);
+    expect(result.constraints).toEqual([
+      ...holeRadius,
+      {
+        id: expect.not.stringMatching(/^r$/),
+        type: "radius",
+        entity: copy!.id,
+        value: 2,
+      },
+    ]);
+  });
+
+  it("swaps a mirrored arc's ends so it stays the mirror image", () => {
+    const entities: SketchEntity[] = [
+      P("c", 10, 0),
+      P("s", 15, 0),
+      P("e", 10, 5),
+      { id: "arc", kind: "arc", center: "c", start: "s", end: "e" },
+      P("y0", 0, 0),
+      P("y1", 0, 10),
+      L("axis", "y0", "y1"),
+    ];
+    const result = copySketchSelection(entities, [], ["arc"], {
+      kind: "mirror",
+      line: "axis",
+    });
+    const copy = result.entities.at(-1)!;
+    if (copy.kind !== "arc") throw new Error("expected an arc");
+    expect(point(result.entities, copy.start)).toMatchObject({ x: -10, y: 5 });
+    expect(point(result.entities, copy.end)).toMatchObject({ x: -15, y: 0 });
+  });
+
+  it("mirrors line directions across a slanted line", () => {
+    const entities = [
+      P("a", 0, 0),
+      P("b", 10, 0),
+      L("flat", "a", "b"),
+      P("c", 0, 5),
+      P("d", 10 * Math.cos(Math.PI / 9), 5 + 10 * Math.sin(Math.PI / 9)),
+      L("tilt", "c", "d"),
+      P("m0", 0, -20),
+      P("m1", 10 * Math.cos(Math.PI / 6), 10 * Math.sin(Math.PI / 6) - 20),
+      L("mirror", "m0", "m1"),
+    ];
+    const constraints: SketchConstraint[] = [
+      { id: "h", type: "horizontal", line: "flat" },
+      { id: "dx", type: "distance", a: "a", b: "b", axis: "x", value: 10 },
+      { id: "t", type: "lineAngle", line: "tilt", value: 20 },
+      { id: "ty", type: "lineAngle", line: "tilt", axis: "y", value: -70 },
+    ];
+    const result = copySketchSelection(
+      entities,
+      constraints,
+      ["flat", "tilt"],
+      {
+        kind: "mirror",
+        line: "mirror",
+      },
+    );
+
+    expect(result.removedConstraints).toBe(1);
+    const copies = result.constraints.slice(constraints.length);
+    expect(copies.map((c) => [c.type, "value" in c ? c.value : null])).toEqual([
+      ["lineAngle", expect.closeTo(60, 9)],
+      ["lineAngle", expect.closeTo(40, 9)],
+      ["lineAngle", expect.closeTo(-50, 9)],
+    ]);
+    const [flat, tilt] = result.entities
+      .slice(entities.length)
+      .filter((e) => e.kind === "line");
+    expect(along(result.entities, flat!.id)).toBeCloseTo(60, 9);
+    expect(along(result.entities, tilt!.id)).toBeCloseTo(40, 9);
+  });
+
+  it("makes a 3 by 2 rect pattern at 20 and 15 mm: 6 circles on the grid", () => {
+    const result = copySketchSelection(hole, holeRadius, ["hole"], {
+      kind: "rect",
+      first: { axis: "x", count: 3, spacing: 20 },
+      second: { axis: "y", count: 2, spacing: 15 },
+    });
+
+    expect(centres(result.entities)).toEqual([
+      [10, 5],
+      [30, 5],
+      [50, 5],
+      [10, 20],
+      [30, 20],
+      [50, 20],
+    ]);
+    const radii = result.constraints.filter((c) => c.type === "radius");
+    expect(new Set(radii.map((c) => c.type === "radius" && c.entity))).toEqual(
+      new Set(circles(result.entities).map((c) => c.id)),
+    );
+    expect(dof(result.entities, result.constraints)).toBe(
+      6 * dof(hole, holeRadius),
+    );
+  });
+
+  it("patterns along a sketch line", () => {
+    const entities = [...hole, P("a", 0, 0), P("b", 3, 4), L("dir", "a", "b")];
+    const result = copySketchSelection(entities, [], ["hole"], {
+      kind: "rect",
+      first: { axis: { line: "dir" }, count: 2, spacing: 10 },
+      second: null,
+    });
+    expect(centres(result.entities)).toEqual([
+      [10, 5],
+      [16, 13],
+    ]);
+  });
+
+  it("makes 6 circular copies over 360 degrees, 60 degrees apart at the same radius", () => {
+    const result = copySketchSelection(hole, holeRadius, ["hole"], {
+      kind: "circ",
+      centre: { x: 0, y: 0 },
+      count: 6,
+      angle: 360,
+    });
+
+    const at = centres(result.entities);
+    expect(at).toHaveLength(6);
+    const turns = at.map(([x, y]) => Math.atan2(y!, x!) - Math.atan2(5, 10));
+    turns.forEach((t, k) => {
+      expect(Math.hypot(...at[k]!)).toBeCloseTo(Math.hypot(10, 5), 9);
+      expect(Math.cos(t - (k * Math.PI) / 3)).toBeCloseTo(1, 9);
+    });
+  });
+
+  it("spreads a partial circular pattern from first to last", () => {
+    const result = copySketchSelection(hole, [], ["hole"], {
+      kind: "circ",
+      centre: { x: 10, y: 0 },
+      count: 3,
+      angle: 180,
+    });
+    expect(centres(result.entities)).toEqual([
+      [10, 5],
+      [5, 0],
+      [10, -5],
+    ]);
+  });
+
+  it("refuses a quantity that is not a whole number above 1 and an oversized pattern", () => {
+    const grid = (count: number, second = 1) =>
+      copySketchSelection(hole, [], ["hole"], {
+        kind: "rect",
+        first: { axis: "x", count, spacing: 5 },
+        second: { axis: "y", count: second, spacing: 5 },
+      });
+    expect(() => grid(1)).toThrow("Set a quantity above 1.");
+    expect(() => grid(2.5)).toThrow("whole number");
+    expect(() => grid(30, 30)).toThrow("at most 500 copies");
+  });
 });

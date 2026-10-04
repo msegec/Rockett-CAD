@@ -58,6 +58,22 @@ offset geometry cannot move, and the panel names it. Copy still copies it as
 plain geometry, without its Fix. Unselected curves keep their ends where they
 were.
 
+Set Type in the same panel to copy the selection instead of moving it:
+
+- **Mirror** copies it across a sketch line you pick, construction lines
+  included. Arcs stay mirror images and angle dimensions follow the mirror.
+- **Rect Pattern** repeats it along a Direction (X axis, Y axis or a picked
+  sketch line) by Quantity and Spacing. Tick Second direction for a grid.
+- **Circ Pattern** repeats it round the sketch origin or a picked point. A
+  Total angle of 360 degrees spaces the copies evenly; a smaller angle spreads
+  them from the first to the last.
+
+Quantity counts the original, so a 3 by 2 grid gives 6 in all, up to 500
+copies. Each copy keeps the constraints inside the selection and is plain
+geometry after OK, which is one undo step. Horizontal and vertical relations
+on a circular copy, or on a mirror across a line not at a multiple of 45
+degrees, become angle dimensions as they do for Move.
+
 ### Regions
 
 Closed shapes fill as regions you can hover, pick and extrude. Curves that

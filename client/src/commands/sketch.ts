@@ -155,7 +155,8 @@ export const sketchCommands: Command[] = [
     label: "Move",
     icon: "move",
     group: "design.sketch.group.sketch",
-    tooltip: "Move/Copy: move, rotate or copy the selected sketch geometry",
+    tooltip:
+      "Move/Copy: move, rotate, copy, mirror or pattern the selected sketch geometry",
     enabled: sketching,
     active: (s) =>
       s.active?.id === "design.sketch" &&
