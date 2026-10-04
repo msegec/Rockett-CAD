@@ -38,7 +38,7 @@ import type {
 import type { ProjectMember } from "./model.js";
 import { settingsRoutes } from "./settingsRoutes.js";
 import { refRepairRoutes } from "./refRepairRoutes.js";
-import { MEASURE_MAX_REFS, VIEW_VERSION } from "./api.js";
+import { MEASURE_MAX_REFS, type MeshPayload, VIEW_VERSION } from "./api.js";
 import { VIEW_PROJECTION } from "./settings.js";
 import { edgeRef, faceRef, groupsSchema, vec3 } from "./schema/features.js";
 import { bodyIdSchema } from "./schema/coreFeatures.js";
@@ -316,7 +316,7 @@ export const ROUTES = {
     placeProjectBody,
   ),
   downloadProjectFile: route<never, Blob>()("GET", "/projects/:id/file"),
-  mesh: route<never, Blob>()("GET", "/projects/:id/meshes/:hash"),
+  mesh: route<never, MeshPayload>()("GET", "/projects/:id/meshes/:hash"),
   evaluate: route<HeldMeshes, WireEvaluateResult>()(
     "POST",
     "/projects/:id/evaluate",

@@ -21,8 +21,8 @@ export function meshRoute(
     )
       return missing();
     const doc = await store.load(projectId);
-    if (cache.rejects(doc.id, doc.revision, hash)) return missing();
     let bytes = cache.get(doc.id, doc.revision, hash);
+    if (!bytes && cache.rejects(doc.id, doc.revision, hash)) return missing();
     if (!bytes) {
       const result = await evaluate(doc);
       cache.publish(doc.id, doc.revision, result.bodies);

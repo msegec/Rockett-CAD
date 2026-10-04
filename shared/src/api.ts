@@ -75,12 +75,7 @@ export interface VertexInfo {
   position: Vec3;
 }
 
-export interface BodyPayload {
-  bodyId: string;
-  name: string;
-  color?: string;
-  meshKey: string;
-  mesh?: { hash: string; bytes: number };
+export interface MeshPayload {
   positions: number[];
   normals: number[];
   indices: number[];
@@ -88,6 +83,26 @@ export interface BodyPayload {
   edges: EdgeInfo[];
   vertices: VertexInfo[];
   bbox: { min: Vec3; max: Vec3 };
+}
+
+export function meshPayload({
+  positions,
+  normals,
+  indices,
+  faces,
+  edges,
+  vertices,
+  bbox,
+}: MeshPayload): MeshPayload {
+  return { positions, normals, indices, faces, edges, vertices, bbox };
+}
+
+export interface BodyPayload extends MeshPayload {
+  bodyId: string;
+  name: string;
+  color?: string;
+  meshKey: string;
+  mesh?: { hash: string; bytes: number };
 }
 
 export type HeldBodyPayload = Pick<

@@ -1,20 +1,26 @@
 import { createHash } from "node:crypto";
-import type { BodyPayload } from "@rockett/shared";
+import { meshPayload, type BodyPayload } from "@rockett/shared";
 
-const LIMIT = 256 * 1024 * 1024;
-const PROJECT_LIMIT = 4096;
-const INDEX_LIMIT = 65536;
+const MESH_LIMITS = {
+  bytes: 256 * 1024 * 1024,
+  projects: 4096,
+  indexed: 65536,
+  recent: 4096,
+};
 
 type Entry = { hash: string; data: Buffer };
+type Project = { revision?: number; hashes: Set<string>; recent: Set<string> };
 
 export class MeshCache {
   private readonly entries = new Map<string, Entry>();
-  private readonly projects = new Map<
-    string,
-    { revision: number; hashes: Set<string> }
-  >();
+  private readonly projects = new Map<string, Project>();
+  private readonly limits: typeof MESH_LIMITS;
   private size = 0;
   private indexed = 0;
+
+  constructor(limits: Partial<typeof MESH_LIMITS> = {}) {
+    this.limits = { ...MESH_LIMITS, ...limits };
+  }
 
   private encoded(body: BodyPayload): Entry {
     const hit = this.entries.get(body.meshKey);
@@ -23,32 +29,31 @@ export class MeshCache {
       this.entries.set(body.meshKey, hit);
       return hit;
     }
-    const { positions, normals, indices, faces, edges, vertices, bbox } = body;
-    const data = Buffer.from(
-      JSON.stringify({
-        positions,
-        normals,
-        indices,
-        faces,
-        edges,
-        vertices,
-        bbox,
-      }),
-    );
+    const data = Buffer.from(JSON.stringify(meshPayload(body)));
     const entry = {
       hash: createHash("sha256").update(data).digest("hex"),
       data,
     };
-    if (data.length <= LIMIT) {
+    if (data.length <= this.limits.bytes) {
       this.entries.set(body.meshKey, entry);
       this.size += data.length;
       for (const [key, old] of this.entries) {
-        if (this.size <= LIMIT) break;
+        if (this.size <= this.limits.bytes) break;
         this.entries.delete(key);
         this.size -= old.data.length;
       }
     }
     return entry;
+  }
+
+  private project(projectId: string): Project {
+    const project = this.projects.get(projectId) ?? {
+      hashes: new Set<string>(),
+      recent: new Set<string>(),
+    };
+    this.projects.delete(projectId);
+    this.projects.set(projectId, project);
+    return project;
   }
 
   publish(
@@ -62,12 +67,27 @@ export class MeshCache {
       this.describe(body);
       hashes.add(body.mesh!.hash);
     }
-    if (!current) return;
-    this.drop(projectId);
-    this.projects.set(projectId, { revision, hashes });
-    this.indexed += hashes.size;
+    const project = this.project(projectId);
+    const before = project.hashes.size + project.recent.size;
+    if (current) {
+      project.revision = revision;
+      project.hashes = hashes;
+    } else {
+      for (const hash of hashes) {
+        project.recent.delete(hash);
+        project.recent.add(hash);
+      }
+      for (const hash of project.recent) {
+        if (project.recent.size <= this.limits.recent) break;
+        project.recent.delete(hash);
+      }
+    }
+    this.indexed += project.hashes.size + project.recent.size - before;
     for (const [oldId] of this.projects) {
-      if (this.projects.size <= PROJECT_LIMIT && this.indexed <= INDEX_LIMIT)
+      if (
+        this.projects.size <= this.limits.projects &&
+        this.indexed <= this.limits.indexed
+      )
         break;
       this.drop(oldId);
     }
@@ -85,7 +105,10 @@ export class MeshCache {
 
   get(projectId: string, revision: number, hash: string): Buffer | undefined {
     const project = this.projects.get(projectId);
-    if (project?.revision !== revision || !project.hashes.has(hash)) return;
+    const known =
+      project?.recent.has(hash) ||
+      (project?.revision === revision && project.hashes.has(hash));
+    if (!known) return;
     for (const [key, entry] of this.entries) {
       if (entry.hash !== hash) continue;
       this.entries.delete(key);
@@ -99,7 +122,9 @@ export class MeshCache {
   }
 
   drop(projectId: string): void {
-    this.indexed -= this.projects.get(projectId)?.hashes.size ?? 0;
+    const project = this.projects.get(projectId);
+    if (!project) return;
+    this.indexed -= project.hashes.size + project.recent.size;
     this.projects.delete(projectId);
   }
 }
