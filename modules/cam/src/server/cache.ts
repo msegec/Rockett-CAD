@@ -4,6 +4,7 @@ import { validateProgram, type Program } from "../shared/ir.js";
 const MIB = 2 ** 20;
 export const CACHE_BYTES = 256 * MIB;
 export const MAX_CACHE_BYTES = 384 * MIB;
+const FAILURES = 256;
 
 const ENTRY = /^cache\/([0-9a-f]{64})\.json$/;
 const entry = (fingerprint: string) => `cache/${fingerprint}.json`;
@@ -79,21 +80,37 @@ export function programCache(files: ModuleFiles, limit = CACHE_BYTES) {
     string,
     { run: Promise<Program>; signal: AbortSignal | undefined }
   >();
+  const failed = new Map<string, string>();
 
   async function made(
     fingerprint: string,
     make: () => Promise<Program>,
     signal?: AbortSignal,
   ) {
-    const program = await make();
-    const [problem] = validateProgram(program);
-    if (problem) throw new Error(`generated program is invalid: ${problem}`);
-    signal?.throwIfAborted();
-    await stored.write(fingerprint, program);
-    return program;
+    try {
+      const program = await make();
+      const [problem] = validateProgram(program);
+      if (problem) throw new Error(`generated program is invalid: ${problem}`);
+      signal?.throwIfAborted();
+      await stored.write(fingerprint, program);
+      failed.delete(fingerprint);
+      return program;
+    } catch (error) {
+      if (!signal?.aborted) {
+        failed.delete(fingerprint);
+        failed.set(
+          fingerprint,
+          error instanceof Error ? error.message : String(error),
+        );
+        const [oldest] = failed.keys();
+        if (failed.size > FAILURES) failed.delete(oldest!);
+      }
+      throw error;
+    }
   }
 
   return {
+    failure: (fingerprint: string) => failed.get(fingerprint),
     async program(
       fingerprint: string,
       make: () => Promise<Program>,

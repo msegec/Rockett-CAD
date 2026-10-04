@@ -2,9 +2,11 @@ import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import type {
   CadDocument,
+  FeatureStatus,
   KernelJobRun,
   Route,
   RouteModuleApi,
+  ServerBody,
   ServerContext,
   User,
 } from "@rockett/plugin-api";
@@ -45,39 +47,75 @@ async function sha256(text: string) {
   ).join("");
 }
 
+export type OperationStatus =
+  | { status: "fresh" | "stale" | "never" }
+  | { status: "error" | "missingReference"; reason: string };
+
+type Blocked = Extract<OperationStatus, { reason: string }>;
+
+const why = ({ featureId, status, error }: FeatureStatus) =>
+  status === "error"
+    ? `${featureId}, which failed${error ? `: ${error}` : ""}`
+    : status === "cancelled"
+      ? `${featureId}, which was cancelled`
+      : `${featureId}, which has unresolved references`;
+
+async function prepare(
+  context: Pick<ServerContext, "bodies">,
+  { projectId, user, ...job }: GenerateRequest,
+): Promise<Blocked | { fingerprint: string; input: GenerateInput }> {
+  const { type } = job.operation;
+  if (!isOperation(type))
+    return { status: "error", reason: `operation ${type} is unknown` };
+  const model = new Map(
+    (await context.bodies(projectId, user)).map((body) => [body.id, body]),
+  );
+  const bodies: ServerBody[] = [];
+  for (const id of job.setup.bodies) {
+    const body = model.get(id);
+    if (!body)
+      return {
+        status: "missingReference",
+        reason: `setup body ${id} is not in the model`,
+      };
+    if (body.problems?.length)
+      return {
+        status: "error",
+        reason: `setup body ${id} depends on ${body.problems.map(why).join("; ")}`,
+      };
+    bodies.push(body);
+  }
+  const fingerprint = await sha256(
+    JSON.stringify(
+      {
+        engine: CAM_ENGINE,
+        generator: OPERATION_VERSIONS[type],
+        bodies: bodies.map((body) => body.fingerprint),
+        ...job,
+      },
+      sorted,
+    ),
+  );
+  return {
+    fingerprint,
+    input: {
+      ...job,
+      bodies: bodies.map(({ id, bbox, brep }) => ({ id, bbox, brep })),
+    },
+  };
+}
+
 export function generator(
   context: Pick<ServerContext, "bodies" | "startKernelJob">,
   cache: ProgramCache,
 ) {
   return async function generate(
-    { projectId, user, ...job }: GenerateRequest,
+    request: GenerateRequest,
     run: KernelJobRun = {},
   ): Promise<{ fingerprint: string; program: Program }> {
-    const { type } = job.operation;
-    if (!isOperation(type)) throw new Error(`operation ${type} is unknown`);
-    const model = new Map(
-      (await context.bodies(projectId, user)).map((body) => [body.id, body]),
-    );
-    const bodies = job.setup.bodies.map((id) => {
-      const body = model.get(id);
-      if (!body) throw new Error(`setup body ${id} is not in the model`);
-      return body;
-    });
-    const fingerprint = await sha256(
-      JSON.stringify(
-        {
-          engine: CAM_ENGINE,
-          generator: OPERATION_VERSIONS[type],
-          bodies: bodies.map((body) => body.fingerprint),
-          ...job,
-        },
-        sorted,
-      ),
-    );
-    const input: GenerateInput = {
-      ...job,
-      bodies: bodies.map(({ id, bbox, brep }) => ({ id, bbox, brep })),
-    };
+    const ready = await prepare(context, request);
+    if ("reason" in ready) throw new Error(ready.reason);
+    const { fingerprint, input } = ready;
     const program = await cache.program(
       fingerprint,
       async () =>
@@ -119,20 +157,23 @@ const find = (data: CamData, { setupId, operationId }: Target) => {
   return { setup, op };
 };
 
-function inputs(data: CamData, at: Target): Omit<GenerateInput, "bodies"> {
+function inputs(
+  data: CamData,
+  at: Target,
+): Omit<GenerateInput, "bodies"> | string {
   const { setup, op } = find(data, at);
   const { bodies, stock, wcs, safeHeight, clearance } = setup;
   if (!bodies || !stock || !wcs || safeHeight === undefined)
-    throw new Error(`setup ${setup.id} needs bodies, stock, WCS and heights`);
+    return `setup ${setup.id} needs bodies, stock, WCS and heights`;
   if (clearance === undefined || !op.type)
-    throw new Error(`setup ${setup.id} needs a clearance and operation type`);
+    return `setup ${setup.id} needs a clearance and operation type`;
   const found = data.tools.find((item) => item.id === op.toolId);
-  if (!found) throw new Error(`operation ${op.id} needs a tool`);
+  if (!found) return `operation ${op.id} needs a tool`;
   const { presets, libraryRef: _ref, ...tool } = found;
   if (!Value.Check(toolSchema, { ...tool }) || tool.number === undefined)
-    throw new Error(`operation ${op.id} needs a complete numbered tool`);
+    return `operation ${op.id} needs a complete numbered tool`;
   const preset = presets?.find((item) => item.id === op.presetId);
-  if (!preset) throw new Error(`operation ${op.id} needs a preset of its tool`);
+  if (!preset) return `operation ${op.id} needs a preset of its tool`;
   return structuredClone({
     setup: { id: setup.id, bodies, stock, wcs, safeHeight, clearance },
     operation: { id: op.id, type: op.type, params: op.params ?? {} },
@@ -141,13 +182,52 @@ function inputs(data: CamData, at: Target): Omit<GenerateInput, "bodies"> {
   });
 }
 
+export const statusRoute: Route<
+  "/projects/:id/m/rockett/cam/setups/:setupId/operations/:operationId/status",
+  unknown,
+  OperationStatus
+> = {
+  method: "GET",
+  path: "/projects/:id/m/rockett/cam/setups/:setupId/operations/:operationId/status",
+};
+
+function operationStatus(
+  context: Pick<ServerContext, "bodies">,
+  cache: Pick<ProgramCache, "failure">,
+) {
+  return async (
+    doc: CadDocument,
+    at: Target & { id: string },
+    user: User,
+  ): Promise<OperationStatus> => {
+    const data = cam(doc);
+    const { op } = find(data, at);
+    const job = inputs(data, at);
+    if (typeof job === "string") return { status: "error", reason: job };
+    const ready = await prepare(context, { projectId: at.id, user, ...job });
+    if ("reason" in ready) return ready;
+    const failed = cache.failure(ready.fingerprint);
+    if (failed !== undefined) return { status: "error", reason: failed };
+    if (!op.lastGenerated) return { status: "never" };
+    return op.lastGenerated.fingerprint === ready.fingerprint
+      ? { status: "fresh" }
+      : { status: "stale" };
+  };
+}
+
 export function mountGenerate(
   api: RouteModuleApi,
   context: Pick<ServerContext, "bodies" | "startKernelJob" | "files">,
 ) {
-  const generate = generator(context, programCache(context.files));
+  const cache = programCache(context.files);
+  const generate = generator(context, cache);
+  const status = operationStatus(context, cache);
+  api.projectRoute(statusRoute, (doc, req, { user }) =>
+    status(doc, req.params, user),
+  );
   api.projectMutation(generateRoute, async (doc, req, { user }) => {
     const job = inputs(cam(doc), req.body);
+    if (typeof job === "string") throw new Error(job);
     const made = await generate({ projectId: req.params.id, user, ...job });
     const data = cam(doc);
     const { op } = find(data, req.body);
