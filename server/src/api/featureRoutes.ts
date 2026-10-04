@@ -106,26 +106,24 @@ function addFeatureRoute(context: ApiRoutes) {
       if (doc.features.some((f) => f.id === feature.id))
         throw new ValidationError("duplicate feature id");
       const at = Math.min(doc.timelinePosition, doc.features.length);
-      let warning: string | undefined;
       if (
         feature.type === "sketch" &&
         feature.plane.kind === "face" &&
-        feature.entities.length === 0
+        feature.entities.length === 0 &&
+        req.body?.emptySketch !== true
       ) {
-        const boundary = await kernel.stateQuery(doc, {
-          kind: "projectFace",
+        feature.entities = await kernel.stateQuery(doc, {
+          kind: "copyFace",
           position: at,
           face: feature.plane.face,
         });
-        feature.entities = boundary.entities;
-        warning = boundary.warning;
         validateBuilt(feature);
       }
       await signed(doc, at, feature);
       doc.features.splice(at, 0, feature);
       doc.timelinePosition = at + 1;
       await written(doc, at, req.res.locals.user);
-      return { label: `Add ${feature.name}`, ...(warning && { warning }) };
+      return { label: `Add ${feature.name}` };
     }, true),
   );
 }

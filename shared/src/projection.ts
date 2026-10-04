@@ -1,8 +1,10 @@
 import type { EdgeRef, SketchEntity } from "./model.js";
-import type { EdgeInfo, PlaneFrame, Vec3 } from "./api.js";
+import type { EdgeInfo, ExactCurve, PlaneFrame, Vec3 } from "./api.js";
+import { sketchBuilder, type SketchBuilder } from "./sketchBuilder.js";
 import { TAU, type XY } from "./sketchCurves.js";
 
 type Conic = Extract<EdgeInfo["curve"], { type: "circle" | "ellipse" }>;
+type Copyable = Exclude<ExactCurve, { type: "other" }>;
 
 const dot = (a: readonly number[], b: readonly number[]) =>
   a.reduce((v, x, i) => v + x * b[i]!, 0);
@@ -61,6 +63,18 @@ const pointEntity =
     construction: true,
   });
 
+const whole = (curve: Conic) =>
+  curve.sweep === undefined || curve.sweep > TAU - 1e-6;
+
+function arcEnds(curve: Conic, uv: (p: Vec3) => XY, forward: boolean) {
+  if (!curve.start || !curve.end) throw new Error("Missing arc endpoints.");
+  const [s, e] = [uv(curve.start), uv(curve.end)];
+  return (forward ? [s, e] : [e, s]) as [XY, XY];
+}
+
+const inPlane = (frame: PlaneFrame) => (w: Vec3) =>
+  [dot(w, frame.xAxis), dot(w, frame.yAxis)] as XY;
+
 /** Exact orthogonal projection of supported analytic edges, with stable child IDs. */
 export function projectEdge(
   curve: EdgeInfo["curve"],
@@ -98,12 +112,8 @@ function projectConic(
 ): SketchEntity[] {
   const { id } = common;
   const [uv, point] = [planeUv(frame), pointEntity(id)];
-  const full = curve.sweep === undefined || curve.sweep > TAU - 1e-6;
-  const ends = (forward: boolean): [XY, XY] => {
-    if (!curve.start || !curve.end) throw new Error("Missing arc endpoints.");
-    const [s, e] = [uv(curve.start), uv(curve.end)];
-    return forward ? [s, e] : [e, s];
-  };
+  const full = whole(curve);
+  const ends = (forward: boolean) => arcEnds(curve, uv, forward);
   const c = uv(curve.center);
   const normal = dot(curve.axis, frame.normal);
   if (curve.type === "circle" && Math.abs(normal) >= 1 - 1e-6) {
@@ -126,10 +136,7 @@ function projectConic(
       },
     ];
   }
-  const [u, v] = semiAxes(curve).map((w) => [
-    dot(w, frame.xAxis),
-    dot(w, frame.yAxis),
-  ]) as [XY, XY];
+  const [u, v] = semiAxes(curve).map(inPlane(frame)) as [XY, XY];
   const turn = u[0] * v[1] - u[1] * v[0];
   if (Math.abs(turn) < 1e-9 * (dot(u, u) + dot(v, v)))
     throw new Error(
@@ -156,4 +163,28 @@ function projectConic(
     point("b", b),
     { ...ellipse, start: `${id}:a`, end: `${id}:b` },
   ];
+}
+
+function copyCurve(b: SketchBuilder, curve: Copyable, frame: PlaneFrame) {
+  const uv = planeUv(frame);
+  if (curve.type === "line") return b.line(uv(curve.a), uv(curve.b));
+  if (curve.type === "bspline")
+    return b.spline({ ...curve, poles: curve.poles.map(uv) });
+  const ends = whole(curve)
+    ? undefined
+    : arcEnds(curve, uv, dot(curve.axis, frame.normal) > 0);
+  const c = uv(curve.center);
+  if (curve.type === "circle")
+    return ends ? b.arc(c, ...ends) : b.circle(c, curve.radius);
+  const [major] = semiAxes(curve).map(inPlane(frame));
+  const ratio = curve.minorRadius / curve.majorRadius;
+  return b.ellipse(c, major!, ratio, false, ends);
+}
+
+export function copyEdges(
+  curves: Copyable[],
+  frame: PlaneFrame,
+): SketchEntity[] | undefined {
+  const b = sketchBuilder();
+  return curves.every((c) => copyCurve(b, c, frame)) ? b.entities : undefined;
 }

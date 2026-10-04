@@ -14,6 +14,7 @@ import {
   type Own,
   type Shape,
 } from "./kernel.js";
+import { bsplineCurve } from "./edgeCurve.js";
 import { uvTo3d } from "./frames.js";
 
 type UV = [number, number];
@@ -141,31 +142,12 @@ function splineEdge(
   const ends = (i: number) => !s.periodic && (i === 0 || i === last);
   return acquire(
     scoped((own) => {
-      const reals = (values: number[]) => {
-        const out = own(new k.TColStd_Array1OfReal_2(1, values.length));
-        values.forEach((v, i) => out.SetValue_1(i + 1, v));
-        return out;
-      };
-      const poles = own(new k.TColgp_Array1OfPnt_2(1, s.poles.length));
-      s.poles.forEach(([u, v], i) => {
-        const at = ends(i) ? snap(u, v) : ([u, v] as UV);
-        poles.SetValue_1(i + 1, own(pnt(...uvTo3d(frame, ...at))));
+      const curve = bsplineCurve(own, {
+        ...s,
+        poles: s.poles.map(([u, v], i) =>
+          uvTo3d(frame, ...(ends(i) ? snap(u, v) : ([u, v] as UV))),
+        ),
       });
-      const mults = own(new k.TColStd_Array1OfInteger_2(1, s.knots.length));
-      s.multiplicities.forEach((m, i) => mults.SetValue_1(i + 1, m));
-      const knots = reals(s.knots);
-      const periodic = s.periodic ?? false;
-      const curve = s.weights
-        ? new k.Geom_BSplineCurve_2(
-            poles,
-            reals(s.weights),
-            knots,
-            mults,
-            s.degree,
-            periodic,
-            true,
-          )
-        : new k.Geom_BSplineCurve_1(poles, knots, mults, s.degree, periodic);
       const handle = own(new k.Handle_Geom_Curve_2(curve));
       const edge = own(own(new k.BRepBuilderAPI_MakeEdge_24(handle)).Edge());
       return own.keep(

@@ -44,7 +44,7 @@ everything downstream against persistent topology references.
 - **Size hints**: fillet, chamfer, shell, inward Offset Face, cut depth and pattern spacing show the size that builds for your picks.
 - **Replicate**: mirror, rectangular pattern and circular pattern.
 - **Parameters**: name values with units, then type expressions like `width / 2` into feature fields, sketch dimensions and Quick Edit.
-- **Construction**: offset, midplane, angled, three-point or two-edge planes, with flip; sketch on planar faces with any boundary; hide planes.
+- **Construction**: offset, midplane, angled, three-point or two-edge planes, with flip; sketch on planar faces copying their exact boundary; hide planes.
 - **Origin axes**: pick X, Y or Z in the model tree or at the origin as a revolve or pattern axis.
 - **Drag handles**: every feature with a main value, from extrude distance to pattern spacing, has an arrow or arc to drag.
 - **Reference images**: place PNG, JPEG or WebP images on planes and calibrate them to real size.

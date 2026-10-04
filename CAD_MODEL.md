@@ -424,13 +424,12 @@ input bound, not a tolerance.
   profile has the same area and directed curves that all lie on that loop. A
   sketch without spurs resolves every id as it did before pruning:
   `shared/src/profiles.test.ts`.
-- A planar face supports a sketch independently of its boundary curves.
-  Automatic boundary import retains exact straight edges, circles, ellipses
-  and their arcs. If any curve is unsupported, the sketch starts empty and reports that
-  limit instead of importing a partial profile. Reference import classifies
-  unsupported curves without sampling them; DXF export still samples them.
-  Project can import supported edges individually; unsupported edges report
-  their limit.
+- Create Sketch on a planar face copies its boundary into local curves: lines,
+  circles, ellipses and arcs, and B-spline edges, rational, trimmed or periodic,
+  as splines with exact poles, weights and knots. A copy has no projection or
+  link: source changes move only the plane. Other curves refuse with
+  `boundary-not-copied` unless the add sets `emptySketch`. Project links and
+  refuses B-splines. Reference import never samples; DXF export does.
 - Projections (`shared/src/projection.ts`) keep child ids `:a`, `:b` across
   regeneration. A missing source fails the sketch rather
   than keep stale points. A circle parallel to the sketch stays a circle or
@@ -511,11 +510,12 @@ the global origin, so a sketch rides its face. Construction plane methods:
 
 ## Tessellation
 
-`server/src/geometry/tessellate.ts` and `server/src/geometry/mesh.ts`. Every
-face triangle range, edge polyline and vertex carries its persistent name, so
-selection is topology, never a triangle index. The viewport and STL export
-both mesh through `meshShape`, which meshes only faces without an exact
-triangle. Export formats: `server/src/geometry/exporters.ts`.
+`server/src/geometry/tessellate.ts`, `server/src/geometry/edgeCurve.ts` and
+`server/src/geometry/mesh.ts`. Every face triangle range, edge polyline and
+vertex carries its persistent name, so selection is topology, never a triangle
+index. The viewport and STL export both mesh through `meshShape`, which meshes
+only faces without an exact triangle. Export formats:
+`server/src/geometry/exporters.ts`.
 
 Under naming version 2, a closed single-part mesh import stays a mesh body
 (`server/src/geometry/meshBody.ts`). It draws from its triangles, one face

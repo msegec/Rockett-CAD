@@ -96,7 +96,7 @@ import { ShapeMap } from "./shapeMap.js";
 
 import { V, frameFromPlane, offsetFrame, uvTo3d } from "./frames.js";
 import { geometryNames } from "./signature.js";
-import { curveInfo } from "./tessellate.js";
+import { curveInfo } from "./edgeCurve.js";
 import { readImport } from "./importers.js";
 import { placeImport } from "./stepImport.js";
 import { type EvalContext } from "./featureKinds.js";

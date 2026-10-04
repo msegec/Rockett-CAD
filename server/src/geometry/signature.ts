@@ -20,7 +20,8 @@ import {
 } from "./naming.js";
 import { ShapeMap } from "./shapeMap.js";
 import { sha256 } from "../store/jsonStore.js";
-import { curveInfo, surfaceType } from "./tessellate.js";
+import { curveInfo } from "./edgeCurve.js";
+import { surfaceType } from "./tessellate.js";
 
 type Vec = RefSignature["direction"];
 

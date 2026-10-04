@@ -26,6 +26,7 @@ import {
   scoped,
   type Shape,
 } from "./kernel.js";
+import { curveInfo } from "./edgeCurve.js";
 import { meshShape, type FaceMesh } from "./mesh.js";
 import { drawnTriangles } from "./meshBody.js";
 import {
@@ -303,64 +304,6 @@ function surfaceInfo(face: Shape): FaceInfo["surface"] {
           origin: [locP.X(), locP.Y(), locP.Z()] as Vec3,
           axis: [d.X(), d.Y(), d.Z()] as Vec3,
           radius: cyl.Radius(),
-        };
-      }
-      return { type: "other" };
-    });
-  } catch {
-    return { type: "other" };
-  }
-}
-
-const at = (p: { X(): number; Y(): number; Z(): number }): Vec3 => [
-  p.X(),
-  p.Y(),
-  p.Z(),
-];
-
-export function curveInfo(edge: Shape): EdgeInfo["curve"] {
-  const k = getKernel();
-  try {
-    return scoped((own): EdgeInfo["curve"] => {
-      const curve = own(new k.BRepAdaptor_Curve_2(edge));
-      const type = curve.GetType();
-      if (type === k.GeomAbs_CurveType.GeomAbs_Line) {
-        const p1 = own(curve.Value(curve.FirstParameter()));
-        const p2 = own(curve.Value(curve.LastParameter()));
-        return {
-          type: "line",
-          a: [p1.X(), p1.Y(), p1.Z()] as Vec3,
-          b: [p2.X(), p2.Y(), p2.Z()] as Vec3,
-        };
-      }
-      if (type === k.GeomAbs_CurveType.GeomAbs_Circle) {
-        const circ = own(curve.Circle());
-        const c = own(circ.Location());
-        const d = own(own(circ.Axis()).Direction());
-        const start = own(curve.Value(curve.FirstParameter()));
-        const end = own(curve.Value(curve.LastParameter()));
-        return {
-          type: "circle",
-          center: [c.X(), c.Y(), c.Z()] as Vec3,
-          axis: [d.X(), d.Y(), d.Z()] as Vec3,
-          radius: circ.Radius(),
-          start: [start.X(), start.Y(), start.Z()],
-          end: [end.X(), end.Y(), end.Z()],
-          sweep: curve.LastParameter() - curve.FirstParameter(),
-        };
-      }
-      if (type === k.GeomAbs_CurveType.GeomAbs_Ellipse) {
-        const el = own(curve.Ellipse());
-        return {
-          type: "ellipse",
-          center: at(own(el.Location())),
-          axis: at(own(own(el.Axis()).Direction())),
-          majorAxis: at(own(own(el.XAxis()).Direction())),
-          majorRadius: el.MajorRadius(),
-          minorRadius: el.MinorRadius(),
-          start: at(own(curve.Value(curve.FirstParameter()))),
-          end: at(own(curve.Value(curve.LastParameter()))),
-          sweep: curve.LastParameter() - curve.FirstParameter(),
         };
       }
       return { type: "other" };

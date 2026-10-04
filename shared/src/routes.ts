@@ -328,12 +328,10 @@ export const ROUTES = {
     parameterEditBody,
     "document",
   ),
-  addFeature: route<{ feature: Feature }, MutationResponse>()(
-    "POST",
-    "/projects/:id/features",
-    undefined,
-    "document",
-  ),
+  addFeature: route<
+    { feature: Feature; emptySketch?: true },
+    MutationResponse
+  >()("POST", "/projects/:id/features", undefined, "document"),
   updateFeature: route<
     {
       feature: Partial<Feature>;

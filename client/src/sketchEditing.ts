@@ -10,13 +10,14 @@ import type {
 } from "@rockett/shared";
 import {
   movedBindings,
+  ROUTES,
   newId,
   resolvedFeatureIn,
   solveSketch,
   editedEntities,
   OverConstrainedError,
 } from "@rockett/shared";
-import { api, type MutationResponse } from "./api";
+import { api, send, type MutationResponse } from "./api";
 import type { Active } from "./commands/active";
 import {
   sketchState,
@@ -105,7 +106,7 @@ export function sketchBindings(
 }
 
 export interface SketchActions {
-  startSketchOnPlane: (ref: PlaneRef) => Promise<void>;
+  startSketchOnPlane: (ref: PlaneRef, boundary?: Boundary) => Promise<void>;
   editSketch: (sketchId: string) => Promise<void>;
   setSketchState: (
     state: Partial<Omit<SketchState, "sketchId" | "tool">>,
@@ -124,12 +125,28 @@ export interface SketchActions {
   finishSketch: () => Promise<void>;
 }
 
+type Boundary = "copy" | "empty";
+
+const addSketch = (
+  id: string,
+  feature: SketchFeature,
+  tx: string,
+  boundary: Boundary,
+) =>
+  boundary === "copy"
+    ? api.addFeature(id, feature, tx)
+    : send(
+        ROUTES.addFeature,
+        { id },
+        { body: { feature, emptySketch: true }, tx },
+      );
+
 export function sketchActions(
   set: StoreApi<State>["setState"],
   get: StoreApi<State>["getState"],
 ): SketchActions {
   return {
-    async startSketchOnPlane(ref) {
+    async startSketchOnPlane(ref, boundary = "copy") {
       const { document } = get();
       if (!document) return;
       const feature: SketchFeature = {
@@ -141,7 +158,7 @@ export function sketchActions(
         entities: [],
         constraints: [],
       };
-      await get().mutate((tx) => api.addFeature(document.id, feature, tx));
+      await get().mutate((tx) => addSketch(document.id, feature, tx, boundary));
       const created = get().document!.features.find(
         (f) => f.id === feature.id,
       ) as SketchFeature;

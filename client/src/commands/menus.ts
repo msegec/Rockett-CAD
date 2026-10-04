@@ -28,6 +28,7 @@ import { alignCameraToActiveSketch, type ViewportRef } from "../viewportRef";
 import "./design";
 import { canExportDxf } from "./export";
 import { featureCommand } from "./featureCommand";
+import { sketchOnPlane } from "./sketchCreate";
 import { moveBodies } from "./treeMove";
 import {
   commandById,
@@ -315,12 +316,10 @@ for (const command of [
     "Create Sketch on face",
     (s) => {
       const { bodyId, faceName } = s.target.sel;
-      return s
-        .startSketchOnPlane({
-          kind: "face",
-          face: { kind: "face", bodyId, faceName },
-        })
-        .then(() => alignCameraToActiveSketch(s.viewport));
+      return sketchOnPlane({
+        kind: "face",
+        face: { kind: "face", bodyId, faceName },
+      }).then(() => alignCameraToActiveSketch(s.viewport));
     },
   ),
   ...FACE_FEATURES.map(([name, label, type]) =>

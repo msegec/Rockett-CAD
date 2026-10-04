@@ -1,9 +1,9 @@
 import {
+  copyEdges,
   curveSamples,
   entityPointIds,
-  newId,
-  projectEdge,
   sketchCurves,
+  type ExactCurve,
   type PlaneFrame,
   type SketchCurve,
   type SketchEntity,
@@ -13,9 +13,11 @@ import {
 import { pointToUV, V } from "./frames.js";
 import { acquire, getKernel, scoped, type Shape } from "./kernel.js";
 import { computeEdgeNames, findFace, type NamedBody } from "./naming.js";
-import { curveInfo } from "./tessellate.js";
+import { exactCurve } from "./edgeCurve.js";
 
 type Pair = [number, string];
+
+type CopyableCurve = Exclude<ExactCurve, { type: "other" }>;
 
 export type Polyline = [number, number][];
 
@@ -206,38 +208,29 @@ export function faceDrawing(
     const face = findFace(body, faceName);
     if (!face) throw new Error(`face ${faceName} not found`);
     const onFace = acquire(new k.TopTools_IndexedMapOfShape_1());
-    const named = computeEdgeNames(body).byName;
-
     k.TopExp.MapShapes_1(face, k.TopAbs_ShapeEnum.TopAbs_EDGE, onFace);
-    const drawing: FaceDrawing = {
-      sketch: [],
-      polylines: [],
-      unsupported: false,
-    };
-    for (const [edgeName, edge] of named) {
+    const curves: CopyableCurve[] = [];
+    const others: Shape[] = [];
+    for (const edge of computeEdgeNames(body).byName.values()) {
       if (!onFace.Contains(edge)) continue;
-      const curve = curveInfo(edge);
-      if (curve.type === "other") {
-        drawing.unsupported = true;
-        if (quality !== undefined)
-          drawing.polylines.push(
-            sampleCurve(edge, quality).map((p) => {
-              const { u, v } = pointToUV(frame, p);
-              return [u, v];
-            }),
-          );
-      } else
-        drawing.sketch.push(
-          ...projectEdge(
-            curve,
-            frame,
-            newId("proj"),
-            { kind: "edge", bodyId: body.bodyId, edgeName },
-            false,
-          ),
-        );
+      const curve = exactCurve(edge);
+      const asPolyline =
+        curve.type === "other" ||
+        (quality !== undefined && curve.type === "bspline");
+      if (asPolyline) others.push(edge);
+      else curves.push(curve);
     }
-    return drawing;
+    const sketch = copyEdges(curves, frame);
+    const traced = (edge: Shape): Polyline =>
+      sampleCurve(edge, quality!).map((p) => {
+        const { u, v } = pointToUV(frame, p);
+        return [u, v];
+      });
+    return {
+      sketch: sketch ?? [],
+      polylines: quality === undefined ? [] : others.map(traced),
+      unsupported: others.length > 0 || !sketch,
+    };
   });
 }
 

@@ -1,4 +1,5 @@
 import {
+  BOUNDARY_NOT_COPIED,
   projectEdge,
   ValidationError,
   type CadDocument,
@@ -44,7 +45,7 @@ import {
   withNamingVersion,
 } from "../geometry/naming.js";
 import { resolveRefs } from "../geometry/resolve.js";
-import { curveInfo } from "../geometry/tessellate.js";
+import { curveInfo } from "../geometry/edgeCurve.js";
 import { faceDrawing } from "../geometry/dxf.js";
 import { signRefs } from "../geometry/signature.js";
 import { planNamingUpgrade } from "../geometry/upgradeNaming.js";
@@ -68,7 +69,7 @@ interface StateQueries {
     edge: EdgeRef;
     entityId: string;
   };
-  projectFace: { position: number; face: FaceRef };
+  copyFace: { position: number; face: FaceRef };
   sign: { position: number; refs: Array<FaceRef | EdgeRef> };
   sizeLimit: { position: number | undefined; feature: SizedFeature };
   brep: { bodyIds: readonly string[] };
@@ -82,7 +83,7 @@ export interface StateAnswers {
   measure: MeasureResult;
   tangentEdges: EdgeRef[];
   projectEdge: SketchEntity[];
-  projectFace: { entities: SketchEntity[]; warning?: string };
+  copyFace: SketchEntity[];
   sign: Array<RefSignature | undefined>;
   sizeLimit: SizeLimit;
   brep: Array<{ brep: string; faceNames: string[] }>;
@@ -200,23 +201,22 @@ const ANSWERS: {
       release(byName?.values() ?? []);
     }
   },
-  projectFace(state, { face: ref }) {
+  copyFace(state, { face: ref }) {
     const body = state.bodies.get(ref.bodyId);
     if (!body)
       throw new ValidationError(
         "Face body is not available before this sketch",
       );
-    return asValidation(() => {
+    const drawing = asValidation(() => {
       const frame = resolvePlaneFrame(state, { kind: "face", face: ref });
-      const drawing = faceDrawing(body, ref.faceName, frame);
-      return drawing.unsupported
-        ? {
-            entities: [],
-            warning:
-              "Sketch created without its boundary. Boundary import supports straight edges, circles, ellipses and their arcs.",
-          }
-        : { entities: drawing.sketch };
+      return faceDrawing(body, ref.faceName, frame);
     });
+    if (drawing.unsupported)
+      throw new ValidationError(
+        "This face's boundary cannot be copied exactly: copying supports lines, circles, ellipses, B-splines and their arcs.",
+        BOUNDARY_NOT_COPIED,
+      );
+    return drawing.sketch;
   },
   sign: (state, { refs }) => signed(state, refs),
   sizeLimit: (state, { position, feature }, doc, resume) =>

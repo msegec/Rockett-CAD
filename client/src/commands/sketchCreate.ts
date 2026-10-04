@@ -1,4 +1,6 @@
-import type { PlaneRef } from "@rockett/shared";
+import { BOUNDARY_NOT_COPIED, type PlaneRef } from "@rockett/shared";
+import { ApiError } from "../api";
+import { confirm } from "../components/ConfirmPanel";
 import { isPlanarFace } from "./featureCommand";
 import { useStore, type Selection } from "../store";
 import { alignCameraToActiveSketch, type ViewportRef } from "../viewportRef";
@@ -14,12 +16,24 @@ function planeFor(selection: Selection | null): PlaneRef | undefined {
     return { kind: "face", face: selection };
 }
 
+export async function sketchOnPlane(plane: PlaneRef) {
+  const s = useStore.getState();
+  try {
+    await s.startSketchOnPlane(plane);
+  } catch (e) {
+    if (!(e instanceof ApiError && e.detail === BOUNDARY_NOT_COPIED)) throw e;
+    s.setError(null);
+    if (await confirm(e.message, undefined, "Create empty sketch"))
+      await s.startSketchOnPlane(plane, "empty");
+  }
+}
+
 async function pick(selection: Selection | null, viewport?: ViewportRef) {
   const s = useStore.getState();
   if (s.active?.id !== "design.sketch.create" || s.busy) return;
   const plane = planeFor(selection);
   if (!plane) return;
-  await s.startSketchOnPlane(plane);
+  await sketchOnPlane(plane);
   if (useStore.getState().active?.id === "design.sketch.create")
     sketchCreateCommand.exit();
   if (viewport) alignCameraToActiveSketch(viewport);

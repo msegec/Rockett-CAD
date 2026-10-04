@@ -12,6 +12,7 @@ import type {
   SketchSolveStatus,
   SketchEntity,
 } from "./model.js";
+import type { BSpline } from "./bspline.js";
 import type { Profile } from "./profiles.js";
 import type { SettingTypes } from "./settings.js";
 
@@ -69,6 +70,12 @@ export interface EdgeInfo {
       }
     | { type: "other" };
 }
+
+export type ExactCurve =
+  | EdgeInfo["curve"]
+  | ({ type: "bspline"; poles: Vec3[] } & Omit<BSpline, "poles">);
+
+export const BOUNDARY_NOT_COPIED = "boundary-not-copied";
 
 export interface VertexInfo {
   name: string;
