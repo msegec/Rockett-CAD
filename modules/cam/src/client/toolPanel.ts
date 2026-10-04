@@ -5,11 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type {
-  ClientContext,
-  NumberFieldProps,
-  UserDataEntry,
-} from "@rockett/plugin-api";
+import type { ClientContext, UserDataEntry } from "@rockett/plugin-api";
 import {
   machineSchema,
   newMachine,
@@ -17,15 +13,22 @@ import {
   withFirmware,
   type MachineProfile,
 } from "../shared/machine.js";
-import { validateTool, type Tool } from "../shared/tools.js";
+import { validateTool, type Preset, type Tool } from "../shared/tools.js";
+import {
+  exportTools,
+  importRockett,
+  merge,
+  TOOLS_FILE,
+  type ToolImport,
+} from "../import/rockett.js";
 import { schemaFields } from "./schemaForm.js";
+import { newTool, toolFields } from "./toolForm.js";
 
 export const TOOL_PANEL = "rockett.cam.library.panel";
 
 type Ui = ClientContext["ui"];
 type Item = { id: string; name: string };
 type Library<T> = { items: T[]; etag: string | null };
-type Kind = Tool["kind"];
 
 type Section<T extends Item> = {
   noun: string;
@@ -34,48 +37,6 @@ type Section<T extends Item> = {
   problems(item: T): string[];
   fields(ui: Ui, item: T, edit: (item: T) => void): ReactNode[];
 };
-type LengthKey = "diameter" | "fluteLength" | "overallLength" | "shankDiameter";
-
-const KINDS: [Kind, string][] = [
-  ["flat", "Flat end mill"],
-  ["ball", "Ball end mill"],
-  ["bull", "Bull nose end mill"],
-  ["vbit", "V-bit"],
-  ["drill", "Drill"],
-  ["chamfer", "Chamfer mill"],
-];
-
-const LENGTHS: [LengthKey, string][] = [
-  ["fluteLength", "Flute length"],
-  ["overallLength", "Overall length"],
-  ["shankDiameter", "Shank diameter"],
-];
-
-const CORNER_RADIUS = 1;
-const TIP_ANGLE = 90;
-
-const newTool = (count: number): Tool => ({
-  id: crypto.randomUUID(),
-  name: `Tool ${count + 1}`,
-  kind: "flat",
-  diameter: 6,
-  fluteLength: 20,
-  overallLength: 50,
-  shankDiameter: 6,
-  flutes: 2,
-  centreCutting: true,
-});
-
-function withKind(tool: Tool, kind: Kind): Tool {
-  const { cornerRadius, tipAngle, ...rest } = tool as Tool & {
-    cornerRadius?: number;
-    tipAngle?: number;
-  };
-  if (kind === "bull")
-    return { ...rest, kind, cornerRadius: cornerRadius ?? CORNER_RADIUS };
-  if (kind === "flat" || kind === "ball") return { ...rest, kind };
-  return { ...rest, kind, tipAngle: tipAngle ?? TIP_ANGLE };
-}
 
 const saved = <T extends Item>(items: T[], item: T) =>
   items.some((t) => t.id === item.id)
@@ -93,64 +54,6 @@ function libraryOf<T>(entry: UserDataEntry | null): Library<T> {
 
 const reason = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
-
-function toolFields(ui: Ui, tool: Tool, edit: (tool: Tool) => void) {
-  const length = (
-    key: LengthKey,
-    label: string,
-    bound: Pick<NumberFieldProps, "min" | "above">,
-  ) =>
-    h(ui.LengthField, {
-      key,
-      label,
-      value: tool[key],
-      onChange: (v) => edit({ ...tool, [key]: v }),
-      ...bound,
-    });
-  return [
-    h(ui.SelectField<Kind>, {
-      key: "kind",
-      label: "Kind",
-      value: tool.kind,
-      options: KINDS,
-      onChange: (kind) => edit(withKind(tool, kind)),
-    }),
-    length("diameter", "Diameter", { above: 0 }),
-    tool.kind === "bull" &&
-      h(ui.LengthField, {
-        key: "cornerRadius",
-        label: "Corner radius",
-        value: tool.cornerRadius,
-        min: 0,
-        max: tool.diameter / 2,
-        onChange: (cornerRadius) => edit({ ...tool, cornerRadius }),
-      }),
-    "tipAngle" in tool &&
-      h(ui.AngleField, {
-        key: "tipAngle",
-        label: "Tip angle",
-        value: tool.tipAngle,
-        above: 0,
-        max: 180,
-        onChange: (tipAngle) => edit({ ...tool, tipAngle }),
-      }),
-    ...LENGTHS.map(([key, label]) => length(key, label, { above: 0 })),
-    h(ui.NumField, {
-      key: "flutes",
-      label: "Flutes",
-      value: tool.flutes,
-      int: true,
-      min: 1,
-      onChange: (flutes) => edit({ ...tool, flutes }),
-    }),
-    h(ui.CheckField, {
-      key: "centreCutting",
-      label: "Centre cutting",
-      value: tool.centreCutting,
-      onChange: (centreCutting) => edit({ ...tool, centreCutting }),
-    }),
-  ];
-}
 
 const button = (
   text: string,
@@ -221,8 +124,12 @@ function useSection<T extends Item>(
           setLibrary(next);
           setError(null);
           setEditing(null);
+          return true;
         },
-        (e) => setError(`${section.title} did not save: ${reason(e)}.`),
+        (e) => {
+          setError(`${section.title} did not save: ${reason(e)}.`);
+          return false;
+        },
       )
       .finally(() => setPending(false));
   };
@@ -240,6 +147,7 @@ function useSection<T extends Item>(
     error,
     editing,
     pending,
+    setError,
     setEditing,
     write,
     remove,
@@ -275,14 +183,33 @@ function sectionForm<T extends Item>(ui: Ui, state: State<T>) {
   });
 }
 
-function sectionList<T extends Item>(state: State<T>) {
+const row = (key: string, name: string, ...rest: ReactNode[]) =>
+  h(
+    "div",
+    { key, className: "tree-item", role: "listitem" },
+    h("span", null, name),
+    ...rest,
+  );
+
+const tree = (title: string, ...children: ReactNode[]) =>
+  h(
+    "div",
+    { key: title, className: "tree-section" },
+    h("div", { className: "tree-header" }, title),
+    h(
+      "div",
+      { className: "tree-children", role: "list", "aria-label": title },
+      ...children,
+    ),
+  );
+
+function sectionList<T extends Item>(state: State<T>, extra?: ReactNode) {
   const { section, library, error, pending } = state;
   const plural = section.title.toLowerCase();
   const rows = library?.items.map((item) =>
-    h(
-      "div",
-      { key: item.id, className: "tree-item", role: "listitem" },
-      h("span", null, item.name),
+    row(
+      item.id,
+      item.name,
       button("Edit", `Edit ${item.name}`, pending, () =>
         state.setEditing(item),
       ),
@@ -303,26 +230,201 @@ function sectionList<T extends Item>(state: State<T>) {
     Fragment,
     { key: section.noun },
     banner(error),
-    h(
-      "div",
-      { className: "tree-section" },
-      h("div", { className: "tree-header" }, section.title),
-      h(
-        "div",
-        {
-          className: "tree-children",
-          role: "list",
-          "aria-label": section.title,
-        },
-        empty,
-        rows,
-      ),
-    ),
+    tree(section.title, empty, rows),
     library &&
       button(add, add, pending, () =>
         state.setEditing(section.create(library.items.length)),
       ),
+    extra,
   );
+}
+
+type ImportView = {
+  name: string;
+  result: ToolImport;
+  tools: Tool[];
+  presets: Preset[];
+  replace: boolean;
+  error: string | null;
+  pending: boolean;
+  setReplace(replace: boolean): void;
+  onOk(): void;
+  onCancel(): void;
+};
+
+function importRows<T extends Item>(
+  items: T[],
+  incoming: T[],
+  replace: boolean,
+) {
+  const known = new Set(items.map((item) => item.id));
+  return incoming.map((item) =>
+    row(
+      item.id,
+      item.name,
+      h(
+        "span",
+        null,
+        !known.has(item.id)
+          ? "New"
+          : replace
+            ? "Replaces yours"
+            : "Skipped, already in your library",
+      ),
+    ),
+  );
+}
+
+export function importDialog(ui: Ui, view: ImportView) {
+  const { result, replace } = view;
+  const unchanged =
+    merge(view.tools, result.tools, replace) === view.tools &&
+    merge(view.presets, result.presets, replace) === view.presets;
+  return h(ui.DraggablePanel, {
+    title: `Import ${view.name}`,
+    children: h(
+      Fragment,
+      null,
+      h(
+        "div",
+        { className: "dialog-body" },
+        banner(view.error),
+        result.tools.length > 0 &&
+          tree("Tools", importRows(view.tools, result.tools, replace)),
+        result.presets.length > 0 &&
+          tree("Presets", importRows(view.presets, result.presets, replace)),
+        result.rejects.length > 0 &&
+          tree(
+            "Rejected",
+            result.rejects.map((reject, index) =>
+              row(String(index), reject.item, h("span", null, reject.reason)),
+            ),
+          ),
+        h(ui.CheckField, {
+          label: "Replace tools and presets with the same id",
+          value: replace,
+          onChange: view.setReplace,
+        }),
+      ),
+      h(ui.DialogFooter, {
+        onOk: view.onOk,
+        onCancel: view.onCancel,
+        okLabel: "Import",
+        okDisabled: unchanged,
+        pending: view.pending,
+      }),
+    ),
+  });
+}
+
+type Importing = {
+  name: string;
+  result: ToolImport;
+  replace: boolean;
+  presets: Library<Preset>;
+};
+
+const readPresets = ({ request }: ClientContext) =>
+  request<UserDataEntry | null>("GET", "presets").then(libraryOf<Preset>);
+
+const exportLibrary = async (context: ClientContext, tools: Tool[]) =>
+  context.ui.download({
+    fileName: TOOLS_FILE,
+    data: exportTools(tools, (await readPresets(context)).items),
+    type: "application/json",
+  });
+
+async function pickImport(context: ClientContext): Promise<Importing | null> {
+  const file = await context.ui.pickFile({
+    accept: ".json,application/json",
+    maxBytes: Infinity,
+  });
+  if (!file) return null;
+  return {
+    name: file.name,
+    result: importRockett(file.text),
+    replace: false,
+    presets: await readPresets(context),
+  };
+}
+
+function useTransfer(context: ClientContext, tools: State<Tool>) {
+  const { ui, request } = context;
+  const [importing, setImporting] = useState<Importing | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const items = tools.library?.items;
+  const exportFile = (list: Tool[]) =>
+    exportLibrary(context, list).catch((e) =>
+      setError(`Export did not read your presets: ${reason(e)}.`),
+    );
+  const pick = () =>
+    pickImport(context).then(
+      (next) => {
+        if (!next) return;
+        setError(null);
+        setImporting(next);
+      },
+      (e) => setError(`Import did not start: ${reason(e)}.`),
+    );
+  const writePresets = async (open: Importing, next: Preset[]) => {
+    setPending(true);
+    try {
+      const stored = await request<UserDataEntry>("PUT", "presets", {
+        data: next,
+        etag: open.presets.etag,
+      });
+      setImporting({ ...open, presets: libraryOf<Preset>(stored) });
+      return true;
+    } catch (e) {
+      setError(`Presets did not save: ${reason(e)}.`);
+      return false;
+    } finally {
+      setPending(false);
+    }
+  };
+  const run = async (open: Importing) => {
+    const { result, replace, presets } = open;
+    const nextTools = merge(items!, result.tools, replace);
+    if (nextTools !== items && !(await tools.write(nextTools))) return;
+    const next = merge(presets.items, result.presets, replace);
+    if (next !== presets.items && !(await writePresets(open, next))) return;
+    setImporting(null);
+  };
+  const busy = pending || tools.pending;
+  const buttons =
+    items &&
+    h(
+      Fragment,
+      null,
+      banner(error),
+      button("Import tools", "Import tools", busy, () => void pick()),
+      button(
+        "Export tools",
+        "Export tools",
+        busy,
+        () => void exportFile(items),
+      ),
+    );
+  const dialog =
+    importing &&
+    items &&
+    importDialog(ui, {
+      name: importing.name,
+      result: importing.result,
+      replace: importing.replace,
+      tools: items,
+      presets: importing.presets.items,
+      error: error ?? tools.error,
+      pending: busy,
+      setReplace: (replace) => setImporting({ ...importing, replace }),
+      onOk: () => void run(importing),
+      onCancel: () => {
+        setError(null);
+        setImporting(null);
+      },
+    });
+  return { buttons, dialog };
 }
 
 export function toolPanel(context: ClientContext) {
@@ -331,9 +433,11 @@ export function toolPanel(context: ClientContext) {
   return function ToolPanel() {
     const tools = useSection(context, TOOLS);
     const machines = useSection(context, MACHINES);
+    const transfer = useTransfer(context, tools);
     return (
-      sectionForm(ui, tools) ??
-      sectionForm(ui, machines) ??
+      transfer.dialog ||
+      sectionForm(ui, tools) ||
+      sectionForm(ui, machines) ||
       h(ui.DraggablePanel, {
         title: "Library",
         children: h(
@@ -342,7 +446,7 @@ export function toolPanel(context: ClientContext) {
           h(
             "div",
             { className: "dialog-body" },
-            sectionList(tools),
+            sectionList(tools, transfer.buttons),
             sectionList(machines),
           ),
           h(ui.DialogFooter, { onCancel: close, cancelLabel: "Close" }),
