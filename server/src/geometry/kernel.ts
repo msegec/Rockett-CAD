@@ -109,6 +109,8 @@ export class HandleScope {
   private readonly retained = new Set<Owned>();
 
   readonly acquire = <H extends Owned>(handle: H): H => {
+    if (handle === range)
+      throw new Error("the shared progress range cannot be owned");
     this.owned.add(handle);
     return handle;
   };
