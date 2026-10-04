@@ -1,5 +1,4 @@
 import type {
-  BodyPayload,
   CadDocument,
   NamingCandidate,
   NamingDecision,
@@ -7,6 +6,7 @@ import type {
   NamingMesh,
   NamingUpgradeProposal,
   NamingVersion,
+  MeshedBody,
 } from "@rockett/shared";
 import type { KernelClient } from "../kernel/client.js";
 import { backupNamespace } from "./jsonStore.js";
@@ -41,7 +41,7 @@ async function staged(
 }
 
 function meshOf(
-  bodies: BodyPayload[],
+  bodies: MeshedBody[],
   { bodyId, name }: NamingCandidate,
 ): NamingMesh | undefined {
   const body = bodies.find((b) => b.bodyId === bodyId);
@@ -63,7 +63,7 @@ async function withMeshes(
 ): Promise<NamingMapping[]> {
   const scratch = { ...upgraded, id: `${upgraded.id}~mesh` };
   const sources = await store.sources(upgraded);
-  const states = new Map<string | null, BodyPayload[]>();
+  const states = new Map<string | null, MeshedBody[]>();
   const bodiesAt = async (featureId: string | null) => {
     const known = states.get(featureId);
     if (known) return known;

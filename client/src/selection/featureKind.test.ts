@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { expect, it } from "vitest";
-import { createEmptyDocument, type BodyPayload } from "@rockett/shared";
+import { createEmptyDocument, type MeshedBody } from "@rockett/shared";
 import { pickLabel } from "../components/form/fields";
 import {
   fromRef,
@@ -56,7 +56,7 @@ const zeros = () =>
     3,
   );
 
-function body(bodyId: string, faces: BodyPayload["faces"]) {
+function body(bodyId: string, faces: MeshedBody["faces"]) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", zeros());
   geometry.setAttribute("normal", zeros());
@@ -69,7 +69,7 @@ function body(bodyId: string, faces: BodyPayload["faces"]) {
     faces,
     edges: [],
     vertices: [],
-  } as unknown as BodyPayload;
+  } as unknown as MeshedBody;
   return [bodyId, { payload, mesh: new THREE.Mesh(geometry) }] as const;
 }
 

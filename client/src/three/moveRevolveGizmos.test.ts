@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { afterEach, expect, it, vi } from "vitest";
 import {
   createEmptyDocument,
-  type BodyPayload,
+  type MeshedBody,
   type SketchPayload,
 } from "@rockett/shared";
 import "../features/core";
@@ -49,7 +49,7 @@ const sketch: SketchPayload = {
     },
   ],
 };
-const body: BodyPayload = {
+const body: MeshedBody = {
   bodyId: "body",
   name: "Body",
   meshKey: "mesh",

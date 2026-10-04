@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
-import { meshPayload, type BodyPayload } from "@rockett/shared";
+import {
+  meshPayload,
+  type BodyPayload,
+  type EvaluateResult,
+  type MeshedBody,
+  type MeshedEvaluation,
+} from "@rockett/shared";
 
 const MESH_LIMITS = {
   bytes: 256 * 1024 * 1024,
@@ -22,7 +28,7 @@ export class MeshCache {
     this.limits = { ...MESH_LIMITS, ...limits };
   }
 
-  private encoded(body: BodyPayload): Entry {
+  private encoded(body: MeshedBody): Entry {
     const hit = this.entries.get(body.meshKey);
     if (hit) {
       this.entries.delete(body.meshKey);
@@ -59,14 +65,11 @@ export class MeshCache {
   publish(
     projectId: string,
     revision: number,
-    bodies: BodyPayload[],
+    evaluation: MeshedEvaluation,
     current = true,
-  ): void {
-    const hashes = new Set<string>();
-    for (const body of bodies) {
-      this.describe(body);
-      hashes.add(body.mesh!.hash);
-    }
+  ): EvaluateResult {
+    const bodies = evaluation.bodies.map((body) => this.wire(body));
+    const hashes = new Set(bodies.map((body) => body.mesh!.hash));
     const project = this.project(projectId);
     const before = project.hashes.size + project.recent.size;
     if (current) {
@@ -91,11 +94,14 @@ export class MeshCache {
         break;
       this.drop(oldId);
     }
+    return { ...evaluation, bodies };
   }
 
-  describe(body: BodyPayload): void {
+  private wire(body: MeshedBody): BodyPayload {
     const { hash, data } = this.encoded(body);
-    body.mesh = { hash, bytes: data.length };
+    const { bodyId, name, color, meshKey, bbox } = body;
+    const mesh = { hash, bytes: data.length };
+    return { bodyId, name, ...(color && { color }), meshKey, mesh, bbox };
   }
 
   rejects(projectId: string, revision: number, hash: string): boolean {
@@ -117,7 +123,7 @@ export class MeshCache {
     }
   }
 
-  materialize(body: BodyPayload): Buffer {
+  materialize(body: MeshedBody): Buffer {
     return this.encoded(body).data;
   }
 

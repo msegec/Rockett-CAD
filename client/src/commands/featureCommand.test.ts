@@ -8,6 +8,7 @@ import {
 } from "../features/registry";
 import { registerPickProvider } from "../three/pickProviders";
 import { featureCommand } from "./featureCommand";
+import { meshedBody } from "../../test/helpers/meshedBody";
 import { activeCommand } from "./active";
 import { runCommand } from "./registry";
 import { useStore, type Selection } from "../store";
@@ -78,16 +79,10 @@ it.each([
     useStore.setState({
       evaluation: {
         bodies: [
-          {
+          meshedBody({
             bodyId: "b1",
             name: "Body",
             meshKey: "mesh",
-            positions: [],
-            normals: [],
-            indices: [],
-            edges: [],
-            vertices: [],
-            bbox: { min: [0, 0, 0], max: [1, 1, 1] },
             faces: [
               {
                 name: "flat",
@@ -101,7 +96,7 @@ it.each([
                 },
               },
             ],
-          },
+          }),
         ],
         planes: [],
         sketches: [],

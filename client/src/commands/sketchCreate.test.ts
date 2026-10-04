@@ -6,6 +6,7 @@ import { activeCommand, exitActive } from "./active";
 import { runCommand } from "./registry";
 import { useStore, type Selection } from "../store";
 import { sketchState } from "./sketch";
+import { meshedBody } from "../../test/helpers/meshedBody";
 
 const initial = useStore.getState();
 const plane: Selection = {
@@ -29,16 +30,10 @@ beforeEach(() => {
       evaluation: {
         kernelMs: 0,
         bodies: [
-          {
+          meshedBody({
             bodyId: "body",
             name: "Body",
             meshKey: "body",
-            positions: [],
-            normals: [],
-            indices: [],
-            edges: [],
-            vertices: [],
-            bbox: { min: [0, 0, 0], max: [1, 1, 1] },
             faces: [
               {
                 name: "flat",
@@ -64,7 +59,7 @@ beforeEach(() => {
                 },
               },
             ],
-          },
+          }),
         ],
         planes: [],
         sketches: [],

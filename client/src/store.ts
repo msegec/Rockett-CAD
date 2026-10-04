@@ -289,7 +289,6 @@ export const useStore = create<State>((set, get) => ({
     api.forgetJob?.();
     unsent = [];
     session.forget();
-    api.forgetMeshes();
     set({
       recovery: null,
       saveState: "saved",

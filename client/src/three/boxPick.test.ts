@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { expect, it } from "vitest";
-import type { BodyPayload, Vec3 } from "@rockett/shared";
+import type { MeshedBody, Vec3 } from "@rockett/shared";
 import { boxPick, type BoxMode, type BoxScene } from "./boxPick";
 import type { PickBody } from "./pickProviders";
 
@@ -28,7 +28,7 @@ function body(
   polyline: number[],
 ): PickBody {
   const origin: Vec3 = [0, 0, 0];
-  const payload: BodyPayload = {
+  const payload: MeshedBody = {
     bodyId: "b",
     name: "Body1",
     meshKey: "m",

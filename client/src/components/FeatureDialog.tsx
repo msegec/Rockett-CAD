@@ -15,6 +15,7 @@ import { SizeLimitHint } from "./form/SizeLimitHint";
 import { featureUI, type DialogFeatureUI } from "../features/registry";
 import { axisMissing, axisPicks } from "../features/inputs";
 import { nextBindings, saveBound } from "../features/bindings";
+import { useMeshVersion } from "../three/meshes";
 
 function attempt(build: (() => Feature) | null): Feature | null {
   try {
@@ -95,7 +96,6 @@ function DialogBody({
   ui: DialogFeatureUI;
   editId?: string | undefined;
 }) {
-  const dialog = ui.type;
   const selection = useStore((s) => s.selection);
   const inputs = useStore((s) =>
     s.active?.id === "design.feature" ? s.active.state.inputs : undefined,
@@ -110,22 +110,23 @@ function DialogBody({
   const stored = useStoredFeature(document, editId);
   const [pending, setPending] = useState(false);
 
-  const axisDialog = takesAxis(dialog, params);
+  const axisDialog = takesAxis(ui.type, params);
   const axisPicked = axisPicks(selection, document).length > 0;
   useEffect(() => {
     if (axisDialog && axisPicked && params.axisSource !== "edge")
       setFeatureParams({ axisSource: "edge" });
-  }, [axisPicked, dialog]);
+  }, [axisPicked, ui.type]);
   const originAxis = selection.findLast((s) => s.kind === "axis")?.axis;
   useEffect(() => {
     if (axisDialog && originAxis)
       setFeatureParams({ axisSource: "origin", axis: originAxis });
-  }, [originAxis, dialog]);
+  }, [originAxis, ui.type]);
 
+  const meshVersion = useMeshVersion();
   useEffect(() => {
     const patch = inputs?.onParamsChange();
     if (patch) setFeatureParams(patch);
-  }, [dialog, selection, params]);
+  }, [ui.type, selection, params, meshVersion]);
 
   const build =
     ui.hasBuild && inputs

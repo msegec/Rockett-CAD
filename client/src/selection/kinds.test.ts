@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { createEmptyDocument, type BodyPayload } from "@rockett/shared";
+import { createEmptyDocument, type MeshedBody } from "@rockett/shared";
 import { pickLabel } from "../components/form/fields";
 import {
   fromRef,
@@ -181,7 +181,7 @@ describe("selection kinds", () => {
   });
 
   it("numbers topology within the selected body and retains missing-name labels", () => {
-    const body: BodyPayload = {
+    const body: MeshedBody = {
       bodyId: "b",
       name: "Bracket",
       meshKey: "mesh",
@@ -317,7 +317,7 @@ function highlightFixture() {
     new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1], 3),
   );
   const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
-  const payload: BodyPayload = {
+  const payload: MeshedBody = {
     bodyId: "b",
     name: "Body",
     meshKey: "fixture",

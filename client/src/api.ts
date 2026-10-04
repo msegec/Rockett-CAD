@@ -8,16 +8,12 @@ import {
   type ApiErrorBody,
   type ApiErrorCode,
   type BodyEdit,
-  type BodyPayload,
   type CadDocument,
   type EdgeRef,
-  type EvaluateResult,
   type ExportRequest,
   type Feature,
   type ParameterBinding,
-  type HeldMeshes,
   type MeasureRequest,
-  type MutationResponse,
   type NamingDecision,
   type ParameterEdit,
   type PathParams,
@@ -27,8 +23,6 @@ import {
   type User,
   type SizedFeature,
   type TreeGroup,
-  type WireEvaluateResult,
-  type WireMutationResponse,
 } from "@rockett/shared";
 import type { Download } from "./download";
 export { saveDownload, type Download } from "./download";
@@ -107,6 +101,7 @@ interface RequestOptions {
   keepalive?: boolean;
   jobId?: string;
   onEtag?: (etag: string | null) => void;
+  unwatched?: boolean;
 }
 
 export type JobEvent =
@@ -262,10 +257,11 @@ export async function request(
     jobId,
     response,
     onEtag,
+    unwatched,
   }: RequestOptions & { response?: "blob" } = {},
 ): Promise<unknown> {
   const raw = body instanceof FormData || body instanceof Blob;
-  const watch = watching(path);
+  const watch = unwatched ? null : watching(path);
   const sent = {
     ...(body !== undefined && !raw && { "Content-Type": "application/json" }),
     ...headers,
@@ -359,54 +355,6 @@ export function send<P extends string, Req, Res>(
       ...(seq !== undefined && { [PREVIEW_HEADER]: String(seq) }),
     },
   });
-}
-
-type Held = ReadonlyMap<string, BodyPayload>;
-let meshes = new Map<string, BodyPayload>();
-let staged: { tx?: string | undefined; held: string[] } | undefined;
-let closed: typeof staged;
-
-function keep(evaluation: EvaluateResult, held: Held): EvaluateResult {
-  if (held === meshes)
-    meshes = new Map(evaluation.bodies.map((body) => [body.meshKey, body]));
-  return evaluation;
-}
-
-function refill(evaluation: WireEvaluateResult, held: Held): EvaluateResult {
-  return {
-    ...evaluation,
-    bodies: evaluation.bodies.map((body) => {
-      if ("positions" in body) return body;
-      const mesh = held.get(body.meshKey);
-      if (!mesh) throw new Error(`The server omitted mesh ${body.meshKey}`);
-      const { color: _held, ...shape } = mesh;
-      return { ...shape, ...body };
-    }),
-  };
-}
-
-async function sendHeld<P extends string, Req, Res>(
-  route: Route<P, Req & HeldMeshes, Res>,
-  params: PathParams<P>,
-  body: Req,
-  stamp: Stamp = {},
-): Promise<[Res, Held]> {
-  const [held, keys] = [meshes, [...meshes.keys()]];
-  if (stamp.seq === 1) staged = { tx: stamp.tx, held: keys };
-  const options = { body: { ...body, held: keys }, ...stamp };
-  return [await send(route, params, options), held];
-}
-
-export { holding as sendMutation };
-async function holding<P extends string, Req, Res extends WireMutationResponse>(
-  route: Route<P, Req & HeldMeshes, Res>,
-  params: PathParams<P>,
-  body: Req,
-  stamp?: Stamp,
-): Promise<Omit<Res, "evaluation"> & MutationResponse> {
-  const [response, held] = await sendHeld(route, params, body, stamp);
-  const evaluation = keep(refill(response.evaluation, held), held);
-  return { ...response, evaluation };
 }
 
 function fileForm(name: string, file: File): FormData {
@@ -527,16 +475,8 @@ export const api = {
     send(ROUTES.updateFolder, { id }, { body: { parentId } }),
   deleteFolder: (id: string) => send(ROUTES.deleteFolder, { id }),
 
-  forgetMeshes: () => {
-    meshes = new Map();
-    closed = staged;
-  },
-  evaluate: async (id: string, position?: number) => {
-    const stamp = { position };
-    const [wire, held] = await sendHeld(ROUTES.evaluate, { id }, {}, stamp);
-    const evaluation = refill(wire, held);
-    return position === undefined ? keep(evaluation, held) : evaluation;
-  },
+  evaluate: (id: string, position?: number) =>
+    send(ROUTES.evaluate, { id }, { position }),
   tangentEdges: (id: string, edge: EdgeRef, beforeFeatureId?: string) =>
     send(ROUTES.tangentEdges, { id }, { body: { edge, beforeFeatureId } }),
   sizeLimit: (id: string, feature: SizedFeature, position: number) =>
@@ -545,9 +485,9 @@ export const api = {
     send(ROUTES.projectEdge, { id, fid }, { body: { edge, entityId } }),
 
   updateParameters: (id: string, edit: ParameterEdit, stamp?: Stamp) =>
-    holding(ROUTES.updateParameters, { id }, edit, stamp),
+    send(ROUTES.updateParameters, { id }, { body: edit, ...stamp }),
   addFeature: (id: string, feature: Feature, tx?: string, seq?: number) =>
-    holding(ROUTES.addFeature, { id }, { feature }, { tx, seq }),
+    send(ROUTES.addFeature, { id }, { body: { feature }, tx, seq }),
   updateFeature: (
     id: string,
     fid: string,
@@ -557,41 +497,41 @@ export const api = {
     seq?: number,
     parameterBindings?: ParameterBinding[],
   ) =>
-    holding(
+    send(
       ROUTES.updateFeature,
       { id, fid },
-      parameterBindings ? { feature, parameterBindings } : { feature },
-      { position, tx, seq },
+      {
+        body: parameterBindings ? { feature, parameterBindings } : { feature },
+        position,
+        tx,
+        seq,
+      },
     ),
   deleteFeature: (id: string, fid: string, tx?: string) =>
-    holding(ROUTES.deleteFeature, { id, fid }, {}, { tx }),
+    send(ROUTES.deleteFeature, { id, fid }, { tx }),
   setTimeline: (id: string, position: number, tx?: string) =>
-    holding(ROUTES.setTimeline, { id }, { position }, { tx }),
+    send(ROUTES.setTimeline, { id }, { body: { position }, tx }),
   undo: (id: string, position?: number) =>
-    holding(ROUTES.undo, { id }, {}, { position }),
+    send(ROUTES.undo, { id }, { position }),
   redo: (id: string, position?: number) =>
-    holding(ROUTES.redo, { id }, {}, { position }),
+    send(ROUTES.redo, { id }, { position }),
   commitPreview: (id: string, tx: string) =>
-    holding(ROUTES.commitPreview, { id, tx }, {}),
-  abortPreview: async (id: string, tx: string) => {
-    if (closed?.tx !== tx) return holding(ROUTES.abortPreview, { id, tx }, {});
-    const { held } = closed;
-    await send(ROUTES.abortPreview, { id, tx }, { body: { held } });
-    return null;
-  },
+    send(ROUTES.commitPreview, { id, tx }),
+  abortPreview: (id: string, tx: string) =>
+    send(ROUTES.abortPreview, { id, tx }),
   history: (id: string) => send(ROUTES.history, { id }),
   createCheckpoint: (id: string, label: string) =>
     send(ROUTES.createCheckpoint, { id }, { body: { label } }),
   restoreHistory: (id: string, snapshot: string) =>
-    holding(ROUTES.restoreHistory, { id }, { snapshot }),
+    send(ROUTES.restoreHistory, { id }, { body: { snapshot } }),
   updateBody: (id: string, bodyId: string, patch: BodyEdit, tx?: string) =>
-    holding(ROUTES.updateBody, { id, bodyId }, patch, { tx }),
+    send(ROUTES.updateBody, { id, bodyId }, { body: patch, tx }),
   updateGroups: (id: string, groups: TreeGroup[], tx?: string) =>
-    holding(ROUTES.updateGroups, { id }, { groups }, { tx }),
+    send(ROUTES.updateGroups, { id }, { body: { groups }, tx }),
   stageNamingUpgrade: (id: string, accept: NamingDecision[] = []) =>
     send(ROUTES.stageNamingUpgrade, { id }, { body: { accept } }),
   commitNamingUpgrade: (id: string, accept: NamingDecision[] = []) =>
-    holding(ROUTES.commitNamingUpgrade, { id }, { accept }),
+    send(ROUTES.commitNamingUpgrade, { id }, { body: { accept } }),
   getView: (id: string) =>
     send(ROUTES.getView, { id }, { onEtag: keepViewTag(id) }),
   putView: (id: string, view: ProjectView) =>

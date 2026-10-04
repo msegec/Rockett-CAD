@@ -81,14 +81,11 @@ export const documentSchema = Type.Refine(
   () => "has invalid parameters, bindings or timelinePosition",
 );
 
-export const heldMeshKeys = Type.Optional(Type.Array(Type.String()));
-
 export const bodyEditBody = Type.Refine(
   Type.Object(
     {
       name: Type.Optional(Type.String()),
       color: Type.Optional(Type.Union([bodyColorSchema, Type.Null()])),
-      held: heldMeshKeys,
     },
     { additionalProperties: false },
   ),

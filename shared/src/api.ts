@@ -82,7 +82,6 @@ export interface MeshPayload {
   faces: FaceInfo[];
   edges: EdgeInfo[];
   vertices: VertexInfo[];
-  bbox: { min: Vec3; max: Vec3 };
 }
 
 export function meshPayload({
@@ -92,27 +91,20 @@ export function meshPayload({
   faces,
   edges,
   vertices,
-  bbox,
 }: MeshPayload): MeshPayload {
-  return { positions, normals, indices, faces, edges, vertices, bbox };
+  return { positions, normals, indices, faces, edges, vertices };
 }
 
-export interface BodyPayload extends MeshPayload {
+export interface BodyPayload {
   bodyId: string;
   name: string;
   color?: string;
   meshKey: string;
   mesh?: { hash: string; bytes: number };
+  bbox: { min: Vec3; max: Vec3 };
 }
 
-export type HeldBodyPayload = Pick<
-  BodyPayload,
-  "bodyId" | "name" | "meshKey" | "color"
->;
-
-export interface HeldMeshes {
-  held?: string[];
-}
+export type MeshedBody = BodyPayload & MeshPayload;
 
 export type FeatureRunStatus =
   "ok" | "warning" | "error" | "suppressed" | "rolledBack" | "cancelled";
@@ -227,8 +219,8 @@ export interface EvaluateResult {
   kernelMs: number;
 }
 
-export interface WireEvaluateResult extends Omit<EvaluateResult, "bodies"> {
-  bodies: Array<BodyPayload | HeldBodyPayload>;
+export interface MeshedEvaluation extends EvaluateResult {
+  bodies: MeshedBody[];
 }
 
 export interface ProjectSummary {

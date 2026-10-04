@@ -5,7 +5,7 @@ import {
   ROUTES,
   type BodyPayload,
   type CadDocument,
-  type EvaluateResult,
+  type MeshedEvaluation,
   type Method,
   type Route,
   type User,
@@ -20,12 +20,11 @@ import { MeshCache } from "../kernel/meshCache.js";
 import { JSON_BODY_LIMIT_BYTES } from "./uploads.js";
 import { IMPORT_LIMITS, type ImportLimits } from "../tunables.js";
 import { checkRevision, reply } from "./revision.js";
-import { omitHeldMeshes } from "./heldMeshes.js";
 import { projectAccessGuard } from "./projectAccess.js";
 import { createJobRoutes } from "./jobRoutes.js";
 import type { UserStore } from "../auth/userStore.js";
 import type { FriendStore } from "../auth/friendStore.js";
-import { fail, check, parseBody, requireRevision } from "./apiErrors.js";
+import { fail, parseBody, requireRevision } from "./apiErrors.js";
 import { pruneGroups } from "./bodyRoutes.js";
 function projectWrapper(
   store: ProjectStore,
@@ -50,15 +49,16 @@ function projectReply(history: HistoryStore, meshCache: MeshCache) {
   return async (
     res: any,
     doc: CadDocument,
-    evaluation?: EvaluateResult,
+    meshed?: MeshedEvaluation,
     extra?: object,
     position?: number,
   ) => {
-    if (evaluation)
+    const evaluation =
+      meshed &&
       meshCache.publish(
         doc.id,
         doc.revision,
-        evaluation.bodies,
+        meshed,
         position === undefined || position === doc.timelinePosition,
       );
     return reply(res, {
@@ -120,7 +120,7 @@ export function createRouterContext(
   const previews = new Previews();
   const meshCache = new MeshCache();
   const jobs = createJobRoutes(store, kernel, fail);
-  router.use(json({ limit: JSON_BODY_LIMIT_BYTES }), check(omitHeldMeshes));
+  router.use(json({ limit: JSON_BODY_LIMIT_BYTES }));
   router.param("id", projectAccessGuard(store, folders));
   const on = (route: Route, ...handlers: RequestHandler[]) => {
     if (DOCUMENT_EDITS(route) && route.method === "GET")

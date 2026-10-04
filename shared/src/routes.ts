@@ -19,7 +19,6 @@ import type {
   Folder,
   FolderTree,
   Formats,
-  HeldMeshes,
   HistoryStatus,
   MeasureRequest,
   MeasureResult,
@@ -33,7 +32,6 @@ import type {
   ProjectView,
   SizeLimit,
   SizeLimitRequest,
-  WireEvaluateResult,
 } from "./api.js";
 import type { ProjectMember } from "./model.js";
 import { settingsRoutes } from "./settingsRoutes.js";
@@ -42,11 +40,7 @@ import { MEASURE_MAX_REFS, type MeshPayload, VIEW_VERSION } from "./api.js";
 import { VIEW_PROJECTION } from "./settings.js";
 import { edgeRef, faceRef, groupsSchema, vec3 } from "./schema/features.js";
 import { bodyIdSchema } from "./schema/coreFeatures.js";
-import {
-  bodyEditBody,
-  heldMeshKeys as held,
-  namingUpgradeBody,
-} from "./schema/documents.js";
+import { bodyEditBody, namingUpgradeBody } from "./schema/documents.js";
 import { parameterStateSchema } from "./schema/parameters.js";
 import { CHECKPOINT_ROUTES, snapshotHash } from "./schema/history.js";
 import {
@@ -64,9 +58,7 @@ export interface MutationResponse<Evaluation = EvaluateResult> {
   warning?: string;
 }
 
-export type WireMutationResponse = MutationResponse<WireEvaluateResult>;
-
-export interface NamingUpgradeResponse extends WireMutationResponse {
+export interface NamingUpgradeResponse extends MutationResponse {
   backup: string;
   mappings: NamingMapping[];
 }
@@ -209,10 +201,9 @@ const measureRef = Type.Union([
 ]);
 
 const viewIds = Type.Array(Type.String({ minLength: 1 }));
-const parameterEditBody = Type.Object(
-  { ...parameterStateSchema, held },
-  { additionalProperties: false },
-);
+const parameterEditBody = Type.Object(parameterStateSchema, {
+  additionalProperties: false,
+});
 export const parameterBindingsBody = Type.Object({
   parameterBindings: parameterStateSchema.parameterBindings,
 });
@@ -317,7 +308,7 @@ export const ROUTES = {
   ),
   downloadProjectFile: route<never, Blob>()("GET", "/projects/:id/file"),
   mesh: route<never, MeshPayload>()("GET", "/projects/:id/meshes/:hash"),
-  evaluate: route<HeldMeshes, WireEvaluateResult>()(
+  evaluate: route<never, EvaluateResult>()(
     "POST",
     "/projects/:id/evaluate",
     undefined,
@@ -331,13 +322,13 @@ export const ROUTES = {
     undefined,
     "document",
   ),
-  updateParameters: route<ParameterEdit & HeldMeshes, WireMutationResponse>()(
+  updateParameters: route<ParameterEdit, MutationResponse>()(
     "PUT",
     "/projects/:id/parameters",
     parameterEditBody,
     "document",
   ),
-  addFeature: route<{ feature: Feature } & HeldMeshes, WireMutationResponse>()(
+  addFeature: route<{ feature: Feature }, MutationResponse>()(
     "POST",
     "/projects/:id/features",
     undefined,
@@ -347,8 +338,8 @@ export const ROUTES = {
     {
       feature: Partial<Feature>;
       parameterBindings?: ParameterBinding[];
-    } & HeldMeshes,
-    WireMutationResponse
+    },
+    MutationResponse
   >()("PUT", "/projects/:id/features/:fid", undefined, "document"),
   projectEdge: route<
     { edge: EdgeRef; entityId: string },
@@ -362,65 +353,53 @@ export const ROUTES = {
     }),
     "viewer",
   ),
-  deleteFeature: route<HeldMeshes, WireMutationResponse>()(
+  deleteFeature: route<never, MutationResponse>()(
     "DELETE",
     "/projects/:id/features/:fid",
     undefined,
     "document",
   ),
-  setTimeline: route<{ position: number } & HeldMeshes, WireMutationResponse>()(
+  setTimeline: route<{ position: number }, MutationResponse>()(
     "POST",
     "/projects/:id/timeline",
     Type.Object({ position: Type.Integer({ minimum: 0 }) }),
     "document",
   ),
   ...refRepairRoutes(route),
-  undo: route<HeldMeshes, WireMutationResponse>()(
+  undo: route<never, MutationResponse>()(
     "POST",
     "/projects/:id/undo",
     undefined,
     "document",
   ),
-  redo: route<HeldMeshes, WireMutationResponse>()(
+  redo: route<never, MutationResponse>()(
     "POST",
     "/projects/:id/redo",
     undefined,
     "document",
   ),
-  commitPreview: route<HeldMeshes, WireMutationResponse>()(
+  commitPreview: route<never, MutationResponse>()(
     "POST",
     "/projects/:id/previews/:tx/commit",
   ),
-  abortPreview: route<HeldMeshes, WireMutationResponse>()(
+  abortPreview: route<never, MutationResponse>()(
     "DELETE",
     "/projects/:id/previews/:tx",
   ),
   ...CHECKPOINT_ROUTES,
-  restoreHistory: route<
-    { snapshot: string } & HeldMeshes,
-    WireMutationResponse
-  >()(
+  restoreHistory: route<{ snapshot: string }, MutationResponse>()(
     "POST",
     "/projects/:id/history/restore",
-    Type.Object(
-      {
-        snapshot: snapshotHash,
-        held,
-      },
-      { additionalProperties: false },
-    ),
+    Type.Object({ snapshot: snapshotHash }, { additionalProperties: false }),
     "document",
   ),
-  updateBody: route<BodyEdit & HeldMeshes, WireMutationResponse>()(
+  updateBody: route<BodyEdit, MutationResponse>()(
     "PUT",
     "/projects/:id/bodies/:bodyId",
     bodyEditBody,
     "document",
   ),
-  updateGroups: route<
-    { groups: TreeGroup[] } & HeldMeshes,
-    WireMutationResponse
-  >()(
+  updateGroups: route<{ groups: TreeGroup[] }, MutationResponse>()(
     "PUT",
     "/projects/:id/groups",
     Type.Object({ groups: groupsSchema }),
@@ -431,7 +410,7 @@ export const ROUTES = {
     NamingUpgradeProposal
   >()("POST", "/projects/:id/upgrade-naming", namingUpgradeBody),
   commitNamingUpgrade: route<
-    { accept?: NamingDecision[] } & HeldMeshes,
+    { accept?: NamingDecision[] },
     NamingUpgradeResponse
   >()(
     "POST",

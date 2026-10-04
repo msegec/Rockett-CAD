@@ -183,13 +183,14 @@ in the same edit.
 
 ## Evaluation
 
-- Mutations answer `WireMutationResponse` (`shared/src/routes.ts`).
-- A request may send `held` (`HeldMeshes`); a body whose `meshKey` is held
-  comes back as `HeldBodyPayload`: `server/src/api/heldMeshes.ts`.
+- Evaluate answers `EvaluateResult` and mutations `MutationResponse`
+  (`shared/src/routes.ts`). Each `BodyPayload` carries `bodyId`, `name`,
+  `color`, `meshKey`, `bbox` and `mesh`, the hash and byte size of its
+  mesh, never the mesh itself. The client fetches each hash from the mesh
+  route once: `client/src/three/meshes.ts`.
 - `BodyPayload.color` is the body's stored `bodyMeta` colour, else the
   `#rrggbb` a STEP file gave it, kept per body id through later features
-  (`EvalState.imported`). A held body's stub carries it too, and a refill
-  takes colour from the stub, never from the held mesh.
+  (`EvalState.imported`).
 - `PUT /projects/:id/bodies/:bodyId` sends exactly one of `name` or `color`,
   each its own undo step. `color` is lowercase `#rrggbb`, or `null` to clear
   it. Anything else, an unknown key included, is a 400; a body id that is not

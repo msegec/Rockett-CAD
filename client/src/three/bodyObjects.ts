@@ -95,6 +95,7 @@ export class BodyLayer {
   readonly bodies = new Map<string, BodyObjects>();
   private readonly materials = new BodyMaterials();
   private missing: LayerBody[] = [];
+  private synced: readonly LayerBody[] = [];
   private hidden: ReadonlySet<string> = new Set();
   private dimmed: ReadonlySet<string> = new Set();
   private readonly unsubscribe = meshes.subscribe(() => this.arrive());
@@ -110,7 +111,8 @@ export class BodyLayer {
     projectId?: string,
   ) {
     meshes.useProject(projectId);
-    meshes.retry();
+    if (bodies !== this.synced) meshes.retry();
+    this.synced = bodies;
     this.hidden = hidden;
     this.missing = [];
     const seen = new Set<string>();

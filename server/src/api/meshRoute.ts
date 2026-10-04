@@ -1,12 +1,12 @@
 import type { Request, Response } from "express";
-import type { CadDocument, EvaluateResult } from "@rockett/shared";
+import type { CadDocument, MeshedEvaluation } from "@rockett/shared";
 import type { ProjectStore } from "../store/projectStore.js";
 import type { MeshCache } from "../kernel/meshCache.js";
 
 export function meshRoute(
   store: ProjectStore,
   cache: MeshCache,
-  evaluate: (doc: CadDocument) => Promise<EvaluateResult>,
+  evaluate: (doc: CadDocument) => Promise<MeshedEvaluation>,
 ): (req: Request, res: Response) => Promise<void> {
   return async (req, res) => {
     const missing = () => {
@@ -25,11 +25,12 @@ export function meshRoute(
     if (!bytes && cache.rejects(doc.id, doc.revision, hash)) return missing();
     if (!bytes) {
       const result = await evaluate(doc);
-      cache.publish(doc.id, doc.revision, result.bodies);
-      const body = result.bodies.find((item) => item.mesh?.hash === hash);
-      if (body)
+      const { bodies } = cache.publish(doc.id, doc.revision, result);
+      const at = bodies.findIndex((item) => item.mesh?.hash === hash);
+      if (at >= 0)
         bytes =
-          cache.get(doc.id, doc.revision, hash) ?? cache.materialize(body);
+          cache.get(doc.id, doc.revision, hash) ??
+          cache.materialize(result.bodies[at]!);
     }
     if (!bytes) return missing();
     res.set("Cache-Control", "private, max-age=31536000, immutable");

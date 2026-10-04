@@ -1,10 +1,10 @@
 import { resolveDocumentParameters } from "@rockett/shared";
 import type {
-  BodyPayload,
   CadDocument,
   ConstructionPlanePayload,
-  EvaluateResult,
   FeatureStatus,
+  MeshedBody,
+  MeshedEvaluation,
   NamingVersion,
   SketchPayload,
 } from "@rockett/shared";
@@ -215,7 +215,7 @@ function featureKeys(
 
 interface Tessellation {
   shape: Shape;
-  payload: BodyPayload;
+  payload: MeshedBody;
   bytes: number;
 }
 
@@ -247,7 +247,7 @@ function evict(key: string): void {
   tessCache.bytes -= entry.bytes;
 }
 
-function store(body: NamedBody, payload: BodyPayload): Tessellation {
+function store(body: NamedBody, payload: MeshedBody): Tessellation {
   const key = cacheKey(body);
   evict(key);
   const entry = { shape: body.shape, payload, bytes: payloadBytes(payload) };
@@ -330,7 +330,7 @@ class DocumentEngine {
     position?: number,
     sources?: Sources,
     hooks?: EvaluateHooks,
-  ): EvaluateResult {
+  ): MeshedEvaluation {
     return this.measured(() => {
       const t0 = performance.now();
       const { state, statuses } = this.regenerate(
@@ -340,7 +340,7 @@ class DocumentEngine {
         hooks,
       );
 
-      const bodies: BodyPayload[] = [];
+      const bodies: MeshedBody[] = [];
       let js = 0;
       for (const bytes of this.held.values()) js += bytes.byteLength;
       for (const body of state.bodies.values()) {
@@ -492,7 +492,7 @@ class DocumentEngine {
     );
   }
 
-  private moved({ bodyId, copyOf }: StateBody): BodyPayload | undefined {
+  private moved({ bodyId, copyOf }: StateBody): MeshedBody | undefined {
     const source = copyOf && cached(copyOf.source)?.payload;
     return source && movePayload(source, bodyId, copyOf);
   }

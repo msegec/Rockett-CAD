@@ -10,9 +10,9 @@
 import { createHash } from "node:crypto";
 import {
   compareNames,
-  type BodyPayload,
   type EdgeInfo,
   type FaceInfo,
+  type MeshedBody,
   type RefSignature,
   type VertexInfo,
   type Vec3,
@@ -94,7 +94,7 @@ export function tessellateBody(
   body: NamedBody,
   meta: { name: string },
   opts: TessellationOptions = {},
-): BodyPayload {
+): MeshedBody {
   return scoped(() => {
     const k = getKernel();
     const positions: number[] = [];
@@ -165,14 +165,14 @@ function vertexFacesOf(body: NamedBody): VertexFaces[] {
 }
 
 export function movePayload(
-  source: BodyPayload,
+  source: MeshedBody,
   bodyId: string,
   {
     offset,
     prefix,
     source: from,
   }: { offset: Vec3; prefix: string; source: NamedBody },
-): BodyPayload | undefined {
+): MeshedBody | undefined {
   const faceNames = source.faces.map((f) => f.name);
   if (
     new Set(faceNames).size < faceNames.length ||

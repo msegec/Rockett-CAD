@@ -23,13 +23,14 @@ export function evaluationRoutes(context: ApiRoutes) {
       const doc = await store.load(req.params.id);
       const position = evaluationPosition(req, doc);
       const result = await evaluate(doc, position);
-      meshCache.publish(
-        doc.id,
-        doc.revision,
-        result.bodies,
-        position === undefined || position === doc.timelinePosition,
+      res.json(
+        meshCache.publish(
+          doc.id,
+          doc.revision,
+          result,
+          position === undefined || position === doc.timelinePosition,
+        ),
       );
-      res.json(result);
     }),
   );
 }

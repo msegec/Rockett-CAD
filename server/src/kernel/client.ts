@@ -3,7 +3,6 @@ import {
   ValidationError,
   type CadDocument,
   type EdgeRef,
-  type EvaluateResult,
   type ExportRequest,
   type ExportSource,
   type FaceRef,
@@ -12,6 +11,7 @@ import {
   type Health,
   type MeasureRequest,
   type MeasureResult,
+  type MeshedEvaluation,
   type NamingDecision,
   type NamingFailure,
   type NamingMapping,
@@ -116,7 +116,7 @@ export interface KernelClient {
     position?: number,
     extra?: Sources,
     hooks?: EvaluateHooks,
-  ): Promise<EvaluateResult>;
+  ): Promise<MeshedEvaluation>;
   stateQuery<K extends keyof StateQueries>(
     doc: CadDocument,
     query: StateQuery<K>,

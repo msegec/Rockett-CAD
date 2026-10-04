@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { expect, expectTypeOf, it } from "vitest";
 import type {
-  BodyPayload,
+  MeshedBody,
   EvaluateResult,
   ExtensionFeature,
 } from "@rockett/shared";
@@ -38,7 +38,7 @@ it.each([
   );
 });
 
-const body: BodyPayload = {
+const body: MeshedBody = {
   bodyId: "handle-body",
   name: "Handle fixture",
   meshKey: "triangle",

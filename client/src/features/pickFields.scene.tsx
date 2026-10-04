@@ -7,7 +7,7 @@ import {
   createEmptyDocument,
   emptyView,
   nextFeatureName,
-  type BodyPayload,
+  type MeshedBody,
   type CadDocument,
   type SketchEntity,
   type SketchPayload,
@@ -32,7 +32,7 @@ import {
 
 const DX = 20;
 
-function second(): BodyPayload {
+function second(): MeshedBody {
   const body = box("second");
   body.bodyId = "b2";
   body.name = "Body2";

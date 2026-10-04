@@ -4,6 +4,7 @@ import {
   pathFor,
   ROUTES,
   type BodyPayload,
+  type MeshedBody,
   type MeshPayload,
 } from "@rockett/shared";
 import { request } from "../api";
@@ -12,11 +13,10 @@ const MAX_FETCHES = 6;
 const MESH_NUMBERS = 32 * 1024 * 1024;
 const QUEUE_LIMIT = 1024;
 
-export type LayerBody = Omit<BodyPayload, keyof MeshPayload> &
-  Partial<MeshPayload>;
+export type LayerBody = BodyPayload & Partial<MeshPayload>;
 
 export const hashOf = (body: LayerBody) => body.mesh?.hash ?? body.meshKey;
-const decoded = (body: LayerBody): body is LayerBody & MeshPayload =>
+const decoded = (body: LayerBody): body is MeshedBody =>
   body.positions !== undefined;
 const numbers = (m: MeshPayload) =>
   m.positions.length + m.normals.length + m.indices.length;
@@ -42,9 +42,8 @@ export class MeshRegistry {
   };
 
   get(body: LayerBody): MeshPayload | undefined {
+    if (decoded(body)) return body;
     const hit = this.meshes.get(body.meshKey);
-    if (decoded(body) && hit?.positions !== body.positions)
-      return this.keep(body.meshKey, meshPayload(body));
     if (!hit) return this.want(body);
     this.meshes.delete(body.meshKey);
     this.meshes.set(body.meshKey, hit);
@@ -113,6 +112,7 @@ export class MeshRegistry {
     const path = pathFor(ROUTES.mesh, { id: scope.id, hash });
     request<MeshPayload>(ROUTES.mesh.method, path, {
       signal: scope.stop.signal,
+      unwatched: true,
     })
       .then((mesh) => {
         if (scope !== this.scope) return;
@@ -138,4 +138,4 @@ export class MeshRegistry {
 export const meshes = new MeshRegistry();
 export const meshOf = (body: LayerBody) => meshes.get(body);
 export const useMeshVersion = () =>
-  useSyncExternalStore(meshes.subscribe, meshes.current);
+  useSyncExternalStore(meshes.subscribe, meshes.current, meshes.current);

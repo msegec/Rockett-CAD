@@ -175,8 +175,11 @@ function previewStage(context: RouterContext) {
       evaluationPosition(req, document),
     );
     previews.keep(id, tx, staged);
-    meshCache.publish(id, document.revision, evaluation.bodies, false);
-    reply(res, { document, evaluation, history: await history.status(id) });
+    reply(res, {
+      document,
+      evaluation: meshCache.publish(id, document.revision, evaluation, false),
+      history: await history.status(id),
+    });
   };
 
   async function sendStored(req: any, res: any) {

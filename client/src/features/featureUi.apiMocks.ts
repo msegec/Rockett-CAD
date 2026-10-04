@@ -18,7 +18,6 @@ export const repairApiMock = () => ({
     abortPreview: vi.fn(),
     undo: vi.fn(),
     evaluate: vi.fn(),
-    forgetMeshes: vi.fn(),
     stageNamingUpgrade: vi.fn(),
     commitNamingUpgrade: vi.fn(),
   },
@@ -30,7 +29,6 @@ export const pickApiMock = () => ({
     evaluate: vi.fn(),
     addFeature: vi.fn(),
     updateFeature: vi.fn(),
-    forgetMeshes: vi.fn(),
     putView: vi.fn(async (_id: string, view: unknown) => view),
   },
 });

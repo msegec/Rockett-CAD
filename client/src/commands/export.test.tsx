@@ -46,7 +46,6 @@ vi.mock("../api", () => ({
       ],
     })),
     exportModel: vi.fn(),
-    forgetMeshes: vi.fn(),
     putView: vi.fn(async (_id: string, view: unknown) => view),
   },
 }));

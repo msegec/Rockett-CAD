@@ -2,9 +2,9 @@ import {
   ValidationError,
   type ApiErrorCode,
   type CadDocument,
-  type EvaluateResult,
   type Formats,
   type Health,
+  type MeshedEvaluation,
 } from "@rockett/shared";
 import { StoreError } from "../store/projectStore.js";
 import type { Sources } from "../geometry/importers.js";
@@ -27,7 +27,7 @@ export interface Calls {
       extra: Sources | undefined,
       stop: Int32Array,
     ];
-    result: EvaluateResult;
+    result: MeshedEvaluation;
   };
   stateQuery: {
     args: [doc: CadDocument, query: StateQuery];
