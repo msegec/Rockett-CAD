@@ -1,5 +1,6 @@
 import { defineKernelJobs, type KernelJobScope } from "@rockett/plugin-api";
-import type { Arc, Xy } from "../shared/ir.js";
+import type { Arc, Xy, Xyz } from "../shared/ir.js";
+import type { FaceRef } from "../shared/params.js";
 import type { Placement } from "../shared/setup.js";
 
 export type Segment =
@@ -20,8 +21,17 @@ export type RegionsInput = {
 };
 type Edge = { from: Xy; segment: Segment };
 
+export type PlanarFace = { z: number; outer: RegionLoop; inner: RegionLoop[] };
+
+export type FaceBody = {
+  id: string;
+  brep: string;
+  faceNames: readonly string[];
+};
+
 const LENGTH = 1e-6;
 const FACING = 1 - 1e-9;
+const ALIGNED = 1 - 1e-6;
 
 const same = (a: Xy, b: Xy) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= LENGTH;
 
@@ -180,6 +190,104 @@ function section(scope: KernelJobScope, body: any, z: number): RegionLoop[] {
     edges.map((shape) => edge(scope, shape, z)),
     z,
   );
+}
+
+function planeOf({ oc, own }: KernelJobScope, face: any) {
+  const surface = own(new oc.BRepAdaptor_Surface_2(face, true));
+  if (surface.GetType() !== oc.GeomAbs_SurfaceType.GeomAbs_Plane)
+    return undefined;
+  const p = own(new oc.gp_Pnt_1());
+  const du = own(new oc.gp_Vec_1());
+  const dv = own(new oc.gp_Vec_1());
+  surface.D1(
+    (surface.FirstUParameter() + surface.LastUParameter()) / 2,
+    (surface.FirstVParameter() + surface.LastVParameter()) / 2,
+    p,
+    du,
+    dv,
+  );
+  const sign =
+    face.Orientation_1() === oc.TopAbs_Orientation.TopAbs_REVERSED ? -1 : 1;
+  const [ux, uy, uz] = [du.X(), du.Y(), du.Z()];
+  const [vx, vy, vz] = [dv.X(), dv.Y(), dv.Z()];
+  const n: Xyz = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+  const length = Math.hypot(...n) || 1;
+  const props = own(new oc.GProp_GProps_1());
+  oc.BRepGProp.SurfaceProperties_1(face, props, false, false);
+  const c = own(props.CentreOfMass());
+  return {
+    point: [c.X(), c.Y(), c.Z()] as Xyz,
+    direction: n.map((x) => (sign * x) / length) as Xyz,
+  };
+}
+
+function picked(scope: KernelJobScope, body: FaceBody, ref: FaceRef) {
+  const { faceName, sig } = ref;
+  const what = `face ${faceName} of body ${body.id}`;
+  if (!faceName || faceName.includes("~?"))
+    throw new RangeError(
+      `face name "${faceName}" of body ${body.id} is not a stable name; pick the face again`,
+    );
+  const index = body.faceNames.indexOf(faceName);
+  if (index < 0) throw new RangeError(`${what} is not in the model`);
+  const faces = [
+    ...shapes(scope, read(scope, body.brep, "face"), "TopAbs_FACE"),
+  ];
+  if (faces.length !== body.faceNames.length)
+    throw new Error(
+      `body ${body.id} has ${faces.length} faces but ${body.faceNames.length} face names`,
+    );
+  const face = scope.own(scope.oc.TopoDS.Face_1(faces[index]));
+  const found = planeOf(scope, face);
+  if (!found) throw new RangeError(`${what} is not planar`);
+  const dot = found.direction.reduce(
+    (sum, x, i) => sum + x * sig.direction[i]!,
+    0,
+  );
+  const moved = Math.hypot(...found.point.map((x, i) => x - sig.point[i]!));
+  if (sig.type !== "plane" || dot < ALIGNED || moved > LENGTH)
+    throw new RangeError(
+      `${what} no longer matches the face that was picked; pick it again`,
+    );
+  return face;
+}
+
+function wireLoop(scope: KernelJobScope, wire: any, z: number) {
+  const edges = [...shapes(scope, wire, "TopAbs_EDGE")];
+  const [loop, ...more] = chain(
+    edges.map((shape) => edge(scope, shape, z)),
+    z,
+  );
+  if (!loop || more.length)
+    throw new Error(`a wire of the face at Z ${z} is not one closed loop`);
+  return loop;
+}
+
+export function planarFace(
+  scope: KernelJobScope,
+  body: FaceBody,
+  ref: FaceRef,
+  at: Placement,
+): PlanarFace {
+  const { oc, own } = scope;
+  const face = own(
+    oc.TopoDS.Face_1(toSetup(scope, picked(scope, body, ref), at)),
+  );
+  const found = planeOf(scope, face)!;
+  if (found.direction[2] < FACING)
+    throw new RangeError(
+      `face ${ref.faceName} of body ${body.id} does not face up in the setup`,
+    );
+  const z = found.point[2];
+  const outer = own(oc.BRepTools.OuterWire(face));
+  const inner = [...shapes(scope, face, "TopAbs_WIRE")].filter(
+    (wire) => !wire.IsSame(outer),
+  );
+  return {
+    z,
+    outer: wireLoop(scope, outer, z),
+    inner: inner.map((wire) => wireLoop(scope, wire, z)),
+  };
 }
 
 export default defineKernelJobs({

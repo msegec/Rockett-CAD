@@ -10,11 +10,16 @@ import {
   type Xyz,
 } from "../src/shared/ir.js";
 import type { Preset, Tool } from "../src/shared/tools.js";
-import { contour, type ContourInput } from "../src/toolpath/contour.js";
+import offset from "../src/kernel/offset.js";
+import {
+  contour,
+  type ContourInput,
+  type Offset,
+} from "../src/toolpath/contour.js";
 import type { Loop } from "../src/toolpath/geometry.js";
-import { moduleJob, startKernel } from "./helpers/kernel.js";
+import { oc, scoped, startKernel } from "./helpers/kernel.js";
 
-const ENTRY = new URL("../src/kernel/offset.ts", import.meta.url).href;
+const job = offset["rockett.cam.offset"]!;
 
 beforeAll(startKernel, 120_000);
 
@@ -110,13 +115,17 @@ const base: ContourInput = {
   preset,
 };
 
-const run = (id: string, input: unknown) => moduleJob(ENTRY, id, input);
+const run: Offset = (input) =>
+  scoped(
+    (own) =>
+      job(input as never, { oc, own, progress: () => {} }) as RegionLoop[],
+  );
 
 const cut = (changes: Partial<ContourInput>) =>
   contour({ ...base, ...changes }, run);
 
 const offsetTo = (path: RegionLoop) => (changes: Partial<ContourInput>) =>
-  contour({ ...base, ...changes }, () => Promise.resolve([path]));
+  contour({ ...base, ...changes }, () => [path]);
 
 function ends(moves: Move[]): Xyz[] {
   return moves.flatMap((move) =>
@@ -153,21 +162,21 @@ function fromCore([x, y]: Xy, [x0, y0, x1, y1]: number[]): number {
 }
 
 describe("contour", () => {
-  it("matches the golden IR for an outside climb contour of 40 by 30 R5", async () => {
+  it("matches the golden IR for an outside climb contour of 40 by 30 R5", () => {
     const golden = JSON.parse(
       readFileSync(new URL("golden/ir/contour.json", import.meta.url), "utf8"),
     ) as unknown;
-    expect(await cut({})).toEqual(golden);
+    expect(cut({})).toEqual(golden);
   });
 
-  it("rejects a plunge with a tool that is not centre cutting", async () => {
-    await expect(
-      cut({ tool: { ...tool, centreCutting: false } }),
-    ).rejects.toThrow("6 mm flat is not centre cutting and cannot plunge");
+  it("rejects a plunge with a tool that is not centre cutting", () => {
+    expect(() => cut({ tool: { ...tool, centreCutting: false } })).toThrow(
+      "6 mm flat is not centre cutting and cannot plunge",
+    );
   });
 
-  it("forms a valid program", async () => {
-    const section = await cut({});
+  it("forms a valid program", () => {
+    const section = cut({});
     expect(
       validateProgram({
         irVersion: 1,
@@ -180,8 +189,8 @@ describe("contour", () => {
     ).toEqual([]);
   });
 
-  it("enters and retracts at the start point, rapids only above the clearance", async () => {
-    const { moves } = await cut({});
+  it("enters and retracts at the start point, rapids only above the clearance", () => {
+    const { moves } = cut({});
     expect(moves.slice(0, 3)).toEqual([
       { kind: "rapid", to: [-3, 15, 15] },
       { kind: "rapid", to: [-3, 15, 3] },
@@ -202,19 +211,19 @@ describe("contour", () => {
     expect(ends([moves.at(-2)!])).toEqual([[-3, 15, -6]]);
   });
 
-  it("plunges at the path point nearest the start point", async () => {
-    const { moves } = await cut({ start: [60, 15] });
+  it("plunges at the path point nearest the start point", () => {
+    const { moves } = cut({ start: [60, 15] });
     expect(moves[0]).toEqual({ kind: "rapid", to: [43, 15, 15] });
   });
 
-  it("steps down no more than the stepdown and ends at the final depth", async () => {
+  it("steps down no more than the stepdown and ends at the final depth", () => {
     for (const [stepdown, bottom, want] of [
       [3, -6, [-3, -6]],
       [4, -6, [-4, -6]],
       [2.5, -6, [-2.5, -5, -6]],
       [10, -6, [-6]],
     ] as const) {
-      const { moves } = await cut({ bottom, preset: { ...preset, stepdown } });
+      const { moves } = cut({ bottom, preset: { ...preset, stepdown } });
       const zs = moves.flatMap((move) =>
         move.kind === "feed" && move.role === "plunge" ? [move.to[2]] : [],
       );
@@ -222,12 +231,12 @@ describe("contour", () => {
     }
   });
 
-  it("cuts outside at the tool radius on R8 arcs and inside on R2 arcs", async () => {
+  it("cuts outside at the tool radius on R8 arcs and inside on R2 arcs", () => {
     for (const [side, radius] of [
       ["outside", 8],
       ["inside", 2],
     ] as const) {
-      const section = await cut({ side });
+      const section = cut({ side });
       for (const point of level(section, -6))
         expect(fromCore(point, [5, 5, 35, 25])).toBeCloseTo(radius, 9);
       const arcs = section.moves.flatMap((move) =>
@@ -244,29 +253,29 @@ describe("contour", () => {
     }
   });
 
-  it("runs climb clockwise outside and counter-clockwise inside", async () => {
+  it("runs climb clockwise outside and counter-clockwise inside", () => {
     for (const [side, direction, clockwiseWanted, dir] of [
       ["outside", "climb", true, "cw"],
       ["outside", "conventional", false, "ccw"],
       ["inside", "climb", false, "ccw"],
       ["inside", "conventional", true, "cw"],
     ] as const) {
-      const section = await cut({ side, direction });
+      const section = cut({ side, direction });
       expect(area(level(section, -3)) < 0).toBe(clockwiseWanted);
       for (const move of section.moves)
         if (move.kind === "arc") expect(move.dir).toBe(dir);
     }
   });
 
-  it("cuts the same path from a loop given clockwise", async () => {
+  it("cuts the same path from a loop given clockwise", () => {
     for (const side of ["outside", "inside"] as const)
-      expect(snapped(await cut({ loop: clockwise, side }))).toEqual(
-        snapped(await cut({ side })),
+      expect(snapped(cut({ loop: clockwise, side }))).toEqual(
+        snapped(cut({ side })),
       );
   });
 
-  it("offsets a full circle and plunges where the start point says", async () => {
-    const section = await cut({ loop: circle(5), start: [0, 20] });
+  it("offsets a full circle and plunges where the start point says", () => {
+    const section = cut({ loop: circle(5), start: [0, 20] });
     expect(snapped(section.moves[0])).toEqual({
       kind: "rapid",
       to: [0, 8, 15],
@@ -282,7 +291,7 @@ describe("contour", () => {
     ).toEqual([x, y, -6]);
   });
 
-  it("never emits an arc short enough to read as a full circle", async () => {
+  it("never emits an arc short enough to read as a full circle", () => {
     const kinked: RegionLoop = {
       start: [0, 0],
       segments: [
@@ -293,7 +302,7 @@ describe("contour", () => {
         { kind: "line", to: [0, 0] },
       ],
     };
-    const { moves } = await cut({ loop: kinked, start: [-10, 10] });
+    const { moves } = cut({ loop: kinked, start: [-10, 10] });
     let at: Xyz | undefined;
     for (const move of moves) {
       if (move.kind === "arc" && at)
@@ -306,9 +315,9 @@ describe("contour", () => {
     expect(moves.filter((move) => move.kind === "arc")).toHaveLength(8);
   });
 
-  it("cuts a near full arc closed by a sub-micron line as its whole circle", async () => {
+  it("cuts a near full arc closed by a sub-micron line as its whole circle", () => {
     const short = 0.0005 / 8;
-    const { moves } = await offsetTo({
+    const { moves } = offsetTo({
       start: [8, 0],
       segments: [
         {
@@ -331,8 +340,8 @@ describe("contour", () => {
     expect(turned).toBeCloseTo(2 * Math.PI - short, 6);
   });
 
-  it("rejects a path whose only area is in arc joins shorter than a micron", async () => {
-    await expect(
+  it("rejects a path whose only area is in arc joins shorter than a micron", () => {
+    expect(() =>
       offsetTo({
         start: [0, 0],
         segments: [
@@ -342,18 +351,18 @@ describe("contour", () => {
           { kind: "arc", to: [0, 0], centre: [3, 5e-7], dir: "ccw" },
         ],
       })({}),
-    ).rejects.toThrow("leaves a path with no area");
+    ).toThrow("leaves a path with no area");
   });
 
-  it("rejects an inside contour of a loop smaller than the tool", async () => {
-    await expect(cut({ loop: circle(2), side: "inside" })).rejects.toThrow(
+  it("rejects an inside contour of a loop smaller than the tool", () => {
+    expect(() => cut({ loop: circle(2), side: "inside" })).toThrow(
       "inside offset by the 3 mm tool radius leaves no path: the loop is smaller than the tool",
     );
   });
 
-  it("offsets a point loop through clipper at the tool radius", async () => {
+  it("offsets a point loop through clipper at the tool radius", () => {
     for (const loop of [rectangle, [...rectangle].reverse()]) {
-      const section = await cut({ loop });
+      const section = cut({ loop });
       const points = level(section, -6);
       expect(points.length).toBeGreaterThan(8);
       for (const point of points)
@@ -369,7 +378,7 @@ describe("contour", () => {
     }
   });
 
-  it("rejects an inside path with no area in a slot as wide as the tool", async () => {
+  it("rejects an inside path with no area in a slot as wide as the tool", () => {
     const slot: RegionLoop = {
       start: [0, 0],
       segments: [
@@ -379,46 +388,46 @@ describe("contour", () => {
         { kind: "arc", to: [0, 0], centre: [0, 3], dir: "ccw" },
       ],
     };
-    await expect(cut({ loop: slot, side: "inside" })).rejects.toThrow(
+    expect(() => cut({ loop: slot, side: "inside" })).toThrow(
       "inside offset by the 3 mm tool radius leaves a path with no area: the loop is no wider than the tool",
     );
   });
 
-  it("rejects an inside offset that splits where the tool does not fit", async () => {
-    await expect(cut({ loop: dumbbell, side: "inside" })).rejects.toThrow(
+  it("rejects an inside offset that splits where the tool does not fit", () => {
+    expect(() => cut({ loop: dumbbell, side: "inside" })).toThrow(
       "inside offset by the 3 mm tool radius splits into 2 loops: the tool does not fit everywhere",
     );
   });
 
-  it("rejects tools that are not flat or bull end mills", async () => {
+  it("rejects tools that are not flat or bull end mills", () => {
     for (const other of [
       { ...tool, kind: "ball" as const },
       { ...tool, kind: "drill" as const, tipAngle: 118 },
       { ...tool, kind: "vbit" as const, tipAngle: 90 },
     ])
-      await expect(cut({ tool: other })).rejects.toThrow(
+      expect(() => cut({ tool: other })).toThrow(
         `contour needs a flat or bull end mill, not a ${other.kind}`,
       );
-    await expect(
+    expect(
       cut({ tool: { ...tool, kind: "bull", cornerRadius: 1 } }),
-    ).resolves.toBeDefined();
+    ).toBeDefined();
   });
 
-  it("rejects a cut past the flute length", async () => {
-    await expect(cut({ bottom: -22.5 })).rejects.toThrow(
+  it("rejects a cut past the flute length", () => {
+    expect(() => cut({ bottom: -22.5 })).toThrow(
       "a 22.5 mm deep cut is past the 22 mm flute length of 6 mm flat",
     );
   });
 
-  it("rejects a final depth not below the stock top and a clearance it cannot keep", async () => {
-    await expect(cut({ bottom: 0 })).rejects.toThrow(RangeError);
-    await expect(
-      cut({ setup: { safeHeight: 15, clearance: 0 } }),
-    ).rejects.toThrow(RangeError);
-    await expect(
-      cut({ setup: { safeHeight: 2, clearance: 3 } }),
-    ).rejects.toThrow(RangeError);
-    await expect(cut({ preset: { ...preset, plungeFeed: 0 } })).rejects.toThrow(
+  it("rejects a final depth not below the stock top and a clearance it cannot keep", () => {
+    expect(() => cut({ bottom: 0 })).toThrow(RangeError);
+    expect(() => cut({ setup: { safeHeight: 15, clearance: 0 } })).toThrow(
+      RangeError,
+    );
+    expect(() => cut({ setup: { safeHeight: 2, clearance: 3 } })).toThrow(
+      RangeError,
+    );
+    expect(() => cut({ preset: { ...preset, plungeFeed: 0 } })).toThrow(
       "plungeFeed must be greater than 0",
     );
   });

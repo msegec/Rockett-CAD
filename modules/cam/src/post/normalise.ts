@@ -15,6 +15,7 @@ import {
   type Xyz,
 } from "../shared/ir.js";
 import { MM_PER_INCH } from "../shared/tools.js";
+import { arcStep } from "../toolpath/geometry.js";
 import type { Post } from "./schema.js";
 
 export type Units = "mm" | "inch";
@@ -67,7 +68,7 @@ export function expandArc(
   const sweep = arcSweep(from, arc);
   const sign = dir === "ccw" ? 1 : -1;
   const start = Math.atan2(sv - cv, su - cu);
-  const step = 2 * Math.acos(Math.max(-1, 1 - tolerance / Math.max(r0, r1)));
+  const step = arcStep(Math.max(r0, r1), tolerance);
   const cuts = quadrantCuts(start, sweep, dir === "ccw");
   const angles = cuts.slice(1).flatMap((end, i) => {
     const begin = cuts[i]!;

@@ -3,8 +3,10 @@ import type { Section, Xy, Xyz } from "../shared/ir.js";
 import type { Fixture, Setup } from "../shared/setup.js";
 import {
   PIECE,
+  append,
   bandOf,
   checkCut,
+  checkMoves,
   components,
   covers,
   depthLevels,
@@ -43,7 +45,9 @@ export type Clearing = Layer & {
 
 type Entry = { kind: "helix"; centre: Xy } | { kind: "ramp" };
 
-type Step = { ring: RegionLoop; entry?: Entry };
+type Role = "link" | "cut";
+
+type Step = { ring: RegionLoop } & ({ entry: Entry } | { link: Role });
 
 type Plan = { steps: Step[]; descend: boolean };
 
@@ -61,6 +65,7 @@ const PROOF = 2e-3;
 export const SKIN = WALL + PROOF;
 const HELIX = 0.45;
 const MARGIN = 0.05;
+const RAMP_ANGLE = 0.5;
 
 const point = ([x, y]: Xy) => ({ x, y });
 
@@ -165,7 +170,10 @@ function plan(
     const next = unionLoops([...cleared, ...bandOf(points, shape.radius)]);
     chosen.push(
       at && reachable(at, ring.start, next, shape)
-        ? { ring }
+        ? {
+            ring,
+            link: reachable(at, ring.start, cleared, shape) ? "link" : "cut",
+          }
         : { ring, entry: entryFor(ring, shape) },
     );
     cleared = next;
@@ -226,12 +234,12 @@ function ramp(ring: RegionLoop, top: number, z: number, shape: Pocket) {
   return moves;
 }
 
-function link([x, y]: Xy, z: number, shape: Pocket): Motion {
+function link([x, y]: Xy, z: number, shape: Pocket, role: Role): Motion {
   return {
     kind: "feed",
     to: [x, y, z],
     feed: shape.input.preset.cutFeed,
-    role: "link",
+    role,
   };
 }
 
@@ -262,19 +270,21 @@ function level(
   at: Xyz | undefined,
 ) {
   const moves: Motion[] = [];
-  for (const [i, { ring, entry }] of order.entries()) {
+  for (const [i, step] of order.entries()) {
+    const { ring } = step;
     const p = ring.start;
-    if (!entry) moves.push(link(p, z, shape));
+    if ("link" in step) moves.push(link(p, z, shape, step.link));
     else {
-      if (at && !i && descend) moves.push(link(p, from, shape));
-      else moves.push(...approach(moves.at(-1)?.to ?? at, p, from, shape));
-      moves.push(
-        ...(entry.kind === "helix"
-          ? helix(entry.centre, p, from, z, shape)
-          : ramp(ring, from, z, shape)),
+      if (at && !i && descend) moves.push(link(p, from, shape, "link"));
+      else append(moves, approach(moves.at(-1)?.to ?? at, p, from, shape));
+      append(
+        moves,
+        step.entry.kind === "helix"
+          ? helix(step.entry.centre, p, from, z, shape)
+          : ramp(ring, from, z, shape),
       );
     }
-    moves.push(...pass(ring, z, shape.input.preset.cutFeed));
+    append(moves, pass(ring, z, shape.input.preset.cutFeed));
   }
   return moves;
 }
@@ -347,8 +357,10 @@ export function clearRegion(
 ): Section {
   checkCut("pocket", input);
   const { setup, stock, tool, preset, rampAngle } = input;
-  if (!(rampAngle > 0 && rampAngle < 90))
-    throw new RangeError("ramp angle must be above 0 and below 90 degrees");
+  if (!(rampAngle >= RAMP_ANGLE && rampAngle < 90))
+    throw new RangeError(
+      `ramp angle must be at least ${RAMP_ANGLE} and below 90 degrees`,
+    );
   const top = stock.max[2];
   const levels = depthLevels(top, input.bottom, preset.stepdown);
   const radius = tool.diameter / 2;
@@ -374,7 +386,11 @@ export function clearRegion(
     if (!chosen) continue;
     const from = l ? levels[l - 1]! : top;
     const linked = chosen === last ? chosen : { ...chosen, descend: false };
-    moves.push(...level(z, from, linked, shape, moves.at(-1)?.to));
+    append(moves, level(z, from, linked, shape, moves.at(-1)?.to));
+    checkMoves(
+      `pocket at depth level ${l + 1} of ${levels.length}`,
+      moves.length,
+    );
     last = chosen;
   }
   const end = moves.at(-1)!.to;

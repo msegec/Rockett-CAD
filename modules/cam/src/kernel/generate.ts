@@ -1,9 +1,20 @@
 import { defineKernelJobs, type KernelJobScope } from "@rockett/plugin-api";
 import type { Program, Section } from "../shared/ir.js";
 import { isOperation, type OperationType } from "../shared/operations.js";
+import {
+  contourParams,
+  paramsOf,
+  pocketParams,
+  type FaceRef,
+} from "../shared/params.js";
 import { stockBox, type Box, type Setup } from "../shared/setup.js";
 import type { Preset, Tool } from "../shared/tools.js";
+import { contour } from "../toolpath/contour.js";
 import { facing } from "../toolpath/facing.js";
+import { checkMoves, chorded } from "../toolpath/geometry.js";
+import { pocket } from "../toolpath/pocket.js";
+import offset, { type OffsetInput } from "./offset.js";
+import { planarFace, type FaceBody, type RegionLoop } from "./regions.js";
 
 export type GenerateInput = {
   setup: Pick<
@@ -13,10 +24,15 @@ export type GenerateInput = {
   operation: { id: string; type: string; params: unknown };
   tool: Tool & { number: number };
   preset: Preset;
-  bodies: { id: string; bbox: Box; brep: string }[];
+  bodies: (FaceBody & { bbox: Box })[];
 };
 
 type Generator = (input: GenerateInput, scope: KernelJobScope) => Section[];
+
+const offsetJob = offset["rockett.cam.offset"] as (
+  input: OffsetInput,
+  scope: KernelJobScope,
+) => RegionLoop[];
 
 const boxes = ({ bodies }: GenerateInput) =>
   Object.fromEntries(bodies.map(({ id, bbox }) => [id, bbox]));
@@ -35,6 +51,21 @@ function modelTop({ setup }: GenerateInput, at: Record<string, Box>) {
   );
 }
 
+function faceOf(input: GenerateInput, scope: KernelJobScope, ref: FaceRef) {
+  const body = input.bodies.find(({ id }) => id === ref.bodyId);
+  if (!body)
+    throw new RangeError(`face body ${ref.bodyId} is not a setup body`);
+  const stock = stockBox(input.setup, boxes(input));
+  return { stock, face: planarFace(scope, body, ref, stock.modelToSetup) };
+}
+
+const cut = ({ operation, setup, tool, preset }: GenerateInput) => ({
+  operationId: operation.id,
+  setup,
+  tool,
+  preset,
+});
+
 const GENERATORS: Readonly<Record<OperationType, Generator>> = {
   "rockett.cam.facing"(input) {
     const at = boxes(input);
@@ -49,6 +80,45 @@ const GENERATORS: Readonly<Record<OperationType, Generator>> = {
       }),
     ];
   },
+  "rockett.cam.contour"(input, scope) {
+    const { type, params } = input.operation;
+    const {
+      face: ref,
+      side,
+      bottomOffset,
+    } = paramsOf(contourParams, type, params);
+    const { stock, face } = faceOf(input, scope, ref);
+    return [
+      contour(
+        {
+          ...cut(input),
+          stock,
+          bottom: face.z - bottomOffset,
+          loop: face.outer,
+          side,
+          direction: "climb",
+          start: face.outer.start,
+        },
+        (loop) => offsetJob(loop, scope),
+      ),
+    ];
+  },
+  "rockett.cam.pocket"(input, scope) {
+    const { type, params } = input.operation;
+    const { floor, rampAngle } = paramsOf(pocketParams, type, params);
+    const { stock, face } = faceOf(input, scope, floor);
+    return [
+      pocket({
+        ...cut(input),
+        setup: { ...input.setup, fixtures: [] },
+        stock,
+        bottom: face.z,
+        rampAngle,
+        boundary: chorded(face.outer),
+        islands: face.inner.map(chorded),
+      }),
+    ];
+  },
 };
 
 function generate(input: GenerateInput, scope: KernelJobScope): Program {
@@ -57,6 +127,10 @@ function generate(input: GenerateInput, scope: KernelJobScope): Program {
   if (!isOperation(type)) throw new Error(`operation ${type} is unknown`);
   scope.progress(0, 1, type);
   const sections = GENERATORS[type](input, scope);
+  checkMoves(
+    `operation ${input.operation.id}`,
+    sections.reduce((sum, { moves }) => sum + moves.length, 0),
+  );
   scope.progress(1, 1, type);
   return {
     irVersion: 1,

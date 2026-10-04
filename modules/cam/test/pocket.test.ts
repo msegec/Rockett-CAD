@@ -331,7 +331,7 @@ describe("pocket", () => {
     );
     for (const rampAngle of [0, 90, Number.NaN])
       expect(() => cut({ rampAngle })).toThrow(
-        "ramp angle must be above 0 and below 90 degrees",
+        "ramp angle must be at least 0.5 and below 90 degrees",
       );
   });
 

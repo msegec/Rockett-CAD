@@ -109,7 +109,12 @@ async function prepare(model: Model, job: Job): Promise<Blocked | Ready> {
     fingerprint,
     input: {
       ...job,
-      bodies: bodies.map(({ id, bbox, brep }) => ({ id, bbox, brep })),
+      bodies: bodies.map(({ id, bbox, brep, faceNames }) => ({
+        id,
+        bbox,
+        brep,
+        faceNames,
+      })),
     },
   };
 }

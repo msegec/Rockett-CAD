@@ -99,7 +99,7 @@ const base: ContourInput = {
 const TAB_TOP = -2;
 
 const cut = (changes: Partial<ContourInput>, path = outside) =>
-  contour({ ...base, ...changes }, () => Promise.resolve([path]));
+  contour({ ...base, ...changes }, () => [path]);
 
 function samples(moves: Move[]): Xyz[] {
   const out: Xyz[] = [];
@@ -233,22 +233,21 @@ const secondLevel = (moves: Move[]) =>
   );
 
 describe("contour tabs", () => {
-  it("keeps four 3 mm wide, 4 mm high tabs intact on every pass below the tab top", async () => {
-    const { moves } = await cut({});
+  it("keeps four 3 mm wide, 4 mm high tabs intact on every pass below the tab top", () => {
+    const { moves } = cut({});
     keepsTabs(moves, outside);
   });
 
-  it("cuts the passes above the tab top as an untabbed contour does", async () => {
-    const tabbed = (await cut({})).moves;
-    const untabbed = (await contour(plain, () => Promise.resolve([outside])))
-      .moves;
+  it("cuts the passes above the tab top as an untabbed contour does", () => {
+    const tabbed = cut({}).moves;
+    const untabbed = contour(plain, () => [outside]).moves;
     expect(tabbed.slice(0, secondLevel(tabbed))).toEqual(
       untabbed.slice(0, secondLevel(untabbed)),
     );
   });
 
-  it("drops beside a tab only through cut stock and ramps at the ramp feed", async () => {
-    const { moves } = await cut({});
+  it("drops beside a tab only through cut stock and ramps at the ramp feed", () => {
+    const { moves } = cut({});
     const entry = moves[2]!;
     const deepest = new Map<string, number>();
     let at: Xyz | undefined;
@@ -270,9 +269,9 @@ describe("contour tabs", () => {
     }
   });
 
-  it("splits the arcs of a round part exactly at the tab ends", async () => {
+  it("splits the arcs of a round part exactly at the tab ends", () => {
     const path = ring(23);
-    const section = await cut({ loop: ring(20), start: [0, -40] }, path);
+    const section = cut({ loop: ring(20), start: [0, -40] }, path);
     keepsTabs(section.moves, path);
     for (const move of section.moves)
       if (move.kind === "arc") {
@@ -291,24 +290,20 @@ describe("contour tabs", () => {
     ).toEqual([]);
   });
 
-  it("refuses tabs that cannot sit a tool radius clear of corners and the start point", async () => {
-    await expect(cut({ start: [-10, 15] })).rejects.toThrow(
+  it("refuses tabs that cannot sit a tool radius clear of corners and the start point", () => {
+    expect(() => cut({ start: [-10, 15] })).toThrow(
       "4 evenly spaced tabs do not fit: each lifted span must lie on one line or arc of the path, 3 mm clear of every corner and of the start point",
     );
   });
 
-  it("refuses more tabs than the path has room for", async () => {
-    await expect(
-      cut({ tabs: { count: 20, width: 3, height: 4 } }),
-    ).rejects.toThrow(
+  it("refuses more tabs than the path has room for", () => {
+    expect(() => cut({ tabs: { count: 20, width: 3, height: 4 } })).toThrow(
       "20 tabs do not fit on the 150.265 mm path: each lifts over its 3 mm width plus the 6 mm tool diameter, then ramps down over another tool diameter",
     );
   });
 
-  it("refuses a tab that reaches the stock top and tab sizes that are not positive", async () => {
-    await expect(
-      cut({ tabs: { count: 4, width: 3, height: 6 } }),
-    ).rejects.toThrow(
+  it("refuses a tab that reaches the stock top and tab sizes that are not positive", () => {
+    expect(() => cut({ tabs: { count: 4, width: 3, height: 6 } })).toThrow(
       "a 6 mm tab reaches the stock top: the cut is only 6 mm deep",
     );
     for (const [tabs, message] of [
@@ -323,6 +318,6 @@ describe("contour tabs", () => {
       [{ count: 4, width: 0, height: 4 }, "tab width must be above 0"],
       [{ count: 4, width: 3, height: -1 }, "tab height must be above 0"],
     ] as const)
-      await expect(cut({ tabs })).rejects.toThrow(message);
+      expect(() => cut({ tabs })).toThrow(message);
   });
 });

@@ -37,7 +37,25 @@ const UNITS_PER_MM = 10_000;
 const EPSILON = 1e-9;
 const ARC_TOLERANCE = 0.0005;
 const MITER_LIMIT = 2;
+const STEPDOWN = 0.01;
+const STEPOVER = 0.05;
+const MOVES = 1_000_000;
 export const PIECE = 1e-3;
+
+export function checkMoves(what: string, count: number) {
+  if (count > MOVES)
+    throw new RangeError(
+      `${what} passes the limit of ${MOVES.toLocaleString("en")} moves`,
+    );
+}
+
+export function append<T>(out: T[], items: readonly T[]) {
+  for (const item of items) out.push(item);
+}
+
+export function arcStep(radius: number, tolerance: number): number {
+  return 2 * Math.acos(Math.max(-1, 1 - tolerance / radius));
+}
 
 export function steps(length: number, step: number): number {
   return Math.max(1, Math.ceil(length / step - EPSILON));
@@ -50,7 +68,8 @@ export function depthLevels(
 ): number[] {
   if (!(top > bottom))
     throw new RangeError("stock top must be above the cut depth");
-  if (!(stepdown > 0)) throw new RangeError("stepdown must be above 0");
+  if (!(stepdown >= STEPDOWN))
+    throw new RangeError(`stepdown must be at least ${STEPDOWN} mm`);
   const count = steps(top - bottom, stepdown);
   return Array.from({ length: count }, (_, i) =>
     i + 1 < count ? top - (i + 1) * stepdown : bottom,
@@ -180,8 +199,10 @@ export function checkCut(operation: string, cut: Cut) {
 }
 
 export function stepoverOf({ stepoverFraction }: Preset, tool: Tool): number {
-  if (!(stepoverFraction > 0 && stepoverFraction <= 1))
-    throw new RangeError("stepover fraction must be above 0 and at most 1");
+  if (!(stepoverFraction >= STEPOVER && stepoverFraction <= 1))
+    throw new RangeError(
+      `stepover fraction must be at least ${STEPOVER} and at most 1`,
+    );
   return stepoverFraction * tool.diameter;
 }
 
@@ -197,6 +218,29 @@ function sweep(from: Xy, to: Xy, centre: Xy, dir: "cw" | "ccw") {
     feed: 1,
     role: "cut",
   });
+}
+
+export function chorded(loop: RegionLoop): Loop {
+  const points: Loop = [{ x: loop.start[0], y: loop.start[1] }];
+  for (const { from, segment } of pieces(loop)) {
+    if (segment.kind === "arc") {
+      const [cx, cy] = segment.centre;
+      const radius = gap(from, segment.centre);
+      const turn = sweep(from, segment.to, segment.centre, segment.dir);
+      const count = steps(turn, arcStep(radius, ARC_TOLERANCE));
+      const begin = Math.atan2(from[1] - cy, from[0] - cx);
+      const sign = segment.dir === "ccw" ? 1 : -1;
+      for (let i = 1; i < count; i++) {
+        const angle = begin + (sign * turn * i) / count;
+        points.push({
+          x: cx + radius * Math.cos(angle),
+          y: cy + radius * Math.sin(angle),
+        });
+      }
+    }
+    points.push({ x: segment.to[0], y: segment.to[1] });
+  }
+  return points.slice(0, -1);
 }
 
 export function lines(loop: Loop): RegionLoop {

@@ -2,7 +2,7 @@ import type { Move, Section, Xyz } from "../shared/ir.js";
 import { toolRefusal } from "../shared/operations.js";
 import type { Box, Setup } from "../shared/setup.js";
 import type { Preset, Tool } from "../shared/tools.js";
-import { depthLevels, steps } from "./geometry.js";
+import { checkMoves, depthLevels, stepoverOf, steps } from "./geometry.js";
 
 export type FacingInput = {
   operationId: string;
@@ -17,9 +17,7 @@ function rows({ stock, tool, preset }: FacingInput): number[] {
   const refusal = toolRefusal("rockett.cam.facing", tool.kind);
   if (refusal) throw new RangeError(refusal);
   const radius = tool.diameter / 2;
-  const stepover = preset.stepoverFraction * tool.diameter;
-  if (!(preset.stepoverFraction > 0 && preset.stepoverFraction <= 1))
-    throw new RangeError("stepover fraction must be above 0 and at most 1");
+  const stepover = stepoverOf(preset, tool);
   if (!(stepover > 0)) throw new RangeError("tool diameter must be above 0");
   const [, from] = stock.min;
   const count = steps(stock.max[1] - from, stepover);
@@ -61,6 +59,10 @@ export function facing(input: FacingInput): Section {
       at = [ends[side]!, y, z];
       moves.push({ kind: "feed", to: at, feed: preset.cutFeed, role: "cut" });
     }
+    checkMoves(
+      `facing at depth level ${level + 1} of ${levels.length}`,
+      moves.length,
+    );
   }
   moves.push({ kind: "rapid", to: [at[0], at[1], top + setup.safeHeight] });
   return {

@@ -1,4 +1,3 @@
-import type { StartKernelJob } from "@rockett/plugin-api";
 import {
   arcSweep,
   type Move,
@@ -10,8 +9,10 @@ import type { OffsetInput } from "../kernel/offset.js";
 import type { RegionLoop, Segment } from "../kernel/regions.js";
 import {
   PIECE,
+  append,
   area,
   checkCut,
+  checkMoves,
   depthLevels,
   gap,
   lines,
@@ -23,6 +24,8 @@ import {
   type Loop,
   type Motion,
 } from "./geometry.js";
+
+export type Offset = (input: OffsetInput) => RegionLoop[];
 
 export type Tabs = { count: number; width: number; height: number };
 
@@ -61,16 +64,13 @@ function check(input: ContourInput) {
     );
 }
 
-async function offset(input: ContourInput, run: StartKernelJob) {
+function offset(input: ContourInput, run: Offset) {
   const { loop, side, tool } = input;
   const radius = tool.diameter / 2;
   const distance = side === "outside" ? radius : -radius;
   const found = Array.isArray(loop)
     ? offsetLoops([loop], distance).map(lines)
-    : ((await run("rockett.cam.offset", {
-        loop,
-        distance,
-      } satisfies OffsetInput)) as RegionLoop[]);
+    : run({ loop, distance });
   const what = `${side} offset by the ${radius} mm tool radius`;
   if (!found.length)
     throw new RangeError(
@@ -319,15 +319,12 @@ function tabbed(
   return [...moves, ...pass(stretch(path, s, length), z, cutFeed)];
 }
 
-export async function contour(
-  input: ContourInput,
-  run: StartKernelJob,
-): Promise<Section> {
+export function contour(input: ContourInput, run: Offset): Section {
   check(input);
   const { setup, stock, tool, preset } = input;
   const top = stock.max[2];
   const levels = depthLevels(top, input.bottom, preset.stepdown);
-  const loop = startAt(oriented(await offset(input, run), input), input.start);
+  const loop = startAt(oriented(offset(input, run), input), input.start);
   const path = measured(loop);
   const plan = input.tabs && planned(path, input, input.tabs);
   const [x, y] = loop.start;
@@ -335,14 +332,26 @@ export async function contour(
   const moves: Move[] = [
     { kind: "rapid", to: above(setup.safeHeight) },
     { kind: "rapid", to: above(setup.clearance) },
-    ...levels.flatMap((z, i): Move[] => [
-      { kind: "feed", to: [x, y, z], feed: preset.plungeFeed, role: "plunge" },
-      ...(plan && z < plan.top
-        ? tabbed(path, z, levels[i - 1] ?? top, plan, preset)
-        : pass(loop, z, preset.cutFeed)),
-    ]),
-    { kind: "rapid", to: above(setup.safeHeight) },
   ];
+  for (const [i, z] of levels.entries()) {
+    moves.push({
+      kind: "feed",
+      to: [x, y, z],
+      feed: preset.plungeFeed,
+      role: "plunge",
+    });
+    append(
+      moves,
+      plan && z < plan.top
+        ? tabbed(path, z, levels[i - 1] ?? top, plan, preset)
+        : pass(loop, z, preset.cutFeed),
+    );
+    checkMoves(
+      `contour at depth level ${i + 1} of ${levels.length}`,
+      moves.length,
+    );
+  }
+  moves.push({ kind: "rapid", to: above(setup.safeHeight) });
   return {
     operationId: input.operationId,
     toolId: tool.id,
