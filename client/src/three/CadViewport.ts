@@ -10,7 +10,6 @@
 import * as THREE from "three";
 import {
   ORIGIN_AXES,
-  type BodyPayload,
   type ConstructionPlanePayload,
   type OriginAxis,
   type PlaneFrame,
@@ -28,7 +27,8 @@ import {
 } from "./pickProviders";
 import { clientRay } from "./screen";
 import { boxPick, type BoxMode, type ClientBox } from "./boxPick";
-import { BodyLayer, type LayerBody } from "./bodyObjects";
+import { BodyLayer } from "./bodyObjects";
+import type { LayerBody } from "./meshes";
 import { clearGroup, disposeObject } from "./dispose";
 import { fillGhost } from "./ghostGeometry";
 import { type LayerHandle, sceneLayers } from "./sceneLayers";
@@ -697,7 +697,7 @@ export class CadViewport {
     return mesh;
   }
 
-  bodyPayloads(): BodyPayload[] {
+  bodyPayloads(): LayerBody[] {
     return [...this.bodies.values()].map((b) => b.payload);
   }
 

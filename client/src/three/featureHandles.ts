@@ -4,12 +4,14 @@ import type {
   BodyPayload,
   EvaluateResult,
   FaceInfo,
+  MeshPayload,
   PlaneFrame,
   Profile,
   SketchPayload,
 } from "@rockett/shared";
 import { findProfile } from "@rockett/shared";
 import type { Selection } from "../store";
+import { meshOf } from "./meshes";
 import { ORIGIN_PLANE_DEFS } from "./CadViewport";
 
 export type NumericParam<P> = {
@@ -63,12 +65,12 @@ export function profileCentroid(profile: Profile): [number, number] {
   return [u / (n || 1), v / (n || 1)];
 }
 
-function vertex(body: BodyPayload, at: number, from = body.positions) {
+function vertex(body: MeshPayload, at: number, from = body.positions) {
   return new THREE.Vector3(from[at * 3], from[at * 3 + 1], from[at * 3 + 2]);
 }
 
 export function faceCentroid(
-  body: BodyPayload,
+  body: MeshPayload,
   face: FaceInfo,
 ): THREE.Vector3 | null {
   const seen = new Set<number>();
@@ -102,7 +104,7 @@ export function frameAlong(
   };
 }
 
-function faceNormal(body: BodyPayload, face: FaceInfo): THREE.Vector3 | null {
+function faceNormal(body: MeshPayload, face: FaceInfo): THREE.Vector3 | null {
   if (face.surface.type === "plane")
     return new THREE.Vector3(...face.surface.normal).normalize();
   const sum = new THREE.Vector3();
@@ -116,7 +118,8 @@ export function faceRay(
   sel: Selection | undefined,
 ): Ray | null {
   if (sel?.kind !== "face") return null;
-  const body = bodies.find((b) => b.bodyId === sel.bodyId);
+  const found = bodies.find((b) => b.bodyId === sel.bodyId);
+  const body = found && meshOf(found);
   const face = body?.faces.find((f) => f.name === sel.faceName);
   if (!body || !face) return null;
   const origin = faceCentroid(body, face);
@@ -129,9 +132,10 @@ export function edgeRay(
   sel: Selection | undefined,
 ): Ray | null {
   if (sel?.kind !== "edge") return null;
-  const body = bodies.find((b) => b.bodyId === sel.bodyId);
+  const found = bodies.find((b) => b.bodyId === sel.bodyId);
+  const body = found && meshOf(found);
   const pl = body?.edges.find((e) => e.name === sel.edgeName)?.polyline;
-  if (!body || !pl || pl.length < 6) return null;
+  if (!found || !body || !pl || pl.length < 6) return null;
   const n = pl.length / 3;
   const i = Math.floor((n - 1) / 2);
   const mid = new THREE.Vector3(pl[i * 3], pl[i * 3 + 1], pl[i * 3 + 2])
@@ -143,8 +147,8 @@ export function edgeRay(
       ),
     )
     .multiplyScalar(0.5);
-  const size = new THREE.Vector3(...body.bbox.max).distanceTo(
-    new THREE.Vector3(...body.bbox.min),
+  const size = new THREE.Vector3(...found.bbox.max).distanceTo(
+    new THREE.Vector3(...found.bbox.min),
   );
   const tolerance = 1e-6 + size * 1e-4;
   const axis = new THREE.Vector3();

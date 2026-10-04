@@ -1,12 +1,13 @@
 import * as THREE from "three";
-import type { BodyPayload, OriginAxis, PlaneRef, Vec3 } from "@rockett/shared";
+import type { OriginAxis, PlaneRef, Vec3 } from "@rockett/shared";
 import { HIGHLIGHT_APPEARANCE } from "../tunables";
 import { themeColor } from "../theme/tokens";
+import { meshOf, type LayerBody } from "../three/meshes";
 
 export type HighlightStyle = "select" | "hover";
 
 interface HighlightSources {
-  bodies: ReadonlyMap<string, { payload: BodyPayload; mesh: THREE.Mesh }>;
+  bodies: ReadonlyMap<string, { payload: LayerBody; mesh: THREE.Mesh }>;
   originAxisLines: ReadonlyMap<OriginAxis, THREE.Line>;
   originPlaneMeshes: readonly THREE.Mesh[];
   constructionPlanes: THREE.Group;
@@ -34,6 +35,11 @@ export class HighlightContext {
     this.faces.set(key, pending);
   }
 
+  mesh(bodyId: string) {
+    const body = this.sources.bodies.get(bodyId);
+    return body && meshOf(body.payload);
+  }
+
   flush() {
     for (const { bodyId, names, style } of this.faces.values())
       this.body(bodyId, names, style);
@@ -46,8 +52,8 @@ export class HighlightContext {
     style: HighlightStyle,
   ) {
     const body = this.sources.bodies.get(bodyId);
-    if (!body) return;
-    const src = body.payload;
+    const src = this.mesh(bodyId);
+    if (!body || !src) return;
     const index = names
       ? src.faces
           .filter((f) => names.has(f.name))

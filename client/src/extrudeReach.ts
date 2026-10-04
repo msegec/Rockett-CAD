@@ -7,11 +7,13 @@ import {
   UNIT_DOT_TOL,
   type BodyPayload,
   type FaceInfo,
+  type MeshPayload,
   type PlaneFrame,
   type SketchPayload,
   type Vec3,
 } from "@rockett/shared";
 import type { PreviewGhost } from "./livePreview";
+import { meshOf, type LayerBody } from "./three/meshes";
 import {
   previewBodies,
   previewedFeature,
@@ -76,7 +78,8 @@ function faceBase(
   sel: { bodyId: string; faceName: string },
   bodies: BodyPayload[],
 ): Base | null {
-  const body = bodies.find((b) => b.bodyId === sel.bodyId);
+  const found = bodies.find((b) => b.bodyId === sel.bodyId);
+  const body = found && meshOf(found);
   const face = body?.faces.find((f) => f.name === sel.faceName);
   if (!body || !face || face.surface.type !== "plane") return null;
   const triangles: Vec3[][] = [];
@@ -243,7 +246,7 @@ const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 const flatten = (ring: Vector2[]) => ring.flatMap((q) => [q.x, q.y]);
 
-function faceLoops(body: BodyPayload, face: FaceInfo, normal: Vec3) {
+function faceLoops(body: MeshPayload, face: FaceInfo, normal: Vec3) {
   const at = (v: number): Vec3 => [
     body.positions[v * 3]!,
     body.positions[v * 3 + 1]!,
@@ -409,11 +412,12 @@ export function extrudeGhosts(ghosts: PreviewGhost[]): PreviewGhost[] {
     }),
     ...(feature.faces ?? []).map((ref): Section | undefined => {
       const body = bodies.find((b) => b.bodyId === ref.bodyId);
-      const face = body?.faces.find((f) => f.name === ref.faceName);
-      if (!body || face?.surface.type !== "plane") return undefined;
+      const shape = body && meshOf(body);
+      const face = shape?.faces.find((f) => f.name === ref.faceName);
+      if (!body || !shape || face?.surface.type !== "plane") return undefined;
       return {
         key: `${body.meshKey} ${face.name}`,
-        loops: faceLoops(body, face, face.surface.normal),
+        loops: faceLoops(shape, face, face.surface.normal),
         normal: face.surface.normal,
         sketches,
       };
@@ -429,7 +433,7 @@ export function extrudeGhosts(ghosts: PreviewGhost[]): PreviewGhost[] {
   const corner = (pick: (b: Bounds) => Vec3, f: typeof Math.min) =>
     [0, 1, 2].map((i) => f(...boxes.map((b) => pick(b)[i]!))) as Vec3;
   const indices = Array.from({ length: out.positions.length / 3 }, (_, i) => i);
-  const body: BodyPayload = {
+  const body: LayerBody = {
     bodyId: ghosts[0]!.body.bodyId,
     name: feature.name,
     meshKey: `extrude ${feature.id} ${ends} ${sections.map((c) => c.key)}`,

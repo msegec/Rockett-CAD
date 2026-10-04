@@ -5,6 +5,7 @@ import type {
   SketchFeature,
 } from "@rockett/shared";
 import { savedRegionIds } from "../sketchUsage";
+import { meshOf } from "../three/meshes";
 import { isCoreSelection, selectionKey, type Selection } from "./kinds";
 
 function numbered(kind: string, index: number, owner?: string): string {
@@ -57,16 +58,17 @@ export function pickLabel(
   if ("bodyId" in pick) {
     const body = ranked(bodies, (b) => b.bodyId).get(pick.bodyId)?.item;
     if (pick.kind === "body") return body?.name ?? "Body";
+    const shape = body && meshOf(body);
     const [kind, list, name]: [
       string,
       readonly { name: string }[] | undefined,
       string,
     ] =
       pick.kind === "face"
-        ? ["Face", body?.faces, pick.faceName]
+        ? ["Face", shape?.faces, pick.faceName]
         : pick.kind === "edge"
-          ? ["Edge", body?.edges, pick.edgeName]
-          : ["Vertex", body?.vertices, pick.vertexName];
+          ? ["Edge", shape?.edges, pick.edgeName]
+          : ["Vertex", shape?.vertices, pick.vertexName];
     return numbered(
       kind,
       (list && ranked(list, (x) => x.name).get(name)?.rank) ?? -1,

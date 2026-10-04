@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import type { BodyPayload } from "@rockett/shared";
 import type { PreviewGhost } from "../livePreview";
+import { meshOf, type LayerBody } from "./meshes";
 
 function refill(
   geom: THREE.BufferGeometry,
@@ -20,9 +20,16 @@ function refill(
 
 export function fillGhost(
   geom: THREE.BufferGeometry,
-  { meshKey, positions, normals, indices }: BodyPayload,
+  body: LayerBody,
   ranges: PreviewGhost["ranges"],
 ) {
+  const shape = meshOf(body);
+  if (!shape) {
+    geom.setDrawRange(0, 0);
+    return;
+  }
+  const { meshKey } = body;
+  const { positions, normals, indices } = shape;
   if (geom.userData.meshKey !== meshKey) {
     geom.userData.meshKey = meshKey;
     geom.boundingSphere = null;

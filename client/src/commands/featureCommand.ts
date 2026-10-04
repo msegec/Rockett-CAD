@@ -2,6 +2,7 @@ import { selectionBeforeCommand } from "../selection/kinds";
 import type { ActiveCommand, PickModifiers } from "./active";
 import { repick } from "../featureReferences";
 import type { Feature } from "@rockett/shared";
+import { meshOf } from "../three/meshes";
 import { pickProviders } from "../three/pickProviders";
 import {
   previewBodies,
@@ -182,7 +183,9 @@ export function activeInput(s: Store): PickInput | undefined {
 export function isPlanarFace(sel: Selection, s: Store): boolean {
   if (sel.kind !== "face") return false;
   const body = previewBodies(s).find((b) => b.bodyId === sel.bodyId);
-  const face = body?.faces.find((f) => f.name === sel.faceName);
+  const face = (body && meshOf(body))?.faces.find(
+    (f) => f.name === sel.faceName,
+  );
   return face?.surface.type === "plane";
 }
 
@@ -207,7 +210,8 @@ function isStraight(sel: Selection, s: Store): boolean {
   if (sel.kind === "edge") {
     const body = previewBodies(s).find((b) => b.bodyId === sel.bodyId);
     return (
-      body?.edges.find((e) => e.name === sel.edgeName)?.curve.type === "line"
+      (body && meshOf(body))?.edges.find((e) => e.name === sel.edgeName)?.curve
+        .type === "line"
     );
   }
   if (sel.kind !== "sketchEntity") return true;

@@ -1,4 +1,5 @@
-import type { BodyPayload, FaceInfo, Feature } from "@rockett/shared";
+import type { FaceInfo, Feature, MeshPayload } from "@rockett/shared";
+import { meshOf, type LayerBody } from "./three/meshes";
 import type { ThemeColor } from "./theme/tokens";
 import { TIMING_MS } from "./tunables";
 
@@ -76,13 +77,13 @@ export interface PreviewTint {
 }
 
 export interface PreviewGhost extends PreviewTint {
-  body: BodyPayload;
+  body: LayerBody;
 }
 
 function sameTriangles(
-  a: BodyPayload,
+  a: MeshPayload,
   fa: FaceInfo,
-  b: BodyPayload,
+  b: MeshPayload,
   fb: FaceInfo,
 ): boolean {
   if (fa.count !== fb.count) return false;
@@ -95,7 +96,7 @@ function sameTriangles(
   return true;
 }
 
-function changedFaces(old: BodyPayload | undefined, body: BodyPayload) {
+function changedFaces(old: MeshPayload | undefined, body: MeshPayload) {
   if (!old) return [{ start: 0, count: body.indices.length }];
   const before = new Map(old.faces.map((f) => [f.name, f]));
   const added = body.faces.filter((f) => !before.has(f.name));
@@ -110,8 +111,8 @@ function changedFaces(old: BodyPayload | undefined, body: BodyPayload) {
 
 export function previewTints(
   feature: Feature,
-  before: BodyPayload[],
-  after: BodyPayload[],
+  before: readonly LayerBody[],
+  after: readonly LayerBody[],
 ): Map<string, PreviewTint> {
   const tint = removesMaterial(feature) ? "preview-cut" : "preview-add";
   const old = new Map(before.map((b) => [b.bodyId, b]));
@@ -119,7 +120,10 @@ export function previewTints(
   for (const body of after) {
     const base = old.get(body.bodyId);
     if (base?.meshKey === body.meshKey) continue;
-    const ranges = changedFaces(base, body);
+    const shape = meshOf(body);
+    const baseShape = base && meshOf(base);
+    if (!shape || (base && !baseShape)) continue;
+    const ranges = changedFaces(baseShape, shape);
     if (ranges.length > 0) tints.set(body.bodyId, { tint, ranges });
   }
   return tints;

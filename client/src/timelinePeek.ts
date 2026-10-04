@@ -3,6 +3,7 @@ import { create } from "zustand";
 import type { EvaluateResult } from "@rockett/shared";
 import { api } from "./api";
 import { createLivePreview } from "./livePreview";
+import { meshOf } from "./three/meshes";
 import { useStore, isIdle, type Selection } from "./store";
 import { TIMING_MS } from "./tunables";
 
@@ -33,7 +34,7 @@ export function peekHighlight(
     );
   };
   return evaluation.bodies.flatMap((b) =>
-    b.faces
+    (meshOf(b)?.faces ?? [])
       .filter((f) => made(b.bodyId, f.name))
       .map((f) => ({
         kind: "face" as const,

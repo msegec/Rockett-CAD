@@ -103,7 +103,12 @@ it.each([false, true])(
   "keeps equal-depth face and fallback body ties in body order, mapped first: %s",
   (mappedFirst) => {
     const mapped = manyBodyPayloads(1, 1)[0]!;
-    const unmapped = { ...mapped, bodyId: "unmapped", faces: [] };
+    const unmapped = {
+      ...mapped,
+      bodyId: "unmapped",
+      meshKey: "unmapped",
+      faces: [],
+    };
     viewport.syncBodies(mappedFirst ? [mapped, unmapped] : [unmapped, mapped]);
     const objects = vi.spyOn(THREE.Raycaster.prototype, "intersectObject");
     const chosen = pick(centre, ["design.face", "design.body"]);

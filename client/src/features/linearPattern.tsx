@@ -5,6 +5,7 @@ import {
   type FeatureHandleDefinition,
   type HandleInput,
 } from "../three/featureHandles";
+import { meshOf } from "../three/meshes";
 import { newId, type LinearPatternFeature } from "@rockett/shared";
 import {
   AxisField,
@@ -43,9 +44,10 @@ function patternDirection(input: HandleInput): THREE.Vector3 | null {
   const edge = selection.find((s) => s.kind === "edge");
   if ((params.axisSource ?? "origin") === "edge") {
     if (edge?.kind !== "edge") return null;
-    const pl = bodies
-      .find((b) => b.bodyId === edge.bodyId)
-      ?.edges.find((e) => e.name === edge.edgeName)?.polyline;
+    const body = bodies.find((b) => b.bodyId === edge.bodyId);
+    const pl = (body && meshOf(body))?.edges.find(
+      (e) => e.name === edge.edgeName,
+    )?.polyline;
     if (!pl || pl.length < 6) return null;
     const n = pl.length;
     return new THREE.Vector3(

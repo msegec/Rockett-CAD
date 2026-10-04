@@ -14,6 +14,7 @@ import { GIZMO_APPEARANCE } from "../tunables";
 import type { PlaneFrame } from "@rockett/shared";
 import { axisRef, type AxisParams } from "../features/inputs";
 import { previewBodies, useStore } from "../store";
+import { meshOf } from "./meshes";
 import { uv3 } from "./CadViewport";
 import { buildRevolveGhost } from "./revolveGhost";
 import { disposeGroup } from "./dispose";
@@ -238,9 +239,10 @@ export function featureAxis(params: AxisParams) {
     origin = uv3(sketch.frame, a.x, a.y);
     end = uv3(sketch.frame, b.x, b.y);
   } else {
-    const polyline = previewBodies(state)
-      .find((body) => body.bodyId === ref.edge.bodyId)
-      ?.edges.find((edge) => edge.name === ref.edge.edgeName)?.polyline;
+    const body = previewBodies(state).find((b) => b.bodyId === ref.edge.bodyId);
+    const polyline = (body && meshOf(body))?.edges.find(
+      (edge) => edge.name === ref.edge.edgeName,
+    )?.polyline;
     if (!polyline || polyline.length < 6) return;
     origin = new THREE.Vector3(polyline[0], polyline[1], polyline[2]);
     end = new THREE.Vector3(polyline.at(-3), polyline.at(-2), polyline.at(-1));

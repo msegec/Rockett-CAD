@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { findProfile, type PlaneFrame, type Profile } from "@rockett/shared";
 import { useStore } from "../store";
 import { baseBodies } from "../previewBase";
+import { meshOf } from "./meshes";
 import { faceCentroid, frameAlong, profileCentroid } from "./featureHandles";
 import { disposeObject } from "./dispose";
 import { Manipulator, snapStep, type ManipulatorHost } from "./Manipulator";
@@ -339,7 +340,8 @@ export function extrudeGizmoSource(): GizmoSource | null {
   }
   const faceSel = s.selection.find((x) => x.kind === "face");
   if (!faceSel) return null;
-  const body = baseBodies(s).find((b) => b.bodyId === faceSel.bodyId);
+  const found = baseBodies(s).find((b) => b.bodyId === faceSel.bodyId);
+  const body = found && meshOf(found);
   const face = body?.faces.find((f) => f.name === faceSel.faceName);
   if (!body || !face || face.surface.type !== "plane") return null;
   const centroid = faceCentroid(body, face);

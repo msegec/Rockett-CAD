@@ -1,10 +1,7 @@
 import * as THREE from "three";
-import {
-  createRegistry,
-  type BodyPayload,
-  type OriginAxis,
-} from "@rockett/shared";
+import { createRegistry, type OriginAxis } from "@rockett/shared";
 import type { Selection } from "../store";
+import { meshOf, type LayerBody } from "./meshes";
 
 export interface PickResult {
   selection: Selection;
@@ -20,7 +17,7 @@ export interface PickBody {
   edgeSegments: string[];
   vertices: THREE.Points;
   vertexNames: string[];
-  payload: BodyPayload;
+  payload: LayerBody;
 }
 
 export interface PickContext {
@@ -188,7 +185,7 @@ function surfacePicks(ctx: PickContext, kind: "face" | "body"): PickResult[] {
     return ctx.hits(b).flatMap((h) => {
       if (h.faceIndex === undefined || h.faceIndex === null) return [];
       const indexPos = h.faceIndex * 3;
-      const face = b.payload.faces.find(
+      const face = meshOf(b.payload)?.faces.find(
         (f) => indexPos >= f.start && indexPos < f.start + f.count,
       );
       if (kind === "face" && !face && !ctx.providerIds.includes("design.body"))

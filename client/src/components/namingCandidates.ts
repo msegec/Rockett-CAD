@@ -7,6 +7,7 @@ import type {
 } from "@rockett/shared";
 import { selectionKey, useStore, type Selection } from "../store";
 import { usePreviewBase } from "../previewBase";
+import { meshOf, useMeshVersion } from "../three/meshes";
 
 export const mappingKey = (m: NamingMapping) => `${m.featureId}\n${m.path}`;
 
@@ -15,14 +16,18 @@ const sameBox = (a: BodyPayload["bbox"], b: BodyPayload["bbox"]) =>
 
 function shownIn(body: BodyPayload, mesh: NamingMesh): Selection | null {
   const { bodyId } = body;
+  const shape = meshOf(body);
+  if (!shape) return null;
   if (mesh.kind === "edge") {
     const line = JSON.stringify(mesh.polyline);
-    const edge = body.edges.find((e) => JSON.stringify(e.polyline) === line);
+    const edge = shape.edges.find((e) => JSON.stringify(e.polyline) === line);
     return edge ? { kind: "edge", bodyId, edgeName: edge.name } : null;
   }
   if (mesh.kind === "body")
-    return body.indices.length === mesh.count ? { kind: "body", bodyId } : null;
-  const face = body.faces.find(
+    return shape.indices.length === mesh.count
+      ? { kind: "body", bodyId }
+      : null;
+  const face = shape.faces.find(
     (f) => f.start === mesh.start && f.count === mesh.count,
   );
   return face ? { kind: "face", bodyId, faceName: face.name } : null;
@@ -57,6 +62,7 @@ export function useNamingCandidates(
   const here =
     active?.id === "design.feature" ? active.state.editFeatureId : null;
   const base = usePreviewBase();
+  useMeshVersion();
   const bodies =
     here === null
       ? (evaluation?.bodies ?? [])

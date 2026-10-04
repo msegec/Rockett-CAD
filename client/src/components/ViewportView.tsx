@@ -33,6 +33,8 @@ import { renderSketches, styleSketches } from "../three/sketchRender";
 import { hoverPiece } from "../three/sketchStyle";
 import { sketchRenderInputs } from "../sketchInputs";
 import { ExtrudeGizmo } from "../three/ExtrudeGizmo";
+import { meshOf } from "../three/meshes";
+import { useBodySync } from "../three/useBodySync";
 import { themeColor } from "../theme/tokens";
 import { SKETCH_APPEARANCE } from "../tunables";
 import { RevolveGizmo, ringThrough, featureAxis } from "../three/RevolveGizmo";
@@ -45,9 +47,8 @@ import { FeatureGizmos } from "../three/featureGizmos";
 import { GizmoSlot } from "../three/gizmoSlot";
 import { clearToolPreview, updateToolPreview } from "../three/toolPreview";
 import { listenWheel } from "../three/wheel";
-import { extrudeGhosts } from "../extrudeReach";
 import { previewBodies, useStore, isIdle, type Selection } from "../store";
-import { loadPreviewBase, previewScene, usePreviewBase } from "../previewBase";
+import { loadPreviewBase, usePreviewBase } from "../previewBase";
 import { api } from "../api";
 import { ViewportContext, alignCameraToActiveSketch } from "../viewportRef";
 import { activeCommand } from "../commands/active";
@@ -108,7 +109,6 @@ export function ViewportView({
 
   const evaluation = useStore((s) => s.evaluation);
   const document_ = useStore((s) => s.document);
-  const hiddenBodies = useStore((s) => s.view.hidden.bodies);
   const hiddenFeatures = useStore((s) => s.view.hidden.features);
   const projectId = useStore((s) => s.projectId);
   const savedCamera = useStore((s) => s.view.camera);
@@ -351,14 +351,7 @@ export function ViewportView({
     void loadPreviewBase(editFeatureId, useStore.getState);
   }, [editFeatureId]);
 
-  useEffect(() => {
-    const vp = viewportRef.current;
-    if (!vp || !evaluation) return;
-    const scene = previewScene(useStore.getState());
-    vp.syncBodies(scene.bodies, new Set(hiddenBodies));
-    vp.setBodyTints(scene.tints);
-    vp.setPreviewGhosts(extrudeGhosts(scene.ghosts));
-  }, [evaluation, document_, hiddenBodies, dialogOpen, editFeatureId, held]);
+  const meshVersion = useBodySync(viewportRef, dialogOpen, editFeatureId);
 
   useEffect(() => {
     const vp = viewportRef.current;
@@ -457,7 +450,7 @@ export function ViewportView({
     for (const s of selection) vp.addHighlight(s, "select");
     if (hover) vp.addHighlight(hover, "hover");
     if (peeked) vp.addHighlights(peekHighlight(evaluation, peeked), "hover");
-  }, [evaluation, document_, held, selection, hover, peeked]);
+  }, [evaluation, document_, held, selection, hover, peeked, meshVersion]);
 
   useEffect(() => {
     const vp = viewportRef.current;
@@ -722,7 +715,8 @@ export function ViewportView({
       const body = s.evaluation?.bodies.find(
         (b) => b.bodyId === feat.plane.face.bodyId,
       );
-      if (!body) return null;
+      const shape = body && meshOf(body);
+      if (!shape) return body && undefined;
       const faceName: string = feat.plane.face.faceName;
       const o = frame.origin,
         xa = frame.xAxis,
@@ -735,7 +729,7 @@ export function ViewportView({
           corners.push({ x, y });
         }
       };
-      for (const ed of body.edges) {
+      for (const ed of shape.edges) {
         if (!ed.name.includes(faceName)) continue;
         const pl = ed.polyline;
         if (pl.length < 6) continue;
@@ -774,6 +768,7 @@ export function ViewportView({
       return segs.length > 0 ? { corners, mids, segs } : null;
     };
     const data = compute();
+    if (data === undefined) return null;
     faceSnapCache.current = { key: sketchId, eval: s.evaluation, data };
     return data;
   }
@@ -1654,9 +1649,9 @@ export function ViewportView({
     if (tool === "project") {
       const picked = vp.pick(e.clientX, e.clientY, ["design.edge"])?.selection;
       if (picked?.kind !== "edge") return;
-      const edge = s.evaluation?.bodies
-        .find((b) => b.bodyId === picked.bodyId)
-        ?.edges.find((ed) => ed.name === picked.edgeName);
+      const body = s.evaluation?.bodies.find((b) => b.bodyId === picked.bodyId);
+      const edges = (body && meshOf(body))?.edges ?? [];
+      const edge = edges.find((ed) => ed.name === picked.edgeName);
       const frame = activeSketchFrame();
       if (!edge || !frame) return;
       try {

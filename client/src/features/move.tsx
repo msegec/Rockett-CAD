@@ -126,12 +126,7 @@ export function moveGizmo(context: FeatureGizmoContext<MoveParams>) {
       context.host,
       center,
       translation(context.params()),
-      previewedFeature(state)
-        ? []
-        : selectedBodies.map(({ positions, indices }) => ({
-            positions,
-            indices,
-          })),
+      previewedFeature(state) ? [] : selectedBodies,
     ),
   );
 }

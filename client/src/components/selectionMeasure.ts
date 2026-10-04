@@ -17,6 +17,7 @@ import { previewBodies } from "../previewBase";
 import { useSetting } from "../settings";
 import { dimensionFor, measureDimension, type DimTarget } from "../sketchTools";
 import { useStore, type Selection } from "../store";
+import { meshOf, useMeshVersion } from "../three/meshes";
 import { TIMING_MS } from "../tunables";
 
 interface Scene {
@@ -50,10 +51,11 @@ function sketchPick(pick: Selection, scene: Scene): SketchPick | undefined {
 }
 
 function lengthOf(pick: Selection, scene: Scene): number | undefined {
-  if (pick.kind === "edge")
-    return scene.bodies
-      .find((b) => b.bodyId === pick.bodyId)
-      ?.edges.find((e) => e.name === pick.edgeName)?.length;
+  if (pick.kind === "edge") {
+    const body = scene.bodies.find((b) => b.bodyId === pick.bodyId);
+    return (body && meshOf(body))?.edges.find((e) => e.name === pick.edgeName)
+      ?.length;
+  }
   const sketch = sketchPick(pick, scene);
   if (sketch?.target.kind !== "line") return;
   return measureDimension(
@@ -190,6 +192,7 @@ export function useSelectionMeasures(): string[] {
   const evaluation = useStore((s) => s.evaluation);
   const active = useStore((s) => s.active);
   const draft = useStore((s) => s.draftSketch);
+  useMeshVersion();
   const bodies = previewBodies({ active, evaluation });
   const scene: Scene = {
     bodies,

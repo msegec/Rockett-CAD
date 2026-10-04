@@ -1,6 +1,12 @@
 import { Plane, Ray, Vector3 } from "three";
 import { ConvexHull } from "three/examples/jsm/math/ConvexHull.js";
-import { LINEAR_TOL, type BodyPayload, type Vec3 } from "@rockett/shared";
+import {
+  LINEAR_TOL,
+  type BodyPayload,
+  type MeshPayload,
+  type Vec3,
+} from "@rockett/shared";
+import { meshOf } from "./three/meshes";
 
 interface Solid {
   corners: Float64Array;
@@ -17,7 +23,7 @@ interface Cell {
   center: Vector3;
 }
 
-const solids = new WeakMap<BodyPayload, Solid>();
+const solids = new WeakMap<MeshPayload, Solid>();
 
 const RAY = new Vector3(1, 0.371, 0.529).normalize();
 const ACROSS = [
@@ -36,16 +42,16 @@ function triangle({ corners }: Pick<Solid, "corners">, t: number): Vector3[] {
   return scratch;
 }
 
-function solid(body: BodyPayload): Solid {
-  const known = solids.get(body);
+function solid(body: BodyPayload, mesh: MeshPayload): Solid {
+  const known = solids.get(mesh);
   if (known) return known;
-  const count = Math.floor(body.indices.length / 3);
+  const count = Math.floor(mesh.indices.length / 3);
   const corners = new Float64Array(count * 9);
   const boxes = new Float64Array(count * 6).fill(Infinity, 0, count * 6);
   for (let t = 0; t < count; t++)
     for (let k = 0; k < 3; k++)
       for (let axis = 0; axis < 3; axis++) {
-        const v = body.positions[body.indices[t * 3 + k]! * 3 + axis]!;
+        const v = mesh.positions[mesh.indices[t * 3 + k]! * 3 + axis]!;
         corners[t * 9 + k * 3 + axis] = v;
         boxes[t * 6 + axis] = Math.min(boxes[t * 6 + axis]!, v);
         boxes[t * 6 + 3 + axis] =
@@ -67,7 +73,7 @@ function solid(body: BodyPayload): Solid {
     min: body.bbox.min,
     max: body.bbox.max,
   };
-  solids.set(body, made);
+  solids.set(mesh, made);
   return made;
 }
 
@@ -168,7 +174,9 @@ export function cellsMeetSolid(
   body: BodyPayload,
   margin: number,
 ): boolean {
-  const prepared = solid(body);
+  const mesh = meshOf(body);
+  if (!mesh) return false;
+  const prepared = solid(body, mesh);
   const near = cells.flatMap((points) => {
     const cell = cellNear(points, prepared, margin);
     return cell ? [cell] : [];

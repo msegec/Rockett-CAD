@@ -173,9 +173,8 @@ registerCore<"edge">({
   kind: "edge",
   highlight: (s, style, ctx) =>
     ctx.line(
-      ctx.sources.bodies
-        .get(s.bodyId)
-        ?.payload.edges.find((edge) => edge.name === s.edgeName)?.polyline,
+      ctx.mesh(s.bodyId)?.edges.find((edge) => edge.name === s.edgeName)
+        ?.polyline,
       style,
     ),
   key: (s) => `edge:${s.bodyId}:${s.edgeName}`,
@@ -190,10 +189,9 @@ registerCore<"vertex">({
   kind: "vertex",
   highlight: (s, style, ctx) =>
     ctx.point(
-      ctx.sources.bodies
-        .get(s.bodyId)
-        ?.payload.vertices.find((vertex) => vertex.name === s.vertexName)
-        ?.position,
+      ctx
+        .mesh(s.bodyId)
+        ?.vertices.find((vertex) => vertex.name === s.vertexName)?.position,
       style,
     ),
   key: (s) => `vertex:${s.bodyId}:${s.vertexName}`,
@@ -278,8 +276,8 @@ registerCore<"sketchPoint">({
 registerCore<"feature">({
   kind: "feature",
   highlight: (s, style, ctx) => {
-    for (const [bodyId, { payload }] of ctx.sources.bodies)
-      for (const face of payload.faces)
+    for (const bodyId of ctx.sources.bodies.keys())
+      for (const face of ctx.mesh(bodyId)?.faces ?? [])
         if (faceMadeBy(s.featureId, face.name))
           ctx.face(bodyId, face.name, style);
   },

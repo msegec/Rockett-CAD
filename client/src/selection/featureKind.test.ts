@@ -62,8 +62,13 @@ function body(bodyId: string, faces: BodyPayload["faces"]) {
   geometry.setAttribute("normal", zeros());
   const payload = {
     bodyId,
+    meshKey: bodyId,
+    positions: Array.from({ length: 18 }, () => 0),
+    normals: Array.from({ length: 18 }, () => 0),
     indices: [0, 1, 2, 3, 4, 5],
     faces,
+    edges: [],
+    vertices: [],
   } as unknown as BodyPayload;
   return [bodyId, { payload, mesh: new THREE.Mesh(geometry) }] as const;
 }

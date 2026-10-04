@@ -10,6 +10,7 @@ import * as THREE from "three";
 import { Manipulator, snapStep, type ManipulatorHost } from "./Manipulator";
 import { themeColor } from "../theme/tokens";
 import { GIZMO_APPEARANCE, PREVIEW_APPEARANCE } from "../tunables";
+import { meshOf, type LayerBody } from "./meshes";
 
 const AXIS_COLORS = ["move-axis-x", "move-axis-y", "move-axis-z"] as const;
 const AXES: THREE.Vector3[] = [
@@ -17,11 +18,6 @@ const AXES: THREE.Vector3[] = [
   new THREE.Vector3(0, 1, 0),
   new THREE.Vector3(0, 0, 1),
 ];
-
-export interface MoveGhostSource {
-  positions: number[];
-  indices: number[];
-}
 
 export class MoveGizmo extends Manipulator {
   private arrows: {
@@ -43,7 +39,7 @@ export class MoveGizmo extends Manipulator {
     host: ManipulatorHost,
     origin: THREE.Vector3,
     initial: [number, number, number],
-    ghostSources: MoveGhostSource[],
+    ghostBodies: LayerBody[],
   ) {
     super(host);
     this.origin.copy(origin);
@@ -74,7 +70,8 @@ export class MoveGizmo extends Manipulator {
       this.arrows.push({ shaft, cone, dir: AXES[i]!, token });
     }
 
-    for (const src of ghostSources) {
+    for (const src of ghostBodies.map(meshOf)) {
+      if (!src) continue;
       const geom = new THREE.BufferGeometry();
       geom.setAttribute(
         "position",

@@ -1,40 +1,16 @@
 import * as THREE from "three";
-import { pathFor, ROUTES, type BodyPayload } from "@rockett/shared";
-import { request } from "../api";
+import type { MeshPayload } from "@rockett/shared";
 import { disposeAll, disposeGroup } from "./dispose";
 import { BodyMaterials } from "./materials";
 import type { PickBody } from "./pickProviders";
-
-const MAX_FETCHES = 6;
-
-export type BodyMesh = Pick<
-  BodyPayload,
-  "positions" | "normals" | "indices" | "faces" | "edges" | "vertices" | "bbox"
->;
-export type LayerBody = Omit<BodyPayload, keyof BodyMesh> & Partial<BodyMesh>;
+import { hashOf, meshes, meshOf, type LayerBody } from "./meshes";
 
 export interface BodyObjects extends PickBody {
   material: THREE.MeshStandardMaterial;
   tint: THREE.MeshStandardMaterial | null;
 }
 
-interface FetchScope {
-  id: string;
-  stop: AbortController;
-  queue: string[];
-  fetching: Set<string>;
-}
-
-const hashOf = (body: LayerBody) => body.mesh?.hash ?? body.meshKey;
-const decoded = (body: LayerBody): body is BodyPayload =>
-  body.positions !== undefined;
-
-function meshOf(p: BodyPayload): BodyMesh {
-  const { positions, normals, indices, faces, edges, vertices, bbox } = p;
-  return { positions, normals, indices, faces, edges, vertices, bbox };
-}
-
-function edgeLines(p: BodyPayload) {
+function edgeLines(p: MeshPayload) {
   const points: number[] = [];
   const edgeSegments: string[] = [];
   for (const e of p.edges) {
@@ -58,7 +34,7 @@ function edgeLines(p: BodyPayload) {
   return { edgeGeometry: geometry, edgeSegments };
 }
 
-function vertexPoints(p: BodyPayload) {
+function vertexPoints(p: MeshPayload) {
   const points: number[] = [];
   const vertexNames: string[] = [];
   for (const v of p.vertices) {
@@ -74,7 +50,8 @@ function vertexPoints(p: BodyPayload) {
 }
 
 function buildBody(
-  p: BodyPayload,
+  p: LayerBody,
+  shape: MeshPayload,
   materials: BodyMaterials,
   dimmed: boolean,
 ): BodyObjects {
@@ -83,12 +60,15 @@ function buildBody(
   const geom = new THREE.BufferGeometry();
   geom.setAttribute(
     "position",
-    new THREE.Float32BufferAttribute(p.positions, 3),
+    new THREE.Float32BufferAttribute(shape.positions, 3),
   );
-  geom.setAttribute("normal", new THREE.Float32BufferAttribute(p.normals, 3));
-  geom.setIndex(p.indices);
-  const { edgeGeometry, edgeSegments } = edgeLines(p);
-  const { vertexGeometry, vertexNames } = vertexPoints(p);
+  geom.setAttribute(
+    "normal",
+    new THREE.Float32BufferAttribute(shape.normals, 3),
+  );
+  geom.setIndex(shape.indices);
+  const { edgeGeometry, edgeSegments } = edgeLines(shape);
+  const { vertexGeometry, vertexNames } = vertexPoints(shape);
   const material = materials.face(p.color, dimmed);
   const mesh = new THREE.Mesh(geom, material);
   mesh.userData.bodyId = p.bodyId;
@@ -114,11 +94,10 @@ function buildBody(
 export class BodyLayer {
   readonly bodies = new Map<string, BodyObjects>();
   private readonly materials = new BodyMaterials();
-  private missing = new Map<string, LayerBody[]>();
+  private missing: LayerBody[] = [];
   private hidden: ReadonlySet<string> = new Set();
   private dimmed: ReadonlySet<string> = new Set();
-  private scope: FetchScope | null = null;
-  private active = 0;
+  private readonly unsubscribe = meshes.subscribe(() => this.arrive());
 
   constructor(
     private readonly root: THREE.Group,
@@ -130,21 +109,20 @@ export class BodyLayer {
     hidden: ReadonlySet<string>,
     projectId?: string,
   ) {
-    this.useProject(projectId);
+    meshes.useProject(projectId);
+    meshes.retry();
     this.hidden = hidden;
-    this.missing = new Map();
+    this.missing = [];
     const seen = new Set<string>();
     for (const body of bodies) {
       seen.add(body.bodyId);
       const built = this.bodies.get(body.bodyId);
       if (built && hashOf(built.payload) === hashOf(body))
         this.update(built, body);
-      else if (decoded(body)) this.place(body);
-      else this.want(body, built);
+      else this.show(body, built);
     }
     for (const [id, built] of this.bodies)
       if (!seen.has(id)) this.remove(id, built);
-    this.pump();
     this.changed();
   }
 
@@ -156,32 +134,41 @@ export class BodyLayer {
   }
 
   dispose() {
-    this.useProject(undefined);
-    this.missing.clear();
+    this.unsubscribe();
+    meshes.useProject(undefined);
+    this.missing = [];
     for (const [id, built] of this.bodies) this.remove(id, built);
   }
 
-  private useProject(id: string | undefined) {
-    if (this.scope?.id === id) return;
-    this.scope?.stop.abort();
-    this.scope =
-      id === undefined
-        ? null
-        : { id, stop: new AbortController(), queue: [], fetching: new Set() };
+  private show(body: LayerBody, stale: BodyObjects | undefined) {
+    const shape = meshOf(body);
+    if (shape) return this.place(body, shape);
+    if (stale) stale.group.visible = !this.hidden.has(body.bodyId);
+    this.missing.push(body);
+  }
+
+  private arrive() {
+    const waiting = this.missing;
+    this.missing = [];
+    for (const body of waiting) this.show(body, this.bodies.get(body.bodyId));
+    if (this.missing.length < waiting.length) this.changed();
   }
 
   private update(built: BodyObjects, body: LayerBody) {
     if (built.payload.color !== body.color) this.paint(built, body.color);
-    built.payload = decoded(body)
-      ? body
-      : { ...meshOf(built.payload), ...body };
+    built.payload = body;
     built.group.visible = !this.hidden.has(body.bodyId);
   }
 
-  private place(body: BodyPayload) {
+  private place(body: LayerBody, shape: MeshPayload) {
     const old = this.bodies.get(body.bodyId);
     if (old) this.remove(body.bodyId, old);
-    const built = buildBody(body, this.materials, this.dimmed.has(body.bodyId));
+    const built = buildBody(
+      body,
+      shape,
+      this.materials,
+      this.dimmed.has(body.bodyId),
+    );
     built.group.visible = !this.hidden.has(body.bodyId);
     this.bodies.set(body.bodyId, built);
     this.root.add(built.group);
@@ -210,48 +197,5 @@ export class BodyLayer {
     this.materials.release(built.vertices.material);
     disposeGroup(built.group, this.materials.live());
     this.bodies.delete(id);
-  }
-
-  private want(body: LayerBody, stale: BodyObjects | undefined) {
-    if (stale) stale.group.visible = !this.hidden.has(body.bodyId);
-    const hash = hashOf(body);
-    const waiting = this.missing.get(hash);
-    if (waiting) return waiting.push(body);
-    this.missing.set(hash, [body]);
-    if (!this.scope || this.scope.fetching.has(hash)) return;
-    this.scope.fetching.add(hash);
-    this.scope.queue.push(hash);
-  }
-
-  private pump() {
-    const scope = this.scope;
-    if (!scope) return;
-    while (this.active < MAX_FETCHES) {
-      const hash = scope.queue.shift();
-      if (hash === undefined) return;
-      if (this.missing.has(hash)) this.fetch(scope, hash);
-      else scope.fetching.delete(hash);
-    }
-  }
-
-  private fetch(scope: FetchScope, hash: string) {
-    this.active++;
-    const path = pathFor(ROUTES.mesh, { id: scope.id, hash });
-    request<BodyMesh>(ROUTES.mesh.method, path, { signal: scope.stop.signal })
-      .then((mesh) => this.arrive(scope, hash, mesh))
-      .catch(() => scope.fetching.delete(hash))
-      .finally(() => {
-        this.active--;
-        this.pump();
-      });
-  }
-
-  private arrive(scope: FetchScope, hash: string, mesh: BodyMesh) {
-    scope.fetching.delete(hash);
-    if (scope !== this.scope) return;
-    for (const body of this.missing.get(hash) ?? [])
-      this.place({ ...mesh, ...body });
-    this.missing.delete(hash);
-    this.changed();
   }
 }
