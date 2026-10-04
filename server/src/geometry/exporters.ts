@@ -171,11 +171,14 @@ export function write3mf(
     `<Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>` +
     `</Relationships>`;
 
-  const zipped = zipSync({
-    "[Content_Types].xml": strToU8(contentTypes),
-    "_rels/.rels": strToU8(rels),
-    "3D/3dmodel.model": strToU8(model),
-  });
+  const zipped = zipSync(
+    {
+      "[Content_Types].xml": strToU8(contentTypes),
+      "_rels/.rels": strToU8(rels),
+      "3D/3dmodel.model": strToU8(model),
+    },
+    { mtime: new Date(1980, 0, 1) },
+  );
   return Buffer.from(zipped);
 }
 
