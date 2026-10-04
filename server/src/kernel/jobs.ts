@@ -4,10 +4,19 @@ import { JOB_LIMITS, TIMING_MS } from "../tunables.js";
 
 export type JobEvent =
   | { type: "progress"; done: number; total: number; label: string }
-  | { type: "done" | "failed" }
+  | { type: "done" | "failed"; message?: string }
   | { type: "cancelled"; generation: "committed" | "preview_discarded" };
 
 type Subscriber = { response: Response; idle?: NodeJS.Timeout };
+
+export type JobBudget = { stall: number; ceiling: number };
+
+const BUDGET: JobBudget = {
+  stall: TIMING_MS.jobStall,
+  ceiling: TIMING_MS.jobCeiling,
+};
+const STALLED = "No feature finished in time, so the job stopped.";
+const TOO_LONG = "The job ran too long, so it stopped.";
 
 export interface Job {
   id: string;
@@ -22,7 +31,8 @@ export interface Job {
   finishedAt?: number;
   events: JobEvent[];
   subscribers: Set<Subscriber>;
-  runtime: NodeJS.Timeout;
+  stall: NodeJS.Timeout;
+  ceiling: NodeJS.Timeout;
 }
 
 export const jobContext = new AsyncLocalStorage<Job>();
@@ -30,6 +40,8 @@ export const jobContext = new AsyncLocalStorage<Job>();
 export class JobRegistry {
   private readonly jobs = new Map<string, Job>();
   private readonly active = new Map<string, Job>();
+
+  constructor(private readonly budget: JobBudget = BUDGET) {}
 
   get(id: string): Job | undefined {
     this.prune();
@@ -60,12 +72,9 @@ export class JobRegistry {
       state: "running",
       events: [],
       subscribers: new Set(),
-      runtime: setTimeout(() => {
-        this.cancel(job);
-        this.finish(job, "failed");
-      }, TIMING_MS.jobRuntime),
+      stall: this.expireAfter(this.budget.stall, () => job, STALLED),
+      ceiling: this.expireAfter(this.budget.ceiling, () => job, TOO_LONG),
     };
-    job.runtime.unref();
     this.jobs.set(id, job);
     this.active.set(id, job);
     return job;
@@ -73,21 +82,29 @@ export class JobRegistry {
 
   progress(job: Job, done: number, total: number, label: string): void {
     if (job.state !== "running") return;
+    job.stall.refresh();
     this.emit(job, { type: "progress", done, total, label });
   }
 
-  finish(job: Job, type: "done" | "failed" | "cancelled"): void {
+  finish(
+    job: Job,
+    type: "done" | "failed" | "cancelled",
+    message?: string,
+  ): void {
     if (job.state !== "running") return;
     job.state = type;
     job.finishedAt = Date.now();
-    clearTimeout(job.runtime);
+    clearTimeout(job.stall);
+    clearTimeout(job.ceiling);
     if (this.jobs.get(job.id) === job) {
       this.jobs.delete(job.id);
       this.jobs.set(job.id, job);
     }
     this.emit(
       job,
-      type === "cancelled" ? { type, generation: job.generation } : { type },
+      type === "cancelled"
+        ? { type, generation: job.generation }
+        : { type, ...(message !== undefined && { message }) },
     );
     this.prune();
   }
@@ -127,6 +144,15 @@ export class JobRegistry {
     }
     if (job.state !== "running") close();
     return true;
+  }
+
+  private expireAfter(ms: number, job: () => Job, message: string) {
+    const timer = setTimeout(() => {
+      this.cancel(job());
+      this.finish(job(), "failed", message);
+    }, ms);
+    timer.unref();
+    return timer;
   }
 
   private emit(job: Job, event: JobEvent): void {

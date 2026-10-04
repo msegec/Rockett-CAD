@@ -198,8 +198,12 @@ in the same edit.
 
 A request may send `Rockett-Job: <UUID v4>` to follow its kernel work at the
 job events route (`text/event-stream`) or cancel it. Jobs belong to the
-submitting user and project; anyone else gets 404. A worker that misses the
-cancel watchdog is restarted and in-flight kernel requests get 503 `kernel`:
+submitting user and project; anyone else gets 404. A job fails with a plain
+`message` on its `failed` event when no feature finishes within `jobStall`,
+or when it runs past `jobCeiling` (`server/src/tunables.ts`); both cancel it.
+A retry resumes from the snapshots that cancel kept, unless the worker was
+restarted. A worker that misses the cancel watchdog is restarted and
+in-flight kernel requests get 503 `kernel`:
 `server/src/kernel/jobs.ts`, `server/src/kernel/workerKernel.ts`.
 
 ## Naming upgrade
