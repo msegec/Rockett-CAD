@@ -20,7 +20,7 @@ import {
 import { writeDxf, type Drawing } from "./dxf.js";
 import { meshCopy } from "./mesh.js";
 import type { NamedBody } from "./naming.js";
-import { writeXdeStep } from "./xde.js";
+import { writeXdeGlb, writeXdeStep } from "./xde.js";
 
 export const EXPORT_QUALITY = 0.05;
 
@@ -29,12 +29,16 @@ interface Mesh {
   indices: number[];
 }
 
+const tolerance = (quality: number) => ({
+  linear: quality,
+  angular: 0.3 * Math.sqrt(quality / EXPORT_QUALITY),
+});
+
 /** Tessellate a body at export quality. */
 export function exportMesh(body: NamedBody, quality = EXPORT_QUALITY): Mesh {
   const positions: number[] = [];
   const indices: number[] = [];
-  const angular = 0.3 * Math.sqrt(quality / EXPORT_QUALITY);
-  for (const m of meshCopy(body.shape, { linear: quality, angular })) {
+  for (const m of meshCopy(body.shape, tolerance(quality))) {
     const offset = positions.length / 3;
     for (const p of m.positions) positions.push(p);
     for (const i of m.indices) indices.push(offset + i);
@@ -210,6 +214,14 @@ export const exporters = createRegistry<Exporter>(
 
 export const registerExporter = exporters.register;
 
+const labelled = ({ doc, bodies, colorOf }: ExportContext) =>
+  bodies.map((body) => ({
+    body,
+    shape: body.shape,
+    name: bodyName(doc, body.bodyId),
+    color: colorOf(body.bodyId),
+  }));
+
 export function exporterFor(format: string): Exporter {
   const exporter = exporters.get(format);
   if (exporter) return exporter;
@@ -235,15 +247,7 @@ registerExporter({
   ext: "3mf",
   mime: "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
   source: "bodies",
-  write: ({ doc, bodies, colorOf, options }) =>
-    write3mf(
-      bodies.map((body) => ({
-        body,
-        name: bodyName(doc, body.bodyId),
-        color: colorOf(body.bodyId),
-      })),
-      options.quality,
-    ),
+  write: (ctx) => write3mf(labelled(ctx), ctx.options.quality),
 });
 
 registerExporter({
@@ -259,6 +263,15 @@ registerExporter({
         name: bodyName(doc, body.bodyId),
       })),
     ),
+});
+
+registerExporter({
+  format: "glb",
+  label: "glTF binary (named, coloured)",
+  ext: "glb",
+  mime: "model/gltf-binary",
+  source: "bodies",
+  write: (ctx) => writeXdeGlb(labelled(ctx), tolerance(ctx.options.quality)),
 });
 
 registerExporter({
