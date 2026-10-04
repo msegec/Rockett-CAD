@@ -237,7 +237,7 @@ export function finalizeNames(
       let n = 0;
       for (const { item: face, tied } of sorted) {
         let name: string;
-        do name = `f:${featureId}:x${tied ? "~?" : ""}${++n}`;
+        do name = `${unnamedPrefix(featureId)}${tied ? "~?" : ""}${++n}`;
         while (taken.has(name));
         taken.add(name);
         result.set(face, name);
@@ -343,6 +343,8 @@ export const blendFaceName = (
 
 export const geometryName = (featureId: string, type: string, key: string) =>
   `f:${featureId}:g:${type}:${key}`;
+
+export const unnamedPrefix = (featureId: string) => `f:${featureId}:x`;
 
 export const mirrorPrefix = (featureId: string) => `m:${featureId}`;
 

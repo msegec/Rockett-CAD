@@ -12,7 +12,12 @@ import {
   type Own,
   type Shape,
 } from "./kernel.js";
-import { blendFaceName, finalizeNames, type NamedBody } from "./naming.js";
+import {
+  blendFaceName,
+  finalizeNames,
+  unnamedPrefix,
+  type NamedBody,
+} from "./naming.js";
 import { ShapeMap } from "./shapeMap.js";
 import {
   contourContinuations,
@@ -97,7 +102,7 @@ function unnamePropagated(
   const provisional = new ShapeMap<string>();
   try {
     for (const [face, name] of result.names.entries())
-      if (!propagated.has(name) && !name.startsWith(`f:${featureId}:x`))
+      if (!propagated.has(name) && !name.startsWith(unnamedPrefix(featureId)))
         provisional.set(face, name);
     return {
       ...result,
