@@ -1,11 +1,7 @@
 import { Type } from "typebox";
 import { SCHEMA_VERSION } from "../documents.js";
-import {
-  bodyIdSchema,
-  featureIdSchema,
-  featureNameSchema,
-  NAME_LENGTH,
-} from "./coreFeatures.js";
+import { featureNameSchema, NAME_LENGTH } from "./coreFeatures.js";
+import { bodyIdSchema, featureIdSchema } from "./refs.js";
 import { parameterStateSchema, validParameterState } from "./parameters.js";
 
 const id = featureIdSchema;

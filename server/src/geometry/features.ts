@@ -96,7 +96,7 @@ import { ShapeMap } from "./shapeMap.js";
 
 import { V, frameFromPlane, offsetFrame, uvTo3d } from "./frames.js";
 import { geometryNames } from "./signature.js";
-import { exactCurve } from "./edgeCurve.js";
+import { sourceCurve, sourceLabel } from "./projectSource.js";
 import { readImport } from "./importers.js";
 import { placeImport } from "./stepImport.js";
 import { type EvalContext } from "./featureKinds.js";
@@ -249,14 +249,13 @@ export function evalSketch(
   for (const entity of f.entities) {
     if (entity.kind === "point" || !entity.projection) continue;
     const ref = entity.projection;
-    const body = state.bodies.get(ref.bodyId);
-    const edge = body && computeEdgeNames(body).byName.get(ref.edgeName);
-    if (!edge)
+    const curve = sourceCurve(state, ref);
+    if (!curve)
       throw new Error(
-        `Projected edge ${ref.edgeName} is missing. Restore its source or delete and re-project the reference.`,
+        `Projected ${sourceLabel(ref)} is missing. Restore its source or delete and re-project the reference.`,
       );
     const projected = projectEdge(
-      exactCurve(edge),
+      curve,
       frame,
       entity.id,
       ref,
@@ -264,7 +263,7 @@ export function evalSketch(
     );
     if (projected.at(-1)!.kind !== entity.kind)
       throw new Error(
-        `Projected edge ${ref.edgeName} changed curve type. Re-project this reference.`,
+        `Projected ${sourceLabel(ref)} changed curve type. Re-project this reference.`,
       );
     moved ||= projected.some((e) => stored.get(e.id) !== place(e));
     const replacements = new Map(projected.map((e) => [e.id, e]));

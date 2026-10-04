@@ -5,10 +5,10 @@ export type { Health, HealthResponse } from "./health.js";
 import type {
   BodyEdit,
   CadDocument,
-  EdgeRef,
   Feature,
   ParameterBinding,
   ParameterEdit,
+  ProjectionRef,
   SketchEntity,
   TreeGroup,
 } from "./model.js";
@@ -38,8 +38,14 @@ import { settingsRoutes } from "./settingsRoutes.js";
 import { refRepairRoutes } from "./refRepairRoutes.js";
 import { MEASURE_MAX_REFS, VIEW_VERSION } from "./api.js";
 import { VIEW_PROJECTION } from "./settings.js";
-import { edgeRef, faceRef, groupsSchema, vec3 } from "./schema/features.js";
-import { bodyIdSchema } from "./schema/coreFeatures.js";
+import {
+  bodyIdSchema,
+  edgeRef,
+  faceRef,
+  groupsSchema,
+  projectionRef,
+  vec3,
+} from "./schema/features.js";
 import { bodyEditBody, namingUpgradeBody } from "./schema/documents.js";
 import { parameterStateSchema } from "./schema/parameters.js";
 import { CHECKPOINT_ROUTES, snapshotHash } from "./schema/history.js";
@@ -340,13 +346,13 @@ export const ROUTES = {
     MutationResponse
   >()("PUT", "/projects/:id/features/:fid", undefined, "document"),
   projectEdge: route<
-    { edge: EdgeRef; entityId: string },
+    { edge: ProjectionRef; entityId: string },
     { entities: SketchEntity[] }
   >()(
     "POST",
     "/projects/:id/features/:fid/project",
     Type.Object({
-      edge: edgeRef,
+      edge: projectionRef,
       entityId: Type.String({ minLength: 1, maxLength: 100 }),
     }),
     "viewer",

@@ -17,6 +17,7 @@ import {
   type NamingFailure,
   type NamingMapping,
   type PlaneRef,
+  type ProjectionRef,
   type RefSignature,
   type SizeLimit,
   type SizedFeature,
@@ -33,19 +34,14 @@ import {
   getKernel,
   initKernel,
   kernelVersion,
-  release,
   scoped,
 } from "../geometry/kernel.js";
 import { measure } from "../geometry/measure.js";
 import { resolvePlaneFrame, type EvalState } from "../geometry/features.js";
 import { bodyLabel } from "../geometry/featureState.js";
-import {
-  computeEdgeNames,
-  faceNamesOf,
-  withNamingVersion,
-} from "../geometry/naming.js";
+import { faceNamesOf, withNamingVersion } from "../geometry/naming.js";
 import { resolveRefs } from "../geometry/resolve.js";
-import { exactCurve } from "../geometry/edgeCurve.js";
+import { sourceCurve } from "../geometry/projectSource.js";
 import { faceDrawing } from "../geometry/dxf.js";
 import { signRefs } from "../geometry/signature.js";
 import { planNamingUpgrade } from "../geometry/upgradeNaming.js";
@@ -66,7 +62,7 @@ interface StateQueries {
   projectEdge: {
     position: number;
     plane: PlaneRef;
-    edge: EdgeRef;
+    edge: ProjectionRef;
     entityId: string;
   };
   copyFace: { position: number; face: FaceRef };
@@ -181,25 +177,14 @@ const ANSWERS: {
     return asValidation(() => tangentEdges(body, [edge]));
   },
   projectEdge(state, { plane, edge: ref, entityId }) {
-    const body = state.bodies.get(ref.bodyId);
-    const byName = body && computeEdgeNames(body).byName;
-    try {
-      const edge = byName?.get(ref.edgeName);
-      if (!edge)
-        throw new ValidationError(
-          "This edge is not available before the sketch. Choose geometry from an earlier feature.",
-        );
-      return asValidation(() =>
-        projectEdge(
-          exactCurve(edge),
-          resolvePlaneFrame(state, plane),
-          entityId,
-          ref,
-        ),
+    const curve = sourceCurve(state, ref);
+    if (!curve)
+      throw new ValidationError(
+        `This ${ref.kind === "edge" ? "edge" : "sketch entity"} is not available before the sketch. Choose geometry from an earlier feature.`,
       );
-    } finally {
-      release(byName?.values() ?? []);
-    }
+    return asValidation(() =>
+      projectEdge(curve, resolvePlaneFrame(state, plane), entityId, ref),
+    );
   },
   copyFace(state, { face: ref }) {
     const body = state.bodies.get(ref.bodyId);

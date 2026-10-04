@@ -89,11 +89,13 @@ registerCoreSpec(
   "Sketch",
   (f) => [
     refAt("plane", "/plane", f.plane),
-    ...f.entities.flatMap((e, i) =>
-      e.kind !== "point" && e.projection
-        ? [refAt("edge", `/entities/${i}/projection`, e.projection)]
-        : [],
-    ),
+    ...f.entities.flatMap((e, i) => {
+      if (e.kind === "point" || !e.projection) return [];
+      const path = `/entities/${i}/projection`;
+      return e.projection.kind === "edge"
+        ? [refAt("edge", path, e.projection)]
+        : [refAt("sketchEntity", path, e.projection)];
+    }),
   ],
   { producesGeometry: false, check: sketchReferences },
 );

@@ -11,14 +11,15 @@ import type {
   PlaneRef,
   PointRef,
   ProfileRef,
+  SketchEntityRef,
 } from "./model.js";
 import { createRegistry, REGISTRY_ID } from "./registry.js";
 import {
   extensionFeatureSchema,
   FEATURE_SCHEMAS,
-  featureIdSchema,
   featureNameSchema,
 } from "./schema/coreFeatures.js";
+import { featureIdSchema } from "./schema/refs.js";
 import { parse } from "./schema/validation.js";
 
 interface RefTargets {
@@ -30,6 +31,7 @@ interface RefTargets {
   point: PointRef;
   body: string;
   sketch: string;
+  sketchEntity: SketchEntityRef;
   feature: string;
 }
 
@@ -112,6 +114,9 @@ export function featureInputs(f: Feature) {
         break;
       case "sketch":
         features.add(ref.sketch);
+        break;
+      case "sketchEntity":
+        features.add(ref.sketchEntity.sketchId);
         break;
       case "feature":
         features.add(ref.feature);

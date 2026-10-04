@@ -1,7 +1,7 @@
-import type { EdgeRef, SketchEntity } from "./model.js";
+import type { ProjectionRef, SketchEntity } from "./model.js";
 import type { EdgeInfo, ExactCurve, PlaneFrame, Vec3 } from "./api.js";
 import { sketchBuilder, type SketchBuilder } from "./sketchBuilder.js";
-import { TAU, type XY } from "./sketchCurves.js";
+import { sketchCurves, TAU, type Curve, type XY } from "./sketchCurves.js";
 import { LINEAR_TOL } from "./tolerance.js";
 
 type Conic = Extract<EdgeInfo["curve"], { type: "circle" | "ellipse" }>;
@@ -47,7 +47,7 @@ function semiAxes(curve: Conic): [Vec3, Vec3] {
 
 interface Common {
   id: string;
-  projection: EdgeRef;
+  projection: ProjectionRef;
   external: true;
   construction: boolean;
 }
@@ -87,7 +87,7 @@ export function projectEdge(
   curve: ExactCurve,
   frame: PlaneFrame,
   id: string,
-  projection: EdgeRef,
+  projection: ProjectionRef,
   construction = true,
 ): SketchEntity[] {
   const [uv, point] = [planeUv(frame), pointEntity(id)];
@@ -108,6 +108,67 @@ export function projectEdge(
     );
   if (curve.type === "bspline") return projectSpline(curve, frame, common);
   return projectConic(curve, frame, common);
+}
+
+const sweep = (from: number, to: number) =>
+  (((to - from) % TAU) + TAU) % TAU || TAU;
+
+function spaceCurve(c: Curve, frame: PlaneFrame): ExactCurve {
+  const at = ([x, y]: XY) =>
+    frame.origin.map(
+      (o, i) => o + x * frame.xAxis[i]! + y * frame.yAxis[i]!,
+    ) as Vec3;
+  const axis = frame.normal;
+  if (c.kind === "line")
+    return { type: "line", a: at([c.x1, c.y1]), b: at([c.x2, c.y2]) };
+  if (c.kind === "spline") {
+    const { degree, poles, weights, knots, multiplicities, periodic } = c;
+    return {
+      type: "bspline",
+      degree,
+      poles: poles.map(at),
+      ...(weights && { weights }),
+      knots,
+      multiplicities,
+      ...(periodic && { periodic }),
+    };
+  }
+  const center = at([c.cx, c.cy]);
+  if (c.kind === "circle") return { type: "circle", center, axis, radius: c.r };
+  if (c.kind === "arc")
+    return {
+      type: "circle",
+      center,
+      axis,
+      radius: c.r,
+      start: at(c.s),
+      end: at(c.e),
+      sweep: sweep(c.a0, c.a1),
+    };
+  const ellipse = {
+    type: "ellipse" as const,
+    center,
+    axis,
+    majorAxis: frame.xAxis.map(
+      (v, i) => c.ux * v + c.uy * frame.yAxis[i]!,
+    ) as Vec3,
+    majorRadius: c.a,
+    minorRadius: c.b,
+  };
+  const { span } = c;
+  if (!span) return ellipse;
+  const ends = { start: at(span.s), end: at(span.e) };
+  return { ...ellipse, ...ends, sweep: sweep(span.t0, span.t1) };
+}
+
+export function sketchSpaceCurve(
+  sketch: { frame: PlaneFrame; entities: readonly SketchEntity[] },
+  entityId: string,
+): ExactCurve | undefined {
+  const curve = sketchCurves(sketch.entities, true).find(
+    (c) => c.id === entityId,
+  );
+  return curve && spaceCurve(curve, sketch.frame);
 }
 
 function spread(points: readonly number[][]): [number, number] {

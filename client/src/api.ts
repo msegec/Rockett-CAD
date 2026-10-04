@@ -481,8 +481,6 @@ export const api = {
     send(ROUTES.tangentEdges, { id }, { body: { edge, beforeFeatureId } }),
   sizeLimit: (id: string, feature: SizedFeature, position: number) =>
     send(ROUTES.sizeLimit, { id }, { body: { feature }, position }),
-  projectEdge: (id: string, fid: string, edge: EdgeRef, entityId: string) =>
-    send(ROUTES.projectEdge, { id, fid }, { body: { edge, entityId } }),
 
   updateParameters: (id: string, edit: ParameterEdit, stamp?: Stamp) =>
     send(ROUTES.updateParameters, { id }, { body: edit, ...stamp }),

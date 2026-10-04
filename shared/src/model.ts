@@ -27,6 +27,14 @@ export interface VertexRef {
 
 export type TopoRef = FaceRef | EdgeRef | VertexRef;
 
+export interface SketchEntityRef {
+  kind: "sketchEntity";
+  sketchId: string;
+  entityId: string;
+}
+
+export type ProjectionRef = EdgeRef | SketchEntityRef;
+
 export type PointRef =
   VertexRef | { kind: "sketchPoint"; sketchId: string; entityId: string };
 
@@ -87,7 +95,7 @@ export interface SketchPoint {
 }
 
 export interface SketchLine {
-  projection?: EdgeRef;
+  projection?: ProjectionRef;
   id: string;
   kind: "line";
   p1: string;
@@ -97,7 +105,7 @@ export interface SketchLine {
 }
 
 export interface SketchCircle {
-  projection?: EdgeRef;
+  projection?: ProjectionRef;
   id: string;
   kind: "circle";
   center: string;
@@ -107,7 +115,7 @@ export interface SketchCircle {
 }
 
 export interface SketchArc {
-  projection?: EdgeRef;
+  projection?: ProjectionRef;
   id: string;
   kind: "arc";
   center: string;
@@ -118,7 +126,7 @@ export interface SketchArc {
 }
 
 export interface SketchEllipse {
-  projection?: EdgeRef;
+  projection?: ProjectionRef;
   id: string;
   kind: "ellipse";
   center: string;

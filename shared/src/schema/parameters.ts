@@ -1,5 +1,6 @@
 import { Type } from "typebox";
-import { featureIdSchema, NAME_LENGTH } from "./coreFeatures.js";
+import { NAME_LENGTH } from "./coreFeatures.js";
+import { featureIdSchema } from "./refs.js";
 import { EXPRESSION_MAX_BYTES } from "../expressions.js";
 import type { ParameterUnit } from "../parameters.js";
 import { resolveDocumentParameters } from "../parameters.js";

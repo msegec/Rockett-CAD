@@ -1,7 +1,7 @@
-import type { EdgeRef } from "./model.js";
+import type { ProjectionRef } from "./model.js";
 
 export interface SketchSpline {
-  projection?: EdgeRef;
+  projection?: ProjectionRef;
   id: string;
   kind: "spline";
   degree: number;
@@ -16,7 +16,7 @@ export interface SketchSpline {
 }
 
 export interface SketchFitSpline {
-  projection?: EdgeRef;
+  projection?: ProjectionRef;
   id: string;
   kind: "fitSpline";
   points: string[];

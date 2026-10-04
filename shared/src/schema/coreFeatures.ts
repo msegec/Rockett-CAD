@@ -1,12 +1,18 @@
 import { Type, type TProperties, type TSchema } from "typebox";
-import {
-  CHAMFER_TYPES,
-  FILLET_TYPES,
-  ORIGIN_AXES,
-  REF_SIGNATURE_TYPES,
-  SHELL_DIRECTIONS,
-} from "../model.js";
+import { CHAMFER_TYPES, FILLET_TYPES, SHELL_DIRECTIONS } from "../model.js";
 import { ownedFields } from "./chamferFields.js";
+import {
+  axisRef,
+  bodyIdSchema,
+  edgeRef,
+  faceRef,
+  featureIdSchema,
+  originAxis,
+  planeRef,
+  pointRef,
+  profileRef,
+  projectionRef,
+} from "./refs.js";
 import { splineEntities } from "./splineEntity.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
@@ -14,9 +20,6 @@ export const MAX_DIM = 100_000;
 export const MAX_TARGETS = 10_000;
 export const NAME_LENGTH = 200;
 
-export const featureIdSchema = Type.String({ minLength: 1, maxLength: 100 });
-export const bodyIdSchema = Type.String({ minLength: 1 });
-const topoName = Type.String({ minLength: 1 });
 export const featureNameSchema = Type.String({
   minLength: 1,
   maxLength: NAME_LENGTH,
@@ -30,61 +33,6 @@ const coordinate = Type.Number({
   parameterUnit: "mm",
 });
 const flag = Type.Optional(Type.Boolean());
-
-export const vec3 = Type.Tuple([Type.Number(), Type.Number(), Type.Number()]);
-
-const sig = Type.Optional(
-  Type.Object({
-    type: Type.Enum([...REF_SIGNATURE_TYPES]),
-    point: vec3,
-    direction: vec3,
-  }),
-);
-
-export const faceRef = Type.Object({
-  kind: Type.Literal("face"),
-  bodyId,
-  faceName: topoName,
-  sig,
-});
-
-export const edgeRef = Type.Object({
-  kind: Type.Literal("edge"),
-  bodyId,
-  edgeName: topoName,
-  sig,
-});
-
-const pointRef = Type.Union([
-  Type.Object({ kind: Type.Literal("vertex"), bodyId, vertexName: topoName }),
-  Type.Object({
-    kind: Type.Literal("sketchPoint"),
-    sketchId: id,
-    entityId: id,
-  }),
-]);
-
-const planeRef = Type.Union([
-  Type.Object({
-    kind: Type.Literal("origin"),
-    plane: Type.Enum(["XY", "XZ", "YZ"]),
-  }),
-  Type.Object({ kind: Type.Literal("construction"), featureId: id }),
-  Type.Object({ kind: Type.Literal("face"), face: faceRef }),
-]);
-
-const axis = Type.Enum([...ORIGIN_AXES]);
-
-const axisRef = Type.Union([
-  Type.Object({ kind: Type.Literal("originAxis"), axis }),
-  Type.Object({ kind: Type.Literal("sketchLine"), sketchId: id, entityId: id }),
-  Type.Object({ kind: Type.Literal("edge"), edge: edgeRef }),
-]);
-
-const profileRef = Type.Object({
-  sketchId: id,
-  profileId: Type.String({ minLength: 1, maxLength: 200 }),
-});
 
 const operation = Type.Enum(["newBody", "join", "cut", "intersect"]);
 const positive = Type.Number({
@@ -123,7 +71,7 @@ export const extensionFeatureSchema = <P extends TSchema>(
 ) => feature(type, { version: Type.Literal(version), params });
 
 const entityBase = { id, construction: flag, external: flag };
-const projected = { ...entityBase, projection: Type.Optional(edgeRef) };
+const projected = { ...entityBase, projection: Type.Optional(projectionRef) };
 
 const entity = Type.Union([
   Type.Object({
@@ -452,7 +400,7 @@ const mirror = feature("mirror", {
 const linearPattern = feature("linearPattern", {
   bodies,
   direction: Type.Union([
-    Type.Object({ kind: Type.Literal("axis"), axis }),
+    Type.Object({ kind: Type.Literal("axis"), axis: originAxis }),
     Type.Object({ kind: Type.Literal("edge"), edge: edgeRef }),
   ]),
   count: patternCount,

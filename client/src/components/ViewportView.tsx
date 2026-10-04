@@ -14,7 +14,6 @@ import {
   formatAngle,
   formatLength,
   roundedLength,
-  newId,
   extendSketch,
   refusal,
   unsupported,
@@ -50,7 +49,7 @@ import { clearToolPreview, updateToolPreview } from "../three/toolPreview";
 import { listenWheel } from "../three/wheel";
 import { previewBodies, useStore, isIdle, type Selection } from "../store";
 import { loadPreviewBase, usePreviewBase } from "../previewBase";
-import { api } from "../api";
+import { projectionPick, projectPicked } from "../sketchProject";
 import { ViewportContext, alignCameraToActiveSketch } from "../viewportRef";
 import { activeCommand } from "../commands/active";
 import {
@@ -1106,8 +1105,7 @@ export function ViewportView({
     } else if (s.active?.id === "design.sketch") {
       const tool = s.active.state.tool as string;
       if (tool === "project") {
-        picked =
-          vp.pick(e.clientX, e.clientY, ["design.edge"])?.selection ?? null;
+        picked = projectionPick(vp, e, s.draftSketch?.id) ?? null;
       } else if (tool === "trim") {
         const target = trimTarget(e);
         if (target && trimmable(target.entities, target.curve))
@@ -1584,45 +1582,7 @@ export function ViewportView({
 
     if (s.busy) return;
     if (tool === "project") {
-      const picked = vp.pick(e.clientX, e.clientY, ["design.edge"])?.selection;
-      if (picked?.kind !== "edge") return;
-      const body = s.evaluation?.bodies.find((b) => b.bodyId === picked.bodyId);
-      const edges = (body && meshOf(body))?.edges ?? [];
-      const edge = edges.find((ed) => ed.name === picked.edgeName);
-      const frame = activeSketchFrame();
-      if (!edge || !frame) return;
-      try {
-        if (
-          draft.entities.some(
-            (en) =>
-              en.kind !== "point" &&
-              en.projection?.bodyId === picked.bodyId &&
-              en.projection.edgeName === picked.edgeName,
-          )
-        )
-          throw new Error("This edge is already projected into the sketch.");
-        if (!s.projectId) return;
-        const { entities: added } = await api.projectEdge(
-          s.projectId,
-          draft.id,
-          { kind: "edge", bodyId: picked.bodyId, edgeName: picked.edgeName },
-          newId("proj"),
-        );
-        const current = useStore.getState();
-        if (
-          current.draftSketch !== draft ||
-          current.active?.id !== "design.sketch" ||
-          current.active.state.tool !== "project"
-        )
-          return;
-        s.updateDraftSketch([...draft.entities, ...added], draft.constraints);
-        await s.commitDraftSketch();
-        useStore.getState().setSketchTool("select");
-      } catch (error) {
-        if (useStore.getState().draftSketch?.id === draft.id)
-          useStore.setState({ draftSketch: draft });
-        s.setError((error as Error).message);
-      }
+      if (activeSketchFrame()) await projectPicked(vp, e, draft);
       return;
     }
     if (tool === "extend" || tool === "offset") {

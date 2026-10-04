@@ -448,6 +448,20 @@ input bound, not a tolerance.
   parallel projection is affine. A curved one whose poles fall on a line
   refuses as edge-on; one whose poles meet at a point refuses as a point.
   Edge signatures still record an elliptical edge as `other`.
+- Schema 38 lets a projection name a curve of an earlier sketch,
+  `{ kind: "sketchEntity", sketchId, entityId }`, beside an edge.
+  `sketchSpaceCurve` in `shared/src/projection.ts` carries the evaluated
+  curve through its sketch frame into space, and `projectEdge` projects it as
+  it does an edge, so child ids, curve types and refusals match. Evaluation
+  sees only sketches before the projecting one. A later, own or cyclic
+  source fails the sketch as a deleted or suppressed source or a removed
+  curve does, with the error
+  `Projected sketch entity <id> of <sketch> is missing`; stored positions
+  never stand in. Coincident, midpoint and tangent relations on projected
+  points and curves follow the source, since external points are driven; a
+  point placed by a positional snap holds no relation and stays. Earlier
+  documents read the same, so the step only bumps the version, which makes
+  an older server refuse a newer file by version.
 - A sketch arc runs counter-clockwise from `start` to `end` about `center`.
   The solver holds both ends at one radius.
 - `editSketchOffset` in `shared/src/sketchOffsets.ts` keeps generated entity
