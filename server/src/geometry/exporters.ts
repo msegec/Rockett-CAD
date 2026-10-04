@@ -33,7 +33,8 @@ interface Mesh {
 export function exportMesh(body: NamedBody, quality = EXPORT_QUALITY): Mesh {
   const positions: number[] = [];
   const indices: number[] = [];
-  for (const m of meshCopy(body.shape, { linear: quality, angular: 0.3 })) {
+  const angular = 0.3 * Math.sqrt(quality / EXPORT_QUALITY);
+  for (const m of meshCopy(body.shape, { linear: quality, angular })) {
     const offset = positions.length / 3;
     for (const p of m.positions) positions.push(p);
     for (const i of m.indices) indices.push(offset + i);
