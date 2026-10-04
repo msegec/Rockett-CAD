@@ -43,31 +43,32 @@ export type Clearing = Layer & {
   floor?: Layer & { below: number };
 };
 
-type Entry = { kind: "helix"; centre: Xy } | { kind: "ramp" };
+export type Entry = { kind: "helix"; centre: Xy } | { kind: "ramp" };
 
-type Role = "link" | "cut";
+export type Role = "link" | "cut";
 
 type Step = { ring: RegionLoop } & ({ entry: Entry } | { link: Role });
 
 type Plan = { steps: Step[]; descend: boolean };
 
-type Pocket = {
+export type Pocket = {
   input: ClearInput;
   radius: number;
   stepover: number;
   walls: Loop[];
   room: Loop[];
   slope: number;
+  levels: number[];
 };
 
-const WALL = 1e-3;
-const PROOF = 2e-3;
+export const WALL = 1e-3;
+export const PROOF = 2e-3;
 export const SKIN = WALL + PROOF;
-const HELIX = 0.45;
+export const HELIX = 0.45;
 const MARGIN = 0.05;
 const RAMP_ANGLE = 0.5;
 
-const point = ([x, y]: Xy) => ({ x, y });
+export const point = ([x, y]: Xy) => ({ x, y });
 
 const shown = ([x, y]: Xy) =>
   `(${Number(x.toFixed(3))}, ${Number(y.toFixed(3))})`;
@@ -92,13 +93,27 @@ function rings(
   }
 }
 
+export function inRoom(path: Xy[], shape: Pocket) {
+  return covers(shape.room, swathOf(path.map(point), PIECE / 2));
+}
+
 function reachable(from: Xy, to: Xy, cleared: Loop[], shape: Pocket) {
   if (gap(from, to) <= PIECE) return true;
-  const path = [point(from), point(to)];
   return (
-    covers(shape.room, swathOf(path, PIECE / 2)) &&
-    covers(cleared, swathOf(path, shape.radius - PROOF))
+    inRoom([from, to], shape) &&
+    covers(cleared, swathOf([point(from), point(to)], shape.radius - PROOF))
   );
+}
+
+export function linkRole(
+  from: Xy,
+  to: Xy,
+  ahead: Loop[],
+  cleared: Loop[],
+  shape: Pocket,
+): Role | undefined {
+  if (!reachable(from, to, ahead, shape)) return undefined;
+  return reachable(from, to, cleared, shape) ? "link" : "cut";
 }
 
 function perimeter(ring: RegionLoop) {
@@ -107,7 +122,7 @@ function perimeter(ring: RegionLoop) {
   return length;
 }
 
-function entryFor(ring: RegionLoop, shape: Pocket): Entry {
+export function entryFor(ring: RegionLoop, shape: Pocket): Entry {
   const { diameter } = shape.input.tool;
   const [p, q] = [ring.start, ring.segments[0]!.to];
   const length = gap(p, q);
@@ -143,8 +158,8 @@ export function flatFloor(
   );
 }
 
-function covered(cleared: Loop[], reach: Loop[], shape: Pocket) {
-  const left = subtractLoops(reach, cleared);
+export function covered(cleared: Loop[], target: Loop[], shape: Pocket) {
+  const left = subtractLoops(provenCleared(target, shape.radius), cleared);
   const at = left[0]?.[0];
   if (at)
     throw new RangeError(
@@ -168,18 +183,14 @@ function plan(
   for (const points of order) {
     const ring = at ? startAt(lines(points), at) : lines(points);
     const next = unionLoops([...cleared, ...bandOf(points, shape.radius)]);
+    const role = at && linkRole(at, ring.start, next, cleared, shape);
     chosen.push(
-      at && reachable(at, ring.start, next, shape)
-        ? {
-            ring,
-            link: reachable(at, ring.start, cleared, shape) ? "link" : "cut",
-          }
-        : { ring, entry: entryFor(ring, shape) },
+      role ? { ring, link: role } : { ring, entry: entryFor(ring, shape) },
     );
     cleared = next;
     at = ring.start;
   }
-  covered(cleared, provenCleared(target, shape.radius), shape);
+  covered(cleared, target, shape);
   const first = chosen[0]!.ring.start;
   return { steps: chosen, descend: reachable(at!, first, cleared, shape) };
 }
@@ -234,7 +245,19 @@ function ramp(ring: RegionLoop, top: number, z: number, shape: Pocket) {
   return moves;
 }
 
-function link([x, y]: Xy, z: number, shape: Pocket, role: Role): Motion {
+export function enter(
+  ring: RegionLoop,
+  entry: Entry,
+  top: number,
+  z: number,
+  shape: Pocket,
+) {
+  return entry.kind === "helix"
+    ? helix(entry.centre, ring.start, top, z, shape)
+    : ramp(ring, top, z, shape);
+}
+
+export function link([x, y]: Xy, z: number, shape: Pocket, role: Role): Motion {
   return {
     kind: "feed",
     to: [x, y, z],
@@ -243,7 +266,12 @@ function link([x, y]: Xy, z: number, shape: Pocket, role: Role): Motion {
   };
 }
 
-function approach(at: Xyz | undefined, p: Xy, from: number, shape: Pocket) {
+export function approach(
+  at: Xyz | undefined,
+  p: Xy,
+  from: number,
+  shape: Pocket,
+) {
   const { setup, stock, preset } = shape.input;
   const top = stock.max[2];
   const clear = top + setup.clearance;
@@ -277,12 +305,7 @@ function level(
     else {
       if (at && !i && descend) moves.push(link(p, from, shape, "link"));
       else append(moves, approach(moves.at(-1)?.to ?? at, p, from, shape));
-      append(
-        moves,
-        step.entry.kind === "helix"
-          ? helix(step.entry.centre, p, from, z, shape)
-          : ramp(ring, from, z, shape),
-      );
+      append(moves, enter(ring, step.entry, from, z, shape));
     }
     append(moves, pass(ring, z, shape.input.preset.cutFeed));
   }
@@ -351,32 +374,59 @@ function guarded(moves: Motion[], shape: Pocket): Motion[] {
   return out;
 }
 
-export function clearRegion(
+export function shapeOf(
   input: ClearInput,
-  { region, floor, ...layer }: Clearing,
-): Section {
+  region: Loop[],
+  stepoverFraction = input.preset.stepoverFraction,
+): Pocket {
   checkCut("pocket", input);
-  const { setup, stock, tool, preset, rampAngle } = input;
+  const { stock, tool, preset, rampAngle } = input;
   if (!(rampAngle >= RAMP_ANGLE && rampAngle < 90))
     throw new RangeError(
       `ramp angle must be at least ${RAMP_ANGLE} and below 90 degrees`,
     );
-  const top = stock.max[2];
-  const levels = depthLevels(top, input.bottom, preset.stepdown);
+  const levels = depthLevels(stock.max[2], input.bottom, preset.stepdown);
   const radius = tool.diameter / 2;
   const walls = offsetLoops(region, -(radius + WALL));
   if (!walls.length)
     throw new RangeError(
       `the ${tool.diameter} mm tool does not fit the pocket`,
     );
-  const shape: Pocket = {
+  return {
     input,
     radius,
-    stepover: stepoverOf(preset, tool),
+    stepover: stepoverOf({ ...preset, stepoverFraction }, tool),
     walls,
     room: offsetLoops(walls, PIECE),
     slope: Math.tan((rampAngle * Math.PI) / 180),
+    levels,
   };
+}
+
+export function finish(moves: Motion[], shape: Pocket): Section {
+  const { operationId, setup, stock, tool, preset } = shape.input;
+  const end = moves.at(-1)!.to;
+  moves.push({
+    kind: "rapid",
+    to: [end[0], end[1], stock.max[2] + setup.safeHeight],
+  });
+  return {
+    operationId,
+    toolId: tool.id,
+    pass: "rough",
+    spindle: { rpm: preset.rpm, dir: "cw" },
+    coolant: preset.coolant,
+    moves: guarded(moves, shape),
+  };
+}
+
+export function clearRegion(
+  input: ClearInput,
+  { region, floor, ...layer }: Clearing,
+): Section {
+  const shape = shapeOf(input, region);
+  const { levels } = shape;
+  const top = input.stock.max[2];
   const upper = plan(layer, shape);
   const deep = floor && plan(floor, shape);
   const moves: Motion[] = [];
@@ -393,16 +443,7 @@ export function clearRegion(
     );
     last = chosen;
   }
-  const end = moves.at(-1)!.to;
-  moves.push({ kind: "rapid", to: [end[0], end[1], top + setup.safeHeight] });
-  return {
-    operationId: input.operationId,
-    toolId: tool.id,
-    pass: "rough",
-    spindle: { rpm: preset.rpm, dir: "cw" },
-    coolant: preset.coolant,
-    moves: guarded(moves, shape),
-  };
+  return finish(moves, shape);
 }
 
 export function pocket(input: PocketInput): Section {
