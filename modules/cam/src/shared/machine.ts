@@ -5,6 +5,8 @@ const travel = (title: string) => Type.Number({ title, parameterUnit: "mm" });
 const feed = (axis: string) =>
   Type.Number({ title: `Max feed ${axis} (mm/min)`, exclusiveMinimum: 0 });
 
+const acceleration = Type.Optional(Type.Number({ exclusiveMinimum: 0 }));
+
 const firmwareSchema = Type.Union(
   [
     Type.Literal("grbl", { title: "GRBL 1.1" }),
@@ -42,6 +44,17 @@ export const machineSchema = Type.Object({
   maxFeedZ: feed("Z"),
   rpmMin: Type.Integer({ title: "Min spindle speed (rpm)", minimum: 0 }),
   rpmMax: Type.Integer({ title: "Max spindle speed (rpm)", minimum: 1 }),
+  measuredRpmMin: Type.Optional(Type.Integer({ minimum: 0 })),
+  measuredRpmMax: Type.Optional(Type.Integer({ minimum: 1 })),
+  ratedWatts: Type.Optional(Type.Number({ exclusiveMinimum: 0 })),
+  ratedRpm: Type.Optional(Type.Integer({ minimum: 1 })),
+  spinUpSeconds: Type.Optional(Type.Number({ minimum: 0 })),
+  accelX: acceleration,
+  accelY: acceleration,
+  accelZ: acceleration,
+  junctionDeviation: Type.Optional(Type.Number({ minimum: 0 })),
+  laserMode: Type.Optional(Type.Boolean()),
+  accelerationProfiles: Type.Optional(Type.Boolean()),
   toolChange: toolChangeSchema,
   units: Type.Union(
     [
@@ -99,12 +112,28 @@ const AXES = [
   ["Z", "zMin", "zMax"],
 ] as const;
 
+export const spindleRange = (machine: MachineProfile) => ({
+  min: machine.measuredRpmMin ?? machine.rpmMin,
+  max: machine.measuredRpmMax ?? machine.rpmMax,
+});
+
+export function availableWatts(machine: MachineProfile, rpm: number) {
+  const { ratedWatts, ratedRpm } = machine;
+  if (ratedWatts === undefined || ratedRpm === undefined) return undefined;
+  return ratedWatts * Math.min(1, rpm / ratedRpm);
+}
+
 export function validateMachine(machine: MachineProfile): string[] {
   const problems = AXES.filter(
     ([, min, max]) => !(machine[max] > machine[min]),
   ).map(([axis]) => `${axis} max must be greater than ${axis} min`);
+  const spindle = spindleRange(machine);
   if (!(machine.rpmMax >= machine.rpmMin))
     problems.push("max spindle speed must be at least the min");
+  else if (!(spindle.max >= spindle.min))
+    problems.push("measured max spindle speed must be at least the min");
+  if ((machine.ratedWatts === undefined) !== (machine.ratedRpm === undefined))
+    problems.push("rated power needs both watts and rpm");
   if (machine.firmware === "grbl" && machine.toolChange === "m6")
     problems.push("GRBL 1.1 has no M6; use one file per tool");
   return problems;
