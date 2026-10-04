@@ -12,6 +12,7 @@ import {
   type User,
 } from "@rockett/shared";
 import { StoreError } from "../store/projectStore.js";
+import { backupNamespace } from "../store/jsonStore.js";
 import { discarding } from "./uploads.js";
 import { previewSequence, reply, transactionId } from "./revision.js";
 import type { Edit } from "./routeModules.js";
@@ -106,6 +107,32 @@ async function keeping(
   }
 }
 
+const extensionVersions = (doc: CadDocument) =>
+  new Map(
+    Object.entries(doc.extensions).map(([id, { version }]) => [id, version]),
+  );
+
+async function backupRaised(
+  store: RouterContext["store"],
+  stored: Map<string, number>,
+  doc: CadDocument,
+): Promise<void> {
+  const raised = Object.entries(doc.extensions).flatMap(([id, { version }]) => {
+    const from = stored.get(id);
+    return from !== undefined && version > from
+      ? [`${id.replaceAll("-", "_")}.v${from}.v${version}`]
+      : [];
+  });
+  if (!raised.length || (await store.isTemporary(doc.id))) return;
+  const backup = backupNamespace(
+    store.documents.options.storage,
+    store.documents.dir(doc.id),
+  );
+  await store.documents.exclusive(doc.id, () =>
+    backup.backup(raised.join("_")),
+  );
+}
+
 const ended = () =>
   new StoreError("This preview has ended. Start it again.", "not_found");
 
@@ -188,6 +215,7 @@ export function createProjectMutations(context: RouterContext) {
         const loaded = await editable(req, res);
         const before = structuredClone(resolvedFeatures(loaded));
         const { timelinePosition, revision } = loaded;
+        const versions = extensionVersions(loaded);
         const {
           label,
           cursor,
@@ -206,6 +234,7 @@ export function createProjectMutations(context: RouterContext) {
             { features: before, timelinePosition },
             evaluation,
           );
+        await backupRaised(store, versions, document);
         await keeping(store, loaded.id, revision, async () => {
           await (label === undefined
             ? history.move(document, cursor, ctx.user.id)
