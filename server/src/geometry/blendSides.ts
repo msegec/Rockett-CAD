@@ -229,8 +229,7 @@ function coneSide(face: Shape, edge: Shape, own: Own) {
   };
 }
 
-export function torusSides(edge: Shape, original: Shape[], own: Own) {
-  if (vertices(edge).map(own).length !== 1) return null;
+export function circleSides(edge: Shape, original: Shape[], own: Own) {
   const sides = curveSides(
     edge,
     original,
@@ -242,4 +241,10 @@ export function torusSides(edge: Shape, original: Shape[], own: Own) {
     getKernel().GeomAbs_CurveType.GeomAbs_Circle,
   );
   return sides?.some((side) => side.radius) ? sides : null;
+}
+
+export function torusSides(edge: Shape, original: Shape[], own: Own) {
+  return vertices(edge).map(own).length === 1
+    ? circleSides(edge, original, own)
+    : null;
 }

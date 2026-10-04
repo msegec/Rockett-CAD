@@ -9,6 +9,7 @@ import {
   type Own,
 } from "./kernel.js";
 import { vertexPoint } from "./featureState.js";
+import { axisAngle } from "./axisAngle.js";
 import { sectionCarrier, surfaceGap } from "./blendSides.js";
 import type { FilletEnd } from "./filletBoundaries.js";
 import type { nativeBoundaryCurves } from "./nativeBoundaryCurves.js";
@@ -86,12 +87,15 @@ function guideNeighbor(
     assert(contact);
     return { old: end.old, new: contact };
   });
+  const contactTypes = new Set([
+    k.GeomAbs_CurveType.GeomAbs_Line,
+    k.GeomAbs_CurveType.GeomAbs_Circle,
+  ]);
   const lines = edges(patch.face)
     .map(own)
     .filter(
       (e) =>
-        own(new k.BRepAdaptor_Curve_2(e)).GetType() ===
-          k.GeomAbs_CurveType.GeomAbs_Line &&
+        contactTypes.has(own(new k.BRepAdaptor_Curve_2(e)).GetType()) &&
         vertices(e)
           .map(own)
           .every((v) => gap(vertexPoint(v)) <= k.BRep_Tool.Tolerance_2(e)),
@@ -103,8 +107,38 @@ function guideNeighbor(
   const carrier = planarFacePlane(face)
     ? lines[0]!
     : sectionCarrier(patch.face, face, [start.new, finish.new], own);
-  const edge = carrierEdge(carrier, start.new, finish.new);
+  if (
+    own(new k.BRepAdaptor_Curve_2(carrier)).GetType() !==
+    own(new k.BRepAdaptor_Curve_2(lines[0]!)).GetType()
+  )
+    throw new Error("the fillet contact carrier is not exact");
+  const edge = carrierEdge(
+    carrier,
+    ...inCarrierOrder(carrier, start.new, finish.new, own),
+  );
   transfer(carrier, edge, patch.face);
   if (carrier !== lines[0]) transfer(carrier, edge, face);
   return { face, contacts, edge, oldLine: lines[0]! };
+}
+
+function inCarrierOrder(
+  carrier: Shape,
+  start: Shape,
+  finish: Shape,
+  own: Own,
+): [Shape, Shape] {
+  const k = getKernel(),
+    curve = own(new k.BRepAdaptor_Curve_2(carrier));
+  if (curve.GetType() !== k.GeomAbs_CurveType.GeomAbs_Circle)
+    return [start, finish];
+  const angle = axisAngle(
+    own(own(curve.Circle()).Position()),
+    [curve.FirstParameter(), curve.LastParameter()],
+    own,
+  );
+  const reversed =
+    carrier.Orientation_1() === k.TopAbs_Orientation.TopAbs_REVERSED;
+  return angle(vertexPoint(start)) < angle(vertexPoint(finish)) === !reversed
+    ? [start, finish]
+    : [finish, start];
 }

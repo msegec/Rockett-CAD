@@ -1,6 +1,11 @@
 import { LINEAR_TOL, UNIT_DOT_TOL, type EdgeRef } from "@rockett/shared";
 import { filletSection } from "./blendModule.js";
-import { chamferSides, cylinderOf, torusSides } from "./blendSides.js";
+import {
+  chamferSides,
+  circleSides,
+  cylinderOf,
+  torusSides,
+} from "./blendSides.js";
 import type { ToolResult } from "./featureState.js";
 import { V } from "./frames.js";
 import {
@@ -25,7 +30,7 @@ import {
   type BlendStrip,
 } from "./planarFillet.js";
 import { planarFilletSurface } from "./planarFilletSurface.js";
-import { torusBlend } from "./torusFillet.js";
+import { arcTorusStrip, torusBlend } from "./torusFillet.js";
 
 function sameCylinder(a: Shape, b: Shape, own: Own) {
   const [first, second] = [cylinderOf(a, own), cylinderOf(b, own)];
@@ -105,8 +110,16 @@ function chainBlend(
       byName,
       refs,
     );
-  return along(torusSides)
-    ? torusBlend(body, chain, { kind: "fillet", size: radius }, featureId, own)
+  if (along(torusSides))
+    return torusBlend(
+      body,
+      chain,
+      { kind: "fillet", size: radius },
+      featureId,
+      own,
+    );
+  return along(circleSides)
+    ? planarBlend(body, chain, arcTorusStrip(radius), featureId, byName, refs)
     : null;
 }
 

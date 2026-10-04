@@ -1,5 +1,6 @@
 import { LINEAR_TOL, type Vec3 } from "@rockett/shared";
 import {
+  circleSides,
   cylinderOf,
   radial,
   torusSides,
@@ -30,13 +31,17 @@ import { planeBoundarySample } from "./planeBoundary.js";
 
 const TURN = 2 * Math.PI;
 
-function torusFace(edge: Shape, sides: PlanarSide[], radius: number, own: Own) {
+function torusFace(
+  p: Vec3,
+  sides: PlanarSide[],
+  radius: number,
+  own: Own,
+  turn: [number, number] = [0, TURN],
+) {
   const k = getKernel();
   const wall = sides.find((side) => side.radius !== 0)!;
   const other = sides.find((side) => side !== wall)!;
   const cylinder = cylinderOf(wall.face, own)!;
-  const { point } = planeBoundarySample(edge, other.normal, own);
-  const p: Vec3 = [point.X(), point.Y(), point.Z()];
   const out = V.normalize(radial(cylinder, p));
   const tangent = V.cross(cylinder.axis, out);
   const [section] = planeFilletSection(
@@ -58,20 +63,50 @@ function torusFace(edge: Shape, sides: PlanarSide[], radius: number, own: Own) {
     new k.gp_Ax3_3(
       own(pnt(...V.sub(section.centre, V.scale(out, major)))),
       own(dir(...cylinder.axis)),
-      own(dir(...out)),
+      own(
+        dir(
+          ...V.add(
+            V.scale(out, Math.cos(turn[0])),
+            V.scale(tangent, Math.sin(turn[0])),
+          ),
+        ),
+      ),
     ),
   );
   const make = own(
     new k.BRepBuilderAPI_MakeFace_13(
       own(new k.gp_Torus_2(frame, major, radius)),
       0,
-      TURN,
+      turn[1] - turn[0],
       start,
       start + sweep,
     ),
   );
   if (!make.IsDone()) throw new Error("the torus fillet could not be built");
   return own(make.Face());
+}
+
+export function arcTorusStrip(radius: number): BlendStrip {
+  return {
+    kind: "fillet",
+    size: radius,
+    sides: circleSides,
+    face(points, sides, _axis, own) {
+      const wall = sides.find((side) => side.radius !== 0)!;
+      const cylinder = cylinderOf(wall.face, own)!;
+      const middle = V.scale(wall.normal, Math.sign(wall.radius));
+      const start = radial(cylinder, points[0]);
+      const half = Math.acos(
+        Math.max(-1, Math.min(1, V.dot(V.normalize(start), middle))),
+      );
+      const reach = (half + Math.PI) / 2;
+      const p = V.add(
+        V.sub(points[0], start),
+        V.scale(middle, cylinder.radius),
+      );
+      return torusFace(p, sides, radius, own, [-reach, reach]);
+    },
+  };
 }
 
 type Guide = { guide: Shape; contacts: Shape[] };
@@ -141,7 +176,9 @@ export function torusBlend(
     const guide = copiedEdge(edge);
     const sides = torusSides(guide, source, own);
     if (!sides) throw new Error("the torus fillet guide changed in the copy");
-    return { guide, sides, face: torusFace(guide, sides, strip.size, own) };
+    const { point } = planeBoundarySample(guide, sides[0]!.normal, own);
+    const p: Vec3 = [point.X(), point.Y(), point.Z()];
+    return { guide, sides, face: torusFace(p, sides, strip.size, own) };
   });
   const neighbours = guides
     .flatMap(({ sides }) => sides.map((side) => side.face))

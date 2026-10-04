@@ -21,6 +21,7 @@ import {
 } from "./blendSides.js";
 import { nativeBoundaryCurves } from "./nativeBoundaryCurves.js";
 import { originalCarrierMetric } from "./originalCarrierMetric.js";
+import { axisAngle } from "./axisAngle.js";
 import { moduleSphereCorner } from "./sphereFilletCorner.js";
 import type { FilletEnd } from "./filletBoundaries.js";
 
@@ -35,14 +36,38 @@ function planeStrip(domain: any) {
   return domain.GetType() === getKernel().GeomAbs_SurfaceType.GeomAbs_Plane;
 }
 
-function stripAxis(domain: any, own: Own) {
-  const plane = planeStrip(domain),
-    position = own(own(plane ? domain.Plane() : domain.Cylinder()).Position()),
-    centre = own(position.Location()),
-    direction = own(plane ? position.YDirection() : position.Direction());
+function stripRun(domain: any, own: Own) {
+  const k = getKernel(),
+    torus = domain.GetType() === k.GeomAbs_SurfaceType.GeomAbs_Torus,
+    plane = planeStrip(domain),
+    position = own(
+      own(
+        torus ? domain.Torus() : plane ? domain.Plane() : domain.Cylinder(),
+      ).Position(),
+    );
+  const [u, v] = [
+    [domain.FirstUParameter(), domain.LastUParameter()],
+    [domain.FirstVParameter(), domain.LastVParameter()],
+  ] as [[number, number], [number, number]];
+  if (torus)
+    return {
+      at: axisAngle(position, u, own),
+      span: u,
+      bound: (selected: number, opposite: number) => (selected + opposite) / 2,
+      rect: (first: number, last: number) => [first, last, ...v] as const,
+    };
+  const origin = own(position.Location()),
+    along = own(plane ? position.YDirection() : position.Direction());
   return {
-    origin: [centre.X(), centre.Y(), centre.Z()] as Vec3,
-    normal: [direction.X(), direction.Y(), direction.Z()] as Vec3,
+    at: (point: Vec3) =>
+      V.dot(V.sub(point, [origin.X(), origin.Y(), origin.Z()]), [
+        along.X(),
+        along.Y(),
+        along.Z(),
+      ]),
+    span: v,
+    bound: (_selected: number, opposite: number) => opposite,
+    rect: (first: number, last: number) => [...u, first, last] as const,
   };
 }
 
@@ -50,32 +75,24 @@ function endpointDomain(patch: GuidePatch, vertex: Shape, own: Own) {
   const k = getKernel(),
     location = own(new k.TopLoc_Location_1()),
     surface = own(k.BRep_Tool.Surface_1(patch.face, location));
-  const domain = own(new k.BRepAdaptor_Surface_2(patch.face, true)),
-    { origin, normal } = stripAxis(domain, own);
-  const vOf = (point: Vec3) => V.dot(V.sub(point, origin), normal);
+  const run = stripRun(own(new k.BRepAdaptor_Surface_2(patch.face, true)), own);
   const other = vertices(patch.edge)
     .map(own)
     .find((v) => !v.IsSame(vertex));
   if (!other) throw new Error("the fillet guide has no opposite endpoint");
-  const selected = vOf(vertexPoint(vertex)),
-    opposite = vOf(vertexPoint(other));
-  const first =
+  const selected = run.at(vertexPoint(vertex)),
+    opposite = run.at(vertexPoint(other)),
+    bound = run.bound(selected, opposite);
+  const [first, last] =
     selected > opposite
-      ? Math.max(domain.FirstVParameter(), opposite)
-      : domain.FirstVParameter();
-  const last =
-    selected > opposite
-      ? domain.LastVParameter()
-      : Math.min(domain.LastVParameter(), opposite);
+      ? [Math.max(run.span[0], bound), run.span[1]]
+      : [run.span[0], Math.min(run.span[1], bound)];
   if (!(first < last))
     throw new Error("the fillet endpoint domain has no finite span");
   const make = own(
     new k.BRepBuilderAPI_MakeFace_14(
       surface,
-      domain.FirstUParameter(),
-      domain.LastUParameter(),
-      first,
-      last,
+      ...run.rect(first, last),
       k.BRep_Tool.Tolerance_1(patch.face),
     ),
   );
