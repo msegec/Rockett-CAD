@@ -197,13 +197,24 @@ function arcVars(move: Extract<Move, { kind: "arc" }>, at: Xyz): Vars {
 
 type Power = ((percent: number | undefined) => number) | undefined;
 
+export function powerRefusal(percent: number): string | undefined {
+  if (percent >= 0 && percent <= 100) return undefined;
+  return `laser power ${percent}% is outside 0 to 100`;
+}
+
+function powerOf(move: { power?: number }, toS: Power) {
+  if (move.power !== undefined && !toS)
+    throw new Error("a laser program needs the laser's maximum power S");
+  return toS?.(move.power);
+}
+
 function writeMove(out: Writer, move: Move, at: Xyz | undefined, toS: Power) {
   if (move.kind === "rapid") return out.emit("rapid", xyz(move.to));
   if (move.kind === "feed")
     return out.emit("linear", {
       ...xyz(move.to),
       feed: move.feed,
-      power: toS?.(move.power),
+      power: powerOf(move, toS),
     });
   if (move.kind === "dwell")
     return out.emit("dwell", { seconds: move.seconds });
@@ -213,7 +224,7 @@ function writeMove(out: Writer, move: Move, at: Xyz | undefined, toS: Power) {
   if (move.kind === "arc") {
     if (!at) throw new Error("an arc has no start point in its file");
     const name = move.dir === "cw" ? "arcCw" : "arcCcw";
-    const power = toS?.(move.power);
+    const power = powerOf(move, toS);
     return out.emit(
       name,
       { ...arcVars(move, at), power },
@@ -259,7 +270,13 @@ export function formatProgram(
   if (max !== undefined && !(max > 0 && Number.isFinite(max)))
     throw new Error("the laser maximum power S must be above 0");
   const power: Power =
-    max === undefined ? undefined : (percent) => ((percent ?? 0) * max) / 100;
+    max === undefined
+      ? undefined
+      : (percent = 0) => {
+          const refusal = powerRefusal(percent);
+          if (refusal) throw new Error(refusal);
+          return (percent * max) / 100;
+        };
   const budget = { bytes: 0, max: options.maxBytes ?? MAX_BYTES };
   return program.files.map((file) => {
     const out = new Writer(post, budget);

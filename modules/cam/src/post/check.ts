@@ -105,13 +105,16 @@ function termination({ templates }: CheckInput["post"], report: Report) {
 
 function laserMode(machine: MachineProfile, report: Report) {
   const laser = machineKind(machine) === "laser";
-  if (machine.laserMode === undefined || machine.laserMode === laser) return;
-  report(
-    "laser",
-    laser
-      ? "the controller's laser mode ($32) is off on a laser"
-      : "the controller's laser mode ($32) is on for a mill, so it will not wait for the spindle",
-  );
+  if (laser && machine.laserMode !== true)
+    report(
+      "laser",
+      "laser mode is not on: send $32=1 to the controller, or the beam stays on along every rapid",
+    );
+  if (!laser && machine.laserMode === true)
+    report(
+      "laser",
+      "the controller's laser mode ($32) is on for a mill, so it will not wait for the spindle",
+    );
 }
 
 function contextProblems(input: CheckInput, report: Report) {

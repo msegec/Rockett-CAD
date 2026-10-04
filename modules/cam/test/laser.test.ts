@@ -203,11 +203,35 @@ describe("laser mode", () => {
     ]);
   });
 
-  it("flags a controller laser mode that disagrees with the kind", () => {
-    expect(check({ ...laser, laserMode: false })).toContainEqual({
+  it("needs the controller's laser mode on a laser", () => {
+    const { laserMode: _, ...unset } = laser;
+    const off = {
       rule: "laser",
-      reason: "the controller's laser mode ($32) is off on a laser",
-    });
+      reason:
+        "laser mode is not on: send $32=1 to the controller, or the beam stays on along every rapid",
+    };
+    expect(check(unset)).toContainEqual(off);
+    expect(check({ ...laser, laserMode: false })).toContainEqual(off);
+  });
+
+  it("refuses to post a laser power outside 0 to 100 percent", () => {
+    const under = structuredClone(cut);
+    const first = under.moves[4]!;
+    if (first.kind === "feed") first.power = -10;
+    expect(() =>
+      formatProgram(normalise(program(under), grbl, { units: "mm" }), grbl, {
+        laserPowerMax: 1000,
+      }),
+    ).toThrow("laser power -10% is outside 0 to 100");
+  });
+
+  it("refuses to post a laser program without the maximum power S", () => {
+    expect(() =>
+      formatProgram(normalise(program(cut), grbl, { units: "mm" }), grbl, {}),
+    ).toThrow("a laser program needs the laser's maximum power S");
+  });
+
+  it("flags a controller laser mode on a mill", () => {
     expect(check({ ...newMachine(0), laserMode: true }, facing)).toContainEqual(
       {
         rule: "laser",

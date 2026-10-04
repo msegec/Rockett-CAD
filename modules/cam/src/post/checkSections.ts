@@ -16,6 +16,7 @@ import { toolRefusal } from "../shared/operations.js";
 import type { Tool } from "../shared/tools.js";
 import type { CheckInput, Report } from "./check.js";
 import { POSITIONED, steps } from "./checkSweep.js";
+import { powerRefusal } from "./format.js";
 
 const AXES = ["X", "Y", "Z"] as const;
 
@@ -63,8 +64,8 @@ function laserProblems(section: Section, s: number, report: Report) {
     report("laser", "a laser cannot run a spindle operation", s);
   section.moves.forEach((move, m) => {
     const percent = power(move);
-    if (percent !== undefined && !(percent >= 0 && percent <= 100))
-      report("laser", `laser power ${percent}% is outside 0 to 100`, s, m);
+    const refusal = percent === undefined ? undefined : powerRefusal(percent);
+    if (refusal) report("laser", refusal, s, m);
   });
 }
 
