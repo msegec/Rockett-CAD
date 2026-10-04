@@ -1,5 +1,6 @@
 import { nativeFillet } from "./nativeFillet.js";
 import { planarFillet } from "./planarFillet.js";
+import { planarChamfer } from "./planarChamfer.js";
 import { blendNames } from "./blendNaming.js";
 import { rejectBadBlend } from "./blendValidity.js";
 export { cutsThrough } from "./blendValidity.js";
@@ -357,10 +358,22 @@ function chamferBody(
   const k = getKernel();
   kernelCall("chamfer", () => {
     const byName = computeEdgeNames(body).byName;
+    const sourceEdges = collectEdges(body, byName, refs, f.tangentChain);
+    const planar = planarChamfer(
+      body,
+      sourceEdges,
+      f.distance,
+      f.id,
+      byName,
+      refs,
+    );
+    if (planar) {
+      registerBodySolids(state, bodyId, planar.shape, planar.names);
+      return;
+    }
     const op = acquire(new k.BRepFilletAPI_MakeChamfer(body.shape));
     let result: Shape | undefined;
     {
-      const sourceEdges = collectEdges(body, byName, refs, f.tangentChain);
       for (const { edge } of sourceEdges) {
         if (!op.Contour(edge)) op.Add_2(f.distance, edge);
       }

@@ -49,45 +49,134 @@ function orderedBoundary(boundary: Shape[], own: Own) {
   return ordered;
 }
 
-function nodeContacts(boundary: Shape[], source: Shape, own: Own) {
+function interiorContacts(old: Shape, contacts: Shape[], own: Own) {
   const k = getKernel(),
     curves = nativeBoundaryCurves(own);
-  const contacts = boundary
+  const curve = own(new k.BRepAdaptor_Curve_2(old));
+  if (curve.GetType() !== k.GeomAbs_CurveType.GeomAbs_Line) return [];
+  const start = curves.beginning(old),
+    end = curves.ending(old);
+  const origin = vertexPoint(start),
+    axis = V.sub(vertexPoint(end), origin);
+  const length2 = V.dot(axis, axis);
+  assert(length2 > 0);
+  const distance = originalCarrierMetric(old, own);
+  return contacts
+    .filter((v) => !v.IsSame(start) && !v.IsSame(end))
+    .map((vertex) => ({
+      vertex,
+      t: V.dot(V.sub(vertexPoint(vertex), origin), axis) / length2,
+    }))
+    .filter(
+      ({ vertex, t }) =>
+        t > 0 &&
+        t < 1 &&
+        distance(vertex) <=
+          k.BRep_Tool.Tolerance_2(old) + k.BRep_Tool.Tolerance_3(vertex),
+    )
+    .sort((a, b) => a.t - b.t);
+}
+
+function boundaryVertices(boundary: Shape[], own: Own) {
+  return boundary
     .flatMap((edge) => vertices(edge).map(own))
     .filter((v, i, all) => all.findIndex((other) => other.IsSame(v)) === i);
+}
+
+function nodeContacts(
+  boundary: Shape[],
+  source: Shape,
+  own: Own,
+  pool = boundary,
+) {
+  const curves = nativeBoundaryCurves(own);
+  const contacts = boundaryVertices(pool, own);
   return boundary.flatMap((old) => {
-    const curve = own(new k.BRepAdaptor_Curve_2(old));
-    if (curve.GetType() !== k.GeomAbs_CurveType.GeomAbs_Line) return [old];
-    const start = curves.beginning(old),
-      end = curves.ending(old);
-    const origin = vertexPoint(start),
-      axis = V.sub(vertexPoint(end), origin);
-    const length2 = V.dot(axis, axis);
-    assert(length2 > 0);
-    const distance = originalCarrierMetric(old, own);
-    const interior = contacts
-      .filter((v) => !v.IsSame(start) && !v.IsSame(end))
-      .map((vertex) => ({
-        vertex,
-        t: V.dot(V.sub(vertexPoint(vertex), origin), axis) / length2,
-      }))
-      .filter(
-        ({ vertex, t }) =>
-          t > 0 &&
-          t < 1 &&
-          distance(vertex) <=
-            k.BRep_Tool.Tolerance_2(old) + k.BRep_Tool.Tolerance_3(vertex),
-      )
-      .sort((a, b) => a.t - b.t);
+    const interior = interiorContacts(old, contacts, own);
     if (!interior.length) return [old];
     assert(interior.every((entry, i) => !i || entry.t > interior[i - 1]!.t));
-    const points = [start, ...interior.map((entry) => entry.vertex), end];
+    const points = [
+      curves.beginning(old),
+      ...interior.map((entry) => entry.vertex),
+      curves.ending(old),
+    ];
     return points.slice(1).map((end, i) => {
       const edge = curves.carrierEdge(old, points[i]!, end);
       if (!planarFacePlane(source)) curves.transfer(old, edge, source);
       return edge;
     });
   });
+}
+
+type Traced = {
+  wire: Shape;
+  outer: boolean;
+  changed: boolean;
+  boundary: Shape[];
+};
+
+function touches(a: Traced, b: Traced, own: Own) {
+  const points = boundaryVertices(b.boundary, own);
+  return a.boundary.some(
+    (edge) =>
+      vertices(edge)
+        .map(own)
+        .some((v) => points.some((p) => p.IsSame(v))) ||
+      interiorContacts(edge, points, own).length > 0,
+  );
+}
+
+function touchingWires(traced: Traced[], own: Own) {
+  let groups: Traced[][] = [];
+  for (const entry of traced) {
+    const joined = groups.filter((group) =>
+      group.some(
+        (other) =>
+          (entry.changed || other.changed) &&
+          (touches(entry, other, own) || touches(other, entry, own)),
+      ),
+    );
+    groups = groups.filter((group) => !joined.includes(group));
+    groups.push([...joined.flat(), entry]);
+  }
+  return groups;
+}
+
+function cancels(a: Shape, b: Shape, own: Own) {
+  const k = getKernel(),
+    curves = nativeBoundaryCurves(own);
+  const line = (edge: Shape) =>
+    own(new k.BRepAdaptor_Curve_2(edge)).GetType() ===
+    k.GeomAbs_CurveType.GeomAbs_Line;
+  return (
+    !a.IsSame(b) &&
+    curves.beginning(a).IsSame(curves.ending(b)) &&
+    curves.ending(a).IsSame(curves.beginning(b)) &&
+    line(a) &&
+    line(b)
+  );
+}
+
+function pooledCycles(group: Traced[], source: Shape, own: Own) {
+  const pool = group.flatMap((entry) => entry.boundary);
+  const pieces = group.flatMap(({ outer, boundary }) =>
+    nodeContacts(boundary, source, own, pool).map((edge) => ({
+      edge,
+      outer,
+    })),
+  );
+  const kept = pieces.filter(
+    (piece) => !pieces.some((other) => cancels(piece.edge, other.edge, own)),
+  );
+  return boundaryCycles(
+    kept.map((piece) => piece.edge),
+    own,
+  ).map((cycle) => ({
+    outer: cycle.some((edge) =>
+      kept.some((piece) => piece.outer && piece.edge.IsSame(edge)),
+    ),
+    cycles: [makeWire(cycle, own)],
+  }));
 }
 
 function closedCycles(boundary: Shape[], own: Own) {
@@ -207,7 +296,7 @@ export function planarFaceBoundary(
   const k = getKernel(),
     used = new Set<BoundaryEdit>();
   const outer = own(k.BRepTools.OuterWire(source));
-  const rebuilt = wires(source)
+  const traced = wires(source)
     .map(own)
     .map((wire) => {
       let changed = false;
@@ -221,13 +310,21 @@ export function planarFaceBoundary(
           return edit.replacement;
         },
       );
-      const cycles = changed
-        ? boundaryCycles(nodeContacts(boundary, source, own), own).map(
-            (boundary) => makeWire(boundary, own),
-          )
-        : [wire];
-      return { outer: wire.IsSame(outer), cycles };
+      return { wire, outer: wire.IsSame(outer), changed, boundary };
     });
+  const rebuilt = touchingWires(traced, own).flatMap((group) =>
+    group.length > 1
+      ? pooledCycles(group, source, own)
+      : group.map((entry) => ({
+          outer: entry.outer,
+          cycles: entry.changed
+            ? boundaryCycles(
+                nodeContacts(entry.boundary, source, own),
+                own,
+              ).map((boundary) => makeWire(boundary, own))
+            : [entry.wire],
+        })),
+  );
   if (used.size !== edits.length)
     throw new Error("the boundary edit has no original occurrence");
   const outside = rebuilt

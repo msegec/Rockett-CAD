@@ -163,14 +163,16 @@ export function rejectSewnBlend(
   result: Shape,
   before: Shape,
   made: Shape[],
-  radius: number,
+  kind: "fillet" | "chamfer",
+  value: number,
 ): void {
-  const size = `radius ${radius}`;
-  const advice = "try fewer edges or a different radius";
-  rejectInvalid(result, before, "fillet", size, advice);
+  const measure = kind === "fillet" ? "radius" : "distance";
+  const size = `${measure} ${value}`;
+  const advice = `try fewer edges or a different ${measure}`;
+  rejectInvalid(result, before, kind, size, advice);
   rejectLooseBlend(
     made.some((face) => toleranceOf(face) > LOOSE),
-    "fillet",
+    kind,
   );
   const cut =
     shellCount(result) !== shellCount(before) ||
@@ -178,8 +180,8 @@ export function rejectSewnBlend(
   if (cut === false) return;
   throw new Error(
     cut
-      ? `fillet of ${size} cuts through the body: ${advice}; the previous body has been kept`
-      : `fillet of ${size} could not be checked for cutting through the body: ${advice}; the previous body has been kept`,
+      ? `${kind} of ${size} cuts through the body: ${advice}; the previous body has been kept`
+      : `${kind} of ${size} could not be checked for cutting through the body: ${advice}; the previous body has been kept`,
   );
 }
 

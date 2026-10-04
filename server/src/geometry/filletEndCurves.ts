@@ -1,11 +1,13 @@
 import { storedSurfaceCurve } from "./storedSurfaceCurve.js";
 import { finiteFilletEnd } from "./finiteFilletEnd.js";
-import type { Vec3 } from "@rockett/shared";
+import { UNIT_DOT_TOL, type Vec3 } from "@rockett/shared";
 import {
   getKernel,
+  dir,
   edges,
   vertices,
   planarFacePlane,
+  pnt,
   progress,
   type Shape,
   type Own,
@@ -35,17 +37,27 @@ function section(a: Shape, b: Shape, own: Own) {
   return edges(own(operation.Shape())).map(own);
 }
 
+function planeStrip(domain: any) {
+  return domain.GetType() === getKernel().GeomAbs_SurfaceType.GeomAbs_Plane;
+}
+
+function stripAxis(domain: any, own: Own) {
+  const plane = planeStrip(domain),
+    position = own(own(plane ? domain.Plane() : domain.Cylinder()).Position()),
+    centre = own(position.Location()),
+    direction = own(plane ? position.YDirection() : position.Direction());
+  return {
+    origin: [centre.X(), centre.Y(), centre.Z()] as Vec3,
+    normal: [direction.X(), direction.Y(), direction.Z()] as Vec3,
+  };
+}
+
 function endpointDomain(patch: GuidePatch, vertex: Shape, own: Own) {
   const k = getKernel(),
     location = own(new k.TopLoc_Location_1()),
     surface = own(k.BRep_Tool.Surface_1(patch.face, location));
   const domain = own(new k.BRepAdaptor_Surface_2(patch.face, true)),
-    cylinder = own(domain.Cylinder()),
-    axis = own(cylinder.Axis()),
-    centre = own(axis.Location()),
-    direction = own(axis.Direction());
-  const origin: Vec3 = [centre.X(), centre.Y(), centre.Z()],
-    normal: Vec3 = [direction.X(), direction.Y(), direction.Z()];
+    { origin, normal } = stripAxis(domain, own);
   const vOf = (point: Vec3) => V.dot(V.sub(point, origin), normal);
   const other = vertices(patch.edge)
     .map(own)
@@ -356,6 +368,10 @@ function terminalForGuide(
     ? finiteFilletEnd(sourceFaces, patch, index, old, matches[0].out, own)
     : terminalBoundary(sourceFaces, patch, index, old, own);
 }
+function guideAxis(patch: GuidePatch) {
+  return V.normalize(V.sub(patch.points[1], patch.points[0]));
+}
+
 function junctionEnds(
   sourceFaces: Shape[],
   incident: Incident,
@@ -373,9 +389,27 @@ function junctionEnds(
     };
   if (incident.length === 2) {
     const [a, b] = incident as [Incident[number], Incident[number]];
+    const k = getKernel();
+    const collinear =
+      planeStrip(own(new k.BRepAdaptor_Surface_2(a.patch.face, true))) &&
+      1 - Math.abs(V.dot(guideAxis(a.patch), guideAxis(b.patch))) <=
+        UNIT_DOT_TOL;
+    const across = () =>
+      own(
+        own(
+          new k.BRepBuilderAPI_MakeFace_3(
+            own(
+              new k.gp_Pln_3(
+                own(pnt(...vertexPoint(old))),
+                own(dir(...guideAxis(a.patch))),
+              ),
+            ),
+          ),
+        ).Face(),
+      );
     const curves = section(
       endpointDomain(a.patch, old, own),
-      endpointDomain(b.patch, old, own),
+      collinear ? across() : endpointDomain(b.patch, old, own),
       own,
     );
     if (curves.length !== 1)

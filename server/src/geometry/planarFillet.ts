@@ -30,7 +30,46 @@ import { planarFilletSurface } from "./planarFilletSurface.js";
 import { sharedFilletBoundaries } from "./filletBoundaries.js";
 import { filletEndCurves, type GuidePatch } from "./filletEndCurves.js";
 
-type PlanarSide = PlaneSide & { face: Shape };
+export type PlanarSide = PlaneSide & { face: Shape };
+export type BlendStrip = {
+  kind: "fillet" | "chamfer";
+  size: number;
+  face(
+    points: [Vec3, Vec3],
+    sides: [PlanarSide, PlanarSide],
+    axis: Vec3,
+    own: Own,
+    bounds: ReturnType<typeof bboxOf>,
+  ): Shape;
+  accepts?(chain: { edge: Shape }[], sides: PlanarSide[][], own: Own): boolean;
+};
+
+function filletStrip(radius: number): BlendStrip {
+  return {
+    kind: "fillet",
+    size: radius,
+    face(points, sides, axis, own, bounds) {
+      const concave = sides.every(
+        (side, i) => V.dot(side.into, sides[1 - i]!.normal) > 0,
+      );
+      const orient = (side: PlanarSide) => ({
+        ...side,
+        normal: concave ? V.scale(side.normal, -1) : side.normal,
+      });
+      const section = filletBetweenPlanes(
+        points,
+        [orient(sides[0]), orient(sides[1])],
+        radius,
+      );
+      if (!section)
+        throw new NoCorner(
+          "no sharp corner to fillet: the faces meet smoothly there",
+        );
+      return planarFilletSurface(section, axis, radius, own, bounds).face;
+    },
+  };
+}
+
 function planeSides(
   edge: Shape,
   original: Shape[],
@@ -62,7 +101,7 @@ function planeSides(
 function surfaces(
   selected: { edge: Shape }[],
   source: Shape[],
-  radius: number,
+  strip: BlendStrip,
   own: Own,
   body: Shape,
   contour: any,
@@ -87,24 +126,6 @@ function surfaces(
       vertexPoint(own(k.TopExp.FirstVertex(edge, true))),
       vertexPoint(own(k.TopExp.LastVertex(edge, true))),
     ];
-    if (points.length !== 2)
-      throw new Error("the fillet edge has no two distinct ends");
-    const concave = sides.every(
-      (side, i) => V.dot(side.into, sides[1 - i]!.normal) > 0,
-    );
-    const orient = (side: PlanarSide) => ({
-      ...side,
-      normal: concave ? V.scale(side.normal, -1) : side.normal,
-    });
-    const oriented: [PlaneSide, PlaneSide] = [
-      orient(sides[0]!),
-      orient(sides[1]!),
-    ];
-    const section = filletBetweenPlanes(points, oriented, radius);
-    if (!section)
-      throw new NoCorner(
-        "no sharp corner to fillet: the faces meet smoothly there",
-      );
     const curve = own(new k.BRepAdaptor_Curve_2(edge)),
       direction = own(vec(0, 0, 0));
     curve.D1(curve.FirstParameter(), own(new k.gp_Pnt_1()), direction);
@@ -116,16 +137,16 @@ function surfaces(
       edge,
       points,
       neighbors: sides.map((side) => side.face),
-      face: planarFilletSurface(section, axis, radius, own, bounds).face,
+      face: strip.face(points, [sides[0]!, sides[1]!], axis, own, bounds),
     };
   });
 }
 
 type Cell = { face: Shape; name: string | undefined; made: boolean };
-function assembleFillet(
+function assembleBlend(
   cells: Cell[],
   body: NamedBody,
-  radius: number,
+  strip: BlendStrip,
   featureId: string,
   own: Own,
 ) {
@@ -137,7 +158,7 @@ function assembleFillet(
   sew.Perform(progress());
   if (sew.NbFreeEdges() || sew.NbMultipleEdges())
     throw new Error(
-      "the fillet left an invalid shape: its trimmed faces do not close; the previous body has been kept",
+      `the ${strip.kind} left an invalid shape: its trimmed faces do not close; the previous body has been kept`,
     );
   const solid = own(new k.BRepBuilderAPI_MakeSolid_1());
   for (const shell of explore(own(sew.SewedShape()), "shell"))
@@ -145,7 +166,7 @@ function assembleFillet(
   const result = own(solid.Solid());
   if (!k.BRepLib.OrientClosedSolid(result))
     throw new Error(
-      "the fillet left an invalid shape: its solid could not be oriented",
+      `the ${strip.kind} left an invalid shape: its solid could not be oriented`,
     );
   const mapped = cells.map((cell) => ({
     ...cell,
@@ -155,7 +176,8 @@ function assembleFillet(
     result,
     body.shape,
     mapped.filter((cell) => cell.made).map((cell) => cell.face),
-    radius,
+    strip.kind,
+    strip.size,
   );
   const provisional = new ShapeMap<string>();
   own({ delete: () => provisional.release() });
@@ -174,10 +196,51 @@ export function planarFillet(
   byName: Map<string, Shape>,
   refs: EdgeRef[],
 ): ToolResult | null {
+  return planarBlend(
+    body,
+    selected,
+    filletStrip(radius),
+    featureId,
+    byName,
+    refs,
+  );
+}
+
+function blendFailure(
+  strip: BlendStrip,
+  contour: any,
+  byName: Map<string, Shape>,
+  refs: EdgeRef[],
+) {
+  return strip.kind === "fillet"
+    ? filletFailure(contour, byName, refs, strip.size)
+    : `chamfer of distance ${strip.size} failed: distance may be too large for the geometry`;
+}
+
+export function planarBlend(
+  body: NamedBody,
+  selected: { edge: Shape; name: string }[],
+  strip: BlendStrip,
+  featureId: string,
+  byName: Map<string, Shape>,
+  refs: EdgeRef[],
+): ToolResult | null {
   const result = scoped((own) => {
     const original = faces(body.shape).map(own),
       eligibility = selected.map(({ edge }) => planeSides(edge, original, own));
     if (eligibility.every((sides) => !sides)) return null;
+    const topology = ownedFilletTopology(
+      body,
+      selected,
+      original,
+      eligibility,
+      strip,
+      featureId,
+      byName,
+      refs,
+      own,
+    );
+    if (!topology) return null;
     const {
       source,
       history,
@@ -185,21 +248,11 @@ export function planarFillet(
       planeChosen,
       planeTerminations,
       contour,
-    } = ownedFilletTopology(
-      body,
-      selected,
-      original,
-      eligibility,
-      radius,
-      featureId,
-      byName,
-      refs,
-      own,
-    );
+    } = topology;
     const patches = surfaces(
       planeChosen,
       source,
-      radius,
+      strip,
       own,
       body.shape,
       contour,
@@ -210,7 +263,7 @@ export function planarFillet(
     const { ends, corners } = filletEndCurves(
       source,
       patches,
-      radius,
+      strip.size,
       own,
       planeTerminations,
       nativeEnds,
@@ -221,7 +274,7 @@ export function planarFillet(
       ends,
       own,
       () => {
-        throw new Error(filletFailure(contour, byName, refs, radius));
+        throw new Error(blendFailure(strip, contour, byName, refs));
       },
       history?.source.map((entry) => entry.original) ?? [],
       history?.contacts ?? [],
@@ -238,7 +291,7 @@ export function planarFillet(
       featureId,
       selected.length,
     );
-    const assembled = assembleFillet(cells, body, radius, featureId, own);
+    const assembled = assembleBlend(cells, body, strip, featureId, own);
     return { ...assembled, shape: own.keep(assembled.shape) };
   });
   if (result) acquire(result.shape);
@@ -250,7 +303,7 @@ function ownedFilletTopology(
   selected: { edge: Shape; name: string }[],
   original: Shape[],
   eligibility: (PlanarSide[] | null)[],
-  radius: number,
+  strip: BlendStrip,
   featureId: string,
   byName: Map<string, Shape>,
   refs: EdgeRef[],
@@ -272,9 +325,14 @@ function ownedFilletTopology(
     ),
   );
   chosen.forEach(({ edge }) => {
-    if (!contour.Contour(edge)) contour.Add_2(radius, edge);
+    if (!contour.Contour(edge)) contour.Add_2(strip.size, edge);
   });
   rejectEmptyFilletContours(contour, chosen);
+  if (
+    strip.kind === "chamfer" &&
+    !chamferChain(contour, chosen, eligibility, source, strip, own)
+  )
+    return null;
   const terminations = contourEndReferences(contour, chosen, new Set());
   const mixed = eligibility.some((sides) => !sides);
   const needsNative = mixed || nativeBoundaryTransition(chosen, source, own);
@@ -291,7 +349,7 @@ function ownedFilletTopology(
         chosen,
         eligibility.map(Boolean),
         featureId,
-        radius,
+        strip.size,
         own,
         new Map(
           [...byName].map(([name, edge]) => [
@@ -319,6 +377,27 @@ function ownedFilletTopology(
     planeTerminations,
     contour,
   };
+}
+
+function chamferChain(
+  contour: any,
+  chosen: { edge: Shape; name: string }[],
+  eligibility: (PlanarSide[] | null)[],
+  source: Shape[],
+  strip: BlendStrip,
+  own: Own,
+) {
+  const propagated = contourContinuations(contour, chosen, own);
+  chosen.push(...propagated);
+  eligibility.push(
+    ...propagated.map(({ edge }) => planeSides(edge, source, own)),
+  );
+  const sides = eligibility.flatMap((entry) => (entry ? [entry] : []));
+  return (
+    sides.length === chosen.length &&
+    !nativeBoundaryTransition(chosen, source, own) &&
+    Boolean(strip.accepts?.(chosen, sides, own))
+  );
 }
 
 function contourContinuations(
