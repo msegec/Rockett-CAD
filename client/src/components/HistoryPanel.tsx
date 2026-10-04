@@ -49,7 +49,7 @@ export function HistoryPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <DraggablePanel title="History">
+    <DraggablePanel id="design.history" title="History">
       <div className="dialog-body">
         {error && <div className="error-banner">{error}</div>}
         {!list && !error && <div className="tree-empty">Loading history…</div>}

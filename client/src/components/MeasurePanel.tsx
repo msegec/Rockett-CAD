@@ -16,7 +16,7 @@ export function MeasurePanel() {
     v === undefined ? "-" : formatLength(v, units);
 
   return (
-    <DraggablePanel title="Measure" className="measure">
+    <DraggablePanel id="inspect.measure" title="Measure" className="measure">
       <div className="dialog-body">
         {selection.length === 0 && (
           <div className="sel-info">

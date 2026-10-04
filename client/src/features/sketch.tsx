@@ -41,7 +41,7 @@ registerFeatureUI(sketch);
 
 function SketchRepair({ onClose }: FeaturePanelProps) {
   return (
-    <DraggablePanel title="Repair sketch references">
+    <DraggablePanel id="sketch.repair" title="Repair sketch references">
       <div className="dialog-body">
         <RefRepair />
       </div>

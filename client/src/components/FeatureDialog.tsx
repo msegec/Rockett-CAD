@@ -173,7 +173,7 @@ function DialogBody({
   };
 
   return (
-    <DraggablePanel title={ui.title}>
+    <DraggablePanel id="design.feature" title={ui.title}>
       <div className="dialog-body">
         <RefRepair />
         {inputs?.renderForm(setFeatureParams)}

@@ -36,7 +36,7 @@ export function PasswordDialog({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <DraggablePanel title="Change password">
+    <DraggablePanel id="dialog.password" title="Change password">
       <div className="dialog-body">
         {error && (
           <div className="error-banner" role="alert">

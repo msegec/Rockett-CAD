@@ -211,7 +211,7 @@ export function ParametersPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <DraggablePanel title="Parameters">
+    <DraggablePanel id={PARAMETERS_PANEL} title="Parameters">
       <div className="dialog-body">
         <ListState error={error} loading={!document} empty={!shown.length} />
         <div role="list" aria-label="Parameters">

@@ -56,7 +56,7 @@ export class PanelBoundary extends Component<
     const { panel, children } = this.props;
     if (!this.state.error) return children;
     return (
-      <DraggablePanel title={panel.title}>
+      <DraggablePanel id={panel.id} title={panel.title}>
         <div className="dialog-body">
           <div className="error-banner" role="alert">
             {panel.id}: {this.state.error.message}

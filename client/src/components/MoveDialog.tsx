@@ -88,7 +88,7 @@ export function MoveDialog({
       </Fragment>
     ));
   return (
-    <DraggablePanel title={`Move "${item.name}"`} at={at}>
+    <DraggablePanel id="dialog.move" title={`Move "${item.name}"`} at={at}>
       <div className="dialog-body" ref={body} onKeyDown={moveFocus}>
         <div className="move-tree">
           {row(null, "Projects")}

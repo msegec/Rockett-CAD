@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, type RefObject } from "react";
 import { DraggablePanel } from "./DraggablePanel";
 import { DialogFooter } from "./form/DialogFooter";
 import { lineShortcuts } from "../commands/sketch";
@@ -70,9 +70,7 @@ function ViewportHelp() {
   );
 }
 
-export function ControlsHelp({ onClose }: { onClose: () => void }) {
-  useKeymap();
-  const body = useRef<HTMLDivElement>(null);
+function useLastSize(body: RefObject<HTMLDivElement | null>) {
   useLayoutEffect(() => {
     const panel = body.current!.parentElement!;
     if (lastSize) Object.assign(panel.style, lastSize);
@@ -80,9 +78,19 @@ export function ControlsHelp({ onClose }: { onClose: () => void }) {
       const { width, height } = panel.style;
       if (width || height) lastSize = { width, height };
     };
-  }, []);
+  }, [body]);
+}
+
+export function ControlsHelp({ onClose }: { onClose: () => void }) {
+  useKeymap();
+  const body = useRef<HTMLDivElement>(null);
+  useLastSize(body);
   return (
-    <DraggablePanel title="Keyboard & mouse controls" className="controls-help">
+    <DraggablePanel
+      id="design.help"
+      title="Keyboard & mouse controls"
+      className="controls-help"
+    >
       <div className="dialog-body" ref={body}>
         <div className="shortcut-help">
           <ViewportHelp />

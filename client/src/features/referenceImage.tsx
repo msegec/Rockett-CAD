@@ -208,7 +208,7 @@ function ReferenceImagePanel({
   };
 
   return (
-    <DraggablePanel title="Reference Image">
+    <DraggablePanel id="design.referenceImage" title="Reference Image">
       <div className="dialog-body">
         <RefRepair />
         {!existing && (

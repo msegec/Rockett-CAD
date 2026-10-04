@@ -14,7 +14,10 @@ export function ImportPanel({
   );
   const mesh = feature?.type === "importMesh";
   return (
-    <DraggablePanel title={mesh ? "Imported mesh" : "Imported STEP"}>
+    <DraggablePanel
+      id="dialog.import"
+      title={mesh ? "Imported mesh" : "Imported STEP"}
+    >
       <div className="dialog-body">
         <p>
           {feature?.type === "importStep" || mesh

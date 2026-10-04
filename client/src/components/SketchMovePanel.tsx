@@ -286,7 +286,7 @@ function SketchMovePanel({ draft }: { draft: SketchFeature }) {
     useStore.getState().setSketchState({ moveCopy: false });
   };
   return (
-    <DraggablePanel title="Move/Copy">
+    <DraggablePanel id="sketch.moveCopy" title="Move/Copy">
       <div className="dialog-body">
         <p>
           {ids.length

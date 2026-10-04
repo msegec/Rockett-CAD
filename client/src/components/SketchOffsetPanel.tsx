@@ -54,6 +54,12 @@ export function useSketchPreview(
   }, [layerName, result, draft, evaluation, editingIds, viewport]);
 }
 
+function selectConnector(sketchId: string, entityId: string) {
+  const s = useStore.getState();
+  s.setSketchState({ offsetManualSelection: true });
+  s.toggleSelection({ kind: "sketchEntity", sketchId, entityId }, true);
+}
+
 function SketchOffsetPanel({ sketch }: { sketch: SketchState }) {
   const units = useSetting("units.length");
   const draft = useStore((s) => s.draftSketch);
@@ -121,7 +127,10 @@ function SketchOffsetPanel({ sketch }: { sketch: SketchState }) {
     }
   };
   return (
-    <DraggablePanel title={editing ? "Edit offset" : "Offset sketch"}>
+    <DraggablePanel
+      id="sketch.offset"
+      title={editing ? "Edit offset" : "Offset sketch"}
+    >
       <div className="dialog-body">
         <p>
           {editing
@@ -190,18 +199,7 @@ function SketchOffsetPanel({ sketch }: { sketch: SketchState }) {
         {connector && (
           <button
             className="btn"
-            onClick={() => {
-              const s = useStore.getState();
-              s.setSketchState({ offsetManualSelection: true });
-              s.toggleSelection(
-                {
-                  kind: "sketchEntity",
-                  sketchId: draft!.id,
-                  entityId: connector,
-                },
-                true,
-              );
-            }}
+            onClick={() => selectConnector(draft!.id, connector)}
           >
             Select missing side
           </button>

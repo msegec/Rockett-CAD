@@ -71,6 +71,7 @@ everything downstream against persistent topology references.
 - **Display units**: sketch dimensions, measurements and feature lengths follow the selected unit; typed lengths accept unit suffixes while models remain in millimetres.
 - **Friend requests and notices**: request by email, accept or reject in the user menu, and open newly shared projects.
 - **Model tree width**: drag or arrow-key the tree's right edge, double-click to reset; the width follows you to every machine.
+- **Panel positions**: drag a tool panel by its title, double-click the title to reset it; each position follows you.
 - **Viewport**: orbit, pan, zoom to cursor, named views, fit, ViewCube, camera preferences, pick tolerance; projects reopen at your last camera.
 - **Toolbar**: wheel scrolling in design and sketch; tools show icons above labels, constraints only icons; tooltips show shortcuts.
 - **Shortcuts**: single keys start tools; ? lists every keyboard and mouse control in a resizable panel that fills the window.

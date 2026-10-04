@@ -46,7 +46,7 @@ export function ExportPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <DraggablePanel title="Export for 3D printing">
+    <DraggablePanel id="design.export" title="Export for 3D printing">
       <div className="dialog-body">
         <SelInfo
           label="Bodies"

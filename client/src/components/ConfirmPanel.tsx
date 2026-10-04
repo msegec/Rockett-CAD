@@ -44,6 +44,7 @@ export function ConfirmPanel() {
   return (
     <DraggablePanel
       key={ask.id}
+      id="dialog.confirm"
       title="Confirm"
       {...(ask.at && { at: ask.at })}
     >

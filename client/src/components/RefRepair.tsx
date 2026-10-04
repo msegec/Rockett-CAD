@@ -470,7 +470,11 @@ export function useNamingUpgradePanel() {
           ]
         : [],
     panel: shown && version1 && (
-      <DraggablePanel title="Upgrade naming" at={shown}>
+      <DraggablePanel
+        id="dialog.namingUpgrade"
+        title="Upgrade naming"
+        at={shown}
+      >
         <div className="dialog-body">
           <NamingUpgrade id={version1.id} revision={version1.revision} />
         </div>

@@ -30,7 +30,7 @@ export function BrowserShareDialog({
     }
   };
   return (
-    <DraggablePanel title={`Share "${project.name}"`}>
+    <DraggablePanel id="dialog.shareBrowser" title={`Share "${project.name}"`}>
       <div className="dialog-body">
         {error && <div className="error-banner">{error}</div>}
         <div className="measure-row">
@@ -118,7 +118,7 @@ export function ShareDialog({
     }
   };
   return (
-    <DraggablePanel title={`Share "${target.name}"`}>
+    <DraggablePanel id="dialog.share" title={`Share "${target.name}"`}>
       <div className="dialog-body">
         {error && <div className="error-banner">{error}</div>}
         {!roster && !error && <div className="tree-empty">Loading people…</div>}
