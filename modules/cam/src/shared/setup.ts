@@ -44,6 +44,7 @@ export type Setup = {
   name: string;
   bodies: string[];
   stock: Stock;
+  material?: string;
   wcs: Wcs;
   safeHeight: number;
   clearance: number;

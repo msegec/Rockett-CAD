@@ -104,6 +104,7 @@ const docSetup = Type.Intersect([
       name: Type.String(),
       bodies: Type.Array(Type.String({ minLength: 1 })),
       stock: stockSchema,
+      material: Type.String({ minLength: 1 }),
       wcs: wcsSchema,
       safeHeight: Type.Number(),
       clearance: Type.Number(),
