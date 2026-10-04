@@ -1,4 +1,16 @@
 import { createElement as h, type MouseEvent, type ReactNode } from "react";
+import type { UserDataEntry } from "@rockett/plugin-api";
+
+export type Library<T> = { items: T[]; etag: string | null };
+
+export function libraryOf<T>(entry: UserDataEntry | null): Library<T> {
+  if (entry?.readOnly)
+    throw new Error("it was saved by a newer version of Rockett");
+  return {
+    items: (entry?.data as T[] | undefined) ?? [],
+    etag: entry?.etag ?? null,
+  };
+}
 
 type Menu = {
   onContextMenu?: (e: MouseEvent) => void;
@@ -50,9 +62,10 @@ export const tree = (
   {
     title,
     key = title,
+    aside,
     selected,
     ...handlers
-  }: { title: string; key?: string } & Menu,
+  }: { title: string; key?: string; aside?: ReactNode } & Menu,
   ...children: ReactNode[]
 ) =>
   h(
@@ -62,6 +75,8 @@ export const tree = (
       "div",
       { className: marked("tree-header", selected), ...handlers },
       title,
+      aside && " ",
+      aside,
     ),
     h(
       "div",

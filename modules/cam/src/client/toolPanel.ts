@@ -22,7 +22,16 @@ import {
   type ToolImport,
 } from "../import/rockett.js";
 import { GrblPaste } from "./grblPaste.js";
-import { banner, button, empty, reason, row, tree } from "./libraryParts.js";
+import {
+  banner,
+  button,
+  empty,
+  libraryOf,
+  reason,
+  row,
+  tree,
+  type Library,
+} from "./libraryParts.js";
 import { schemaFields } from "./schemaForm.js";
 import { newTool, toolFields } from "./toolForm.js";
 
@@ -30,7 +39,6 @@ export const TOOL_PANEL = "rockett.cam.library.panel";
 
 type Ui = ClientContext["ui"];
 type Item = { id: string; name: string };
-type Library<T> = { items: T[]; etag: string | null };
 
 type Section<T extends Item> = {
   noun: string;
@@ -44,15 +52,6 @@ const saved = <T extends Item>(items: T[], item: T) =>
   items.some((t) => t.id === item.id)
     ? items.map((t) => (t.id === item.id ? item : t))
     : [...items, item];
-
-function libraryOf<T>(entry: UserDataEntry | null): Library<T> {
-  if (entry?.readOnly)
-    throw new Error("it was saved by a newer version of Rockett");
-  return {
-    items: (entry?.data as T[] | undefined) ?? [],
-    etag: entry?.etag ?? null,
-  };
-}
 
 export const machineFields = (
   ui: Ui,

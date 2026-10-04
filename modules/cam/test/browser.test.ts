@@ -11,19 +11,25 @@ import type {
 } from "@rockett/plugin-api";
 import cam from "../server.js";
 import {
+  clock,
   generateOperation,
   generateStale,
   moveOperation,
   moveSetup,
+  setupTimes,
   toggleSuppressed,
 } from "../src/client/browser.js";
 import {
   CAM_EXTENSION,
   isCamData,
   migrateCam,
+  programRoute,
   statusRoute,
   type CamData,
 } from "../src/shared/document.js";
+import type { Program } from "../src/shared/ir.js";
+import { newMachine } from "../src/shared/machine.js";
+import { estimateTime } from "../src/shared/time.js";
 
 const mark: User = {
   id: "u1",
@@ -35,9 +41,18 @@ const mark: User = {
   modifiedAt: "2026-10-04T00:00:00.000Z",
 };
 
-const program = JSON.parse(
+const program: Program = JSON.parse(
   readFileSync(new URL("./fixtures/ir/facing.json", import.meta.url), "utf8"),
 );
+
+const limits = {
+  ...newMachine(0),
+  accelX: 500,
+  accelY: 500,
+  accelZ: 200,
+  junctionDeviation: 0.01,
+  spinUpSeconds: 3,
+};
 
 const operation = (id: string, name: string) => ({
   id,
@@ -335,6 +350,54 @@ describe("Manufacture browser", () => {
       n: { status: "never" },
     });
     expect(modelReads).toBe(1);
+  });
+
+  it("times fresh operations, and the setup once every one is fresh", async () => {
+    const { view, status } = projectView();
+    await generateOperation(view, "s1", "a");
+    await generateOperation(view, "s1", "b");
+    let reads = 0;
+    const counted: ProjectView = {
+      ...view,
+      read: (route, params) => {
+        if (route.path === programRoute.path) reads++;
+        return view.read(route, params);
+      },
+    };
+    const request = async <T>() =>
+      ({ version: 1, data: [limits], etag: "e", readOnly: false }) as T;
+    const readTimes = setupTimes(counted, request);
+    const s1 = () =>
+      (view.get().document!.extensions[CAM_EXTENSION]!.data as CamData)
+        .setups[0]!;
+    const times = async () => readTimes([s1()], { s1: await status("s1") });
+    const run = (n: number) =>
+      estimateTime(
+        { sections: Array.from({ length: n }, () => program.sections).flat() },
+        limits,
+      );
+
+    const two = (await times()).s1!;
+    expect(two.seconds).toBeUndefined();
+    const { a, b } = two.operations;
+    expect(a!.seconds + b!.seconds).toBeCloseTo(run(2).seconds, 9);
+    expect(reads).toBe(2);
+    await times();
+    expect(reads).toBe(2);
+
+    await generateOperation(view, "s1", "n");
+    const all = (await times()).s1!;
+    expect(all.seconds).toBeCloseTo(run(3).seconds, 9);
+    expect(reads).toBe(5);
+  });
+
+  it("formats a time as m:ss", () => {
+    expect([42, 365, 59.6, 3725].map(clock)).toEqual([
+      "0:42",
+      "6:05",
+      "1:00",
+      "62:05",
+    ]);
   });
 
   it("moves setups and operations up and down, one edit each", async () => {

@@ -11,15 +11,23 @@ import type {
   ContextMenuItem,
   OpenProject,
   ProjectView,
+  UserDataEntry,
 } from "@rockett/plugin-api";
 import {
   generateRoute,
   generateStaleRoute,
+  programRoute,
   statusRoute,
   type CamData,
   type OperationStatus,
 } from "../shared/document.js";
-import { banner, empty, reason, row, tree } from "./libraryParts.js";
+import type { MachineProfile } from "../shared/machine.js";
+import {
+  byAcceleration,
+  estimateTime,
+  type SectionTime,
+} from "../shared/time.js";
+import { banner, empty, libraryOf, reason, row, tree } from "./libraryParts.js";
 import { camRead, editCam } from "./setup.js";
 import type { Selection, ToolpathPreview } from "./toolpaths.js";
 
@@ -27,8 +35,14 @@ type Setup = CamData["setups"][number];
 type Operation = NonNullable<Setup["operations"]>[number];
 type Step = -1 | 1;
 type Statuses = Record<string, Record<string, OperationStatus>>;
+type OperationTime = { seconds: number; acceleration: boolean };
+export type SetupTime = {
+  seconds?: number;
+  operations: Record<string, OperationTime>;
+};
+type Times = Record<string, SetupTime>;
 type Read =
-  | { projectId: string; statuses: Statuses }
+  | { projectId: string; statuses: Statuses; times: Times }
   | { projectId: string; error: string };
 
 export const generateOperation = (
@@ -111,6 +125,18 @@ const BADGES: Record<OperationStatus["status"], [string, string]> = {
   suppressed: ["tl-chip suppressed", "suppressed"],
 };
 
+const ACCELERATION = "Acceleration, not feed, sets this time";
+
+function timed(time: OperationTime | undefined) {
+  if (!time) return null;
+  const { seconds, acceleration } = time;
+  return h(
+    "span",
+    { className: "dimmed", title: acceleration ? ACCELERATION : undefined },
+    acceleration ? `${clock(seconds)} a` : clock(seconds),
+  );
+}
+
 function badge(status: OperationStatus | undefined) {
   if (!status) return null;
   const [className, text] = BADGES[status.status];
@@ -131,7 +157,109 @@ const readStatuses = async (
     ),
   );
 
-function useStatuses(project: ProjectView, open: OpenProject) {
+export const clock = (seconds: number) => {
+  const whole = Math.round(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+};
+
+const summed = (parts: SectionTime[]) =>
+  parts.reduce(
+    (sum, part) => ({
+      seconds: sum.seconds + part.seconds,
+      motion: sum.motion + part.motion,
+      cruise: sum.cruise + part.cruise,
+    }),
+    { seconds: 0, motion: 0, cruise: 0 },
+  );
+
+async function setupTime(
+  project: ProjectView,
+  setup: Setup,
+  statuses: Record<string, OperationStatus>,
+  machine: MachineProfile,
+): Promise<SetupTime> {
+  const live = (setup.operations ?? []).filter((op) => !op.suppressed);
+  const reads = await Promise.all(
+    live
+      .filter(({ id }) => statuses[id]?.status === "fresh")
+      .map(async ({ id }) => ({
+        id,
+        read: await project.read(programRoute, {
+          setupId: setup.id,
+          operationId: id,
+        }),
+      })),
+  );
+  const programs = reads.flatMap(({ id, read }) =>
+    "program" in read ? [{ id, sections: read.program.sections }] : [],
+  );
+  const estimate = estimateTime(
+    { sections: programs.flatMap(({ sections }) => sections) },
+    machine,
+  );
+  let next = 0;
+  const operations = Object.fromEntries(
+    programs.map(({ id, sections }) => {
+      const sum = summed(
+        estimate.sections.slice(next, (next += sections.length)),
+      );
+      return [id, { seconds: sum.seconds, acceleration: byAcceleration(sum) }];
+    }),
+  );
+  const whole = live.length > 0 && programs.length === live.length;
+  return whole ? { seconds: estimate.seconds, operations } : { operations };
+}
+
+export function setupTimes(
+  project: ProjectView,
+  request: ClientContext["request"],
+) {
+  let kept = new Map<string, { key: string; time: SetupTime }>();
+  return async (setups: Setup[], statuses: Statuses): Promise<Times> => {
+    const machines = await request<UserDataEntry | null>("GET", "machines")
+      .then(libraryOf<MachineProfile>)
+      .catch(() => null);
+    const machine = machines?.items[0];
+    if (!machine) return {};
+    const next = new Map<string, { key: string; time: SetupTime }>();
+    await Promise.all(
+      setups.map(async (setup) => {
+        const key = JSON.stringify([
+          machine,
+          (setup.operations ?? []).map((op) => [
+            op.id,
+            op.suppressed ?? false,
+            op.lastGenerated?.fingerprint ?? null,
+            statuses[setup.id]?.[op.id]?.status ?? null,
+          ]),
+        ]);
+        const old = kept.get(setup.id);
+        const time =
+          old?.key === key
+            ? old.time
+            : await setupTime(
+                project,
+                setup,
+                statuses[setup.id] ?? {},
+                machine,
+              ).catch(() => null);
+        if (time) next.set(setup.id, { key, time });
+      }),
+    );
+    kept = next;
+    return Object.fromEntries(
+      [...next].map(([id, { time }]) => [id, time] as const),
+    );
+  };
+}
+
+type TimeReader = ReturnType<typeof setupTimes>;
+
+function useStatuses(
+  project: ProjectView,
+  open: OpenProject,
+  readTimes: TimeReader,
+) {
   const [read, setRead] = useState<Read | null>(null);
   const [retries, setRetries] = useState(0);
   useEffect(() => {
@@ -139,14 +267,18 @@ function useStatuses(project: ProjectView, open: OpenProject) {
     const cam = camRead(open);
     if (!projectId || cam.status !== "ready") return;
     let live = true;
-    void readStatuses(project, cam.data.setups).then(
-      (statuses) => live && setRead({ projectId, statuses }),
+    const { setups } = cam.data;
+    void readStatuses(project, setups).then(
+      async (statuses) => {
+        const times = await readTimes(setups, statuses);
+        if (live) setRead({ projectId, statuses, times });
+      },
       (e: unknown) => live && setRead({ projectId, error: reason(e) }),
     );
     return () => {
       live = false;
     };
-  }, [project, open, retries]);
+  }, [project, open, readTimes, retries]);
   return {
     current: read?.projectId === open.projectId ? read : null,
     retry: () => setRetries((n) => n + 1),
@@ -158,6 +290,7 @@ type Rows = {
   preview: ToolpathPreview;
   selection: Selection;
   statuses: Statuses;
+  times: Times;
   staleItems: ContextMenuItem[];
   act(action: () => Promise<void>): () => void;
   opener(items: ContextMenuItem[]): (e: MouseEvent) => void;
@@ -212,6 +345,7 @@ const operationRow = (rows: Rows, setup: Setup, op: Operation, index: number) =>
       onContextMenu: rows.opener(operationItems(rows, setup, op, index)),
     },
     badge(rows.statuses[setup.id]?.[op.id]),
+    timed(rows.times[setup.id]?.operations[op.id]),
   );
 
 function setupSection(rows: Rows, setup: Setup, index: number, count: number) {
@@ -220,10 +354,14 @@ function setupSection(rows: Rows, setup: Setup, index: number, count: number) {
     ...rows.staleItems,
     ...moves(rows, count, index, (by) => moveSetup(rows.project, setup.id, by)),
   ];
+  const seconds = rows.times[setup.id]?.seconds;
   return tree(
     {
       title: setup.name ?? setup.id,
       key: setup.id,
+      aside:
+        seconds !== undefined &&
+        h("span", { className: "dimmed" }, clock(seconds)),
       selected:
         rows.selection?.setupId === setup.id && !rows.selection.operationId,
       onClick: () => void rows.preview.select({ setupId: setup.id }),
@@ -236,13 +374,14 @@ function setupSection(rows: Rows, setup: Setup, index: number, count: number) {
 }
 
 export function manufactureBrowser(
-  { project, ui }: ClientContext,
+  { project, ui, request }: ClientContext,
   preview: ToolpathPreview,
 ) {
+  const readTimes = setupTimes(project, request);
   return function ManufactureBrowser() {
     const open = useSyncExternalStore(project.subscribe, project.get);
     const { selection } = useSyncExternalStore(preview.subscribe, preview.get);
-    const { current, retry } = useStatuses(project, open);
+    const { current, retry } = useStatuses(project, open, readTimes);
     const [error, setError] = useState<string | null>(null);
     const [menu, setMenu] = useState<{
       x: number;
@@ -258,6 +397,7 @@ export function manufactureBrowser(
       });
     };
     const statuses = current && "statuses" in current ? current.statuses : {};
+    const times = current && "times" in current ? current.times : {};
     const anyStale = Object.values(statuses).some((ops) =>
       Object.values(ops).some(({ status }) => status === "stale"),
     );
@@ -266,6 +406,7 @@ export function manufactureBrowser(
       preview,
       selection,
       statuses,
+      times,
       act,
       staleItems: anyStale
         ? [
