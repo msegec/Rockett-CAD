@@ -257,6 +257,38 @@ body.
 - An axis edge or line that no longer resolves errors the feature and keeps
   the bodies.
 
+## Chamfer
+
+`evalChamfer` in `server/src/geometry/blend.ts`.
+
+- Schema 30 adds `chamferType`: `equalDistance`, `twoDistances` or
+  `distanceAngle`. An earlier chamfer migrates to `equalDistance`.
+- `equalDistance` sets `distance` on both faces and keeps its route: the
+  kernel module for plane-plane and plane-cylinder edges, else OCCT, else the
+  planar envelope.
+- `twoDistances` stores `distance2` and `flip`; `distanceAngle` stores
+  `angle` (above 0 and below 90 degrees) and `flip`. Both build only through
+  `BRepFilletAPI_MakeChamfer`: `distance` lies on the measured face, and
+  `distance2`, or `distance` times the tangent of `angle`, on the other.
+- The measured face of an edge is the one of its two faces bounded by more
+  of the selected edges; on a tie it is the first face in the edge name,
+  `e[{faceA}|{faceB}]`. `flip` measures on the other face, so it flips every
+  edge of a selection. Face names and the selection are stable, so the
+  choice survives re-evaluation. A tangent chain follows the measured face of
+  its first edge (`chamferContour.ts`).
+- `chamferOwns` in `shared/src/schema/coreFeatures.ts` says which of
+  `distance2`, `angle` and `flip` a type owns; an unknown type owns none. An
+  edit that sets `chamferType` drops the fields the new type does not own.
+  An edit that sends no bindings, a preview included, drops the feature's
+  stored bindings whose path no longer holds a number (`bindingHolds`, used
+  by `server/src/api/featureRoutes.ts`), so the staged document still
+  evaluates; sent bindings are still refused when they do not resolve.
+- A dialog keeps the bindings it opened with (`openingBindings` in
+  `client/src/previewSession.ts`). At OK the saved bindings are that
+  snapshot plus the dialog's own edits, filtered by `bindingHolds`, so a type
+  round trip inside one session restores a dropped binding.
+- The size hint covers `equalDistance` only.
+
 ## Tolerances
 
 `shared/src/tolerance.ts` owns `LINEAR_TOL`, `ANGULAR_TOL_DEG` and

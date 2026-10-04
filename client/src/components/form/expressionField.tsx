@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { useStore } from "../../store";
 import { featureParams, setFeatureParams } from "../../commands/featureCommand";
 import { storedExpression } from "../../features/bindings";
+import { openingBindings } from "../../previewSession";
 
 type Inputs = Readonly<Record<string, Scalar>>;
 const resolved = new WeakMap<object, Inputs>();
@@ -144,7 +145,13 @@ function boundText(s: State, bind: Bind): string | undefined {
   if (path === undefined || s.active?.id !== "design.feature") return undefined;
   const own = featureParams(s).expressions?.[path];
   if (own !== undefined) return own ?? undefined;
-  return storedExpression(s.document, s.active.state.editFeatureId, path);
+  const parameterBindings =
+    openingBindings() ?? s.document?.parameterBindings ?? [];
+  return storedExpression(
+    { parameterBindings },
+    s.active.state.editFeatureId,
+    path,
+  );
 }
 
 function mark(bind: string | FieldLink, expression: string | null | false) {

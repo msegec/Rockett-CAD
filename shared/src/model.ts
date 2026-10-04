@@ -14,14 +14,6 @@ import type { FEATURE_SCHEMAS } from "./schema/features.js";
 
 export type NamingVersion = 1 | 2;
 
-// ---------------------------------------------------------------------------
-// Persistent topology references
-// ---------------------------------------------------------------------------
-//
-// Faces, edges and vertices are addressed by *persistent names* assigned by
-// the regeneration engine — never by transient array indexes. See
-// docs/CAD_MODEL.md ("Topological naming") for the naming scheme.
-
 export interface FaceRef {
   kind: "face";
   bodyId: string;
@@ -67,7 +59,6 @@ export interface RefSignature {
 
 export type OriginPlaneName = "XY" | "XZ" | "YZ";
 
-/** Where a sketch / construction plane / mirror plane lives. */
 export type PlaneRef =
   | { kind: "origin"; plane: OriginPlaneName }
   | { kind: "construction"; featureId: string }
@@ -76,9 +67,14 @@ export type PlaneRef =
 export const ORIGIN_AXES = ["X", "Y", "Z"] as const;
 export const SHELL_DIRECTIONS = ["inside", "outside", "both"] as const;
 export type ShellDirection = (typeof SHELL_DIRECTIONS)[number];
+export const CHAMFER_TYPES = [
+  "equalDistance",
+  "twoDistances",
+  "distanceAngle",
+] as const;
+export type ChamferType = (typeof CHAMFER_TYPES)[number];
 export type OriginAxis = (typeof ORIGIN_AXES)[number];
 
-/** An axis for revolve / circular pattern. */
 export type AxisRef =
   | { kind: "originAxis"; axis: OriginAxis }
   | { kind: "sketchLine"; sketchId: string; entityId: string }
@@ -312,7 +308,11 @@ export interface ChamferFeature extends FeatureBase {
   tangentChain?: boolean;
   type: "chamfer";
   edges: EdgeRef[];
+  chamferType: ChamferType;
   distance: number;
+  distance2?: number;
+  angle?: number;
+  flip?: boolean;
 }
 
 export interface ShellFeature extends FeatureBase {

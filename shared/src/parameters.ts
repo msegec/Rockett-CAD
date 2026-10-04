@@ -222,6 +222,16 @@ const idOf = (item: unknown): unknown =>
     ? (item as { id?: unknown }).id
     : undefined;
 
+export function bindingHolds(feature: object, path: string): boolean {
+  let at: unknown = feature;
+  for (const part of path.slice(1).split("/")) {
+    if (typeof at !== "object" || at === null || !Object.hasOwn(at, part))
+      return false;
+    at = (at as Record<string, unknown>)[part];
+  }
+  return typeof at === "number";
+}
+
 export function movedBindings(
   bindings: readonly ParameterBinding[],
   before: Feature,

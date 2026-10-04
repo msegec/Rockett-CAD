@@ -1,8 +1,10 @@
 import { Type, type TProperties, type TSchema } from "typebox";
 import {
+  CHAMFER_TYPES,
   ORIGIN_AXES,
   REF_SIGNATURE_TYPES,
   SHELL_DIRECTIONS,
+  type ChamferType,
 } from "../model.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
@@ -369,11 +371,45 @@ const fillet = feature("fillet", {
   radius: positive,
 });
 
-const chamfer = feature("chamfer", {
-  tangentChain: flag,
-  edges,
-  distance: positive,
-});
+const CHAMFER_FIELDS: Record<ChamferType, readonly ChamferField[]> = {
+  equalDistance: [],
+  twoDistances: ["distance2", "flip"],
+  distanceAngle: ["angle", "flip"],
+};
+
+export const CHAMFER_TYPE_FIELDS = ["distance2", "angle", "flip"] as const;
+type ChamferField = (typeof CHAMFER_TYPE_FIELDS)[number];
+
+export function chamferOwns(chamferType: string, field: ChamferField) {
+  return (
+    Object.hasOwn(CHAMFER_FIELDS, chamferType) &&
+    CHAMFER_FIELDS[chamferType as ChamferType].includes(field)
+  );
+}
+
+const chamfer = Type.Refine(
+  feature("chamfer", {
+    tangentChain: flag,
+    edges,
+    chamferType: Type.Enum([...CHAMFER_TYPES]),
+    distance: positive,
+    distance2: Type.Optional(positive),
+    angle: Type.Optional(
+      Type.Number({
+        exclusiveMinimum: 0,
+        exclusiveMaximum: 90,
+        parameterUnit: "deg",
+      }),
+    ),
+    flip: flag,
+  }),
+  (f: Partial<Record<ChamferField, unknown>> & { chamferType: string }) =>
+    CHAMFER_TYPE_FIELDS.every(
+      (key) => chamferOwns(f.chamferType, key) === (f[key] !== undefined),
+    ),
+  () =>
+    "needs a second distance and a flip exactly for two distances, and an angle and a flip exactly for distance and angle",
+);
 
 const shell = Type.Refine(
   feature("shell", {

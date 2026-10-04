@@ -1,4 +1,7 @@
 import {
+  bindingHolds,
+  CHAMFER_TYPE_FIELDS,
+  chamferOwns,
   lacksTargets,
   nextFeatureName,
   parameterBindingsBody,
@@ -149,12 +152,20 @@ function updateFeatureRoute(context: ApiRoutes) {
         Reflect.deleteProperty(updated, "body");
       if ("direction" in patch && !("outsideThickness" in patch))
         Reflect.deleteProperty(updated, "outsideThickness");
+      if (updated.type === "chamfer" && "chamferType" in patch)
+        for (const key of CHAMFER_TYPE_FIELDS)
+          if (!(key in patch) && !chamferOwns(updated.chamferType, key))
+            Reflect.deleteProperty(updated, key);
       validateFeature(updated);
       const { parameterBindings } = req.body;
-      if (parameterBindings !== undefined)
-        doc.parameterBindings = parse(parameterBindingsBody, {
-          parameterBindings,
-        }).parameterBindings;
+      doc.parameterBindings =
+        parameterBindings === undefined
+          ? doc.parameterBindings.filter(
+              ({ featureId, path }) =>
+                featureId !== updated.id || bindingHolds(updated, path),
+            )
+          : parse(parameterBindingsBody, { parameterBindings })
+              .parameterBindings;
       await signed(doc, idx, updated, current);
       doc.features[idx] = updated;
       await (keepsTargets(patch)

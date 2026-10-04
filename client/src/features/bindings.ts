@@ -1,4 +1,5 @@
 import {
+  bindingHolds,
   resolvedFeatureIn,
   type CadDocument,
   type Feature,
@@ -24,29 +25,23 @@ export function storedExpression(
   )?.expression;
 }
 
-function holds(feature: object, path: string): boolean {
-  let at: unknown = feature;
-  for (const part of path.slice(1).split("/")) {
-    if (typeof at !== "object" || at === null || !Object.hasOwn(at, part))
-      return false;
-    at = (at as Record<string, unknown>)[part];
-  }
-  return typeof at === "number";
-}
-
 export function nextBindings(
   doc: Pick<CadDocument, "parameterBindings">,
   feature: Feature,
   expressions: FieldExpressions | undefined,
+  opening: ParameterBinding[] = doc.parameterBindings,
 ): ParameterBinding[] | null {
-  if (!expressions) return null;
   const own = doc.parameterBindings.filter((b) => b.featureId === feature.id);
-  const kept = new Map(own.map((b) => [b.path, b.expression]));
-  for (const [path, expression] of Object.entries(expressions))
+  const kept = new Map(
+    opening
+      .filter((b) => b.featureId === feature.id)
+      .map((b) => [b.path, b.expression]),
+  );
+  for (const [path, expression] of Object.entries(expressions ?? {}))
     if (expression === null) kept.delete(path);
     else kept.set(path, expression);
   const next = [...kept]
-    .filter(([path]) => holds(feature, path))
+    .filter(([path]) => bindingHolds(feature, path))
     .map(([path, expression]) => ({ featureId: feature.id, path, expression }));
   const same =
     next.length === own.length &&

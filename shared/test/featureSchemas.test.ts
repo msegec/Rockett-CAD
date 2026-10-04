@@ -332,8 +332,20 @@ const fixtures: {
     path: "/radius",
   },
   chamfer: {
-    valid: { ...base, type: "chamfer", edges: [edge], distance: 1 },
-    invalid: { ...base, type: "chamfer", edges: [face], distance: 1 },
+    valid: {
+      ...base,
+      type: "chamfer",
+      chamferType: "equalDistance",
+      edges: [edge],
+      distance: 1,
+    },
+    invalid: {
+      ...base,
+      type: "chamfer",
+      chamferType: "equalDistance",
+      edges: [face],
+      distance: 1,
+    },
     path: "/edges/0",
   },
   shell: {

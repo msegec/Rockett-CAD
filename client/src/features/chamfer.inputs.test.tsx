@@ -15,6 +15,7 @@ import type { ChamferFeature } from "@rockett/shared";
 const original: ChamferFeature = {
   id: "chamfer-input",
   type: "chamfer",
+  chamferType: "equalDistance",
   name: "Chamfer",
   suppressed: false,
   distance: 2.5,
@@ -23,6 +24,48 @@ const original: ChamferFeature = {
 };
 
 describe("typed Chamfer inputs", () => {
+  it.each([
+    ["equalDistance", ["Type", "Distance (mm)"]],
+    ["twoDistances", ["Type", "Distance 1 (mm)", "Distance 2 (mm)", "Flip"]],
+    ["distanceAngle", ["Type", "Distance (mm)", "Angle (°)", "Flip"]],
+  ] as const)("shows the %s fields", (chamferType, labels) => {
+    const host = document.createElement("div");
+    host.innerHTML = renderToStaticMarkup(
+      createFeatureInputs(chamfer, { chamferType }).renderForm(() => {}),
+    );
+    expect(
+      [...host.querySelectorAll("label.field > span")]
+        .map((span) => span.textContent)
+        .filter((text) => text !== "Tangent chain"),
+    ).toEqual(labels);
+  });
+  it("switching a prefilled type builds only the new type's fields", () => {
+    const two: ChamferFeature = {
+      ...original,
+      chamferType: "twoDistances",
+      distance2: 4,
+      flip: true,
+    };
+    const { params, selection } = chamfer.prefill!(two);
+    expect(createFeatureInputs(chamfer, params).build(selection)).toEqual(two);
+    expect(
+      createFeatureInputs(chamfer, {
+        ...params,
+        chamferType: "equalDistance",
+      }).build(selection),
+    ).toEqual(original);
+    expect(
+      createFeatureInputs(chamfer, {
+        ...params,
+        chamferType: "distanceAngle",
+      }).build(selection),
+    ).toEqual({
+      ...original,
+      chamferType: "distanceAngle",
+      angle: 45,
+      flip: true,
+    });
+  });
   it("refuses an input owner from a different feature", () => {
     featureCommand.enter("chamfer");
     const before = useStore.getState().active;

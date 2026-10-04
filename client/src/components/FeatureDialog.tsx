@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CadDocument, Feature } from "@rockett/shared";
 import { useStore } from "../store";
-import { featurePatch } from "../previewSession";
+import { featurePatch, openingBindings } from "../previewSession";
 import {
   takesAxis,
   featureParams,
@@ -139,12 +139,7 @@ function DialogBody({
 
   const draft = attempt(build);
   const live = useLivePreview(editId, draft);
-  useEffect(
-    () => () => {
-      void useStore.getState().cancelPreview();
-    },
-    [],
-  );
+  useEffect(() => () => void useStore.getState().cancelPreview(), []);
   const update = async (patch: Partial<Feature>) => {
     if (featureChanges(stored, patch)) await updateFeature(editId!, patch);
   };
@@ -162,7 +157,8 @@ function DialogBody({
     live.cancel();
     setPending(true);
     const bindings =
-      document && nextBindings(document, feature, params.expressions);
+      document &&
+      nextBindings(document, feature, params.expressions, openingBindings());
     try {
       if (bindings)
         await saveBound(feature, editId, featurePatch(feature), bindings);

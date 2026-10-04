@@ -1,5 +1,5 @@
 import type { StoreApi } from "zustand";
-import type { CadDocument, Feature } from "@rockett/shared";
+import type { CadDocument, Feature, ParameterBinding } from "@rockett/shared";
 import { api, type MutationResponse } from "./api";
 import type { Active } from "./commands/active";
 import * as previewBase from "./previewBase";
@@ -21,6 +21,7 @@ interface Session {
   fresh: boolean;
   staged: number;
   keys: Set<string>;
+  bindings: ParameterBinding[];
 }
 
 const preview: {
@@ -175,7 +176,7 @@ function previewActions(deps: Deps): PreviewActions {
       const { document, evaluation, recovery } = get();
       if (!document || recovery) return;
       previewBase.holdBase(fid, evaluation);
-      preview.session ??= opening(fid, false);
+      preview.session ??= opening(fid, false, document.parameterBindings);
       preview.seq++;
       const { targets: _replaced, ...queued }: Record<string, unknown> =
         preview.pending?.fid === fid ? preview.pending.patch : {};
@@ -185,8 +186,9 @@ function previewActions(deps: Deps): PreviewActions {
     },
 
     async previewNewFeature(feature) {
-      if (!get().document) return;
-      preview.session ??= opening(feature.id, true);
+      const document = get().document;
+      if (!document) return;
+      preview.session ??= opening(feature.id, true, document.parameterBindings);
       return get().updateFeaturePreview(preview.session.fid, feature);
     },
 
@@ -221,8 +223,23 @@ function previewActions(deps: Deps): PreviewActions {
   };
 }
 
-function opening(fid: string, fresh: boolean): Session {
-  return { tx: crypto.randomUUID(), fid, fresh, staged: 0, keys: new Set() };
+function opening(
+  fid: string,
+  fresh: boolean,
+  bindings: ParameterBinding[],
+): Session {
+  return {
+    tx: crypto.randomUUID(),
+    fid,
+    fresh,
+    staged: 0,
+    keys: new Set(),
+    bindings,
+  };
+}
+
+export function openingBindings(): ParameterBinding[] | undefined {
+  return preview.session?.bindings;
 }
 
 async function save(

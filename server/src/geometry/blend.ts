@@ -2,6 +2,7 @@ import { nativeFillet } from "./nativeFillet.js";
 import { planarFillet } from "./planarFillet.js";
 import { cylinderFillet } from "./cylinderFillet.js";
 import { planarChamfer } from "./planarChamfer.js";
+import { addChamferContour } from "./chamferContour.js";
 import { blendNames } from "./blendNaming.js";
 import { rejectBadBlend } from "./blendValidity.js";
 export { cutsThrough } from "./blendValidity.js";
@@ -357,14 +358,9 @@ function chamferBody(
   kernelCall("chamfer", () => {
     const byName = computeEdgeNames(body).byName;
     const sourceEdges = collectEdges(body, byName, refs, f.tangentChain);
-    const planar = planarChamfer(
-      body,
-      sourceEdges,
-      f.distance,
-      f.id,
-      byName,
-      refs,
-    );
+    const equal = f.chamferType === "equalDistance";
+    const planar =
+      equal && planarChamfer(body, sourceEdges, f.distance, f.id, byName, refs);
     if (planar) {
       registerBodySolids(state, bodyId, planar.shape, planar.names);
       return;
@@ -373,18 +369,15 @@ function chamferBody(
     let result: Shape | undefined;
     {
       for (const { edge } of sourceEdges) {
-        if (!op.Contour(edge)) op.Add_2(f.distance, edge);
+        if (!op.Contour(edge))
+          addChamferContour(op, body, edge, sourceEdges, f);
       }
       op.Build(progress());
       const size = `distance ${f.distance}`;
       const advice = "try fewer edges or a different distance";
       if (!op.IsDone()) {
-        const viaEnvelope = chamferByEnvelope(
-          body,
-          sourceEdges,
-          f.distance,
-          f.id,
-        );
+        const viaEnvelope =
+          equal && chamferByEnvelope(body, sourceEdges, f.distance, f.id);
         if (!viaEnvelope) {
           throw new Error(
             `could not build a ${f.distance} mm chamfer: check for missing connecting edges or try a smaller distance`,

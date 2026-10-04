@@ -262,6 +262,14 @@ export const documentMigrations: Migrations<CadDocument> = {
           : feature,
       ),
     }),
+    29: (doc) => ({
+      ...doc,
+      features: (doc.features as Value[]).map((feature) =>
+        feature.type === "chamfer"
+          ? Object.assign({ chamferType: "equalDistance" }, feature)
+          : feature,
+      ),
+    }),
   },
   nested: extensionFeatures,
 };

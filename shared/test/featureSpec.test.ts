@@ -352,14 +352,39 @@ const cases: Record<string, SpecCase> = {
       {
         ...meta,
         type: "chamfer",
+        chamferType: "equalDistance",
         tangentChain: false,
         edges: [refEdge("E1"), refEdge("E2")],
         distance: 1,
       },
+      {
+        ...meta,
+        type: "chamfer",
+        chamferType: "twoDistances",
+        edges: [refEdge("E1")],
+        distance: 1,
+        distance2: 2,
+        flip: true,
+      },
+      {
+        ...meta,
+        type: "chamfer",
+        chamferType: "distanceAngle",
+        edges: [refEdge("E1")],
+        distance: 1,
+        angle: 30,
+        flip: false,
+      },
     ],
     invalid: [
       [
-        { ...meta, type: "chamfer", edges: [], distance: 1 },
+        {
+          ...meta,
+          type: "chamfer",
+          chamferType: "equalDistance",
+          edges: [],
+          distance: 1,
+        },
         "edges must not have fewer than 1 items",
         "/edges",
       ],
@@ -793,9 +818,12 @@ describe.each(Object.entries(cases))("%s feature spec", (type, specCase) => {
   });
 
   it("lists every reference with its param path", () => {
-    for (const f of [...specCase.valid, ...(specCase.refsOnly ?? [])]) {
-      const properties = Object.keys(spec.paramsSchema.properties);
-      expect(properties.filter((key) => !(key in f))).toEqual([]);
+    const features = [...specCase.valid, ...(specCase.refsOnly ?? [])];
+    const properties = Object.keys(spec.paramsSchema.properties);
+    expect(properties.filter((key) => !features.some((f) => key in f))).toEqual(
+      [],
+    );
+    for (const f of features) {
       const refs = featureRefs(f);
       for (const ref of refs) expect(valueAt(f, ref.path)).toEqual(target(ref));
       const missed = markedPaths(f).filter(
