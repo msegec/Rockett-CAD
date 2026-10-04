@@ -3,6 +3,7 @@ import {
   LINEAR_TOL,
   NAME_LENGTH,
   newId,
+  roundedLength,
   ValidationError,
   type Feature,
   type ImportMeshFeature,
@@ -11,8 +12,10 @@ import {
 import {
   explore,
   acquire,
+  bboxOf,
   scoped,
   getKernel,
+  faces,
   solids,
   progress,
   volumeOf,
@@ -46,6 +49,71 @@ function translate(reader: any, file: string): Shape | undefined {
   return result && acquire(result);
 }
 
+function solidsOf(sewn: Shape): Shape {
+  const k = getKernel();
+  return acquire(
+    scoped((own) => {
+      const builder = own(new k.BRep_Builder());
+      const compound = own(new k.TopoDS_Compound());
+      builder.MakeCompound(compound);
+      const shells = [...explore(sewn, "shell")].map((shell) =>
+        own(k.TopoDS.Shell_1(shell)),
+      );
+      const { TopAbs_FACE, TopAbs_SHELL } = k.TopAbs_ShapeEnum;
+      const loose = own(
+        new k.TopExp_Explorer_2(sewn, TopAbs_FACE, TopAbs_SHELL),
+      );
+      for (; loose.More(); loose.Next()) {
+        const shell = own(new k.TopoDS_Shell());
+        builder.MakeShell(shell);
+        builder.Add(shell, own(loose.Current()));
+        shells.push(shell);
+      }
+      for (const shell of shells) {
+        const make = own(new k.BRepBuilderAPI_MakeSolid_3(shell));
+        const solid = own(make.Solid());
+        if (volumeOf(solid) < 0) solid.Reverse();
+        builder.Add(compound, solid);
+      }
+      return own.keep(compound);
+    }),
+  );
+}
+
+function pointText(p: number[]): string {
+  return `(${p.map((v) => roundedLength(v, "mm")).join(", ")})`;
+}
+
+function sewFaces(shape: Shape | undefined, label: string): Shape | undefined {
+  if (
+    !shape ||
+    shape.IsNull() ||
+    solids(shape).length > 0 ||
+    faces(shape).length === 0
+  )
+    return shape;
+  const k = getKernel();
+  return acquire(
+    scoped((own) => {
+      const sewing = own(
+        new k.BRepBuilderAPI_Sewing(LINEAR_TOL, true, true, true, false),
+      );
+      sewing.Add(shape);
+      sewing.Perform(progress());
+      const open = sewing.NbFreeEdges();
+      if (open === 0) return own.keep(solidsOf(own(sewing.SewedShape())));
+      const builder = own(new k.BRep_Builder());
+      const gap = own(new k.TopoDS_Compound());
+      builder.MakeCompound(gap);
+      for (let i = 1; i <= open; i++) builder.Add(gap, own(sewing.FreeEdge(i)));
+      const { min, max } = bboxOf(gap, false);
+      throw new Error(
+        `The ${label} faces do not close into a solid: ${open} open edge${open === 1 ? "" : "s"} from ${pointText(min)} to ${pointText(max)} mm.`,
+      );
+    }),
+  );
+}
+
 const READERS: Record<Format, Reader> = {
   step: {
     label: "STEP",
@@ -55,7 +123,11 @@ const READERS: Record<Format, Reader> = {
   iges: {
     label: "IGES",
     extension: "igs",
-    read: (file) => translate(new (getKernel().IGESControl_Reader_1)(), file),
+    read: (file) =>
+      sewFaces(
+        translate(new (getKernel().IGESControl_Reader_1)(), file),
+        "IGES",
+      ),
   },
   brep: {
     label: "BREP",
@@ -307,17 +379,7 @@ export function readMesh(
         shape: own.keep(sewn),
         warning: `The ${label} mesh is open at ${openEdges} edges, so it imported as a shell, not a solid.`,
       };
-    const compound = own(new k.TopoDS_Compound());
-    builder.MakeCompound(compound);
-    for (const shell of explore(sewn, "shell")) {
-      const make = own(
-        new k.BRepBuilderAPI_MakeSolid_3(own(k.TopoDS.Shell_1(shell))),
-      );
-      const solid = own(make.Solid());
-      if (volumeOf(solid) < 0) solid.Reverse();
-      builder.Add(compound, solid);
-    }
-    return { shape: own.keep(compound) };
+    return { shape: own.keep(solidsOf(sewn)) };
   });
   acquire(result.shape);
   return result;
