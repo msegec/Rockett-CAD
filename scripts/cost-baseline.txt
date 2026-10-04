@@ -1,4 +1,4 @@
-client/src/api.ts 645
+client/src/api.ts 585
 client/src/components/DraggablePanel.tsx DraggablePanel 125
 client/src/components/FeatureDialog.tsx DialogBody 104
 client/src/components/ModelTree.tsx 546
@@ -13,8 +13,8 @@ client/src/components/SketchOffsetPanel.tsx SketchOffsetPanel 161
 client/src/components/Timeline.tsx Timeline 159
 client/src/components/UsersPage.tsx AddUserForm 90
 client/src/components/UsersPage.tsx UserRow 85
-client/src/components/ViewportView.tsx 2407
-client/src/components/ViewportView.tsx ViewportView 2249
+client/src/components/ViewportView.tsx 2402
+client/src/components/ViewportView.tsx ViewportView 2243
 client/src/components/ViewportView.tsx dimLabelsRef.current.map() 82
 client/src/components/ViewportView.tsx handleHover 99
 client/src/components/ViewportView.tsx handlePrimaryUp 90
@@ -26,8 +26,8 @@ client/src/features/referenceImage.tsx ReferenceImagePanel 193
 client/src/sketchEditing.ts sketchActions 226
 client/src/sketchEdits.ts sketchEdits 166
 client/src/sketchTools.ts 1041
-client/src/store.ts 503
-client/src/store.ts useStore 261
+client/src/store.ts 502
+client/src/store.ts useStore 260
 client/src/three/CadViewport.ts 789
 client/src/three/ViewCube.ts constructor 83
 client/src/three/revolveGhost.ts buildRevolveGhost 99
@@ -35,10 +35,8 @@ client/src/three/toolPreview.ts updateToolPreview 147
 server/src/api/jobRoutes.ts createJobRoutes 119
 server/src/geometry/blend.ts built 209
 server/src/geometry/blend.ts chamferByEnvelope 219
-server/src/geometry/engine.ts 548
-server/src/geometry/features.ts 1016
+server/src/geometry/features.ts 1004
 server/src/store/projectStore.ts 520
-shared/src/routes.ts 509
 shared/src/sketchModify.ts 735
 shared/src/sketchModify.ts joinOffsetEndpoints 110
 shared/src/sketchModify.ts offsetRoundedChain 124

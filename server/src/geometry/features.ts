@@ -40,7 +40,6 @@ import {
   type EmbossFeature,
   type ExtrudeFeature,
   type FaceRef,
-  type ImportMeshFeature,
   type ImportStepFeature,
   type LinearPatternFeature,
   type MirrorFeature,
@@ -97,7 +96,7 @@ import { ShapeMap } from "./shapeMap.js";
 import { V, frameFromPlane, offsetFrame, uvTo3d } from "./frames.js";
 import { geometryNames } from "./signature.js";
 import { curveInfo } from "./tessellate.js";
-import { readImport, readMesh } from "./importers.js";
+import { readImport } from "./importers.js";
 import { placeImport } from "./stepImport.js";
 import { type EvalContext } from "./featureKinds.js";
 import {
@@ -976,19 +975,8 @@ export function evalEmboss(state: EvalState, f: EmbossFeature) {
   return evalExtrude(state, pseudo);
 }
 
-export function evalImportMesh(
-  { state, sources }: EvalContext,
-  feature: ImportMeshFeature,
-): FeatureOutcome | void {
-  const { shape, warning } = readMesh(feature, sources),
-    bodyId = `b:${feature.id}`,
-    names = finalizeNames(shape, new ShapeMap(), feature.id);
-  if (!warning) return registerBodySolids(state, bodyId, shape, names);
-  state.bodies.set(bodyId, { bodyId, shape, names });
-  return { warning };
-}
-
 export { evaluateFeature } from "./featureKinds.js";
+export { evalImportMesh } from "./meshBody.js";
 
 export {
   cloneState,

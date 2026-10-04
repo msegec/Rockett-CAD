@@ -1,0 +1,65 @@
+import type { MeshedBody } from "@rockett/shared";
+import type { NamedBody } from "./naming.js";
+import { shapeHash, type Shape } from "./kernel.js";
+
+export interface Tessellation {
+  shape: Shape;
+  payload: MeshedBody;
+  bytes: number;
+}
+
+export const tessCache = {
+  limit: 256 * 1024 * 1024,
+  bytes: 0,
+  entries: new Map<string, Tessellation>(),
+};
+
+export function payloadBytes(value: unknown): number {
+  if (typeof value === "number" || typeof value === "boolean") return 8;
+  if (typeof value === "string") return value.length * 2;
+  if (!value || typeof value !== "object") return 0;
+  if (Array.isArray(value) && typeof value[0] === "number")
+    return value.length * 8;
+  let bytes = 0;
+  for (const v of Object.values(value)) bytes += payloadBytes(v);
+  return bytes;
+}
+
+export function cacheKey(body: NamedBody): string {
+  return `${body.bodyId}:${shapeHash(body.shape)}`;
+}
+
+export function evict(key: string): void {
+  const entry = tessCache.entries.get(key);
+  if (!entry) return;
+  tessCache.entries.delete(key);
+  tessCache.bytes -= entry.bytes;
+}
+
+export function store(body: NamedBody, payload: MeshedBody): Tessellation {
+  const key = cacheKey(body);
+  evict(key);
+  const entry = { shape: body.shape, payload, bytes: payloadBytes(payload) };
+  tessCache.entries.set(key, entry);
+  tessCache.bytes += entry.bytes;
+  for (const old of tessCache.entries.keys()) {
+    if (tessCache.bytes <= tessCache.limit) break;
+    evict(old);
+  }
+  return entry;
+}
+
+export function cached(body: NamedBody): Tessellation | undefined {
+  const key = cacheKey(body);
+  const entry = tessCache.entries.get(key);
+  if (!entry) return undefined;
+  if (entry.shape.isDeleted()) {
+    evict(key);
+    return undefined;
+  }
+  if (body.shape.isDeleted() || !entry.shape.IsSame(body.shape))
+    return undefined;
+  tessCache.entries.delete(key);
+  tessCache.entries.set(key, entry);
+  return entry;
+}
