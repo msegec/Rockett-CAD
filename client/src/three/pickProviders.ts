@@ -219,6 +219,12 @@ registerPickProvider({
   pick: (_raycaster, _tolerance, ctx) => surfacePicks(ctx, "body"),
 });
 registerPickProvider({
+  id: "design.feature",
+  kind: "feature",
+  priority: 0,
+  pick: () => [],
+});
+registerPickProvider({
   id: "design.originPlane",
   kind: "plane",
   priority: -1,

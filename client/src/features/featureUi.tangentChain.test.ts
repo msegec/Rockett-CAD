@@ -33,9 +33,9 @@ describe.each(["fillet", "chamfer"] as const)("%s tangent chain", (type) => {
     expect(built).toMatchObject({ type, tangentChain: true });
   });
 
-  it("refuses to build without an edge", () => {
+  it("refuses to build without an edge, face or feature", () => {
     expect(featureUI(type)!.create().withParams({}).build([])).toEqual({
-      error: "Select at least one edge",
+      error: "Select at least one edge, face or feature",
     });
   });
 

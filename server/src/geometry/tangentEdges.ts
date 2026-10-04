@@ -1,4 +1,9 @@
-import { LINEAR_TOL, type EdgeRef, type Vec3 } from "@rockett/shared";
+import {
+  compareNames,
+  LINEAR_TOL,
+  type EdgeRef,
+  type Vec3,
+} from "@rockett/shared";
 import { ShapeMap } from "./shapeMap.js";
 import { computeEdgeNames, type NamedBody } from "./naming.js";
 import { surfaceNormal } from "./signature.js";
@@ -68,15 +73,20 @@ function normalsAlong(edge: Shape, face: Shape): Vec3[] {
 function namedFaceEdges(
   body: NamedBody,
   names: Map<string, Shape>,
-): { faceEdges: Set<string | undefined>[]; smoothJoins: Set<string> } {
+): {
+  faceNames: (string | undefined)[];
+  faceEdges: Set<string | undefined>[];
+  smoothJoins: Set<string>;
+} {
   const k = getKernel();
   return scoped((own) => {
     const edgeNames = new ShapeMap<string>();
     own({ delete: () => edgeNames.release() });
     for (const [name, edge] of names) edgeNames.set(edge, name);
     const sides = new Map<string, (Vec3[] | undefined)[]>();
+    const faceNames: (string | undefined)[] = [];
     const faceEdges = faces(body.shape).map((face) => {
-      own(face);
+      faceNames.push(body.names.get(own(face)));
       return new Set(
         edges(face).map((edge) => {
           const name = edgeNames.get(own(edge));
@@ -100,7 +110,28 @@ function namedFaceEdges(
       )
         smoothJoins.add(name);
     }
-    return { faceEdges, smoothJoins };
+    return { faceNames, faceEdges, smoothJoins };
+  });
+}
+
+export function sharpEdgesByFace(body: NamedBody): Map<string, string[]> {
+  return scoped(() => {
+    const names = computeEdgeNames(body).byName;
+    const { faceNames, faceEdges, smoothJoins } = namedFaceEdges(body, names);
+    const byFace = new Map<string, Set<string>>();
+    faceNames.forEach((face, i) => {
+      if (face === undefined) return;
+      const sharp = byFace.get(face) ?? new Set<string>();
+      for (const edge of faceEdges[i]!)
+        if (edge !== undefined && !smoothJoins.has(edge)) sharp.add(edge);
+      byFace.set(face, sharp);
+    });
+    return new Map(
+      [...byFace].map(([face, sharp]) => [
+        face,
+        [...sharp].toSorted(compareNames),
+      ]),
+    );
   });
 }
 

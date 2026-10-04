@@ -38,6 +38,12 @@ export const facePicks = (faces: FaceRef[]): Selection[] =>
 export const storedFeature = (id: string | undefined): object =>
   useStore.getState().document?.features.find((f) => f.id === id) ?? {};
 
+export const keptRefs = <K extends string, T>(
+  key: K,
+  refs: T[],
+  stored: object,
+) => (refs.length > 0 || key in stored) && ({ [key]: refs } as Record<K, T[]>);
+
 export function profileSources(
   selection: Selection[],
   stored: object,
@@ -48,7 +54,7 @@ export function profileSources(
     return { error: "Select at least one profile or planar face" };
   return {
     profiles,
-    ...((faces.length > 0 || "faces" in stored) && { faces }),
+    ...keptRefs("faces", faces, stored),
   };
 }
 

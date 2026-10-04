@@ -140,7 +140,9 @@ describe("typed Chamfer inputs", () => {
       tangentChain: false,
     });
     expect(inputs.params.distance).toBe("width /");
-    expect(inputs.build([])).toEqual({ error: "Select at least one edge" });
+    expect(inputs.build([])).toEqual({
+      error: "Select at least one edge, face or feature",
+    });
   });
 });
 

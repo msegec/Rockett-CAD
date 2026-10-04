@@ -149,6 +149,10 @@ Fillet and Chamfer default to **Select tangent chain**: clicking an edge picks
 the smooth edges connected to it, and clicking a picked chain drops it.
 Uncheck it to pick edges one at a time.
 
+Fillet and Chamfer also take faces, which blend their sharp edges, and
+timeline features, which blend the sharp edges of the faces they made. A
+corner is refused: pick the edges or faces at it.
+
 A fillet that meets two earlier fillets can fail. This is a current
 limitation. Fillet the vertical edges before the top edges to avoid it.
 

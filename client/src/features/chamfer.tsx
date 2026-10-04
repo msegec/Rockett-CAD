@@ -13,15 +13,21 @@ import {
   SelInfo,
 } from "../components/form/fields";
 import { useSetting } from "../settings";
-import { edges } from "../commands/featureCommand";
-import { edgePicks, edgeRefs, num } from "./inputs";
+import { blendPicks } from "../commands/featureCommand";
+import { num } from "./inputs";
+import {
+  blendHint,
+  blendSelection,
+  blendSources,
+  refuseVertex,
+} from "./blendPicks";
 import {
   registerFeatureUI,
   type FeatureFormProps,
   type FeatureUI,
   type InputParams,
 } from "./registry";
-import { tangentChain, TangentChainField } from "./tangentChain";
+import { TangentChainField } from "./tangentChain";
 
 export type ChamferParams = InputParams<
   Pick<
@@ -82,7 +88,7 @@ function ChamferForm({ params, setParams }: FeatureFormProps<ChamferParams>) {
   const two = size.chamferType === "twoDistances";
   return (
     <>
-      <SelInfo label="Edges" input="edges" hint="click model edges" />
+      <SelInfo label="Edges" input="edges" hint={blendHint} />
       <TangentChainField params={params} setParams={setParams} />
       <SelectField
         label="Type"
@@ -132,18 +138,18 @@ export const chamfer: FeatureUI<ChamferFeature, ChamferParams> = {
   icon: "◣",
   title: "Chamfer",
   group: "modify",
-  picks: [edges],
+  picks: [blendPicks],
   initialParams: {},
   Form: ChamferForm,
   build: (params, selection) => {
-    const edges = edgeRefs(selection);
-    if (edges.length === 0) return { error: "Select at least one edge" };
+    const picks = blendSources(params.id, selection);
+    if ("error" in picks) return picks;
     return {
       id: params.id ?? newId("chamfer"),
       type: "chamfer",
       name: params.name ?? "",
       suppressed: false,
-      edges,
+      ...picks,
       ...sizes(params),
       tangentChain: params.tangentChain ?? true,
     };
@@ -159,9 +165,11 @@ export const chamfer: FeatureUI<ChamferFeature, ChamferParams> = {
       flip: f.flip,
       tangentChain: f.tangentChain ?? false,
     },
-    selection: edgePicks(f.edges),
+    selection: blendSelection(f),
   }),
-  onPick: tangentChain,
+  onPick: refuseVertex(
+    "Chamfer bevels edges: pick the edges or faces at this corner",
+  ),
 };
 
 registerFeatureUI(chamfer);

@@ -6,8 +6,11 @@ function measuredFace(
   body: NamedBody,
   edge: Shape,
   selected: { edge: Shape }[],
-  flip: boolean,
+  f: ChamferFeature,
 ): Shape {
+  const picked = new Set(
+    f.faces?.filter((r) => r.bodyId === body.bodyId).map((r) => r.faceName),
+  );
   const sides = facesOf(body.shape)
     .map((face) => ({ face, edges: edgesOf(face) }))
     .filter((side) => side.edges.some((e) => e.IsSame(edge)))
@@ -18,8 +21,11 @@ function measuredFace(
         .length,
     }))
     .toSorted((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
-    .toSorted((a, b) => b.shared - a.shared);
-  const side = sides[flip ? sides.length - 1 : 0];
+    .toSorted((a, b) => b.shared - a.shared)
+    .toSorted(
+      (a, b) => Number(picked.has(b.name)) - Number(picked.has(a.name)),
+    );
+  const side = sides[f.flip ? sides.length - 1 : 0];
   if (!side) throw new Error("the chamfer edge has no face");
   return side.face;
 }
@@ -37,7 +43,7 @@ export function addChamferContour(
   f: ChamferFeature,
 ): void {
   if (f.chamferType === "equalDistance") return op.Add_2(f.distance, edge);
-  const face = measuredFace(body, edge, selected, f.flip ?? false);
+  const face = measuredFace(body, edge, selected, f);
   if (f.chamferType === "twoDistances")
     return op.Add_3(
       f.distance,

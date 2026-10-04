@@ -2,6 +2,7 @@ import type { Active } from "../commands/active";
 import type { HighlightContext, HighlightStyle } from "./highlights";
 import {
   createRegistry,
+  faceMadeBy,
   type EdgeRef,
   type FaceRef,
   type OriginAxis,
@@ -27,7 +28,8 @@ export type CoreSelection =
       entityId: string;
       piece?: number[];
     }
-  | { kind: "sketchPoint"; sketchId: string; entityId: string };
+  | { kind: "sketchPoint"; sketchId: string; entityId: string }
+  | { kind: "feature"; featureId: string };
 
 export type ExtensionSelection = {
   kind: `${string}.${string}`;
@@ -59,6 +61,7 @@ interface CoreRefs {
   sketch: string;
   sketchEntity: Omit<SelectionOf<"sketchEntity">, "kind">;
   sketchPoint: Extract<PointRef, { kind: "sketchPoint" }>;
+  feature: string;
 }
 type RefOf<K extends Kind> = K extends keyof CoreRefs ? CoreRefs[K] : unknown;
 
@@ -271,6 +274,18 @@ registerCore<"sketchPoint">({
     sketchId: ref.sketchId,
     entityId: ref.entityId,
   }),
+});
+registerCore<"feature">({
+  kind: "feature",
+  highlight: (s, style, ctx) => {
+    for (const [bodyId, { payload }] of ctx.sources.bodies)
+      for (const face of payload.faces)
+        if (faceMadeBy(s.featureId, face.name))
+          ctx.face(bodyId, face.name, style);
+  },
+  key: (s) => `feature:${s.featureId}`,
+  toRef: (s) => s.featureId,
+  fromRef: (featureId) => ({ kind: "feature", featureId }),
 });
 
 export function highlightSelection(

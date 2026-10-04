@@ -7,15 +7,21 @@ import {
 import { newId, type FilletFeature } from "@rockett/shared";
 import { LengthField, SelInfo } from "../components/form/fields";
 import { useSetting } from "../settings";
-import { edges } from "../commands/featureCommand";
-import { edgePicks, edgeRefs, num } from "./inputs";
+import { blendPicks } from "../commands/featureCommand";
+import { num } from "./inputs";
+import {
+  blendHint,
+  blendSelection,
+  blendSources,
+  refuseVertex,
+} from "./blendPicks";
 import {
   registerFeatureUI,
   type FeatureFormProps,
   type FeatureUI,
   type InputParams,
 } from "./registry";
-import { tangentChain, TangentChainField } from "./tangentChain";
+import { TangentChainField } from "./tangentChain";
 
 export type FilletParams = InputParams<
   Pick<FilletFeature, "id" | "name" | "radius" | "tangentChain">
@@ -32,7 +38,7 @@ function FilletForm({ params, setParams }: FeatureFormProps<FilletParams>) {
   const units = useSetting("units.length");
   return (
     <>
-      <SelInfo label="Edges" input="edges" hint="click model edges" />
+      <SelInfo label="Edges" input="edges" hint={blendHint} />
       <TangentChainField params={params} setParams={setParams} />
       <LengthField
         label="Radius"
@@ -53,17 +59,17 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
   icon: "◠",
   title: "Fillet",
   group: "modify",
-  picks: [edges],
+  picks: [blendPicks],
   Form: FilletForm,
   build: (params, selection) => {
-    const edges = edgeRefs(selection);
-    if (edges.length === 0) return { error: "Select at least one edge" };
+    const picks = blendSources(params.id, selection);
+    if ("error" in picks) return picks;
     return {
       id: params.id ?? newId("fillet"),
       type: "fillet",
       name: params.name ?? "",
       suppressed: false,
-      edges,
+      ...picks,
       radius: num(params, handle.param, handle.fallback),
       tangentChain: params.tangentChain ?? true,
     };
@@ -75,9 +81,11 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
       radius: f.radius,
       tangentChain: f.tangentChain ?? false,
     },
-    selection: edgePicks(f.edges),
+    selection: blendSelection(f),
   }),
-  onPick: tangentChain,
+  onPick: refuseVertex(
+    "Fillet rounds edges: pick the edges or faces at this corner",
+  ),
 };
 
 registerFeatureUI(fillet);

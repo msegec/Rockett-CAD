@@ -337,6 +337,14 @@ const cases: Record<string, SpecCase> = {
         edges: [refEdge("E1"), refEdge("E2")],
         radius: 1,
       },
+      {
+        ...meta,
+        type: "fillet",
+        edges: [],
+        faces: [refFace("F1")],
+        features: ["ref:extrude"],
+        radius: 1,
+      },
     ],
     invalid: [
       [
@@ -375,6 +383,15 @@ const cases: Record<string, SpecCase> = {
         angle: 30,
         flip: false,
       },
+      {
+        ...meta,
+        type: "chamfer",
+        chamferType: "equalDistance",
+        edges: [refEdge("E1")],
+        faces: [refFace("F1")],
+        features: ["ref:extrude"],
+        distance: 1,
+      },
     ],
     invalid: [
       [
@@ -383,10 +400,12 @@ const cases: Record<string, SpecCase> = {
           type: "chamfer",
           chamferType: "equalDistance",
           edges: [],
+          faces: [],
+          features: [],
           distance: 1,
         },
-        "edges must not have fewer than 1 items",
-        "/edges",
+        "request needs an edge, a face or a feature",
+        "",
       ],
     ],
   },

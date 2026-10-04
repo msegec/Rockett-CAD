@@ -4,8 +4,12 @@ import {
   ORIGIN_AXES,
   REF_SIGNATURE_TYPES,
   SHELL_DIRECTIONS,
-  type ChamferType,
 } from "../model.js";
+import {
+  CHAMFER_TYPE_FIELDS,
+  chamferOwns,
+  type ChamferField,
+} from "./chamferFields.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
 export const MAX_DIM = 100_000;
@@ -99,7 +103,6 @@ const bodies = Type.Array(bodyId, { minItems: 1 });
 const targets = Type.Optional(
   Type.Array(bodyId, { maxItems: MAX_TARGETS, uniqueItems: true }),
 );
-const edges = Type.Array(edgeRef, { minItems: 1 });
 const profiles = (minItems: number) => Type.Array(profileRef, { minItems });
 const patternCount = Type.Number({ minimum: 2, parameterUnit: "unitless" });
 
@@ -365,32 +368,27 @@ const loft = feature("loft", {
   targets,
 });
 
-const fillet = feature("fillet", {
-  tangentChain: flag,
-  edges,
-  radius: positive,
-});
-
-const CHAMFER_FIELDS: Record<ChamferType, readonly ChamferField[]> = {
-  equalDistance: [],
-  twoDistances: ["distance2", "flip"],
-  distanceAngle: ["angle", "flip"],
-};
-
-export const CHAMFER_TYPE_FIELDS = ["distance2", "angle", "flip"] as const;
-type ChamferField = (typeof CHAMFER_TYPE_FIELDS)[number];
-
-export function chamferOwns(chamferType: string, field: ChamferField) {
-  return (
-    Object.hasOwn(CHAMFER_FIELDS, chamferType) &&
-    CHAMFER_FIELDS[chamferType as ChamferType].includes(field)
+const blend = <const T extends string, P extends TProperties>(
+  type: T,
+  properties: P,
+) =>
+  Type.Refine(
+    feature(type, {
+      tangentChain: flag,
+      edges: Type.Array(edgeRef),
+      faces: profileFaces,
+      features: Type.Optional(Type.Array(id)),
+      ...properties,
+    }),
+    (f: Partial<Record<"edges" | "faces" | "features", unknown[]>>) =>
+      [f.edges, f.faces, f.features].some((picks) => picks?.length),
+    () => "needs an edge, a face or a feature",
   );
-}
+
+const fillet = blend("fillet", { radius: positive });
 
 const chamfer = Type.Refine(
-  feature("chamfer", {
-    tangentChain: flag,
-    edges,
+  blend("chamfer", {
     chamferType: Type.Enum([...CHAMFER_TYPES]),
     distance: positive,
     distance2: Type.Optional(positive),

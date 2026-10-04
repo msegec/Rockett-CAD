@@ -76,7 +76,12 @@ export const targets = input("targets", ["design.body"], {
 });
 
 export const bodies = input("bodies", ["design.body"]);
-export const edges = input("edges", ["design.edge"]);
+export const blendPicks = input("edges", [
+  "design.edge",
+  "design.face",
+  "design.feature",
+  "design.vertex",
+]);
 const line = { one: true, straight: true } as const;
 export const axis = input(
   "axis",

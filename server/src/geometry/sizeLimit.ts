@@ -23,6 +23,7 @@ import {
   volumeOf,
 } from "./kernel.js";
 import { computeEdgeNames } from "./naming.js";
+import { blendEdges } from "./blendEdges.js";
 import { shelledBody } from "./shell.js";
 
 class Untouched extends Error {}
@@ -66,6 +67,16 @@ function edgeRoom(state: EvalState, refs: EdgeRef[]): number {
   });
 }
 
+function blendRoom(state: EvalState, f: Sized<"fillet" | "chamfer">) {
+  let refs: EdgeRef[];
+  try {
+    refs = blendEdges(state, f);
+  } catch (error) {
+    throw new ValidationError((error as Error).message);
+  }
+  return edgeRoom(state, refs);
+}
+
 function reach(
   state: EvalState,
   bodyIds: Iterable<string>,
@@ -99,8 +110,8 @@ const same = (volume: number, expected: number) =>
   Math.abs(volume - expected) <= LINEAR_TOL * Math.max(expected, LINEAR_TOL);
 
 const BOUNDS: { [T in SizedFeature["type"]]: Bound<Sized<T>> } = {
-  fillet: { estimate: (state, f) => edgeRoom(state, f.edges) },
-  chamfer: { estimate: (state, f) => edgeRoom(state, f.edges) },
+  fillet: { estimate: blendRoom },
+  chamfer: { estimate: blendRoom },
   shell: {
     estimate(state, f) {
       const body = shelledBody(state, f);

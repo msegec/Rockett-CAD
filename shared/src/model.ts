@@ -207,10 +207,6 @@ export type SketchSolveStatus =
   | "fully_constrained"
   | "over_constrained";
 
-// ---------------------------------------------------------------------------
-// Features (timeline entries)
-// ---------------------------------------------------------------------------
-
 export type BooleanOperation = "newBody" | "join" | "cut" | "intersect";
 
 interface FeatureBase {
@@ -221,6 +217,13 @@ interface FeatureBase {
 
 interface ToolFeatureBase extends FeatureBase {
   targets?: string[];
+}
+
+interface BlendFeatureBase extends FeatureBase {
+  tangentChain?: boolean;
+  edges: EdgeRef[];
+  faces?: FaceRef[];
+  features?: string[];
 }
 
 export interface SketchFeature extends FeatureBase {
@@ -297,17 +300,13 @@ export interface LoftFeature extends ToolFeatureBase {
   operation: BooleanOperation;
 }
 
-export interface FilletFeature extends FeatureBase {
-  tangentChain?: boolean;
+export interface FilletFeature extends BlendFeatureBase {
   type: "fillet";
-  edges: EdgeRef[];
   radius: number;
 }
 
-export interface ChamferFeature extends FeatureBase {
-  tangentChain?: boolean;
+export interface ChamferFeature extends BlendFeatureBase {
   type: "chamfer";
-  edges: EdgeRef[];
   chamferType: ChamferType;
   distance: number;
   distance2?: number;

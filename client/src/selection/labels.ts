@@ -46,6 +46,7 @@ export function pickLabel(
     document && ranked(document.features, (f) => f.id).get(id)?.item;
   const featureName = (id: string) => feature(id)?.name;
   if (pick.kind === "axis") return `${pick.axis} Axis`;
+  if (pick.kind === "feature") return featureName(pick.featureId) || "Feature";
   if (pick.kind === "plane") {
     const ref = pick.ref;
     if (ref.kind === "origin") return `${ref.plane} Plane`;

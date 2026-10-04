@@ -304,7 +304,7 @@ it("picks a registered extension, refuses duplicate and invalid priority, and di
   cleanups.push(stop);
   dispose();
   expect(pick(centre, [provider.id])?.selection.kind).toBe("test.selection");
-  expect(pickProviders()).toHaveLength(11);
+  expect(pickProviders()).toHaveLength(12);
 });
 
 it("shares each body and overlay raycast within one pick and recomputes on the next", () => {

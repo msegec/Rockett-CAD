@@ -77,7 +77,8 @@ function selectFeatureBodies(featureId: string, additive: boolean) {
   const s = useStore.getState();
   const bodies = featureBodies(s.evaluation, featureId);
   const command = activeCommand(s);
-  if (command?.onSelection) return command.onSelection(bodies, additive);
+  const picks = [{ kind: "feature" as const, featureId }, ...bodies];
+  if (command?.onSelection) return command.onSelection(picks, additive);
   if (!isIdle(s) || bodies.length === 0) return;
   const had = new Set(s.selection.map(selectionKey));
   s.setSelection(
@@ -299,8 +300,6 @@ export async function openFeatureEditor(
 ): Promise<void> {
   if (useStore.getState().busy) return;
   const ui = featureUI(f.type);
-  if (ui?.open) {
-    if (viewport) await ui.open(f, viewport);
-    else await ui.open(f);
-  } else if (ui?.prefill) await openInDialog(ui, f);
+  if (ui?.open) await (viewport ? ui.open(f, viewport) : ui.open(f));
+  else if (ui?.prefill) await openInDialog(ui, f);
 }

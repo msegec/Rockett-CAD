@@ -259,6 +259,33 @@ body.
 - An axis edge or line that no longer resolves errors the feature and keeps
   the bodies.
 
+## Fillet and chamfer picks
+
+`blendEdges` in `server/src/geometry/blendEdges.ts`.
+
+- Schema 32 adds optional `faces` (face references) and `features` (feature
+  ids) to Fillet and Chamfer, and `edges` may be empty when either has an
+  entry. A blend with no pick is refused: "needs an edge, a face or a
+  feature". An earlier document migrates unchanged.
+- The picks are stored, never the edges they stand for. Each evaluation
+  derives the edges: explicit edges, then each face's sharp boundary edges,
+  then the sharp edges of every face a feature made (`faceMadeBy` in
+  `shared/src/topoRefs.ts`: names starting `f:{id}:`, `m:{id}:` or
+  `p{n}:{id}:`), each set in `compareNames` order. An edge picked twice
+  blends once, at its first place. An upstream edit that adds edges to a
+  picked face adds them to the blend.
+- Sharp means the two faces fold by 1 degree or more; a seam or a tangent
+  join is not sharp. `sharpEdgesByFace` in
+  `server/src/geometry/tangentEdges.ts` owns the test, which the tangent
+  chain shares. Tangent chain applies to derived edges.
+- A face pick resolves, signs and repairs like any face reference. A feature
+  pick is a feature input, so the blend blocks with that feature.
+- A face or feature with no sharp edges errors the blend and keeps the body:
+  "Fillet found no sharp edges on face {name}" or "Fillet found no sharp
+  edges on the faces of feature {id}", with Chamfer for a chamfer.
+- An edge-only blend passes its stored `edges` through unchanged. The size
+  hint estimates from the derived edges.
+
 ## Chamfer
 
 `evalChamfer` in `server/src/geometry/blend.ts`.
@@ -272,13 +299,14 @@ body.
   `angle` (above 0 and below 90 degrees) and `flip`. Both build only through
   `BRepFilletAPI_MakeChamfer`: `distance` lies on the measured face, and
   `distance2`, or `distance` times the tangent of `angle`, on the other.
-- The measured face of an edge is the one of its two faces bounded by more
-  of the selected edges; on a tie it is the first face in the edge name,
+- The measured face of an edge is a picked face when one of its two faces
+  is; otherwise the one bounded by more of the selected edges; on a tie it
+  is the first face in the edge name,
   `e[{faceA}|{faceB}]`. `flip` measures on the other face, so it flips every
   edge of a selection. Face names and the selection are stable, so the
   choice survives re-evaluation. A tangent chain follows the measured face of
   its first edge (`chamferContour.ts`).
-- `chamferOwns` in `shared/src/schema/coreFeatures.ts` says which of
+- `chamferOwns` in `shared/src/schema/chamferFields.ts` says which of
   `distance2`, `angle` and `flip` a type owns; an unknown type owns none. An
   edit that sets `chamferType` drops the fields the new type does not own.
   An edit that sends no bindings, a preview included, drops the feature's

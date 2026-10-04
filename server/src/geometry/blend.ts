@@ -44,6 +44,7 @@ import {
 } from "./naming.js";
 import { ShapeMap } from "./shapeMap.js";
 import { tangentEdges } from "./tangentEdges.js";
+import { blendEdges } from "./blendEdges.js";
 import {
   registerBodySolids,
   vertexPoint,
@@ -95,9 +96,8 @@ function collectEdges(
 }
 
 export function evalFillet(state: EvalState, f: FilletFeature): void {
-  if (f.edges.length === 0) throw new Error("no edges selected");
   if (f.radius <= 0) throw new Error("fillet radius must be positive");
-  blendPerBody(state, f.edges, (body, refs) =>
+  blendPerBody(state, blendEdges(state, f), (body, refs) =>
     filletBody(state, f, body, refs),
   );
 }
@@ -340,9 +340,8 @@ function chamferByEnvelope(
 }
 
 export function evalChamfer(state: EvalState, f: ChamferFeature): void {
-  if (f.edges.length === 0) throw new Error("no edges selected");
   if (f.distance <= 0) throw new Error("chamfer distance must be positive");
-  blendPerBody(state, f.edges, (body, refs) =>
+  blendPerBody(state, blendEdges(state, f), (body, refs) =>
     chamferBody(state, f, body, refs),
   );
 }

@@ -57,9 +57,13 @@ function sizePicks(draft: Feature | null): string | null {
         : null;
     case "fillet":
     case "chamfer":
-      return draft.edges.length &&
-        (draft.type === "fillet" || draft.chamferType === "equalDistance")
-        ? JSON.stringify([draft.edges, draft.tangentChain])
+      return draft.type === "fillet" || draft.chamferType === "equalDistance"
+        ? JSON.stringify([
+            draft.edges,
+            draft.faces,
+            draft.features,
+            draft.tangentChain,
+          ])
         : null;
     case "extrude":
       return draft.operation === "cut" &&

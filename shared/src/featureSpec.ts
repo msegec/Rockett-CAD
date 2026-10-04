@@ -30,6 +30,7 @@ interface RefTargets {
   point: PointRef;
   body: string;
   sketch: string;
+  feature: string;
 }
 
 type RefKind = keyof RefTargets;
@@ -111,6 +112,9 @@ export function featureInputs(f: Feature) {
         break;
       case "sketch":
         features.add(ref.sketch);
+        break;
+      case "feature":
+        features.add(ref.feature);
         break;
       case "profile":
         features.add(ref.profile.sketchId);
