@@ -1,4 +1,4 @@
-import { UNIT_DOT_TOL, type Vec3 } from "@rockett/shared";
+import { LINEAR_TOL, UNIT_DOT_TOL, type Vec3 } from "@rockett/shared";
 import type { ChamferSide } from "./blendModule.js";
 import { vertexPoint } from "./featureState.js";
 import { V } from "./frames.js";
@@ -77,7 +77,7 @@ export function cylinderOf(face: Shape, own: Own) {
   };
 }
 
-function radial(cylinder: { origin: Vec3; axis: Vec3 }, point: Vec3) {
+export function radial(cylinder: { origin: Vec3; axis: Vec3 }, point: Vec3) {
   const offset = V.sub(point, cylinder.origin);
   return V.sub(offset, V.scale(cylinder.axis, V.dot(offset, cylinder.axis)));
 }
@@ -113,10 +113,11 @@ function curveSides(
   original: Shape[],
   own: Own,
   sideOf: (face: Shape) => { normal: Vec3; radius: number } | null,
+  type = getKernel().GeomAbs_CurveType.GeomAbs_Line,
 ): PlanarSide[] | null {
   const k = getKernel();
   const guide = own(new k.BRepAdaptor_Curve_2(edge));
-  if (guide.GetType() !== k.GeomAbs_CurveType.GeomAbs_Line) return null;
+  if (guide.GetType() !== type) return null;
   const neighboring = original.flatMap((face) => {
     const occurrence = edges(face)
       .map(own)
@@ -153,5 +154,43 @@ export function chamferSides(edge: Shape, original: Shape[], own: Own) {
     original,
     own,
     (face) => planeSide(face) ?? cylinderSide(face, ends, own),
+  );
+}
+
+function circleSide(face: Shape, edge: Shape, own: Own) {
+  const k = getKernel(),
+    cylinder = cylinderOf(face, own);
+  if (!cylinder) return null;
+  const guide = own(new k.BRepAdaptor_Curve_2(edge)),
+    circle = own(guide.Circle()),
+    axis = own(own(circle.Axis()).Direction()),
+    centre = own(circle.Location()),
+    mid = own(
+      guide.EvalD0((guide.FirstParameter() + guide.LastParameter()) / 2),
+    );
+  if (
+    1 - Math.abs(V.dot([axis.X(), axis.Y(), axis.Z()], cylinder.axis)) >
+      UNIT_DOT_TOL ||
+    Math.abs(circle.Radius() - cylinder.radius) > LINEAR_TOL ||
+    V.norm(radial(cylinder, [centre.X(), centre.Y(), centre.Z()])) > LINEAR_TOL
+  )
+    return null;
+  return {
+    normal: V.scale(
+      V.normalize(radial(cylinder, [mid.X(), mid.Y(), mid.Z()])),
+      cylinder.outward,
+    ),
+    radius: cylinder.outward * cylinder.radius,
+  };
+}
+
+export function torusSides(edge: Shape, original: Shape[], own: Own) {
+  if (vertices(edge).map(own).length !== 1) return null;
+  return curveSides(
+    edge,
+    original,
+    own,
+    (face) => planeSide(face) ?? circleSide(face, edge, own),
+    getKernel().GeomAbs_CurveType.GeomAbs_Circle,
   );
 }

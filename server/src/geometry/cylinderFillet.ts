@@ -1,6 +1,6 @@
 import { LINEAR_TOL, UNIT_DOT_TOL, type EdgeRef } from "@rockett/shared";
 import { filletSection } from "./blendModule.js";
-import { chamferSides, cylinderOf } from "./blendSides.js";
+import { chamferSides, cylinderOf, torusSides } from "./blendSides.js";
 import type { ToolResult } from "./featureState.js";
 import { V } from "./frames.js";
 import {
@@ -25,6 +25,7 @@ import {
   type BlendStrip,
 } from "./planarFillet.js";
 import { planarFilletSurface } from "./planarFilletSurface.js";
+import { torusBlend } from "./torusFillet.js";
 
 function sameCylinder(a: Shape, b: Shape, own: Own) {
   const [first, second] = [cylinderOf(a, own), cylinderOf(b, own)];
@@ -71,7 +72,6 @@ function filletChain(
   own: Own,
 ) {
   const k = getKernel(),
-    original = faces(body.shape).map(own),
     contour = own(
       new k.BRepFilletAPI_MakeFillet(
         body.shape,
@@ -81,9 +81,32 @@ function filletChain(
   selected.forEach(({ edge }) => {
     if (!contour.Contour(edge)) contour.Add_2(radius, edge);
   });
-  const chain = [...selected, ...contourContinuations(contour, selected, own)];
-  return chain.every(({ edge }) => chamferSides(edge, original, own))
-    ? chain
+  return [...selected, ...contourContinuations(contour, selected, own)];
+}
+
+function chainBlend(
+  body: NamedBody,
+  chain: { edge: Shape; name: string }[],
+  radius: number,
+  featureId: string,
+  byName: Map<string, Shape>,
+  refs: EdgeRef[],
+  own: Own,
+) {
+  const original = faces(body.shape).map(own);
+  const along = (sides: typeof chamferSides) =>
+    chain.every(({ edge }) => sides(edge, original, own));
+  if (along(chamferSides))
+    return planarBlend(
+      body,
+      chain,
+      cylinderStrip(radius),
+      featureId,
+      byName,
+      refs,
+    );
+  return along(torusSides)
+    ? torusBlend(body, chain, { kind: "fillet", size: radius }, featureId, own)
     : null;
 }
 
@@ -126,16 +149,15 @@ export function cylinderFillet(
     const built = kernelCall("fillet", () =>
       scoped((own) => {
         const chain = filletChain(body, selected, radius, own);
-        const result =
-          chain &&
-          planarBlend(
-            body,
-            chain,
-            cylinderStrip(radius),
-            featureId,
-            byName,
-            refs,
-          );
+        const result = chainBlend(
+          body,
+          chain,
+          radius,
+          featureId,
+          byName,
+          refs,
+          own,
+        );
         if (!result) return null;
         own.keep(result.shape);
         return unnamePropagated(

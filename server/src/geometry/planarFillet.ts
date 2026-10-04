@@ -4,7 +4,7 @@ import { nativeOtherEnds, nativeSourceEnd } from "./nativeOtherEnds.js";
 import { mixedFilletHistory } from "./mixedFilletHistory.js";
 import { contourEndReferences } from "./blendEnds.js";
 import { LINEAR_TOL, type Vec3, type EdgeRef } from "@rockett/shared";
-import { filletBetweenPlanes } from "./blendModule.js";
+import { filletBetweenPlanes, type PlaneSide } from "./blendModule.js";
 import { planeSides, type PlanarSide } from "./blendSides.js";
 import { rejectSewnBlend } from "./blendValidity.js";
 import { NoCorner, vertexPoint, type ToolResult } from "./featureState.js";
@@ -43,28 +43,37 @@ export type BlendStrip = {
   sides(edge: Shape, original: Shape[], own: Own): PlanarSide[] | null;
 };
 
+export function planeFilletSection(
+  points: [Vec3, Vec3],
+  sides: [PlaneSide, PlaneSide],
+  radius: number,
+) {
+  const concave = sides.every(
+    (side, i) => V.dot(side.into, sides[1 - i]!.normal) > 0,
+  );
+  const orient = (side: PlaneSide) => ({
+    ...side,
+    normal: concave ? V.scale(side.normal, -1) : side.normal,
+  });
+  const section = filletBetweenPlanes(
+    points,
+    [orient(sides[0]), orient(sides[1])],
+    radius,
+  );
+  if (!section)
+    throw new NoCorner(
+      "no sharp corner to fillet: the faces meet smoothly there",
+    );
+  return section;
+}
+
 function filletStrip(radius: number): BlendStrip {
   return {
     kind: "fillet",
     size: radius,
     sides: planeSides,
     face(points, sides, axis, own, bounds) {
-      const concave = sides.every(
-        (side, i) => V.dot(side.into, sides[1 - i]!.normal) > 0,
-      );
-      const orient = (side: PlanarSide) => ({
-        ...side,
-        normal: concave ? V.scale(side.normal, -1) : side.normal,
-      });
-      const section = filletBetweenPlanes(
-        points,
-        [orient(sides[0]), orient(sides[1])],
-        radius,
-      );
-      if (!section)
-        throw new NoCorner(
-          "no sharp corner to fillet: the faces meet smoothly there",
-        );
+      const section = planeFilletSection(points, sides, radius);
       return planarFilletSurface(section, axis, radius, own, bounds).face;
     },
   };
@@ -114,11 +123,11 @@ function surfaces(
   });
 }
 
-type Cell = { face: Shape; name: string | undefined; made: boolean };
-function assembleBlend(
+export type Cell = { face: Shape; name: string | undefined; made: boolean };
+export function assembleBlend(
   cells: Cell[],
   body: NamedBody,
-  strip: BlendStrip,
+  strip: Pick<BlendStrip, "kind" | "size">,
   featureId: string,
   own: Own,
 ) {
@@ -270,6 +279,18 @@ export function planarBlend(
   return result;
 }
 
+export function copiedBody(body: NamedBody, original: Shape[], own: Own) {
+  const k = getKernel();
+  const copy = own(new k.BRepBuilderAPI_Copy_2(body.shape, false, false));
+  const copied = (shape: Shape) =>
+    own(own(copy.ModifiedShape(shape)).Oriented(shape.Orientation_1()));
+  return {
+    shape: own(copy.Shape()),
+    source: original.map((face) => own(k.TopoDS.Face_1(copied(face)))),
+    edge: (edge: Shape) => own(k.TopoDS.Edge_1(copied(edge))),
+  };
+}
+
 function ownedFilletTopology(
   body: NamedBody,
   selected: { edge: Shape; name: string }[],
@@ -282,17 +303,15 @@ function ownedFilletTopology(
   own: Own,
 ) {
   const k = getKernel();
-  const copy = own(new k.BRepBuilderAPI_Copy_2(body.shape, false, false));
-  const copied = (shape: Shape) =>
-    own(own(copy.ModifiedShape(shape)).Oriented(shape.Orientation_1()));
-  const source = original.map((face) => own(k.TopoDS.Face_1(copied(face))));
+  const copy = copiedBody(body, original, own);
+  const source = copy.source;
   const chosen = selected.map(({ edge, name }) => ({
-    edge: own(k.TopoDS.Edge_1(copied(edge))),
+    edge: copy.edge(edge),
     name,
   }));
   const contour = own(
     new k.BRepFilletAPI_MakeFillet(
-      own(copy.Shape()),
+      copy.shape,
       k.ChFi3d_FilletShape.ChFi3d_Rational,
     ),
   );
@@ -323,12 +342,7 @@ function ownedFilletTopology(
         featureId,
         strip.size,
         own,
-        new Map(
-          [...byName].map(([name, edge]) => [
-            name,
-            own(k.TopoDS.Edge_1(copied(edge))),
-          ]),
-        ),
+        new Map([...byName].map(([name, edge]) => [name, copy.edge(edge)])),
         refs,
         source,
       )
