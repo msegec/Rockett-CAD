@@ -1,7 +1,7 @@
 client/src/api.ts 647
 client/src/components/ControlsHelp.tsx ControlsHelp 102
 client/src/components/DraggablePanel.tsx DraggablePanel 130
-client/src/components/FeatureDialog.tsx DialogBody 108
+client/src/components/FeatureDialog.tsx DialogBody 104
 client/src/components/ModelTree.tsx 551
 client/src/components/ModelTree.tsx ModelTree 419
 client/src/components/ProjectItems.tsx 535
@@ -14,15 +14,15 @@ client/src/components/SketchOffsetPanel.tsx SketchOffsetPanel 169
 client/src/components/Timeline.tsx Timeline 159
 client/src/components/UsersPage.tsx AddUserForm 90
 client/src/components/UsersPage.tsx UserRow 85
-client/src/components/ViewportView.tsx 2454
-client/src/components/ViewportView.tsx ViewportView 2284
+client/src/components/ViewportView.tsx 2444
+client/src/components/ViewportView.tsx ViewportView 2283
 client/src/components/ViewportView.tsx dimLabelsRef.current.map() 82
 client/src/components/ViewportView.tsx handleHover 99
 client/src/components/ViewportView.tsx handlePrimaryUp 90
 client/src/components/ViewportView.tsx handleSketchClick 210
 client/src/components/ViewportView.tsx pointerToSketchUV 221
 client/src/components/ViewportView.tsx useEffect() 111
-client/src/components/ViewportView.tsx useEffect()#2 133
+client/src/components/ViewportView.tsx useEffect()#2 132
 client/src/features/constructionPlane.tsx PlaneForm 111
 client/src/features/referenceImage.tsx ReferenceImagePanel 193
 client/src/sketchEditing.ts sketchActions 226
@@ -30,8 +30,8 @@ client/src/sketchEdits.ts sketchEdits 166
 client/src/sketchTools.ts 1041
 client/src/store.ts 503
 client/src/store.ts useStore 262
-client/src/three/CadViewport.ts 905
-client/src/three/CadViewport.ts buildBody 88
+client/src/three/CadViewport.ts 902
+client/src/three/CadViewport.ts buildBody 86
 client/src/three/ViewCube.ts constructor 83
 client/src/three/revolveGhost.ts buildRevolveGhost 99
 client/src/three/sketchRender.ts buildSketch 152
@@ -39,8 +39,8 @@ client/src/three/toolPreview.ts updateToolPreview 147
 server/src/api/jobRoutes.ts createJobRoutes 119
 server/src/geometry/blend.ts built 209
 server/src/geometry/blend.ts chamferByEnvelope 219
-server/src/geometry/engine.ts 550
-server/src/geometry/features.ts 1018
+server/src/geometry/engine.ts 549
+server/src/geometry/features.ts 1017
 server/src/store/projectStore.ts 520
 shared/src/routes.ts 511
 shared/src/sketchModify.ts 735
