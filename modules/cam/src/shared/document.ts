@@ -1,7 +1,7 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import type { CadDocument, Route } from "@rockett/plugin-api";
-import { toolSchema } from "./tools.js";
+import { presetSchema, toolSchema } from "./tools.js";
 
 export const CAM_EXTENSION = "rockett.cam";
 export const CAM_VERSION = 1;
@@ -11,7 +11,33 @@ export const entry = Type.Object({ id: Type.String({ minLength: 1 }) });
 const docTool = Type.Intersect([
   entry,
   Type.Partial(toolSchema),
-  Type.Partial(Type.Object({ libraryRef: entry })),
+  Type.Partial(
+    Type.Object({
+      libraryRef: entry,
+      number: Type.Integer({ minimum: 1 }),
+      presets: Type.Array(presetSchema),
+    }),
+  ),
+]);
+
+const sha256 = Type.String({ pattern: "^[0-9a-f]{64}$" });
+
+const docOperation = Type.Intersect([
+  entry,
+  Type.Partial(
+    Type.Object({
+      type: Type.String(),
+      name: Type.String(),
+      toolId: Type.String(),
+      presetId: Type.String(),
+      params: Type.Record(Type.String(), Type.Unknown()),
+      lastGenerated: Type.Object({
+        fingerprint: sha256,
+        programSha256: sha256,
+        at: Type.String(),
+      }),
+    }),
+  ),
 ]);
 
 const xyz = Type.Tuple([Type.Number(), Type.Number(), Type.Number()]);
@@ -79,6 +105,9 @@ const docSetup = Type.Intersect([
       bodies: Type.Array(Type.String({ minLength: 1 })),
       stock: stockSchema,
       wcs: wcsSchema,
+      safeHeight: Type.Number(),
+      clearance: Type.Number(),
+      operations: Type.Array(docOperation),
     }),
   ),
 ]);

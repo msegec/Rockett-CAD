@@ -5,12 +5,17 @@ import {
   migrateCam,
   saveCam,
 } from "./src/shared/document.js";
+import { mountGenerate } from "./src/server/generate.js";
 import { mountLibrary } from "./src/server/library.js";
 
 export default defineServerModule({
-  activate({ register, userData }) {
+  activate({ register, userData, ...context }) {
     register.kernelJob(
       "rockett.cam.regions",
+      new URL("./kernel.ts", import.meta.url),
+    );
+    register.kernelJob(
+      "rockett.cam.generate",
       new URL("./kernel.ts", import.meta.url),
     );
     register.routeModule({
@@ -26,6 +31,7 @@ export default defineServerModule({
           return { label: "Edit CAM data" };
         });
         mountLibrary(api, userData);
+        mountGenerate(api, context);
       },
     });
   },
