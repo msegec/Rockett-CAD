@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Type } from "typebox";
 import {
   defineSetting,
+  moduleEnabledSetting,
   registerSettings,
   SETTINGS,
   SettingsError,
@@ -73,6 +74,17 @@ describe("registerSettings", () => {
   it("registers a plugin definition under its own section", () => {
     expect(SETTINGS.get("plugin.demo.size")).toBe(size);
     expect(SETTINGS.get("plugin.demo.size")!.section).toBe("plugin:demo");
+  });
+
+  it("names a dotted module id's setting under that id's section", () => {
+    const enabled = moduleEnabledSetting("acme.tools");
+    registerSettings([enabled]);
+    expect(SETTINGS.get("plugin.acme.tools.enabled")!.section).toBe(
+      "plugin:acme.tools",
+    );
+    expect(validateSettingValue(enabled.key, "user", false)).toMatchObject({
+      code: "scope",
+    });
   });
 
   it("rejects a key that is already registered or repeated in the batch", () => {

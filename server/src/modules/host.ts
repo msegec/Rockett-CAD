@@ -6,9 +6,14 @@ import {
 } from "@rockett/plugin-api";
 import {
   createRegistry,
+  moduleEnabledSetting,
   parseManifest,
   REGISTRY_ID,
   registerExtensionSpec,
+  registerSettings,
+  resolveSettings,
+  SETTINGS,
+  type LayerValues,
   type ModuleInfo,
 } from "@rockett/shared";
 import { registerImporter } from "../api/importers.js";
@@ -110,12 +115,19 @@ const disposeAll = (disposers: readonly Dispose[]) => {
   for (const dispose of disposers.toReversed()) dispose();
 };
 
+function enabled(moduleId: string, app: LayerValues) {
+  const setting = moduleEnabledSetting(moduleId);
+  if (!SETTINGS.has(setting.key)) registerSettings([setting]);
+  return resolveSettings({ app }).values[setting.key]?.value !== false;
+}
+
 async function load(
   module: HostModule,
   own: Dispose[],
   kernel: Kernel,
   store: ProjectStore,
   folders: FolderStore,
+  app: LayerValues,
 ): Promise<ModuleInfo> {
   let check;
   try {
@@ -128,6 +140,8 @@ async function load(
     };
   }
   const info = about(check.manifest);
+  if (!enabled(check.manifest.id, app))
+    return { ...info, status: "disabled", error: null };
   if (check.status === "incompatible")
     return { ...info, status: "incompatible", error: check.reason };
   try {
@@ -162,9 +176,10 @@ export async function loadModules(
 ): Promise<Dispose> {
   const disposers: Dispose[] = [];
   const reports: ModuleInfo[] = [];
+  const app = await store.settings.read({ scope: "app" });
   for (const module of modules) {
     const own: Dispose[] = [];
-    reports.push(await load(module, own, kernel, store, folders));
+    reports.push(await load(module, own, kernel, store, folders, app));
     disposers.push(() => disposeAll(own));
   }
   loaded = reports;

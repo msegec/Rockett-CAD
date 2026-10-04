@@ -11,7 +11,6 @@ export interface SettingsPatch {
 }
 
 export const SETTING_KEY = /^[a-z][A-Za-z0-9]*(\.[a-z][A-Za-z0-9]*)+$/;
-const PLUGIN_KEY = /^plugin\.([a-z][A-Za-z0-9]*)\.[a-z]/;
 
 export interface SettingDefinition<
   S extends TSchema = TSchema,
@@ -100,14 +99,15 @@ function valueError(
 }
 
 function sectionError({ key, section }: SettingDefinition): string | undefined {
-  const plugin = PLUGIN_KEY.exec(key)?.[1];
-  if (key.startsWith("plugin.") && plugin === undefined)
-    return `${key} must be named plugin.<id>.<name>.`;
-  if (plugin !== undefined && section !== `plugin:${plugin}`)
-    return `${key} belongs in section plugin:${plugin}, not ${section}.`;
-  if (plugin === undefined && section.startsWith("plugin:"))
-    return `${key} is in section ${section}, so it must be named plugin.<id>.<name>.`;
-  return undefined;
+  if (section.startsWith("plugin:")) {
+    const prefix = `plugin.${section.slice("plugin:".length)}.`;
+    return key.startsWith(prefix) && key.length > prefix.length
+      ? undefined
+      : `${key} is in section ${section}, so it must be named ${prefix}<name>.`;
+  }
+  return key.startsWith("plugin.")
+    ? `${key} belongs in section plugin:<id>, not ${section}.`
+    : undefined;
 }
 
 export function registerSettings(
@@ -317,6 +317,16 @@ export const SESSION_MAX_DAYS = defineSetting({
   default: 365,
   schema: Type.Integer(SESSION_DAY_RANGE),
 });
+
+export const moduleEnabledSetting = (moduleId: string) =>
+  defineSetting({
+    key: `plugin.${moduleId}.enabled`,
+    label: "Enabled",
+    scopes: ["app"],
+    section: `plugin:${moduleId}`,
+    default: true,
+    schema: Type.Boolean(),
+  });
 
 export const PANEL_MIN_PX = 160;
 

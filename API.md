@@ -288,8 +288,12 @@ module, in load order:
 ```
 
 - `status` is `loaded`, `failed`, `incompatible` or `disabled`.
-- `error` is null for `loaded`. Otherwise it is the manifest error, the
-  thrown registration or activation message, or the plugin API range reason.
+- `error` is null for `loaded` and `disabled`. Otherwise it is the manifest
+  error, the thrown registration or activation message, or the plugin API
+  range reason.
+- `disabled` means the app setting `plugin.<moduleId>.enabled` is `false`.
+  Only an admin can set it (`PATCH /settings`). The host reads it at startup,
+  so a change applies on the next start.
 - `server/src/modules/host.ts` loads every module before the router mounts
   route modules. A module that throws during activation keeps none of its
   registrations; the others still load.
