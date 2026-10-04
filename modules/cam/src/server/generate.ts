@@ -8,7 +8,7 @@ import type {
   ServerContext,
   User,
 } from "@rockett/plugin-api";
-import { operation, type GenerateInput } from "../kernel/generate.js";
+import type { GenerateInput } from "../kernel/generate.js";
 import {
   CAM_EXTENSION,
   CAM_VERSION,
@@ -16,6 +16,7 @@ import {
   type CamData,
 } from "../shared/document.js";
 import type { Program } from "../shared/ir.js";
+import { isOperation, OPERATION_VERSIONS } from "../shared/operations.js";
 import { toolSchema, type Tool } from "../shared/tools.js";
 import { programCache, type ProgramCache } from "./cache.js";
 
@@ -52,8 +53,8 @@ export function generator(
     { projectId, user, ...job }: GenerateRequest,
     run: KernelJobRun = {},
   ): Promise<{ fingerprint: string; program: Program }> {
-    const op = operation(job.operation.type);
-    if (!op) throw new Error(`operation ${job.operation.type} is unknown`);
+    const { type } = job.operation;
+    if (!isOperation(type)) throw new Error(`operation ${type} is unknown`);
     const model = new Map(
       (await context.bodies(projectId, user)).map((body) => [body.id, body]),
     );
@@ -66,7 +67,7 @@ export function generator(
       JSON.stringify(
         {
           engine: CAM_ENGINE,
-          generator: op.version,
+          generator: OPERATION_VERSIONS[type],
           bodies: bodies.map((body) => body.fingerprint),
           ...job,
         },
