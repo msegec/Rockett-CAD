@@ -1,7 +1,7 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import type { CadDocument, Route, SignedFaceRef } from "@rockett/plugin-api";
-import type { Program } from "./ir.js";
+import type { Program, Xy } from "./ir.js";
 import { presetSchema, toolSchema } from "./tools.js";
 
 export const CAM_EXTENSION = "rockett.cam";
@@ -175,6 +175,22 @@ export const programRoute: Route<
 > = {
   method: "GET",
   path: "/projects/:id/m/rockett/cam/setups/:setupId/operations/:operationId/program",
+};
+
+export const surfaceRoute: Route<
+  "/projects/:id/m/rockett/cam/setups/:setupId/surface/:tolerance",
+  unknown,
+  | {
+      min: Xy;
+      cellMm: number;
+      columns: number;
+      rows: number;
+      tops: (number | null)[];
+    }
+  | { reason: string }
+> = {
+  method: "GET",
+  path: "/projects/:id/m/rockett/cam/setups/:setupId/surface/:tolerance",
 };
 
 export const signRoute: Route<

@@ -9,6 +9,7 @@ import {
 import { mountGenerate } from "./src/server/generate.js";
 import { mountLibrary } from "./src/server/library.js";
 import { mountExport } from "./src/server/ncExport.js";
+import { mountSurface } from "./src/server/surface.js";
 
 export default defineServerModule({
   activate(context) {
@@ -19,6 +20,10 @@ export default defineServerModule({
     );
     register.kernelJob(
       "rockett.cam.generate",
+      new URL("./kernel.ts", import.meta.url),
+    );
+    register.kernelJob(
+      "rockett.cam.surfaceMesh",
       new URL("./kernel.ts", import.meta.url),
     );
     register.routeModule({
@@ -42,6 +47,7 @@ export default defineServerModule({
         });
         mountLibrary(api, userData);
         mountExport(api, context, mountGenerate(api, context));
+        mountSurface(api, context);
       },
     });
   },

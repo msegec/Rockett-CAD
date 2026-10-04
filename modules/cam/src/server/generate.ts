@@ -75,12 +75,12 @@ export const readModel = async (
     (await context.bodies(projectId, user)).map((body) => [body.id, body]),
   );
 
-async function prepare(model: Model, job: Job): Promise<Blocked | Ready> {
-  const { type } = job.operation;
-  if (!isOperation(type))
-    return { status: "error", reason: `operation ${type} is unknown` };
+export function setupBodies(
+  model: Model,
+  ids: readonly string[],
+): ServerBody[] | Blocked {
   const bodies: ServerBody[] = [];
-  for (const id of job.setup.bodies) {
+  for (const id of ids) {
     const body = model.get(id);
     if (!body)
       return {
@@ -94,6 +94,15 @@ async function prepare(model: Model, job: Job): Promise<Blocked | Ready> {
       };
     bodies.push(body);
   }
+  return bodies;
+}
+
+async function prepare(model: Model, job: Job): Promise<Blocked | Ready> {
+  const { type } = job.operation;
+  if (!isOperation(type))
+    return { status: "error", reason: `operation ${type} is unknown` };
+  const bodies = setupBodies(model, job.setup.bodies);
+  if ("reason" in bodies) return bodies;
   const fingerprint = await sha256(
     JSON.stringify(
       {

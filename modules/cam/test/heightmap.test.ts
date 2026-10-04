@@ -7,7 +7,13 @@ import type {
   ProjectView,
   ViewportLayer,
 } from "@rockett/plugin-api";
-import { simulateHeightmap } from "../src/client/heightmap.js";
+import {
+  cellSize,
+  gridOf,
+  simulateHeightmap,
+  simulateJob,
+  type SimulationJob,
+} from "../src/client/heightmap.js";
 import { STOCK_LAYER, stockLayer } from "../src/client/stockLayer.js";
 import {
   toolpathBarView,
@@ -17,6 +23,7 @@ import {
 import {
   CAM_EXTENSION,
   programRoute,
+  surfaceRoute,
   type CamData,
 } from "../src/shared/document.js";
 import type { Move, Program, Xyz } from "../src/shared/ir.js";
@@ -217,6 +224,11 @@ function camProject(programs: Record<string, Program>): ProjectView {
       route: { path: string },
       { operationId }: { operationId: string },
     ) => {
+      if (route.path === surfaceRoute.path) {
+        const grid = gridOf(STOCK, cellSize(STOCK));
+        const tops = Array<number>(grid.columns * grid.rows).fill(-5);
+        return { ...grid, tops };
+      }
       expect(route.path).toBe(programRoute.path);
       return { program: programs[operationId]! };
     }) as ProjectView["read"],
@@ -229,10 +241,10 @@ class InlineWorker {
   addEventListener(type: string, listener: (event: { data: unknown }) => void) {
     if (type === "message") this.listeners.add(listener);
   }
-  postMessage(job: { program: Program; stock: Box; cellMm: number }) {
+  postMessage(job: SimulationJob) {
     let data: unknown;
     try {
-      data = { map: simulateHeightmap(job.program, job.stock, job.cellMm) };
+      data = simulateJob(job);
     } catch (error) {
       data = { error };
     }
@@ -353,7 +365,7 @@ describe(`Simulate on layer ${STOCK_LAYER}`, () => {
     const heights = Array.from({ length: z.count }, (_, i) => z.getZ(i));
     expect(Math.min(...heights)).toBe(-2);
     expect(Math.max(...heights)).toBe(0);
-    expect(bar(preview).status).toEqual([]);
+    expect(bar(preview).status).toEqual(["No gouges"]);
     await preview.select({ setupId: "s1", operationId: "b" });
     expect(layer.meshes()).toEqual([]);
     expect(layer.freed).toContain(surface!.geometry);

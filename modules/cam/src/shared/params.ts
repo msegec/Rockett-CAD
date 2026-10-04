@@ -38,6 +38,7 @@ export const pocketParams = Type.Object({
 });
 
 export const MIN_TOLERANCE = 0.001;
+export const GOUGE_TOLERANCE = 0.01;
 
 const tolerance = Type.Number({
   title: "Tolerance",

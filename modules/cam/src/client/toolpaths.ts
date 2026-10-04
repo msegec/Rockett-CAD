@@ -6,10 +6,18 @@ import type {
   OpenProject,
   ProjectView,
 } from "@rockett/plugin-api";
-import { programRoute } from "../shared/document.js";
+import { programRoute, surfaceRoute } from "../shared/document.js";
 import type { Program } from "../shared/ir.js";
+import { GOUGE_TOLERANCE } from "../shared/params.js";
 import { stockBox, type Box, type Placement } from "../shared/setup.js";
-import { simulateInWorker, type Heightmap } from "./heightmap.js";
+import {
+  cellSize,
+  simulateInWorker,
+  type Gouge,
+  type GougeCheck,
+  type Heightmap,
+  type PartTop,
+} from "./heightmap.js";
 import { button, reason } from "./libraryParts.js";
 import { ROLES, programToSegments, type Segments } from "./segments.js";
 import { bodyBoxes, camRead } from "./setup.js";
@@ -19,16 +27,22 @@ export const TOOLPATH_LAYER = "rockett.cam.toolpaths";
 
 const TOKENS = { rapid: "err", cut: "accent", plunge: "warn", link: "ok" };
 const DASH_MM = 1;
-const CELL_MM = 0.5;
-const MAX_CELLS = 600 * 600;
 
 export type Selection = { setupId: string; operationId?: string } | null;
 type Path = { segments: Segments; modelToSetup: Placement };
 type Stock = Box & { modelToSetup: Placement };
+type Named = Gouge & { name: string };
+export type Checked =
+  { gouges: Named[]; gouged: Uint8Array } | { reason: string };
 export type Simulation =
   | { status: "idle" }
   | { status: "running" }
-  | { status: "done"; map: Heightmap; modelToSetup: Placement }
+  | {
+      status: "done";
+      map: Heightmap;
+      modelToSetup: Placement;
+      check: Checked;
+    }
   | { status: "failed"; reason: string };
 export type Preview = {
   selection: Selection;
@@ -53,12 +67,6 @@ const NOTHING = {
   reason: null,
   simulation: IDLE,
 };
-
-const cellSize = ({ min, max }: Box) =>
-  Math.max(
-    CELL_MM,
-    Math.sqrt(((max[0] - min[0]) * (max[1] - min[1])) / MAX_CELLS),
-  );
 
 function picked(open: OpenProject, selection: Selection) {
   const read = camRead(open);
@@ -126,13 +134,93 @@ function drawable(
   }
 }
 
+async function partTop(
+  project: ProjectView,
+  setupId: string,
+  tolerance: number,
+): Promise<PartTop> {
+  try {
+    return await project.read(surfaceRoute, {
+      setupId,
+      tolerance: String(tolerance),
+    });
+  } catch (error) {
+    return { reason: reason(error) };
+  }
+}
+
+function withNames(
+  check: GougeCheck,
+  operations: Chosen["operations"],
+): Checked {
+  if ("reason" in check) return check;
+  const name = (id: string) =>
+    operations.find((item) => item.id === id)?.name ?? id;
+  return {
+    gouged: check.gouged,
+    gouges: check.gouges.map((gouge) => ({
+      ...gouge,
+      name: name(gouge.operationId),
+    })),
+  };
+}
+
+function simulating(
+  project: ProjectView,
+  { setup, operations }: Chosen,
+  program: Program,
+  stock: Stock,
+) {
+  let worker: ReturnType<typeof simulateInWorker> | undefined;
+  let cancelled = false;
+  const tolerances = Object.fromEntries(
+    operations.flatMap(({ id, params }) =>
+      typeof params?.tolerance === "number"
+        ? [[id, params.tolerance] as const]
+        : [],
+    ),
+  );
+  const tolerance = Math.min(
+    ...operations.map(({ id }) => tolerances[id] ?? GOUGE_TOLERANCE),
+  );
+  const result = partTop(project, setup.id, tolerance).then(
+    (top): Promise<Simulation> | Simulation => {
+      if (cancelled)
+        return { status: "failed", reason: "simulation cancelled" };
+      worker = simulateInWorker({
+        program,
+        stock,
+        cellMm: cellSize(stock),
+        top,
+        tolerances,
+      });
+      return worker.result.then(
+        ({ map, check }): Simulation => ({
+          status: "done",
+          map,
+          modelToSetup: stock.modelToSetup,
+          check: withNames(check, operations),
+        }),
+        (error) => ({ status: "failed", reason: reason(error) }),
+      );
+    },
+  );
+  return {
+    result,
+    cancel() {
+      cancelled = true;
+      worker?.cancel();
+    },
+  };
+}
+
 export function toolpathPreview(project: ProjectView) {
   const listeners = new Set<() => void>();
   let state: Preview = { selection: null, ...NOTHING };
   let loaded = "";
   let tickets = 0;
   let unsubscribe: Dispose | undefined;
-  let run: ReturnType<typeof simulateInWorker> | undefined;
+  let run: ReturnType<typeof simulating> | undefined;
 
   const stop = () => {
     run?.cancel();
@@ -181,25 +269,20 @@ export function toolpathPreview(project: ProjectView) {
       set({ shown: Math.min(Math.max(Math.round(shown), 0), state.moves) });
     },
     async simulate() {
-      const { programs, stock } = state;
+      const { programs, stock, selection } = state;
+      const chosen = picked(project.get(), selection);
       const [first] = programs;
       stop();
-      if (!first || !stock) return;
-      const started = simulateInWorker(
-        {
-          ...first,
-          tools: programs.flatMap(({ tools }) => tools),
-          sections: programs.flatMap(({ sections }) => sections),
-        },
-        stock,
-        cellSize(stock),
-      );
+      if (!first || !stock || !chosen) return;
+      const program = {
+        ...first,
+        tools: programs.flatMap(({ tools }) => tools),
+        sections: programs.flatMap(({ sections }) => sections),
+      };
+      const started = simulating(project, chosen, program, stock);
       run = started;
       set({ simulation: { status: "running" } });
-      const simulation: Simulation = await started.result.then(
-        (map) => ({ status: "done", map, modelToSetup: stock.modelToSetup }),
-        (error) => ({ status: "failed", reason: reason(error) }),
-      );
+      const simulation = await started.result;
       if (run === started) set({ simulation });
     },
   };
@@ -261,6 +344,18 @@ const SIMULATION_TEXT = {
   done: null,
 } as const;
 
+function gougeText(simulation: Simulation) {
+  if (simulation.status !== "done") return null;
+  const { check } = simulation;
+  if ("reason" in check) return `Gouge check failed: ${check.reason}`;
+  if (!check.gouges.length) return "No gouges";
+  const listed = check.gouges.map(
+    ({ name, deepest, cells }) =>
+      `${name} ${deepest.toFixed(3)} mm deep in ${count(cells)} cells`,
+  );
+  return `Gouges: ${listed.join("; ")}`;
+}
+
 export function toolpathBarView(
   { name, moves, shown, reason: why, programs, simulation }: Preview,
   preview: ToolpathPreview,
@@ -269,6 +364,7 @@ export function toolpathBarView(
     simulation.status === "failed"
       ? simulation.reason
       : SIMULATION_TEXT[simulation.status];
+  const gouged = gougeText(simulation);
   return h(
     "div",
     { className: "timeline" },
@@ -298,6 +394,7 @@ export function toolpathBarView(
       ),
     why && h("span", { role: "status" }, why),
     simulated && h("span", { role: "status" }, simulated),
+    gouged && h("span", { role: "status" }, gouged),
   );
 }
 

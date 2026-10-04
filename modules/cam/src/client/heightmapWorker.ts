@@ -1,9 +1,12 @@
-import { simulateHeightmap } from "./heightmap.js";
+import { simulateJob } from "./heightmap.js";
 
-self.addEventListener("message", ({ data: { program, stock, cellMm } }) => {
+self.addEventListener("message", ({ data }) => {
   try {
-    const map = simulateHeightmap(program, stock, cellMm);
-    self.postMessage({ map }, { transfer: [map.heights.buffer] });
+    const done = simulateJob(data);
+    const { heights, cutBy } = done.map;
+    const transfer = [heights.buffer, cutBy.buffer];
+    if ("gouged" in done.check) transfer.push(done.check.gouged.buffer);
+    self.postMessage(done, { transfer });
   } catch (error) {
     self.postMessage({ error }, { transfer: [] });
   }

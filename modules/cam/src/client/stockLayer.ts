@@ -7,6 +7,7 @@ import type { Simulation, ToolpathPreview } from "./toolpaths.js";
 export const STOCK_LAYER = "rockett.cam.stock";
 
 const STOCK_TOKEN = "border";
+const GOUGE_TOKEN = "err";
 const AXIS_TOKENS = ["axis-x", "axis-y", "axis-z"] as const;
 const TRIAD_FRACTION = 0.25;
 
@@ -85,9 +86,23 @@ function drawn(open: OpenProject) {
   );
 }
 
+function mesh(
+  positions: THREE.BufferAttribute,
+  index: Uint32Array,
+  token: string,
+) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", positions);
+  geometry.setIndex(new THREE.BufferAttribute(index, 1));
+  geometry.computeVertexNormals();
+  const material = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide });
+  return new THREE.Mesh(geometry, themed(material, token));
+}
+
 function surfaceObject({
   map: { min, cellMm, columns, rows, heights },
   modelToSetup,
+  check,
 }: Extract<Simulation, { status: "done" }>) {
   const positions = new Float32Array(heights.length * 3);
   heights.forEach((z, c) => {
@@ -95,22 +110,29 @@ function surfaceObject({
     positions[3 * c + 1] = min[1] + (Math.floor(c / columns) + 0.5) * cellMm;
     positions[3 * c + 2] = z;
   });
-  const index: number[] = [];
+  const gouged = "gouged" in check ? check.gouged : undefined;
+  const quads = Math.max(0, columns - 1) * Math.max(0, rows - 1) * 6;
+  const plain = new Uint32Array(quads);
+  const red = new Uint32Array(quads);
+  let [p, r] = [0, 0];
   for (let j = 0; j + 1 < rows; j++)
     for (let i = 0; i + 1 < columns; i++) {
       const a = j * columns + i;
       const b = a + columns;
-      index.push(a, a + 1, b + 1, a, b + 1, b);
+      const quad = [a, a + 1, b + 1, a, b + 1, b];
+      if (gouged && quad.some((c) => gouged[c])) {
+        red.set(quad, r);
+        r += 6;
+      } else {
+        plain.set(quad, p);
+        p += 6;
+      }
     }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setIndex(index);
-  geometry.computeVertexNormals();
-  const material = themed(
-    new THREE.MeshStandardMaterial({ side: THREE.DoubleSide }),
-    STOCK_TOKEN,
-  );
-  return placeInModel(new THREE.Mesh(geometry, material), modelToSetup);
+  const shared = new THREE.BufferAttribute(positions, 3);
+  const object = new THREE.Group();
+  object.add(mesh(shared, plain.subarray(0, p), STOCK_TOKEN));
+  if (r) object.add(mesh(shared, red.subarray(0, r), GOUGE_TOKEN));
+  return placeInModel(object, modelToSetup);
 }
 
 export const stockLayer = (
