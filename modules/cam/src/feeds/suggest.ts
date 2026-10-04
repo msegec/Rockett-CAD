@@ -17,6 +17,7 @@ const MATERIALS: Record<string, Material> = data.materials;
 
 const POWER_SHARE = 0.8;
 const MIN_STEPDOWN_FRACTION = 0.1;
+const BAND_EDGE = 1e-6;
 
 export type Feeds = Pick<
   Preset,
@@ -32,6 +33,7 @@ export type Limit = {
     | "plungeCap"
     | "power"
     | "powerUnchecked"
+    | "outsideChart"
     | "preset";
   reason: string;
 };
@@ -49,14 +51,23 @@ function checkTool(tool: Tool) {
     );
 }
 
-function chartBand(material: Material, diameter: number): Band {
+function chartBand(
+  material: Material,
+  diameter: number,
+  limits: Limit[],
+): Band {
   const bands = CHARTS[material.chart] ?? [];
   let band: Band | undefined;
-  for (const row of bands) if (row.from <= diameter) band = row;
+  for (const row of bands) if (row.from - BAND_EDGE <= diameter) band = row;
   if (!band)
     throw new RangeError(
       `a ${diameter} mm tool is smaller than the ${bands[0]?.from} mm the ${material.name} chart starts at`,
     );
+  if (band === bands.at(-1) && diameter > band.from + BAND_EDGE)
+    limits.push({
+      limit: "outsideChart",
+      reason: `a ${diameter} mm tool is above the ${band.from} mm the ${material.name} chart ends at; it takes that size's chip load`,
+    });
   return band;
 }
 
@@ -161,8 +172,8 @@ export function suggestFeeds(
     ? MATERIALS[material]
     : undefined;
   if (!entry) throw new RangeError(`no feeds for material ${material}`);
-  const band = chartBand(entry, tool.diameter);
   const limits: Limit[] = [];
+  const band = chartBand(entry, tool.diameter, limits);
   const speed = spindleSpeed(entry, tool.diameter, machine, limits);
   const { rpm, cutFeed } = feedAtCap(tool, band, speed, machine, limits);
   let plungeFeed = cutFeed / tool.flutes;

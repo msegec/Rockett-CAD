@@ -29,6 +29,13 @@ const spindle300: MachineProfile = {
   ratedRpm: 12000,
 };
 
+const unbounded: MachineProfile = {
+  ...router,
+  maxFeedX: 1e9,
+  maxFeedY: 1e9,
+  maxFeedZ: 1e9,
+};
+
 const kinds = (result: Suggestion) => result.limits.map(({ limit }) => limit);
 
 const chipload = (result: Suggestion, tool: Tool) =>
@@ -133,6 +140,39 @@ describe("suggestFeeds", () => {
     expect(() =>
       suggestFeeds({ ...quarter, kind: "ball" }, "mdf", router),
     ).toThrow(/flat end mill/);
+  });
+
+  it("gives a 7/32 inch bit in wood the 7/32 inch chip load", () => {
+    const tool = { ...quarter, diameter: (7 / 32) * 25.4, flutes: 2 };
+    const result = suggestFeeds(tool, "softwood", unbounded);
+    expect(chipload(result, tool)).toBeCloseTo(0.07112, 9);
+  });
+
+  it("puts every inch band edge in its own band", () => {
+    const charts: Record<string, { from: number; chipload: number }[]> =
+      data.charts;
+    for (const [key, material] of Object.entries(data.materials))
+      for (const band of charts[material.chart]!) {
+        const sixtyfourths = Math.round((band.from / 25.4) * 64);
+        if (Math.abs(sixtyfourths - (band.from / 25.4) * 64) > 1e-9) continue;
+        const tool = { ...quarter, diameter: (sixtyfourths / 64) * 25.4 };
+        const result = suggestFeeds(tool, key, unbounded);
+        expect(chipload(result, tool), `${key} ${sixtyfourths}/64`).toBeCloseTo(
+          band.chipload,
+          9,
+        );
+        expect(kinds(result)).not.toContain("outsideChart");
+      }
+  });
+
+  it("names a tool above the last band as outside the chart", () => {
+    const tool = { ...quarter, diameter: (3 / 4) * 25.4, flutes: 2 };
+    const result = suggestFeeds(tool, "mdf", unbounded);
+    expect(chipload(result, tool)).toBeCloseTo(0.3048, 9);
+    const outside = result.limits.find(({ limit }) => limit === "outsideChart");
+    expect(outside?.reason).toMatch(
+      /above the 15.875 mm the MDF chart ends at/,
+    );
   });
 });
 
