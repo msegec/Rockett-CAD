@@ -22,7 +22,7 @@ import {
   type ToolImport,
 } from "../import/rockett.js";
 import { GrblPaste } from "./grblPaste.js";
-import { banner, button, reason, row, tree } from "./libraryParts.js";
+import { banner, button, empty, reason, row, tree } from "./libraryParts.js";
 import { schemaFields } from "./schemaForm.js";
 import { newTool, toolFields } from "./toolForm.js";
 
@@ -175,8 +175,7 @@ function sectionList<T extends Item>(state: State<T>, extra?: ReactNode) {
   const plural = section.title.toLowerCase();
   const rows = library?.items.map((item) =>
     row(
-      item.id,
-      item.name,
+      { key: item.id, name: item.name },
       button("Edit", `Edit ${item.name}`, pending, () =>
         state.setEditing(item),
       ),
@@ -188,16 +187,15 @@ function sectionList<T extends Item>(state: State<T>, extra?: ReactNode) {
       ),
     ),
   );
-  const empty = !library
-    ? !error && h("div", { className: "tree-empty" }, `Loading ${plural}...`)
-    : !rows?.length &&
-      h("div", { className: "tree-empty" }, `No ${plural} yet.`);
+  const placeholder = !library
+    ? !error && empty(`Loading ${plural}...`)
+    : !rows?.length && empty(`No ${plural} yet.`);
   const add = `Add ${section.noun}`;
   return h(
     Fragment,
     { key: section.noun },
     banner(error),
-    tree(section.title, empty, rows),
+    tree({ title: section.title }, placeholder, rows),
     library &&
       button(add, add, pending, () =>
         state.setEditing(section.create(library.items.length)),
@@ -227,8 +225,7 @@ function importRows<T extends Item>(
   const known = new Set(items.map((item) => item.id));
   return incoming.map((item) =>
     row(
-      item.id,
-      item.name,
+      { key: item.id, name: item.name },
       h(
         "span",
         null,
@@ -257,14 +254,23 @@ export function importDialog(ui: Ui, view: ImportView) {
         { className: "dialog-body" },
         banner(view.error),
         result.tools.length > 0 &&
-          tree("Tools", importRows(view.tools, result.tools, replace)),
+          tree(
+            { title: "Tools" },
+            importRows(view.tools, result.tools, replace),
+          ),
         result.presets.length > 0 &&
-          tree("Presets", importRows(view.presets, result.presets, replace)),
+          tree(
+            { title: "Presets" },
+            importRows(view.presets, result.presets, replace),
+          ),
         result.rejects.length > 0 &&
           tree(
-            "Rejected",
+            { title: "Rejected" },
             result.rejects.map((reject, index) =>
-              row(String(index), reject.item, h("span", null, reject.reason)),
+              row(
+                { key: String(index), name: reject.item },
+                h("span", null, reject.reason),
+              ),
             ),
           ),
         h(ui.CheckField, {

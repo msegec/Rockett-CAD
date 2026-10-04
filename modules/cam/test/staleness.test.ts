@@ -7,8 +7,12 @@ import type {
   User,
 } from "@rockett/plugin-api";
 import cam from "../server.js";
-import { generateRoute, statusRoute } from "../src/server/generate.js";
-import { CAM_EXTENSION, type CamData } from "../src/shared/document.js";
+import {
+  CAM_EXTENSION,
+  generateRoute,
+  statusRoute,
+  type CamData,
+} from "../src/shared/document.js";
 import { OPERATION_VERSIONS } from "../src/shared/operations.js";
 import { startKernel } from "./helpers/kernel.js";
 
@@ -179,11 +183,13 @@ async function edit(id: string, change: (doc: CadDocument) => void) {
 }
 
 const status = async (id: string) =>
-  routes.get(statusRoute.path)!(
-    await store.load(id),
-    { params: { id, ...at }, body: undefined },
-    { user: mark },
-  );
+  (
+    await routes.get(statusRoute.path)!(
+      await store.load(id),
+      { params: { id, setupId: at.setupId }, body: undefined },
+      { user: mark },
+    )
+  )[at.operationId];
 
 async function generate(id: string) {
   const doc = await store.load(id);
@@ -214,7 +220,7 @@ const stepover = (value: number) => (doc: CadDocument) => {
 const data = (doc: CadDocument) =>
   (doc.extensions[CAM_EXTENSION]!.data as CamData).setups[0]!;
 
-describe("GET .../setups/:setupId/operations/:operationId/status", () => {
+describe("GET .../setups/:setupId/status", () => {
   it("leaves the operation fresh after an edit to another body", async () => {
     const id = await project(parts());
     await generate(id);

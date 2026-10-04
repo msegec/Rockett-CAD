@@ -31,6 +31,7 @@ const docOperation = Type.Intersect([
       toolId: Type.String(),
       presetId: Type.String(),
       params: Type.Record(Type.String(), Type.Unknown()),
+      suppressed: Type.Boolean(),
       lastGenerated: Type.Object({
         fingerprint: sha256,
         programSha256: sha256,
@@ -127,6 +128,43 @@ export const saveCam: Route<"/projects/:id/m/rockett/cam", CamData> & {
   path: "/projects/:id/m/rockett/cam",
   body: camDataSchema,
   effect: "document",
+};
+
+const target = Type.Object({
+  setupId: Type.String({ minLength: 1 }),
+  operationId: Type.String({ minLength: 1 }),
+});
+
+export type Target = Static<typeof target>;
+
+export const generateRoute: Route<
+  "/projects/:id/m/rockett/cam/generate",
+  Target
+> & { readonly body: typeof target } = {
+  method: "POST",
+  path: "/projects/:id/m/rockett/cam/generate",
+  body: target,
+  effect: "document",
+};
+
+export const generateStaleRoute: Route<"/projects/:id/m/rockett/cam/generate-stale"> =
+  {
+    method: "POST",
+    path: "/projects/:id/m/rockett/cam/generate-stale",
+    effect: "document",
+  };
+
+export type OperationStatus =
+  | { status: "fresh" | "stale" | "never" | "suppressed" }
+  | { status: "error" | "missingReference"; reason: string };
+
+export const statusRoute: Route<
+  "/projects/:id/m/rockett/cam/setups/:setupId/status",
+  unknown,
+  Record<string, OperationStatus>
+> = {
+  method: "GET",
+  path: "/projects/:id/m/rockett/cam/setups/:setupId/status",
 };
 
 export type CamRead =

@@ -1,4 +1,5 @@
 import { defineClientModule } from "@rockett/plugin-api";
+import { manufactureBrowser } from "./src/client/browser.js";
 import { SETUP_PANEL, setupDialog } from "./src/client/setupDialog.js";
 import { stockLayer } from "./src/client/stockLayer.js";
 import { TOOL_PANEL, toolPanel } from "./src/client/toolPanel.js";
@@ -14,6 +15,7 @@ export default defineClientModule({
       label: "Manufacture",
       panels: [],
       selectionKinds: [],
+      tree: manufactureBrowser(context),
     });
     register.toolbarGroup({
       id: SETUP_GROUP,

@@ -5,7 +5,7 @@ import {
   MAX_SETTINGS_TEXT,
   importGrblSettings,
 } from "../import/grblSettings.js";
-import { banner, button, reason, row, tree } from "./libraryParts.js";
+import { banner, button, empty, reason, row, tree } from "./libraryParts.js";
 
 type GrblPasteProps = {
   ui: ClientUi;
@@ -35,7 +35,7 @@ export function GrblPaste({ ui, machine, edit }: GrblPasteProps) {
     setError(null);
     setMissing(result.missing);
   };
-  const rows = missing?.map((setting) => row(setting, setting));
+  const rows = missing?.map((setting) => row({ key: setting, name: setting }));
   return h(
     Fragment,
     null,
@@ -58,10 +58,8 @@ export function GrblPaste({ ui, machine, edit }: GrblPasteProps) {
         ),
     rows &&
       tree(
-        "Missing from $$",
-        rows.length > 0
-          ? rows
-          : h("div", { className: "tree-empty" }, "Every setting filled."),
+        { title: "Missing from $$" },
+        rows.length > 0 ? rows : empty("Every setting filled."),
       ),
   );
 }

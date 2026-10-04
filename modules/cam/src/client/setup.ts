@@ -59,7 +59,10 @@ export function withStockKind(
     : { kind, diameter: Math.max(x, y), height: z };
 }
 
-export function saveSetup(view: ProjectView, setup: DialogSetup) {
-  const data = camData(view.get());
-  return view.mutate(saveCam, { ...data, setups: [...data.setups, setup] });
-}
+export const editCam = async (
+  view: ProjectView,
+  edit: (data: CamData) => CamData,
+) => view.mutate(saveCam, edit(camData(view.get())));
+
+export const saveSetup = (view: ProjectView, setup: DialogSetup) =>
+  editCam(view, (data) => ({ ...data, setups: [...data.setups, setup] }));
