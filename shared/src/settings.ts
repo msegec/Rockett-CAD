@@ -42,6 +42,7 @@ export interface SettingTypes {
   "ui.treeWidth": number;
   "keys.overrides": Record<string, string[]>;
   "toolbar.layout": ToolbarLayout;
+  "layout.panels": PanelLayouts;
 }
 
 export type SettingOf<D extends SettingDefinition> = Static<D["schema"]>;
@@ -399,6 +400,49 @@ export const TOOLBAR_LAYOUT = defineSetting({
 
 export type ToolbarLayout = SettingOf<typeof TOOLBAR_LAYOUT>;
 
+const PANEL_SIZE = Type.Number({ minimum: 0 });
+
+export const LAYOUT_PANELS = defineSetting({
+  key: "layout.panels",
+  label: "Panel layout",
+  scopes: ["app", "user"],
+  section: "user",
+  default: {},
+  schema: Type.Record(
+    Type.String(),
+    Type.Record(
+      Type.String(),
+      Type.Union([
+        Type.Object(
+          {
+            kind: Type.Literal("floating"),
+            x: Type.Number(),
+            y: Type.Number(),
+            width: PANEL_SIZE,
+            height: PANEL_SIZE,
+          },
+          { additionalProperties: false },
+        ),
+        Type.Object(
+          {
+            kind: Type.Literal("docked"),
+            edge: Type.Enum(["left", "right", "bottom"]),
+            order: Type.Integer({ minimum: 0 }),
+            size: PANEL_SIZE,
+          },
+          { additionalProperties: false },
+        ),
+        Type.Object(
+          { kind: Type.Literal("closed") },
+          { additionalProperties: false },
+        ),
+      ]),
+    ),
+  ),
+});
+
+export type PanelLayouts = SettingOf<typeof LAYOUT_PANELS>;
+
 registerSettings([
   UNITS_LENGTH,
   VIEWPORT_PICK_TOLERANCE,
@@ -417,4 +461,5 @@ registerSettings([
   UI_TREE_WIDTH,
   KEYS_OVERRIDES,
   TOOLBAR_LAYOUT,
+  LAYOUT_PANELS,
 ]);
