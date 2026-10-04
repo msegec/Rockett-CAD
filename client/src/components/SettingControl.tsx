@@ -106,7 +106,7 @@ export function FieldControl({
         value={String(value)}
         options={(schema.enum ?? [])
           .filter((item): item is string => typeof item === "string")
-          .map((choice) => [choice, choice])}
+          .map((choice) => [choice, definition.labels?.[choice] ?? choice])}
         onChange={onChange}
       />
     );
@@ -137,6 +137,7 @@ export function FieldControl({
         onChange={onChange}
       />
     );
+  if (kind !== "text") return null;
   return (
     <label className="field">
       <span>{definition.label}</span>

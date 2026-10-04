@@ -170,6 +170,7 @@ async function mounted({
         return () => {};
       },
       kernelJob: () => () => {},
+      setting: () => () => {},
     },
     startKernelJob: async (_id, input) => {
       const { setup: s, operation } = input as Input;

@@ -323,6 +323,7 @@ async function mounted(r: Awaited<ReturnType<typeof rig>>) {
         return () => {};
       },
       kernelJob: () => () => {},
+      setting: () => () => {},
     },
     startKernelJob: r.context.startKernelJob,
     userData: () => ({ read: async () => null, write: async () => null! }),

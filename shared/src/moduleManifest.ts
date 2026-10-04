@@ -3,7 +3,12 @@ import { CORE_NAMESPACES } from "./featureSpec.js";
 import { REGISTRY_ID } from "./registry.js";
 import { NAME_LENGTH } from "./schema/coreFeatures.js";
 import { parse, ValidationError } from "./schema/validation.js";
-import { moduleHostSettings, SETTING_KEY } from "./settings.js";
+import {
+  moduleHostSettings,
+  registerSettings,
+  SETTING_KEY,
+  type SettingDefinition,
+} from "./settings.js";
 
 const API_RANGE = /^\^(\d+)\.(\d+)$/;
 const HOST_VERSION = /^(\d+)\.(\d+)\.\d+$/;
@@ -65,8 +70,7 @@ function contributionError(
   const valid = point === "settings" ? SETTING_KEY : REGISTRY_ID;
   const entries = contributes[point] ?? [];
   if (point === "settings") {
-    const owned = new Set<string>(moduleHostSettings(id).map(({ key }) => key));
-    const reserved = entries.findIndex((entry) => owned.has(entry));
+    const reserved = entries.findIndex(isHostSetting);
     if (reserved >= 0)
       return `contributes.settings.${reserved} ${entries[reserved]} is a host setting, so a module cannot define it`;
   }
@@ -75,6 +79,35 @@ function contributionError(
   );
   if (index < 0) return undefined;
   return `contributes.${point}.${index} ${entries[index]} must start with ${prefix} and name a valid id`;
+}
+
+const HOST_NAMES = moduleHostSettings("host").map(({ key }) =>
+  key.slice("plugin.host".length),
+);
+
+const isHostSetting = (key: string) =>
+  HOST_NAMES.some((name) => key.endsWith(name));
+
+export interface SettingOwner {
+  id: string;
+  contributes?: Partial<Record<string, readonly string[]>>;
+}
+
+export function registerModuleSetting(
+  { id, contributes }: SettingOwner,
+  definition: SettingDefinition,
+) {
+  const { key } = definition;
+  const prefix = `plugin.${id}.`;
+  if (!key.startsWith(prefix))
+    throw new Error(`setting ${key} must start with ${prefix}`);
+  if (isHostSetting(key))
+    throw new Error(
+      `setting ${key} is a host setting, so a module cannot define it`,
+    );
+  if (!contributes?.settings?.includes(key))
+    throw new Error(`setting ${key} is not in ${id} contributes.settings`);
+  return registerSettings([definition]);
 }
 
 function majorMinor(pattern: RegExp, value: string) {

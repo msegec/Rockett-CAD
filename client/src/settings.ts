@@ -91,7 +91,7 @@ export const useSettings = create<{
 
 let loadError: Record<SettingScope, string | null> = noErrors();
 
-function publish(): void {
+export function publish(): void {
   const shown = {
     app: values(layers.app),
     user: values(layers.user),

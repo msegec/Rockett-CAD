@@ -133,6 +133,7 @@ beforeAll(async () => {
         return () => {};
       },
       kernelJob: () => () => {},
+      setting: () => () => {},
     },
     startKernelJob: async () => {
       throw new Error("no job runs here");

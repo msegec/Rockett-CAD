@@ -118,6 +118,7 @@ beforeAll(async () => {
         return () => {};
       },
       kernelJob: () => () => {},
+      setting: () => () => {},
     },
     startKernelJob: async () => null,
     userData,

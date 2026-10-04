@@ -8,6 +8,7 @@ import type {
   Health,
   PathParams,
   Route,
+  SettingDefinition,
   User,
 } from "@rockett/shared";
 
@@ -23,10 +24,13 @@ export type {
   PathParams,
   Registry,
   Route,
+  SettingDefinition,
+  SettingScope,
+  SettingSection,
   User,
 } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.3.0";
+export const PLUGIN_API_VERSION = "0.4.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -125,6 +129,7 @@ export type StartKernelJob = (
 export interface ServerRegister {
   routeModule(module: RouteModule): Dispose;
   kernelJob(id: string, entry: URL): Dispose;
+  setting(definition: SettingDefinition): Dispose;
 }
 
 export interface UserDataEntry {
@@ -238,12 +243,20 @@ export interface Layer {
   mount(layer: ViewportLayer): void | Dispose;
 }
 
+export interface SettingsPage {
+  id: string;
+  title: string;
+  component: ComponentType;
+}
+
 export interface ClientRegister {
   command(command: Command): Dispose;
   toolbarGroup(group: ToolbarGroup): Dispose;
   panel(panel: Panel): Dispose;
   workbench(workbench: Workbench): Dispose;
   layer(layer: Layer): Dispose;
+  setting(definition: SettingDefinition): Dispose;
+  settingsPage(page: SettingsPage): Dispose;
 }
 
 export interface ProjectBody {
@@ -340,6 +353,7 @@ export interface ClientUi {
   }>;
   openPanel(id: string): void;
   closePanel(id: string): void;
+  openSettings(page: string): void;
   confirm(message: string): Promise<boolean>;
   download(file: { fileName: string; data: BlobPart; type: string }): void;
   pickFile(request: {

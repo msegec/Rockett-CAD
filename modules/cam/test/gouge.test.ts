@@ -130,6 +130,7 @@ async function surface(
         return () => {};
       },
       kernelJob: () => () => {},
+      setting: () => () => {},
     },
     startKernelJob: (id: string, input: unknown) => {
       jobs.push(id);

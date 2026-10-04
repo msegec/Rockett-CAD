@@ -162,6 +162,7 @@ beforeAll(async () => {
         return () => {};
       },
       kernelJob: () => () => {},
+      setting: () => () => {},
     },
     startKernelJob: (id: string, input: unknown) =>
       kernel.moduleJob(ENTRY, id, input, { shouldStop: () => false }),

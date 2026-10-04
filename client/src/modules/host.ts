@@ -9,6 +9,8 @@ import type {
   OpenProject,
   ProjectView,
   RouteResponse,
+  SettingDefinition,
+  SettingsPage,
   Workbench,
 } from "@rockett/plugin-api";
 import {
@@ -17,10 +19,12 @@ import {
   moduleHostSettings,
   nameSection,
   REGISTRY_ID,
+  registerModuleSetting,
   registerSettings,
   SETTINGS,
   type ModuleInfo,
   type Route,
+  type SettingOwner,
 } from "@rockett/shared";
 import { request, send, type MutationResponse } from "../api";
 import {
@@ -34,6 +38,10 @@ import { confirm } from "../components/ConfirmPanel";
 import { ContextMenu } from "../components/ContextMenu";
 import { pickFile, saveDownload } from "../download";
 import { DraggablePanel } from "../components/DraggablePanel";
+import {
+  openSettings,
+  registerSettingsPage,
+} from "../components/SettingsPanel";
 import { DialogFooter } from "../components/form/DialogFooter";
 import {
   AngleField,
@@ -44,7 +52,7 @@ import {
   TextAreaField,
   TextField,
 } from "../components/form/fields";
-import { getSetting, subscribe, useSetting } from "../settings";
+import { getSetting, publish, subscribe, useSetting } from "../settings";
 import {
   closePanel,
   openPanel,
@@ -120,6 +128,30 @@ function registerModuleLayer(moduleId: string, layer: Layer) {
       `layer ${layer.id} must start with ${moduleId}. and name a valid id`,
     );
   return registerLayer(guardedLayer(layer));
+}
+
+function registerClientSetting(
+  manifest: SettingOwner,
+  definition: SettingDefinition,
+) {
+  const dispose = registerModuleSetting(manifest, definition);
+  publish();
+  return () => {
+    dispose();
+    publish();
+  };
+}
+
+function registerModulePage(moduleId: string, page: SettingsPage) {
+  if (!page.id.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(page.id))
+    throw new Error(
+      `settings page ${page.id} must start with ${moduleId}. and name a valid id`,
+    );
+  return registerSettingsPage({
+    ...page,
+    section: `plugin:${moduleId}`,
+    component: bounded(page.id, page.title, page.component),
+  });
 }
 
 type Viewed = Pick<State, "projectId" | "document" | "evaluation">;
@@ -203,6 +235,7 @@ const ui: ClientUi = {
   ContextMenu,
   openPanel,
   closePanel,
+  openSettings: (page) => openSettings({ page }),
   confirm,
   download: ({ fileName, data, type }) =>
     saveDownload({ blob: new Blob([data], { type }), fileName }),
@@ -251,7 +284,8 @@ function hideable(own: Dispose[], moduleId: string) {
     };
 }
 
-function moduleContext(own: Dispose[], moduleId: string) {
+function moduleContext(own: Dispose[], manifest: SettingOwner) {
+  const moduleId = manifest.id;
   const track =
     <A extends unknown[]>(register: (...args: A) => Dispose) =>
     (...args: A) => {
@@ -276,6 +310,12 @@ function moduleContext(own: Dispose[], moduleId: string) {
     selectionKind: track(registerSelectionKind),
     pickProvider: track(registerPickProvider),
     layer: track((layer: Layer) => registerModuleLayer(moduleId, layer)),
+    setting: track((definition: SettingDefinition) =>
+      registerClientSetting(manifest, definition),
+    ),
+    settingsPage: track((page: SettingsPage) =>
+      registerModulePage(moduleId, page),
+    ),
   };
   return {
     register,
@@ -290,7 +330,7 @@ export interface ModuleContext extends ClientContext {
 }
 
 export interface HostModule {
-  manifest: { id: string; name: string };
+  manifest: SettingOwner & { name: string };
   client: { activate(context: ModuleContext): void | Promise<void> };
   icons?: Readonly<Record<string, string>>;
 }
@@ -323,7 +363,7 @@ export async function loadClientModules(
         nameSection(`plugin:${module.manifest.id}`, module.manifest.name),
       );
       registerModuleIcons(own, module);
-      await module.client.activate(moduleContext(own, module.manifest.id));
+      await module.client.activate(moduleContext(own, module.manifest));
       disposers.push(() => disposeAll(own));
     } catch (error) {
       disposeAll(own);

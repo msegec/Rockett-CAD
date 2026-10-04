@@ -11,6 +11,7 @@ import {
   parseManifest,
   REGISTRY_ID,
   registerExtensionSpec,
+  registerModuleSetting,
   registerSettings,
   resolveSettings,
   SETTINGS,
@@ -18,6 +19,8 @@ import {
   type FaceRef,
   type LayerValues,
   type ModuleInfo,
+  type ModuleManifest,
+  type SettingDefinition,
 } from "@rockett/shared";
 import { signAt } from "../api/featureRoutes.js";
 import { registerImporter } from "../api/importers.js";
@@ -77,7 +80,8 @@ const starter =
     });
   };
 
-function registrars(own: Dispose[], moduleId: string) {
+function registrars(own: Dispose[], manifest: ModuleManifest) {
+  const moduleId = manifest.id;
   const track =
     <A extends unknown[]>(register: (...args: A) => Dispose) =>
     (...args: A) => {
@@ -93,6 +97,9 @@ function registrars(own: Dispose[], moduleId: string) {
     extensionSpec: track(registerExtensionSpec),
     kernelJob: track((id: string, entry: URL) =>
       registerKernelJob(moduleId, id, entry),
+    ),
+    setting: track((definition: SettingDefinition) =>
+      registerModuleSetting(manifest, definition),
     ),
   };
 }
@@ -184,7 +191,7 @@ async function load(
     const { id } = check.manifest;
     const { storage } = store.documents.options;
     await module.server.activate({
-      register: registrars(own, id),
+      register: registrars(own, check.manifest),
       startKernelJob: starter(id, kernel),
       userData: moduleUserData(storage, id),
       files: moduleFiles(storage, id),

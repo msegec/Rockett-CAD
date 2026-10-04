@@ -326,8 +326,8 @@ module, in load order:
   so a change applies on the next start.
 - The user setting `plugin.<moduleId>.hidden` (`PATCH /me/settings`) hides
   the module's client UI for that user only. Its status stays `loaded`.
-- Both host settings belong to the host. A manifest that lists either in
-  `contributes.settings` fails `parseManifest`.
+- Keys ending in `.enabled` or `.hidden` belong to the host; a manifest that
+  lists one in `contributes.settings` fails `parseManifest`.
 - `server/src/modules/host.ts` loads every module before the router mounts
   route modules. A module that throws during activation keeps none of its
   registrations; the others still load.
@@ -335,10 +335,14 @@ module, in load order:
   its identity fields are strings; the rest are empty.
 - `activate` receives `ServerContext` (`plugin-api/src/index.ts`):
   `register`, `startKernelJob`, `userData`, `files`, `kernelVersion` and
-  `bodies`. `register.routeModule` and
-  `register.kernelJob` take `plugin-api` types; `exporter`, `importer`,
-  `featureKind` and `extensionSpec` still take core types. Each call is
-  tracked under the module's one disposer.
+  `bodies`. `register.routeModule`, `kernelJob` and `setting` take
+  `plugin-api` types; `exporter`, `importer`, `featureKind` and
+  `extensionSpec` take core types. Each call is tracked under one disposer.
+- `register.setting(definition)` takes a `SettingDefinition` whose key
+  starts with `plugin.<moduleId>.`, is listed in `contributes.settings` and
+  is not a host key, or the load fails naming the key. Settings routes then
+  validate its values with its schema. The client part registers the same
+  definition, so the Settings panel draws it under the module's section.
 - A route module's `projectRoute`, `projectMutation` and `userRoute`
   handlers get `params` from the route path and `body` as the route's
   request type when it has a body schema, `unknown` without one, and
@@ -413,10 +417,14 @@ module, in load order:
 - After sign-in, `client/src/modules/host.ts` activates the client part of
   each listed module that this route reports `loaded`, with `ClientContext`:
   `register`, `project`, `ui` and `request`. `register.command`,
-  `toolbarGroup`, `panel`, `workbench` and `layer` take `plugin-api` types;
-  `selectionKind` and `pickProvider` still take core types. Activation is atomic as on the server. A command
-  `Control` and a workbench `tree` and `bar` draw inside the panel error
-  boundary.
+  `toolbarGroup`, `panel`, `workbench`, `layer`, `setting` and
+  `settingsPage` take `plugin-api` types; `selectionKind` and `pickProvider`
+  take core types. Activation is atomic as on the server. A command
+  `Control`, a workbench `tree` and `bar` and a settings page draw inside the
+  panel error boundary.
+- `register.settingsPage({ id, title, component })` lists a page with id
+  `<moduleId>.<name>` under the module's Settings section, with the title
+  above `component`. `ui.openSettings(page)` opens Settings at that page.
 - A workbench's optional `tree` draws in the left dock and `bar` in the
   timeline row, in place of the model tree and timeline. The view toolbar
   group shows at the right end of every workbench.
@@ -441,8 +449,7 @@ module, in load order:
   `TextAreaField` and `ContextMenu`, so a module dialog uses the KIT fields
   and a module right-click menu is the core menu. `LengthField`
   takes millimetres and shows the user's length unit. `ui.openPanel(id)`
-  and `ui.closePanel(id)` open and close a panel through the core panel
-  state.
+  and `ui.closePanel(id)` open and close a core panel.
 - A number field's `value` may be `undefined`, which shows a blank box.
   With `onClear`, clearing the box calls it, so the module can store
   `undefined`; without it, a blank box shows "Enter a value" and calls

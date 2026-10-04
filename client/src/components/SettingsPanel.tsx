@@ -1,6 +1,14 @@
 import { pushKeyContext } from "../commands/keymap";
-import { useEffect, useState } from "react";
 import {
+  Fragment,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+} from "react";
+import { create } from "zustand";
+import {
+  createRegistry,
   SETTINGS,
   resolveSettings,
   sectionName,
@@ -27,6 +35,38 @@ import { SettingsTransfer } from "./SettingsTransfer";
 import { confirm } from "./ConfirmPanel";
 
 const scopes: SettingScope[] = ["app", "user", "project"];
+
+export interface SettingsPageEntry {
+  id: string;
+  section: string;
+  title: string;
+  component: ComponentType;
+}
+
+const pages = createRegistry<SettingsPageEntry>("settings page", (p) => p.id);
+
+export const registerSettingsPage = pages.register;
+
+type SettingsAt = { section: string; page: string | null; opened: number };
+
+const useSettingsAt = create<{ at: SettingsAt | null }>(() => ({ at: null }));
+
+let opened = 0;
+
+export function openSettings(at: { section?: string; page?: string } = {}) {
+  const page = at.page === undefined ? undefined : pages.get(at.page);
+  if (at.page !== undefined && !page)
+    throw new Error(`settings page ${at.page} is not registered`);
+  useSettingsAt.setState({
+    at: {
+      section: page?.section ?? at.section ?? "app",
+      page: page?.id ?? null,
+      opened: ++opened,
+    },
+  });
+}
+
+const closeSettings = () => useSettingsAt.setState({ at: null });
 
 function label(section: string): string {
   const name = sectionName(section);
@@ -289,17 +329,84 @@ function writableScopes(
   );
 }
 
-export function SettingsPanel({ onClose }: { onClose: () => void }) {
-  const definitions = [...SETTINGS.values()];
-  const sections = [
-    ...new Set([
-      "app",
-      "user",
-      "project",
-      ...definitions.map((definition) => definition.section),
-    ]),
-  ];
-  const [section, setSection] = useState("app");
+function CustomPage({ entry }: { entry: SettingsPageEntry }) {
+  return (
+    <div className="dialog-body settings-content">
+      <div className="settings-heading">
+        <h2>{entry.title}</h2>
+      </div>
+      <entry.component />
+    </div>
+  );
+}
+
+function SettingsNav({
+  custom,
+  section,
+  shown,
+  choose,
+}: {
+  custom: readonly SettingsPageEntry[];
+  section: string;
+  shown: SettingsPageEntry | undefined;
+  choose: (section: string, page?: string) => void;
+}) {
+  const sections = new Set([
+    "app",
+    "user",
+    "project",
+    ...[...SETTINGS.values()].map((definition) => definition.section),
+    ...custom.map((entry) => entry.section),
+  ]);
+  return (
+    <nav aria-label="Settings sections">
+      {[...sections].map((item) => {
+        const children = custom.filter((entry) => entry.section === item);
+        return (
+          <Fragment key={item}>
+            <button
+              className={item === section && !shown ? "active" : ""}
+              onClick={() => choose(item)}
+            >
+              {label(item)}
+            </button>
+            {children.length > 0 && (
+              <div className="settings-entry tree-children">
+                {children.map((entry) => (
+                  <button
+                    key={entry.id}
+                    className={entry === shown ? "active" : ""}
+                    onClick={() => choose(item, entry.id)}
+                  >
+                    {entry.title}
+                  </button>
+                ))}
+              </div>
+            )}
+          </Fragment>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function SettingsPanel({
+  onClose,
+  section: initialSection = "app",
+  page: initialPage = null,
+}: {
+  onClose: () => void;
+  section?: string;
+  page?: string | null;
+}) {
+  const custom = useSyncExternalStore(
+    pages.subscribe,
+    pages.snapshot,
+    pages.snapshot,
+  );
+  const [section, setSection] = useState(initialSection);
+  const [pageId, setPageId] = useState(initialPage);
+  const shown = custom.find((entry) => entry.id === pageId);
   const [scope, setScope] = useState<SettingScope>("app");
   const session = useSession();
   const projectOpen = useSettings((state) => state.projectOpen);
@@ -311,8 +418,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const selected = available.includes(scope)
     ? scope
     : (available.at(-1) ?? "app");
-  const choose = (next: string) => {
+  const choose = (next: string, nextPage?: string) => {
     setSection(next);
+    setPageId(nextPage ?? null);
     setScope(writableScopes(next, projectOpen, admin).at(-1) ?? "app");
   };
   useEffect(() => {
@@ -338,41 +446,47 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         </button>
       </div>
       <div className="settings-layout">
-        <nav aria-label="Settings sections">
-          {sections.map((item) => (
-            <button
-              key={item}
-              className={item === section ? "active" : ""}
-              onClick={() => choose(item)}
-            >
-              {label(item)}
-            </button>
-          ))}
-        </nav>
-        <PageContent
+        <SettingsNav
+          custom={custom}
           section={section}
-          selected={selected}
-          page={page}
-          available={available}
-          setScope={setScope}
+          shown={shown}
+          choose={choose}
         />
+        {shown ? (
+          <CustomPage entry={shown} />
+        ) : (
+          <PageContent
+            section={section}
+            selected={selected}
+            page={page}
+            available={available}
+            setScope={setScope}
+          />
+        )}
       </div>
     </div>
   );
 }
 
 export function SettingsButton() {
-  const [open, setOpen] = useState(false);
+  const at = useSettingsAt((state) => state.at);
   return (
     <>
       <button
         className="icon-btn"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        aria-expanded={at !== null}
+        onClick={() => (at ? closeSettings() : openSettings())}
       >
         Settings
       </button>
-      {open && <SettingsPanel onClose={() => setOpen(false)} />}
+      {at && (
+        <SettingsPanel
+          key={at.opened}
+          section={at.section}
+          page={at.page}
+          onClose={closeSettings}
+        />
+      )}
     </>
   );
 }

@@ -147,6 +147,7 @@ beforeAll(async () => {
         return () => {};
       },
       kernelJob: () => () => {},
+      setting: () => () => {},
     },
     startKernelJob: (id: string, input: unknown, run: KernelJobRun = {}) => {
       jobs.push(id);

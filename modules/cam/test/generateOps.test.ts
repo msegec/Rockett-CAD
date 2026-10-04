@@ -233,6 +233,7 @@ async function route() {
         return () => {};
       },
       kernelJob: () => () => {},
+      setting: () => () => {},
     },
     startKernelJob,
     userData: () => ({ read: async () => null, write: async () => null! }),

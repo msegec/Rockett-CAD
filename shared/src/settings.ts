@@ -22,6 +22,7 @@ export interface SettingDefinition<
   readonly section: SettingSection;
   readonly default: Static<S>;
   readonly schema: S;
+  readonly labels?: Readonly<Record<string, string>>;
 }
 
 export interface SettingTypes {
@@ -115,7 +116,7 @@ function sectionError({ key, section }: SettingDefinition): string | undefined {
 
 export function registerSettings(
   definitions: readonly SettingDefinition[],
-): void {
+): () => void {
   const errors: SettingError[] = [];
   const batch = new Set<string>();
   for (const definition of definitions) {
@@ -137,6 +138,11 @@ export function registerSettings(
   if (errors.length) throw new SettingsError(errors);
   for (const definition of definitions)
     registry.set(definition.key, definition);
+  return () => {
+    for (const definition of definitions)
+      if (registry.get(definition.key) === definition)
+        registry.delete(definition.key);
+  };
 }
 
 export function validateSettingValue(
@@ -218,6 +224,7 @@ export const VIEW_PROJECTION = defineSetting({
   section: "user",
   default: "orthographic",
   schema: Type.Enum(["orthographic", "perspective"]),
+  labels: { orthographic: "Orthographic", perspective: "Perspective" },
 });
 
 export const VIEW_ORBIT = defineSetting({
@@ -227,6 +234,7 @@ export const VIEW_ORBIT = defineSetting({
   section: "user",
   default: "trackball",
   schema: Type.Enum(["trackball", "turntable"]),
+  labels: { trackball: "Trackball", turntable: "Turntable" },
 });
 
 export const VIEW_ZOOM_STEP = defineSetting({
@@ -272,6 +280,7 @@ export const APPEARANCE_THEME = defineSetting({
   section: "user",
   default: "grey",
   schema: Type.Enum(["grey", "black"]),
+  labels: { grey: "Grey", black: "Black" },
 });
 
 export const APPEARANCE_ACCENT = defineSetting({

@@ -188,6 +188,7 @@ beforeAll(async () => {
         return () => {};
       },
       kernelJob: () => () => {},
+      setting: () => () => {},
     },
     startKernelJob: async (_id: string, input: unknown) => {
       const { id } = (input as { operation: { id: string } }).operation;

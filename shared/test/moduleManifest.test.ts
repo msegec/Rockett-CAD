@@ -63,15 +63,15 @@ describe("parseManifest", () => {
     );
   });
 
-  it.each(["enabled", "hidden"])(
-    "fails a setting the host owns: plugin.rockett.cam.%s",
+  it.each(["enabled", "hidden", "laser.enabled"])(
+    "fails a setting a host owns: plugin.rockett.cam.%s",
     (name) => {
       invalid(
         manifest({
           contributes: { settings: [`plugin.rockett.cam.${name}`] },
         }),
         new RegExp(
-          `contributes\\.settings\\.0 plugin\\.rockett\\.cam\\.${name} is a host setting`,
+          `contributes\\.settings\\.0 plugin\\.rockett\\.cam\\.${name.replace(".", "\\.")} is a host setting`,
         ),
       );
     },
