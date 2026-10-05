@@ -52,6 +52,7 @@ import "./features/sketch.js";
 import "./features/importStep.js";
 import "./features/importMesh.js";
 export * from "./placement.js";
+export * from "./assembly.js";
 export * from "./projection.js";
 export * from "./sketchModify.js";
 export * from "./sketchTrim.js";
