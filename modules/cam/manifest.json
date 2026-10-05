@@ -11,7 +11,8 @@
     "settings": [
       "plugin.rockett.cam.defaultMachine",
       "plugin.rockett.cam.safeHeight",
-      "plugin.rockett.cam.clearance"
+      "plugin.rockett.cam.clearance",
+      "plugin.rockett.cam.tolerance"
     ],
     "routes": ["rockett.cam.document"],
     "kernelJobs": ["rockett.cam.regions", "rockett.cam.generate"],

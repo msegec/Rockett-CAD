@@ -32,6 +32,7 @@ import {
   SETUP_TEXTS,
   setupList,
   useLibrary,
+  type List,
 } from "./opDialog.js";
 import { schemaFields } from "./schemaForm.js";
 import { editCam } from "./setup.js";
@@ -116,7 +117,7 @@ function setupChecks(
   );
 }
 
-function postChoices(own: Post[], picked: Setup[], postId: string) {
+export function postChoices(own: Post[], picked: Setup[], postId: string) {
   const copies = picked.flatMap(({ post }) => (post ? [post as PostCopy] : []));
   const others = [...own, ...copies].filter(
     ({ id }, i, all) =>
@@ -185,7 +186,7 @@ function postFields(
   );
 }
 
-const lostPost = (machine: MachineProfile | undefined, lost: boolean) =>
+export const lostPost = (machine: MachineProfile | undefined, lost: boolean) =>
   machine &&
   lost &&
   h(
@@ -193,6 +194,34 @@ const lostPost = (machine: MachineProfile | undefined, lost: boolean) =>
     { className: "field-hint" },
     `${machine.name}'s default post is gone. Pick a post.`,
   );
+
+function machineList(
+  library: List<MachineProfile>,
+  picked: Setup[],
+): List<MachineProfile> {
+  if (library.status !== "ready") return library;
+  const items = new Map(library.items.map((item) => [item.id, item]));
+  for (const { machine } of picked) if (machine) items.set(machine.id, machine);
+  return { status: "ready", items: [...items.values()] };
+}
+
+function starting(
+  settings: ClientContext["settings"],
+  ours: List<MachineProfile>,
+  picked: Setup[],
+  machineId: string,
+) {
+  const stored = picked.find(({ machine, postId }) => machine || postId);
+  const fallback =
+    ours.status === "ready" ? defaultMachine(settings, ours.items)?.id : "";
+  const machines = machineList(ours, picked);
+  const machine = chosen(
+    machines,
+    machineId || stored?.machine?.id || fallback || "",
+  );
+  const postId = (machineId ? undefined : stored?.postId) ?? machine?.post;
+  return { machines, machine, postId: postId ?? "" };
+}
 
 function useRun() {
   const [run, setRun] = useState<Run>({
@@ -227,24 +256,19 @@ export function ncDialog({ ui, project, request, settings }: ClientContext) {
   const close = () => ui.closePanel(NC_PANEL);
   return function NcDialog() {
     const open = useSyncExternalStore(project.subscribe, project.get);
-    const machines = useLibrary<MachineProfile>(request, "machines");
+    const ours = useLibrary<MachineProfile>(request, "machines");
     const posts = useLibrary<Post>(request, "posts");
     const [machineId, setMachineId] = useState("");
     const [choice, setChoice] = useState<Choice>({ off: [] });
     const { run, act } = useRun();
     const setups = setupList(open);
-    const machine = chosen(
-      machines,
-      machineId ||
-        (machines.status === "ready" &&
-          defaultMachine(settings, machines.items)?.id) ||
-        "",
-    );
-    const postId = choice.postId ?? machine?.post ?? "";
     const picked =
       setups.status === "ready"
         ? setups.items.filter(({ id }) => !choice.off.includes(id))
         : [];
+    const start = starting(settings, ours, picked, machineId);
+    const { machines, machine } = start;
+    const postId = choice.postId ?? start.postId;
     const own = posts.status === "ready" ? posts.items : [];
     const { options, post, library } = postChoices(own, picked, postId);
     const toolChange = post?.capabilities.toolChange
@@ -271,6 +295,10 @@ export function ncDialog({ ui, project, request, settings }: ClientContext) {
         await generateOperation(project, blocker.setupId, blocker.operationId);
         return run.blocked.filter((each) => each !== blocker);
       }, `${blocker.name} did not generate`);
+    const pickMachine = (id: string) => {
+      setMachineId(id);
+      setChoice(({ postId: _post, ...now }) => now);
+    };
     const turn = (id: string, on: boolean) =>
       setChoice((now) => ({
         ...now,
@@ -281,7 +309,7 @@ export function ncDialog({ ui, project, request, settings }: ClientContext) {
       { className: "dialog-body" },
       banner(run.error || null),
       setupChecks(ui, setups, choice.off, turn),
-      picker(ui, "Machine", machines, machine, setMachineId, MACHINE_TEXTS),
+      picker(ui, "Machine", machines, machine, pickMachine, MACHINE_TEXTS),
       machine && postFields(ui, options, postId, post, toolChange, setChoice),
       blockedList(
         run.blocked,

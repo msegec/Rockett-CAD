@@ -339,7 +339,7 @@ class JobWorker {
   terminate() {}
 }
 
-function project(floor: number, top: unknown): ProjectView {
+function project(floor: number, top: unknown, tolerance?: number): ProjectView {
   const { sections, ...rest } = program(floor);
   const programs = Object.fromEntries(
     sections.map((section) => [
@@ -351,7 +351,10 @@ function project(floor: number, top: unknown): ProjectView {
     { id: "outline", name: "Outline", type: "rockett.cam.contour" },
     { id: "pocket", name: "Pocket A", type: "rockett.cam.pocket" },
   ];
-  const data = { setups: [{ ...setup, operations }], tools: [] };
+  const data = {
+    setups: [{ ...setup, operations, ...(tolerance && { tolerance }) }],
+    tools: [],
+  };
   const open = {
     projectId: "p1",
     document: {
@@ -418,10 +421,10 @@ describe("gouges in the toolpath bar and the stock layer", () => {
   });
   afterAll(() => vi.unstubAllGlobals());
 
-  it("lists the deepest gouge per operation and draws its cells in err", async () => {
+  it("lists the deepest gouge per operation at 0.01 mm whatever the setup tolerance, and draws its cells in err", async () => {
     const top = await surface(String(GOUGE_TOLERANCE));
-    const shown = async (floor: number) => {
-      const view = project(floor, top);
+    const shown = async (floor: number, tolerance?: number) => {
+      const view = project(floor, top, tolerance);
       const preview = toolpathPreview(view);
       const meshes = layer(view, preview);
       await preview.select({ setupId: "s1" });
@@ -442,5 +445,10 @@ describe("gouges in the toolpath bar and the stock layer", () => {
       status: ["No gouges"],
       meshes: ["border"],
     });
+    const loose = await shown(-4.3, 0.5);
+    expect(loose.status[0]).toMatch(
+      /^Gouges: Pocket A 0\.300 mm deep in [\d,]+ cells$/,
+    );
+    expect(loose.meshes).toEqual(["border", "err"]);
   }, 120_000);
 });

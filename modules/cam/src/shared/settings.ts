@@ -1,5 +1,6 @@
 import { Type } from "typebox";
 import type { ModuleSettings, SettingDefinition } from "@rockett/plugin-api";
+import { GOUGE_TOLERANCE, MIN_TOLERANCE } from "./params.js";
 
 const setting = (
   name: string,
@@ -28,11 +29,22 @@ export const CLEARANCE = setting("clearance", "Default clearance (mm)", {
   schema: Type.Number(),
 });
 
-export const CAM_SETTINGS = [DEFAULT_MACHINE, SAFE_HEIGHT, CLEARANCE];
+export const TOLERANCE = setting("tolerance", "Default tolerance (mm)", {
+  default: GOUGE_TOLERANCE,
+  schema: Type.Number({ minimum: MIN_TOLERANCE }),
+});
+
+export const CAM_SETTINGS = [
+  DEFAULT_MACHINE,
+  SAFE_HEIGHT,
+  CLEARANCE,
+  TOLERANCE,
+];
 
 export const setupDefaults = (settings: ModuleSettings) => ({
   safeHeight: settings.get<number>(SAFE_HEIGHT.key),
   clearance: settings.get<number>(CLEARANCE.key),
+  tolerance: settings.get<number>(TOLERANCE.key),
 });
 
 export const defaultMachine = <T extends { id: string }>(

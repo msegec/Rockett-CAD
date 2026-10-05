@@ -252,23 +252,39 @@ const postOf = (setup: Setup, postId: string) =>
     ? copiedPost(setup.post as PostCopy)
     : undefined);
 
+const machineOf = (
+  setup: Setup,
+  machineId: string,
+  library: MachineProfile | undefined,
+): MachineProfile | undefined => {
+  if (setup.machine?.id !== machineId) return library;
+  const { libraryRef: _ref, ...machine } = setup.machine;
+  return machine;
+};
+
 async function targetOf(
   context: Pick<ServerContext, "userData" | "kernelVersion">,
   user: User,
   params: { machineId: string; toolChange: string },
-): Promise<Omit<Target, "post"> | string> {
+  setups: Setup[],
+): Promise<Map<Setup, Omit<Target, "post">> | string> {
   const { machineId, toolChange } = params;
   const machines = context.userData("machines", 1);
-  const machine = await libraryItem(machines, user, machineId, machineSchema);
-  if (!machine) return `machine ${machineId} is not in your library`;
+  const library = await libraryItem(machines, user, machineId, machineSchema);
+  const chosen = setups.map((setup) => machineOf(setup, machineId, library));
+  const lost = setups[chosen.indexOf(undefined)];
+  if (lost)
+    return `${lost.name ?? lost.id}: machine ${machineId} is not in your library`;
   if (!Value.Check(machineSchema.properties.toolChange, toolChange))
     return `tool change ${toolChange} is not perFile or m6`;
   const kernel = context.kernelVersion;
-  return {
-    machine,
+  const common = {
     toolChange: toolChange === "m6",
     kernel: kernel ? `OCCT ${kernel.occt} ${kernel.commit}` : "unknown",
   };
+  return new Map(
+    setups.map((setup, i) => [setup, { ...common, machine: chosen[i]! }]),
+  );
 }
 
 export function mountExport(
@@ -279,10 +295,10 @@ export function mountExport(
 ) {
   api.projectRoute(ncRoute, async (doc, { params }, { user }) => {
     const data = cam(doc);
-    const chosen = await targetOf(context, user, params);
-    if (typeof chosen === "string") return { reason: chosen };
     const setups = chosenSetups(data, params.setupIds);
     if (typeof setups === "string") return { reason: setups };
+    const targets = await targetOf(context, user, params, setups);
+    if (typeof targets === "string") return { reason: targets };
     const posts = new Map(setups.map((s) => [s, postOf(s, params.postId)]));
     if ([...posts.values()].includes(undefined))
       return { reason: `post ${params.postId} is not installed` };
@@ -297,7 +313,7 @@ export function mountExport(
     let room = maxBytes;
     for (const { setup, made } of gathered) {
       if (!made.length) continue;
-      const target = { ...chosen, post: posts.get(setup)! };
+      const target = { ...targets.get(setup)!, post: posts.get(setup)! };
       const out = await posted(model, data, setup, made, target, room).catch(
         (error: unknown): Posted => ({
           blocked: [

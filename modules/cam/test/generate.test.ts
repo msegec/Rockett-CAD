@@ -427,7 +427,7 @@ describe("POST /projects/:id/m/rockett/cam/generate", () => {
     expect(generated(doc).programSha256).toBe(proof.programSha256);
   });
 
-  it("reads a v1 project from before operations and saves it as v2", async () => {
+  it("reads a v1 project from before operations and saves it as v3", async () => {
     const r = await rig();
     const route = await mounted(r);
     const { safeHeight: _s, clearance: _c, ...setup } = request.setup;
@@ -443,7 +443,7 @@ describe("POST /projects/:id/m/rockett/cam/generate", () => {
     );
     expect(data(doc)).toEqual(before);
     await route.save(doc, data(doc));
-    expect(doc.extensions).toEqual(project(before, 2).extensions);
+    expect(doc.extensions).toEqual(project(before, 3).extensions);
     expect(r.jobs).toEqual([]);
   });
 });

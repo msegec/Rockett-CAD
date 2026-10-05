@@ -14,11 +14,14 @@ import {
   type StockSetup,
 } from "../shared/setup.js";
 
+type DocSetup = CamData["setups"][number];
+
 export type DialogSetup = Pick<
   Setup,
   "id" | "name" | "safeHeight" | "clearance"
 > &
-  StockSetup;
+  StockSetup &
+  Pick<DocSetup, "material" | "machine" | "postId" | "post" | "tolerance">;
 
 export const camRead = ({ document }: OpenProject): CamRead =>
   migrateCam(document?.extensions[CAM_EXTENSION]);
@@ -36,7 +39,7 @@ const MARGINS = { xMin: 2, xMax: 2, yMin: 2, yMax: 2, zMin: 2, zMax: 1 };
 
 export function newSetup(
   project: OpenProject,
-  defaults: Pick<Setup, "safeHeight" | "clearance">,
+  defaults: Pick<DialogSetup, "safeHeight" | "clearance" | "tolerance">,
 ): DialogSetup {
   return {
     id: crypto.randomUUID(),

@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+import { promises as fs, readFileSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -9,12 +9,23 @@ import type {
   OpenProject,
   ProjectView,
 } from "@rockett/plugin-api";
-import { CAM_EXTENSION, migrateCam } from "../src/shared/document.js";
+import {
+  CAM_EXTENSION,
+  migrateCam,
+  type CamData,
+} from "../src/shared/document.js";
 import { newSetup, saveSetup } from "../src/client/setup.js";
 import { CLEARANCE, SAFE_HEIGHT } from "../src/shared/settings.js";
 
 const core = (file: string) =>
   import(new URL(`../../../server/src/${file}`, import.meta.url).href);
+
+const camV2 = JSON.parse(
+  readFileSync(
+    new URL("./fixtures/documents/cam-v2.json", import.meta.url),
+    "utf8",
+  ),
+);
 
 const bodies = [
   { id: "b1", name: "Plate", bbox: { min: [0, 0, 0], max: [40, 20, 5] } },
@@ -29,6 +40,8 @@ let dataDir = "";
 let origin = "";
 let cookie = "";
 let store: any;
+let storage: any;
+let backupNamespace: any;
 let ownerId = "";
 let server: http.Server;
 let unload = () => {};
@@ -87,6 +100,7 @@ beforeAll(async () => {
     { cookieConfig },
     { loadModules },
     { serverModules },
+    jsonStore,
   ] = await Promise.all([
     core("app.ts"),
     core("store/projectStore.ts"),
@@ -99,8 +113,10 @@ beforeAll(async () => {
     core("auth/cookie.ts"),
     core("modules/host.ts"),
     import(new URL("../../index.server.ts", import.meta.url).href),
+    core("store/jsonStore.ts"),
   ]);
-  const storage = new LocalStorage(dataDir, fs);
+  backupNamespace = jsonStore.backupNamespace;
+  storage = new LocalStorage(dataDir, fs);
   store = new ProjectStore(storage, validateDocument);
   const folders = new FolderStore(storage);
   unload = await loadModules(
@@ -141,10 +157,10 @@ afterAll(async () => {
   await fs.rm(dataDir, { recursive: true, force: true });
 });
 
-async function project(data?: unknown): Promise<CadDocument> {
+async function project(data?: unknown, version = 1): Promise<CadDocument> {
   const doc = await store.create("Plate", ownerId);
   if (data === undefined) return doc;
-  doc.extensions = { [CAM_EXTENSION]: { version: 1, data } };
+  doc.extensions = { [CAM_EXTENSION]: { version, data } };
   await store.save(doc, ownerId);
   return doc;
 }
@@ -174,12 +190,12 @@ describe("setup dialog save", () => {
       clearance: 3,
     });
     expect((await load(doc.id)).extensions[CAM_EXTENSION]).toEqual({
-      version: 2,
+      version: 3,
       data: { setups: [setup], tools: [] },
     });
   });
 
-  it("loads a v1 document saved before setup fields unchanged and keeps it as v2 on save", async () => {
+  it("loads a v1 document saved before setup fields unchanged and keeps it as v3 on save", async () => {
     const doc = await project(preSetupData);
     const loaded = await load(doc.id);
     expect(migrateCam(loaded.extensions[CAM_EXTENSION])).toEqual({
@@ -193,8 +209,40 @@ describe("setup dialog save", () => {
     await saveSetup(view, setup);
     expect(await historyLength(doc.id)).toBe(before + 1);
     expect((await load(doc.id)).extensions[CAM_EXTENSION]).toEqual({
-      version: 2,
+      version: 3,
       data: { ...preSetupData, setups: [...preSetupData.setups, setup] },
     });
+  });
+
+  it("loads a v2 document unchanged, backs it up before its first v3 save and stores no machine, post or tolerance on its setups", async () => {
+    const doc = await project(structuredClone(camV2.data), camV2.version);
+    const loaded = await load(doc.id);
+    expect(loaded.extensions[CAM_EXTENSION]).toEqual(camV2);
+    expect(migrateCam(loaded.extensions[CAM_EXTENSION])).toEqual({
+      status: "ready",
+      data: camV2.data,
+    });
+    const view = await projectView(doc.id);
+    const setup = newSetup(view.get(), defaults);
+    await saveSetup(view, setup);
+    const backups = backupNamespace(storage, store.documents.dir(doc.id));
+    const names = await backups.names();
+    expect(names).toEqual([
+      expect.stringMatching(/^rockett\.cam\.v2\.v3-[0-9a-f]{16}$/),
+    ]);
+    const file = (await backups.verify(names[0]!)).find(
+      ([name]: [string]) => name === `documents/${doc.id}.json`,
+    );
+    const backed = JSON.parse(
+      (await backups.verified(names[0]!, ...file!)).toString("utf8"),
+    );
+    expect(backed.extensions[CAM_EXTENSION]).toEqual(camV2);
+    const after = (await load(doc.id)).extensions[CAM_EXTENSION]!;
+    expect(after).toEqual({
+      version: 3,
+      data: { ...camV2.data, setups: [...camV2.data.setups, setup] },
+    });
+    for (const key of ["machine", "postId", "tolerance"])
+      expect((after.data as CamData).setups[0]).not.toHaveProperty(key);
   });
 });

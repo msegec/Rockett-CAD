@@ -377,7 +377,7 @@ describe("GET /projects/:id/m/rockett/cam/nc", () => {
     const route = await mounted();
     const doc = project(setup("s1", "Setup 1"));
     expect(await route.nc(doc, "s1", { machineId: "m2" })).toEqual({
-      reason: "machine m2 is not in your library",
+      reason: "Setup 1: machine m2 is not in your library",
     });
     expect(await route.nc(doc, "s1", { postId: "fanuc" })).toEqual({
       reason: "post fanuc is not installed",

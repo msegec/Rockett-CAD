@@ -55,7 +55,7 @@ describe("CAM data validator", () => {
 
 describe("CAM migration hook", () => {
   it("reads a project saved before CAM as empty data", () => {
-    expect(CAM_VERSION).toBe(2);
+    expect(CAM_VERSION).toBe(3);
     expect(migrateCam(undefined)).toEqual({
       status: "ready",
       data: { setups: [], tools: [] },
@@ -83,12 +83,12 @@ describe("CAM migration hook", () => {
   });
 
   it("keeps newer data unchanged and read only", () => {
-    const stored = { version: 3, data: { future: true } };
+    const stored = { version: 4, data: { future: true } };
     expect(migrateCam(stored)).toEqual({
       status: "kept",
-      reason: "CAM data version 3 is newer than this module reads (2)",
+      reason: "CAM data version 4 is newer than this module reads (3)",
     });
-    expect(stored).toEqual({ version: 3, data: { future: true } });
+    expect(stored).toEqual({ version: 4, data: { future: true } });
   });
 
   it.each([
