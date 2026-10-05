@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { ApiErrorCode } from "@rockett/shared";
+import { StoreError } from "@rockett/shared";
 import {
   migrate,
   NO_BLOBS,
@@ -15,14 +15,7 @@ import { readFirst, storagePath, type Storage } from "./storage.js";
 export const BACKUP_RECORD = "migrating.json";
 export const BACKUP_DELETED = "deleted.json";
 
-export class StoreError extends Error {
-  constructor(
-    message: string,
-    readonly code: ApiErrorCode = "validation",
-  ) {
-    super(message);
-  }
-}
+export { StoreError };
 
 export type Files = ReadonlyMap<string, string | Uint8Array>;
 export type Write<T> = (file: string, text: string, value: T) => Promise<void>;

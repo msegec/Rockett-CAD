@@ -82,7 +82,7 @@ export type Payload = HeldSources | ArrayBuffer;
 export type WireError =
   | { kind: "validation"; message: string; detail?: string }
   | { kind: "store"; message: string; code: ApiErrorCode }
-  | { kind: "error"; message: string; stack?: string };
+  | { kind: "error"; name: string; message: string; stack?: string };
 
 export type Settled<T> =
   { ok: true; value: T } | { ok: false; error: WireError };
@@ -125,9 +125,14 @@ export function toWire(error: unknown): WireError {
     };
   if (error instanceof StoreError)
     return { kind: "store", message: error.message, code: error.code };
-  const { message, stack } =
+  const { name, message, stack } =
     error instanceof Error ? error : new Error(String(error));
-  return { kind: "error", message, ...(stack !== undefined && { stack }) };
+  return {
+    kind: "error",
+    name,
+    message,
+    ...(stack !== undefined && { stack }),
+  };
 }
 
 export function fromWire(wire: WireError): Error {
@@ -138,6 +143,7 @@ export function fromWire(wire: WireError): Error {
       return new StoreError(wire.message, wire.code);
     case "error":
       return Object.assign(new Error(wire.message), {
+        name: wire.name,
         stack: wire.stack ?? wire.message,
       });
   }

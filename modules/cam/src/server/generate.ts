@@ -1,12 +1,13 @@
 import { Value } from "typebox/value";
-import type {
-  CadDocument,
-  FeatureStatus,
-  KernelJobRun,
-  RouteModuleApi,
-  ServerBody,
-  ServerContext,
-  User,
+import {
+  StoreError,
+  type CadDocument,
+  type FeatureStatus,
+  type KernelJobRun,
+  type RouteModuleApi,
+  type ServerBody,
+  type ServerContext,
+  type User,
 } from "@rockett/plugin-api";
 import type { GenerateInput } from "../kernel/generate.js";
 import {
@@ -54,6 +55,19 @@ export async function sha256(text: string) {
 }
 
 export { generateRoute };
+
+export const refusal = (reason: string) =>
+  new StoreError(reason, "unprocessable");
+
+const refused = async <T>(run: () => Promise<T>) => {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof Error && error.name === "RangeError")
+      throw refusal(error.message);
+    throw error;
+  }
+};
 
 type Blocked = Extract<OperationStatus, { reason: string }>;
 
@@ -141,8 +155,11 @@ const producer =
     fingerprint,
     program: await cache.program(
       fingerprint,
-      async () =>
-        (await context.startKernelJob(GENERATE_JOB, input, run)) as Program,
+      () =>
+        refused(
+          async () =>
+            (await context.startKernelJob(GENERATE_JOB, input, run)) as Program,
+        ),
       run.signal,
     ),
   });
@@ -157,22 +174,22 @@ export function generator(
     run: KernelJobRun = {},
   ): Promise<Made> {
     const ready = await prepare(await readModel(context, projectId, user), job);
-    if ("reason" in ready) throw new Error(ready.reason);
+    if ("reason" in ready) throw refusal(ready.reason);
     return produce(ready, run);
   };
 }
 
 export function cam(doc: CadDocument): CamData {
   const read = migrateCam(doc.extensions[CAM_EXTENSION]);
-  if (read.status === "kept") throw new Error(read.reason);
+  if (read.status === "kept") throw refusal(read.reason);
   return read.data;
 }
 
 const find = (data: CamData, { setupId, operationId }: Target) => {
   const setup = data.setups.find((item) => item.id === setupId);
-  if (!setup) throw new Error(`setup ${setupId} is not in this project`);
+  if (!setup) throw refusal(`setup ${setupId} is not in this project`);
   const op = setup.operations?.find((item) => item.id === operationId);
-  if (!op) throw new Error(`operation ${operationId} is not in ${setupId}`);
+  if (!op) throw refusal(`operation ${operationId} is not in ${setupId}`);
   return { setup, op };
 };
 
@@ -239,7 +256,7 @@ export function mountGenerate(
     const { id, setupId } = req.params;
     const data = cam(doc);
     const setup = data.setups.find((item) => item.id === setupId);
-    if (!setup) throw new Error(`setup ${setupId} is not in this project`);
+    if (!setup) throw refusal(`setup ${setupId} is not in this project`);
     const operations = setup.operations ?? [];
     if (!operations.length) return {};
     const model = await readModel(context, id, user);
@@ -270,10 +287,10 @@ export function mountGenerate(
     const data = cam(doc);
     const { op } = find(data, req.body);
     if (op.suppressed)
-      throw new Error(`operation ${op.id} is suppressed; unsuppress it first`);
-    const job = inputs(data, req.body);
-    if (typeof job === "string") throw new Error(job);
-    const made = await generate({ projectId: req.params.id, user, ...job });
+      throw refusal(`operation ${op.id} is suppressed; unsuppress it first`);
+    const ready = inputs(data, req.body);
+    if (typeof ready === "string") throw refusal(ready);
+    const made = await generate({ projectId: req.params.id, user, ...ready });
     op.lastGenerated = await stamp(made);
     save(doc, data);
     return { label: `Generate ${op.name ?? op.id}`, ...made };
@@ -288,7 +305,7 @@ export function mountGenerate(
         const [{ status }, ready] = await assess(model, data, at, cache);
         if (status === "stale" && ready) stale.push({ op, ready });
       }
-    if (!stale.length) throw new Error("No operation is stale");
+    if (!stale.length) throw refusal("No operation is stale");
     for (const { op, ready } of stale)
       op.lastGenerated = await stamp(await produce(ready));
     save(doc, data);

@@ -1,6 +1,16 @@
 import type { Static, TSchema } from "typebox";
 import { Compile, type Validator } from "typebox/compile";
 import { Value } from "typebox/value";
+import type { ApiErrorCode } from "../api.js";
+
+export class StoreError extends Error {
+  constructor(
+    message: string,
+    readonly code: ApiErrorCode = "validation",
+  ) {
+    super(message);
+  }
+}
 
 export class ValidationError extends Error {
   readonly code = "validation";

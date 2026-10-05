@@ -30,7 +30,9 @@ export type {
   User,
 } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.5.0";
+export { StoreError } from "@rockett/shared";
+
+export const PLUGIN_API_VERSION = "0.6.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 

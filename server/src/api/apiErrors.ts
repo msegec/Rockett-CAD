@@ -1,12 +1,12 @@
 import type { Request, RequestHandler } from "express";
 import {
   parse,
+  StoreError,
   ValidationError,
   type ApiErrorBody,
   type ApiErrorCode,
   type Route,
 } from "@rockett/shared";
-import { StoreError } from "../store/projectStore.js";
 import { ifMatchRevision, RevisionConflict } from "./revision.js";
 
 const STATUS: Record<ApiErrorCode, number> = {
@@ -21,6 +21,17 @@ const STATUS: Record<ApiErrorCode, number> = {
   kept: 500,
   internal: 500,
 };
+
+const STACK_FRAMES = 3;
+
+function described(err: unknown) {
+  if (!(err instanceof Error)) return `a thrown ${typeof err}`;
+  const frames = (err.stack ?? "")
+    .split("\n")
+    .filter((line) => /^\s+at /.test(line) && !err.message.includes(line))
+    .slice(0, STACK_FRAMES);
+  return [err.name, ...frames].join("\n");
+}
 
 export function sendError(res: any, body: ApiErrorBody) {
   res.status(STATUS[body.code]).json(body);
@@ -41,7 +52,7 @@ export function fail(req: Request, res: any, err: any) {
         ...(err.draft && { draft: err.draft }),
       }),
     });
-  console.error(`[rockett] 500 ${req.route?.path}: Internal server error`);
+  console.error(`[rockett] 500 ${req.route?.path}: ${described(err)}`);
   sendError(res, { error: "Internal server error", code });
 }
 

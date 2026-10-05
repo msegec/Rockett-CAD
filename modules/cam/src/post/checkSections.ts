@@ -54,7 +54,11 @@ function spindleProblems(
   const { rpm } = spindle;
   const { min, max } = spindleRange(machine);
   if (!(rpm > 0 && rpm >= min && rpm <= max))
-    report("rpm", `${rpm} rpm is outside the machine's range`, s);
+    report(
+      "rpm",
+      `${rpm} rpm is outside the machine's ${min} to ${max} rpm`,
+      s,
+    );
 }
 
 const power = (move: Move) => ("power" in move ? move.power : undefined);

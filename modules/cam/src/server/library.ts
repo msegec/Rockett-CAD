@@ -28,6 +28,7 @@ import {
   type Preset,
   type Tool,
 } from "../shared/tools.js";
+import { refusal } from "./generate.js";
 import { userPost, userPostText } from "./posts.js";
 
 const useTool: Route<
@@ -88,10 +89,10 @@ function list<T extends { id: string }>(
     const { data, etag } = req.body;
     const ids = new Set<string>();
     for (const value of data) {
-      if (ids.has(value.id)) throw new Error(`${noun}s has ${value.id} twice`);
+      if (ids.has(value.id)) throw refusal(`${noun}s has ${value.id} twice`);
       ids.add(value.id);
       const [problem] = problems(value);
-      if (problem) throw new Error(`${noun} ${value.id}: ${problem}`);
+      if (problem) throw refusal(`${noun} ${value.id}: ${problem}`);
     }
     return store.write(user, data, etag);
   });
@@ -133,10 +134,10 @@ export function mountLibrary(
   mountPosts(api, userData("posts", 1));
   api.projectMutation(useTool, async (doc, req, { user }) => {
     const cam = migrateCam(doc.extensions[CAM_EXTENSION]);
-    if (cam.status === "kept") throw new Error(cam.reason);
+    if (cam.status === "kept") throw refusal(cam.reason);
     const { id } = req.body;
     const tool = await libraryItem(tools, user, id, toolSchema);
-    if (!tool) throw new Error(`tool ${id} is not in your library`);
+    if (!tool) throw refusal(`tool ${id} is not in your library`);
     cam.data.tools.push({
       ...tool,
       id: crypto.randomUUID(),

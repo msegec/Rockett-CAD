@@ -74,8 +74,11 @@ nothing else is: `server/src/api/routes.ts`.
 
 Project, folder, settings and job routes answer `ApiErrorBody`
 (`shared/src/api.ts`). `STATUS` in `server/src/api/apiErrors.ts` fixes the
-status for each `code`. `internal` is 500 with a generic message; the log has
-the detail. A 409 on a document edit carries the stored `revision`, and on a
+status for each `code`. `StoreError(message, code)` and `ValidationError`
+(`shared/src/schema/validation.ts`) answer their own code and message; any
+other throw is `internal`, 500 with a generic message, and the server log
+gets the route, the error name and its first three stack frames, never the
+message, the request or the document, because a message can carry user input. A 409 on a document edit carries the stored `revision`, and on a
 preview commit also the staged `draft`. `client/src/api.ts` turns any error
 into `ApiError`; a body without `code` becomes `internal`.
 
@@ -294,7 +297,9 @@ key grammar, so removed plugin values survive:
   `If-Match`. A non-core module id `<moduleId>.<name>` must mount under
   `/projects/:id/m/<moduleId>/`, or mounting throws. Its `userRoute` mounts
   under `/m/<moduleId>/` for the signed-in user; one with an `effect` or an
-  `:id` parameter throws.
+  `:id` parameter throws. A route refuses with
+  `throw new StoreError(reason, "unprocessable")`, which plugin API 0.6.0
+  exports: 422 with the one-line reason.
 - `registerExporter` (`server/src/geometry/exporters.ts`) and
   `registerImporter` (`server/src/api/importers.ts`) return a disposer.
 - Document `extensions` (`shared/src/model.ts`) survive upload, edits and
@@ -416,7 +421,8 @@ module, in load order:
   receives the OCCT instance, `own` for every handle it makes and
   `progress(done, total, label)`. Its handles are freed when it returns,
   throws or is cancelled; an aborted signal cancels it at its next
-  `progress` call.
+  `progress` call. A job's thrown error keeps its `name` and message across
+  the worker, so a module can tell its own refusals from failures.
 - After sign-in, `client/src/modules/host.ts` activates the client part of
   each listed module that this route reports `loaded`, with `ClientContext`:
   `register`, `project`, `ui`, `settings` and `request`. `register.command`,
