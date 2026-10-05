@@ -131,7 +131,7 @@ everything downstream against persistent topology references.
 
 ### Modules and plugins
 
-- **CAM module**: CAM ships as a first-party module on the plugin API, version 0.10.0.
+- **CAM module**: CAM ships as a first-party module on the plugin API, version 0.11.0.
 - **KiCad upload API**: save KiCad 9 or later board bytes and parsed snapshots with a project, including portable `.rockett` files.
 - **Module switches**: in a module's Settings section, an admin turns it off from the next restart, and each user can hide it.
 - **Plugin API**: modules add commands, toolbars, panels, workbenches, layers, settings, menus, kernel jobs, portable project assets, project services and pick modes.

@@ -508,6 +508,14 @@ module, in load order:
   formats lengths, or areas and volumes for power 2 and 3, in the user's
   length unit, and redraws when the unit changes. `ui.openPanel(id)`
   and `ui.closePanel(id)` open and close a core panel.
+- API 0.11.0: `DraggablePanel` takes optional `id` and `className` as core
+  panels do. With an `id` the panel keeps its dragged position in
+  `layout.panels`; the id must start with the module id and a dot, or the
+  panel throws when it renders. `className` adds classes to the panel, so
+  a module can use a core placement such as `measure`.
+  `ui.formatAngle(deg, digits)` is the core angle format: degrees rounded
+  to `digits` decimals with a degree sign. `ui.showError(message)` shows
+  `message` on the core error line, as a core failure does.
 - A number field's `value` may be `undefined`, which shows a blank box.
   With `onClear`, clearing the box calls it, so the module can store
   `undefined`; without it, a blank box shows "Enter a value" and calls

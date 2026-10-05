@@ -420,15 +420,18 @@ it("leaves input and result schema refusal with the provider and consumer", asyn
 });
 
 it("advances the host API and both first-party ranges together without workspace bumps", () => {
-  expect(PLUGIN_API_VERSION).toBe("0.10.0");
+  expect(PLUGIN_API_VERSION).toBe("0.11.0");
+  const [major, minor] = PLUGIN_API_VERSION.split(".").map(Number);
   for (const firstParty of [cam, kicad]) {
-    expect(firstParty.apiRange).toBe("^0.10");
+    expect(firstParty.apiRange).toBe(`^${major}.${minor}`);
     expect(parseManifest(firstParty, PLUGIN_API_VERSION).status).toBe(
       "compatible",
     );
     expect(
-      parseManifest({ ...firstParty, apiRange: "^0.9" }, PLUGIN_API_VERSION)
-        .status,
+      parseManifest(
+        { ...firstParty, apiRange: `^${major}.${minor! - 1}` },
+        PLUGIN_API_VERSION,
+      ).status,
     ).toBe("incompatible");
   }
 });

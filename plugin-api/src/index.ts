@@ -34,7 +34,7 @@ export type {
 
 export { StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.10.0";
+export const PLUGIN_API_VERSION = "0.11.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -359,7 +359,12 @@ export interface NumberFieldProps {
 }
 
 export interface ClientUi {
-  DraggablePanel: ComponentType<{ title: string; children: ReactNode }>;
+  DraggablePanel: ComponentType<{
+    id?: string;
+    title: string;
+    className?: string;
+    children: ReactNode;
+  }>;
   DialogFooter: ComponentType<{
     onOk?: () => void;
     onCancel: () => void;
@@ -372,6 +377,7 @@ export interface ClientUi {
   LengthField: ComponentType<NumberFieldProps & { label: string }>;
   AngleField: ComponentType<NumberFieldProps & { label: string }>;
   useFormatLength(): (mm: number, power?: 2 | 3) => string;
+  formatAngle(deg: number, digits: number): string;
   SelectField<T extends string>(props: {
     label: string;
     value: T;
@@ -409,6 +415,7 @@ export interface ClientUi {
   closePanel(id: string): void;
   openSettings(page: string): void;
   confirm(message: string): Promise<boolean>;
+  showError(message: string): void;
   download(file: { fileName: string; data: BlobPart; type: string }): void;
   pickFile(request: {
     accept: string;

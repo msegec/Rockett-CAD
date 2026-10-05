@@ -19,6 +19,7 @@ import type {
 import {
   checkModuleSetting,
   DOCUMENT_EDITS,
+  formatAngle,
   formatLength,
   formatPower,
   moduleHiddenSetting,
@@ -142,11 +143,15 @@ const owned = (command: Command): Command => ({
   active: (s) => activeOwner(s) === command.id,
 });
 
-function registerModuleLayer(moduleId: string, layer: Layer) {
-  if (!layer.id.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(layer.id))
+function ownId(moduleId: string, kind: string, id: string) {
+  if (!id.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(id))
     throw new Error(
-      `layer ${layer.id} must start with ${moduleId}. and name a valid id`,
+      `${kind} ${id} must start with ${moduleId}. and name a valid id`,
     );
+}
+
+function registerModuleLayer(moduleId: string, layer: Layer) {
+  ownId(moduleId, "layer", layer.id);
   return registerLayer(guardedLayer(layer));
 }
 
@@ -163,10 +168,7 @@ function registerClientSetting(
 }
 
 function registerModulePage(moduleId: string, page: SettingsPage) {
-  if (!page.id.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(page.id))
-    throw new Error(
-      `settings page ${page.id} must start with ${moduleId}. and name a valid id`,
-    );
+  ownId(moduleId, "settings page", page.id);
   return registerSettingsPage({
     ...page,
     section: `plugin:${moduleId}`,
@@ -271,13 +273,19 @@ function useFormatLength() {
   );
 }
 
-const ui: ClientUi = {
-  DraggablePanel,
+const modulePanel = (moduleId: string): ClientUi["DraggablePanel"] =>
+  function ModulePanel(props) {
+    if (props.id) ownId(moduleId, "panel", props.id);
+    return createElement(DraggablePanel, props);
+  };
+
+const ui: Omit<ClientUi, "DraggablePanel"> = {
   DialogFooter,
   NumField,
   LengthField: ModuleLengthField,
   AngleField,
   useFormatLength,
+  formatAngle,
   SelectField,
   CheckField,
   TextField,
@@ -287,6 +295,7 @@ const ui: ClientUi = {
   closePanel,
   openSettings: (page) => openSettings({ page }),
   confirm,
+  showError: (message) => useStore.getState().setError(message),
   download: ({ fileName, data, type }) =>
     saveDownload({ blob: new Blob([data], { type }), fileName }),
   pickFile,
@@ -393,7 +402,7 @@ function moduleContext(own: Dispose[], manifest: SettingOwner) {
         return release;
       },
     },
-    ui,
+    ui: { ...ui, DraggablePanel: modulePanel(moduleId) },
     settings: moduleSettings(
       manifest,
       track((dispose: Dispose) => dispose),
