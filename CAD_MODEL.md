@@ -404,10 +404,11 @@ in `server/src/geometry/nativeFillet.ts`.
   stored bindings whose path no longer holds a number (`bindingHolds`, used
   by `server/src/api/featureRoutes.ts`), so the staged document still
   evaluates; sent bindings are still refused when they do not resolve.
-- A dialog keeps the bindings it opened with (`openingBindings` in
-  `client/src/previewSession.ts`). At OK the saved bindings are that
-  snapshot plus the dialog's own edits, filtered by `bindingHolds`, so a type
-  round trip inside one session restores a dropped binding.
+- A dialog reads the committed bindings, not the preview copy's
+  (`committedLinks` in `client/src/previewBase.ts`). At OK the saved
+  bindings are those plus the dialog's own edits, filtered by
+  `bindingHolds`, so a type round trip inside one session restores a
+  dropped binding.
 - The size hint covers `equalDistance` only.
 
 ## Tolerances
@@ -814,9 +815,22 @@ document's parameters, keeps bounds and stepping, and shows errors on the
 field. A feature field names its binding path; text that uses a parameter
 links, a constant calculates once, and a handle that sets a new value unlinks.
 In a non-mm display unit a unitless linked result is stored with that unit.
-`client/src/features/bindings.ts` saves a feature and its changed bindings as
-one staged transaction, so one undo reverts both. Quick Edit fields link the
-same way.
+Quick Edit and the reference image scale, rotation and U/V fields link the
+same way. `client/src/features/bindings.ts` owns the links a field edit
+stages. Every feature dialog and Quick Edit preview and save of an edit sends
+the whole bindings list with the feature patch, so the preview shows the
+edited expression or typed constant instead of the stored link. While the
+store shows a preview copy, `committedLinks` in `client/src/previewBase.ts`
+answers the links from before that preview, even after its dialog closes and
+another opens. OK compares against them, so a link-only change still saves
+and a cancelled preview's links never reach another feature. The Parameters
+panel and sketch edits read the same committed links. The edit and its links
+save in one feature write and one undo step. Cancel aborts the preview and
+restores the stored link. A new feature saves with its bindings as one staged
+transaction. Staged links count as a staged field in
+`client/src/previewSession.ts`: a save that sends no links, such as a rename,
+suppress or reference repair, aborts a preview that staged links and writes
+over the stored ones, so it never commits the previewed links.
 
 A sketch dimension links through the same field. A binding path names an array
 index, so `movedBindings` in `shared/src/parameters.ts` moves a binding with the

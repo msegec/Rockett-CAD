@@ -182,7 +182,8 @@ entry. Invalid names, cycles, numeric bounds or conflicting dimensions refuse th
 edit before saving. Project files, history and reopen preserve associations.
 `PUT /projects/:id/features/:fid` may also carry the whole `parameterBindings`
 list, so a sketch edit that renumbers its constraints saves the moved bindings
-in the same edit.
+in the same edit. Feature dialog and Quick Edit edits, previews included, send
+it too.
 
 ## Evaluation
 

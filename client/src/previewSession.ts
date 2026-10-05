@@ -7,7 +7,11 @@ import { selectionBeforeCommand } from "./selection/kinds";
 import type { State } from "./store";
 
 export interface PreviewActions {
-  updateFeaturePreview: (fid: string, patch: Partial<Feature>) => Promise<void>;
+  updateFeaturePreview: (
+    fid: string,
+    patch: Partial<Feature>,
+    links?: ParameterBinding[],
+  ) => Promise<void>;
   previewNewFeature: (feature: Feature) => Promise<void>;
   cancelPreview: () => Promise<void>;
   cancelDialog: () => Promise<void>;
@@ -21,7 +25,7 @@ interface Session {
   fresh: boolean;
   staged: number;
   keys: Set<string>;
-  bindings: ParameterBinding[];
+  links?: ParameterBinding[];
 }
 
 const preview: {
@@ -69,14 +73,19 @@ function opened(fresh: boolean, fid?: string): Session | null {
   return session;
 }
 
-const covers = (session: Session, patch: Partial<Feature>) =>
-  [...session.keys].every((key) => key in patch);
+const covers = (
+  session: Session,
+  patch: Partial<Feature>,
+  links: ParameterBinding[] | undefined,
+) =>
+  [...session.keys].every((key) => key in patch) && (!session.links || !!links);
 
 function committing(
   id: string,
   session: Session,
   patch: Partial<Feature>,
   plain: Write,
+  links: ParameterBinding[] | undefined,
 ): () => Promise<MutationResponse> {
   let step: "stage" | "commit" | "plain" = "stage";
   return async () => {
@@ -91,6 +100,7 @@ function committing(
           undefined,
           session.tx,
           seq,
+          links,
         );
         session.staged = seq;
         step = "commit";
@@ -145,6 +155,7 @@ async function sendPreviews({ get, set, inTurn, lost }: Deps): Promise<void> {
               undefined,
               session.tx,
               session.staged + 1,
+              session.links,
             ),
       );
       session.staged++;
@@ -153,7 +164,7 @@ async function sendPreviews({ get, set, inTurn, lost }: Deps): Promise<void> {
       if (seq !== preview.seq) continue;
       previewBase.landAfter(fid, after);
       set((s) => ({
-        document: m.document,
+        document: previewBase.previewCopy(m.document, s.document),
         evaluation: m.evaluation,
         history: m.history ?? s.history,
         error: s.error === preview.error ? null : s.error,
@@ -172,11 +183,12 @@ async function sendPreviews({ get, set, inTurn, lost }: Deps): Promise<void> {
 function previewActions(deps: Deps): PreviewActions {
   const { get, set, inTurn, lost, landed } = deps;
   return {
-    async updateFeaturePreview(fid, patch) {
+    async updateFeaturePreview(fid, patch, links) {
       const { document, evaluation, recovery } = get();
       if (!document || recovery) return;
       previewBase.holdBase(fid, evaluation);
-      preview.session ??= opening(fid, false, document.parameterBindings);
+      preview.session ??= opening(fid, false);
+      if (links) preview.session.links = links;
       preview.seq++;
       const { targets: _replaced, ...queued }: Record<string, unknown> =
         preview.pending?.fid === fid ? preview.pending.patch : {};
@@ -188,7 +200,7 @@ function previewActions(deps: Deps): PreviewActions {
     async previewNewFeature(feature) {
       const document = get().document;
       if (!document) return;
-      preview.session ??= opening(feature.id, true, document.parameterBindings);
+      preview.session ??= opening(feature.id, true);
       return get().updateFeaturePreview(preview.session.fid, feature);
     },
 
@@ -223,23 +235,8 @@ function previewActions(deps: Deps): PreviewActions {
   };
 }
 
-function opening(
-  fid: string,
-  fresh: boolean,
-  bindings: ParameterBinding[],
-): Session {
-  return {
-    tx: crypto.randomUUID(),
-    fid,
-    fresh,
-    staged: 0,
-    keys: new Set(),
-    bindings,
-  };
-}
-
-export function openingBindings(): ParameterBinding[] | undefined {
-  return preview.session?.bindings;
+function opening(fid: string, fresh: boolean): Session {
+  return { tx: crypto.randomUUID(), fid, fresh, staged: 0, keys: new Set() };
 }
 
 async function save(
@@ -249,13 +246,16 @@ async function save(
   fid: string | undefined,
   patch: Partial<Feature>,
   plain: Write,
+  links?: ParameterBinding[],
 ): Promise<void> {
   const open = opened(fresh, fid);
-  if (open && !covers(open, patch)) await get().cancelPreview();
+  if (open && !covers(open, patch, links)) await get().cancelPreview();
   const session = opened(fresh, fid);
   if (session) preview.session = null;
   try {
-    await get().mutate(session ? committing(id, session, patch, plain) : plain);
+    await get().mutate(
+      session ? committing(id, session, patch, plain, links) : plain,
+    );
   } catch (e) {
     if (!get().recovery) preview.session ??= session;
     else if (session?.staged) preview.abandoned.push(session.tx);
@@ -298,6 +298,7 @@ export function previewSession(
       fid: string,
       patch: Partial<Feature>,
       plain: Write,
-    ) => save(get, id, false, fid, patch, plain),
+      links?: ParameterBinding[],
+    ) => save(get, id, false, fid, patch, plain, links),
   };
 }

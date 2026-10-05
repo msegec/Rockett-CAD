@@ -9,6 +9,7 @@ import {
 } from "@rockett/shared";
 import { api } from "../api";
 import { TextField } from "./form/fields";
+import { committedLinks } from "../previewBase";
 import { useStore } from "../store";
 import { registerPanel, togglePanel } from "../shell/panels";
 import { confirm } from "./ConfirmPanel";
@@ -84,7 +85,7 @@ const blank = (n: number): UserParameter => ({
 });
 
 function saveParameters(doc: CadDocument, parameters: UserParameter[]) {
-  const { parameterBindings } = doc;
+  const parameterBindings = committedLinks(doc);
   return useStore
     .getState()
     .mutate((tx) =>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CadDocument, Feature } from "@rockett/shared";
 import { useStore } from "../store";
-import { featurePatch, openingBindings } from "../previewSession";
+import { featurePatch } from "../previewSession";
 import {
   takesAxis,
   featureParams,
@@ -14,7 +14,7 @@ import { DialogFooter } from "./form/DialogFooter";
 import { SizeLimitHint } from "./form/SizeLimitHint";
 import { featureUI, type DialogFeatureUI } from "../features/registry";
 import { axisMissing, axisPicks } from "../features/inputs";
-import { nextBindings, saveBound } from "../features/bindings";
+import { previewLinked, saveEdit, saveNew } from "../features/bindings";
 import { useMeshVersion } from "../three/meshes";
 
 function attempt(build: (() => Feature) | null): Feature | null {
@@ -23,19 +23,6 @@ function attempt(build: (() => Feature) | null): Feature | null {
   } catch {
     return null;
   }
-}
-
-const picked = (value: unknown) =>
-  JSON.stringify(value, (key, v) => (key === "sig" ? undefined : v));
-
-export function featureChanges(
-  stored: Feature | undefined,
-  patch: Partial<Feature>,
-) {
-  const was: Record<string, unknown> = { targets: [], ...stored };
-  return Object.entries({ targets: [], body: undefined, ...patch }).some(
-    ([k, v]) => picked(was[k]) !== picked(v),
-  );
 }
 
 function useLivePreview(editId: string | undefined, draft: Feature | null) {
@@ -48,9 +35,12 @@ function useLivePreview(editId: string | undefined, draft: Feature | null) {
         sent.current = JSON.stringify(patch);
         const s = useStore.getState();
         if (!editId) return s.previewNewFeature(feature);
-        const stored = s.document?.features.find((f) => f.id === editId);
-        if (featureChanges(stored, patch))
-          return s.updateFeaturePreview(editId, patch);
+        return previewLinked(
+          editId,
+          patch,
+          featureParams(s).expressions,
+          feature,
+        );
       },
     }),
   );
@@ -103,8 +93,6 @@ function DialogBody({
   const params = useStore(featureParams);
   const close = useStore((s) => s.clearActive);
   const cancel = useStore((s) => s.cancelDialog);
-  const addFeature = useStore((s) => s.addFeature);
-  const updateFeature = useStore((s) => s.updateFeature);
   const setError = useStore((s) => s.setError);
   const document = useStore((s) => s.document);
   const stored = useStoredFeature(document, editId);
@@ -142,7 +130,7 @@ function DialogBody({
   const live = useLivePreview(editId, draft);
   useEffect(() => () => void useStore.getState().cancelPreview(), []);
   const update = async (patch: Partial<Feature>) => {
-    if (featureChanges(stored, patch)) await updateFeature(editId!, patch);
+    await saveEdit(editId!, stored, patch, featureParams().expressions);
   };
   const props = { editId, onClose: close, cancelPreview: live.cancel, update };
   if (ui.hasPanel) return inputs?.renderPanel(props, setFeatureParams);
@@ -157,14 +145,16 @@ function DialogBody({
     }
     live.cancel();
     setPending(true);
-    const bindings =
-      document &&
-      nextBindings(document, feature, params.expressions, openingBindings());
     try {
-      if (bindings)
-        await saveBound(feature, editId, featurePatch(feature), bindings);
-      else if (editId) await update(featurePatch(feature));
-      else await addFeature(feature);
+      await (editId
+        ? saveEdit(
+            editId,
+            stored,
+            featurePatch(feature),
+            params.expressions,
+            feature,
+          )
+        : saveNew(feature, params.expressions));
       close();
     } catch {
       return;

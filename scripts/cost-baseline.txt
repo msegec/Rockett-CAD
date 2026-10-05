@@ -22,7 +22,7 @@ client/src/components/ViewportView.tsx handleSketchClick 210
 client/src/components/ViewportView.tsx pointerToSketchUV 221
 client/src/components/ViewportView.tsx useEffect() 132
 client/src/features/constructionPlane.tsx PlaneForm 111
-client/src/features/referenceImage.tsx ReferenceImagePanel 193
+client/src/features/referenceImage.tsx ReferenceImagePanel 191
 client/src/sketchEditing.ts sketchActions 226
 client/src/sketchEdits.ts sketchEdits 166
 client/src/sketchTools.ts 1041

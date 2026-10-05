@@ -12,13 +12,13 @@ import { useStore } from "../store";
 import { useSetting } from "../settings";
 import { storedTargets } from "../toolTargets";
 import { AngleField, LengthField, NumField } from "./form/fields";
-import { featureChanges } from "./FeatureDialog";
 import type { FieldLink } from "./form/expressionField";
 import {
-  nextBindings,
+  previewLinked,
   resolvedFeature,
-  saveBound,
+  saveEdit,
   storedExpression,
+  type FieldExpressions,
 } from "../features/bindings";
 
 interface QuickValue {
@@ -101,17 +101,6 @@ export function quickValues(f: Feature): QuickValue[] {
   }
 }
 
-async function sendPreview(fid: string, patch: Partial<Feature>) {
-  const s = useStore.getState();
-  if (
-    featureChanges(
-      s.document?.features.find((f) => f.id === fid),
-      patch,
-    )
-  )
-    return s.updateFeaturePreview(fid, patch);
-}
-
 function useAbove(
   ref: RefObject<HTMLDivElement | null>,
   anchor: { left: number; top: number },
@@ -179,11 +168,11 @@ function QuickField({
 }
 
 function useLinks(featureId: string) {
-  const [links, setLinks] = useState<Record<string, string | null>>({});
+  const links = useRef<FieldExpressions>({});
   const [invalid, setInvalid] = useState<string[]>([]);
   const link = (path: string): FieldLink => ({
-    text: Object.hasOwn(links, path)
-      ? (links[path] ?? undefined)
+    text: Object.hasOwn(links.current, path)
+      ? (links.current[path] ?? undefined)
       : storedExpression(useStore.getState().document, featureId, path),
     set: (expression) => {
       setInvalid((all) => [
@@ -191,24 +180,16 @@ function useLinks(featureId: string) {
         ...(expression === false ? [path] : []),
       ]);
       if (expression !== false)
-        setLinks((all) => ({ ...all, [path]: expression }));
+        links.current = { ...links.current, [path]: expression };
     },
   });
   return { links, invalid, link };
 }
 
-function save(
-  feature: Feature,
-  patch: Partial<Feature>,
-  links: Record<string, string | null>,
-): Promise<void> | null {
-  const s = useStore.getState();
-  const edited = { ...feature, ...patch } as Feature;
-  const bindings = s.document && nextBindings(s.document, edited, links);
-  if (bindings) return saveBound(edited, feature.id, patch, bindings);
-  if (!featureChanges(feature, patch)) return null;
-  return s.updateFeature(feature.id, patch);
-}
+const linkedPreview = (links: RefObject<FieldExpressions>) =>
+  createLivePreview({
+    send: (fid, next) => previewLinked(fid, next, links.current),
+  });
 
 export function QuickEdit({
   feature,
@@ -225,7 +206,7 @@ export function QuickEdit({
   const ref = useRef<HTMLDivElement>(null);
   const at = useAbove(ref, anchor);
   const committed = useRef(false);
-  const [live] = useState(() => createLivePreview({ send: sendPreview }));
+  const [live] = useState(() => linkedPreview(links));
   const draft = { ...shown, ...patch } as Feature;
   const close = useRef(onClose);
   close.current = onClose;
@@ -254,7 +235,7 @@ export function QuickEdit({
   const commit = async () => {
     live.cancel();
     if (invalid.length) return;
-    const saving = save(feature, patch, links);
+    const saving = saveEdit(feature.id, feature, patch, links.current);
     if (!saving) return onClose();
     committed.current = await saving.then(
       () => true,

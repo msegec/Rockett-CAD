@@ -2,6 +2,7 @@ import type {
   BodyPayload,
   CadDocument,
   EvaluateResult,
+  ParameterBinding,
   ProjectView,
 } from "@rockett/shared";
 import { create } from "zustand";
@@ -23,6 +24,8 @@ type Base = {
 const held = create<{ base: Base }>(() => ({ base: null }));
 const hold = (base: Base) => held.setState({ base });
 const current = () => held.getState().base;
+let copied: { shown: ParameterBinding[]; links: ParameterBinding[] } | null =
+  null;
 
 export const usePreviewBase = () => held((s) => s.base);
 
@@ -33,6 +36,22 @@ export function dropBase(): void {
 export function holdBase(fid: string, evaluation: EvaluateResult | null) {
   if (!current())
     hold({ fid, bodies: evaluation?.bodies ?? [], loaded: false });
+}
+
+export function committedLinks(
+  doc: Pick<CadDocument, "parameterBindings">,
+): ParameterBinding[] {
+  const shown = doc.parameterBindings;
+  return shown === copied?.shown ? copied.links : shown;
+}
+
+export function previewCopy(
+  doc: CadDocument,
+  from: CadDocument | null,
+): CadDocument {
+  const shown = doc.parameterBindings;
+  copied = { shown, links: from ? committedLinks(from) : shown };
+  return doc;
 }
 
 export function landAfter(fid: string, after: BodyPayload[] | undefined) {

@@ -80,7 +80,7 @@ export interface State extends SketchActions, SketchEdits, PreviewActions {
   setPickInput: (key: string) => void;
 
   addFeature: (feature: Feature) => Promise<void>;
-  updateFeature: (fid: string, patch: Partial<Feature>) => Promise<void>;
+  updateFeature: PreviewActions["updateFeaturePreview"];
   deleteFeature: (fid: string) => Promise<void>;
   suppressFeature: (fid: string, suppressed: boolean) => Promise<void>;
   renameFeature: (fid: string, name: string) => Promise<void>;
@@ -407,7 +407,7 @@ export const useStore = create<State>((set, get) => ({
     await session.saveNew(document.id, featurePatch(feature), plain);
   },
 
-  async updateFeature(fid, patch) {
+  async updateFeature(fid, patch, links) {
     const { document } = get();
     if (!document) return;
     const plain = (tx: string) =>
@@ -417,8 +417,10 @@ export const useStore = create<State>((set, get) => ({
         patch,
         sketchEditingPosition(document, get().active),
         tx,
+        undefined,
+        links,
       );
-    await session.saveEdit(document.id, fid, patch, plain);
+    await session.saveEdit(document.id, fid, patch, plain, links);
   },
 
   async deleteFeature(fid) {
@@ -428,13 +430,11 @@ export const useStore = create<State>((set, get) => ({
     set({ selection: [] });
   },
 
-  async suppressFeature(fid, suppressed) {
-    await get().updateFeature(fid, { suppressed } as Partial<Feature>);
-  },
+  suppressFeature: (fid, suppressed) =>
+    get().updateFeature(fid, { suppressed } as Partial<Feature>),
 
-  async renameFeature(fid, name) {
-    await get().updateFeature(fid, { name } as Partial<Feature>);
-  },
+  renameFeature: (fid, name) =>
+    get().updateFeature(fid, { name } as Partial<Feature>),
 
   async renameProject(name) {
     const { document } = get();

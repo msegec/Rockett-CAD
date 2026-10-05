@@ -11,11 +11,12 @@ import { RefRepair } from "../components/RefRepair";
 import { DraggablePanel } from "../components/DraggablePanel";
 import { DialogFooter } from "../components/form/DialogFooter";
 import { AngleField, LengthField, SelInfo } from "../components/form/fields";
-import { planar } from "../commands/featureCommand";
+import { featureParams, planar } from "../commands/featureCommand";
 import { useStore, type Selection } from "../store";
 import { useSetting } from "../settings";
 import { ViewportContext } from "../viewportRef";
 import { selectedPlane, num } from "./inputs";
+import { saveNew } from "./bindings";
 import {
   registerFeatureUI,
   type InputParams,
@@ -105,9 +106,9 @@ function ReferenceImagePanel({
   const doc = useStore((s) => s.document);
   const latestParams = useRef(params);
   latestParams.current = params;
-  const addFeature = useStore((s) => s.addFeature);
   const setError = useStore((s) => s.setError);
   const cancel = useStore((s) => s.cancelDialog);
+  const invalid = useStore((s) => featureParams(s).invalid);
   const [file, setFile] = useState<File | null>(null);
   const [pending, setPending] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
@@ -133,10 +134,7 @@ function ReferenceImagePanel({
     setPending(true);
     try {
       if (existing) {
-        await update({
-          opacity,
-          transform: { u, v, rotation, scale },
-        });
+        await update({ opacity, transform: { u, v, rotation, scale } });
         onClose();
         return;
       }
@@ -158,7 +156,7 @@ function ReferenceImagePanel({
         selection,
       );
       if ("error" in built) throw new Error(built.error);
-      await addFeature(built);
+      await saveNew(built, featureParams().expressions);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -170,18 +168,14 @@ function ReferenceImagePanel({
   const calibrate = async () => {
     setCalibrating(true);
     const vp = viewport.current;
-    if (!vp || !existing) {
+    const { evaluation } = useStore.getState();
+    const frame = evaluation?.planes.find((p) => p.featureId === editId)?.frame;
+    if (!vp || !existing || !frame) {
       setCalibrating(false);
       return;
     }
     const clicks: { x: number; y: number; z: number }[] = [];
     const el = vp.renderer.domElement;
-    const evalState = useStore.getState().evaluation;
-    const frame = evalState?.planes.find((p) => p.featureId === editId)?.frame;
-    if (!frame) {
-      setCalibrating(false);
-      return;
-    }
     const handler = (e: PointerEvent) => {
       const pt = vp.screenToPlanePoint(e.clientX, e.clientY, frame);
       if (!pt) return;
@@ -234,23 +228,27 @@ function ReferenceImagePanel({
           label="Scale per pixel"
           units={units}
           autoFocus
+          bind="/transform/scale"
           value={scale}
           onChange={(x) => setParams({ scale: x })}
         />
         <AngleField
           label="Rotation"
+          bind="/transform/rotation"
           value={rotation}
           onChange={(x) => setParams({ rotation: x })}
         />
         <LengthField
           label="Position U"
           units={units}
+          bind="/transform/u"
           value={u}
           onChange={(x) => setParams({ u: x })}
         />
         <LengthField
           label="Position V"
           units={units}
+          bind="/transform/v"
           value={v}
           onChange={(x) => setParams({ v: x })}
         />
@@ -281,6 +279,7 @@ function ReferenceImagePanel({
         onOk={() => void onOk()}
         onCancel={cancel}
         pending={pending}
+        okDisabled={!!invalid?.length}
         escapeAnywhere
       />
     </DraggablePanel>

@@ -26,6 +26,7 @@ import {
 } from "./commands/sketch";
 import type { Selection } from "./selection/kinds";
 import type { State } from "./store";
+import { committedLinks } from "./previewBase";
 
 export function historyEditingState(
   active: Active | null,
@@ -82,15 +83,14 @@ export function sketchBindings(
   const at = new Map(
     draft.constraints.map((c, i) => [`/constraints/${i}/value`, c]),
   );
-  const next = movedBindings(doc.parameterBindings, saved, draft).flatMap(
-    (b) => {
-      const c = b.featureId === draft.id ? at.get(b.path) : undefined;
-      if (!c) return [b];
-      const link = links[c.id];
-      if (driven(c) || link === null) return [];
-      return [link === undefined ? b : { ...b, expression: link }];
-    },
-  );
+  const stored = committedLinks(doc);
+  const next = movedBindings(stored, saved, draft).flatMap((b) => {
+    const c = b.featureId === draft.id ? at.get(b.path) : undefined;
+    if (!c) return [b];
+    const link = links[c.id];
+    if (driven(c) || link === null) return [];
+    return [link === undefined ? b : { ...b, expression: link }];
+  });
   for (const [path, c] of at) {
     const expression = links[c.id];
     if (
@@ -100,9 +100,7 @@ export function sketchBindings(
     )
       next.push({ featureId: draft.id, path, expression });
   }
-  return JSON.stringify(next) === JSON.stringify(doc.parameterBindings)
-    ? null
-    : next;
+  return JSON.stringify(next) === JSON.stringify(stored) ? null : next;
 }
 
 export interface SketchActions {

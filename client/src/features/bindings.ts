@@ -6,6 +6,7 @@ import {
   type ParameterBinding,
 } from "@rockett/shared";
 import { api } from "../api";
+import { committedLinks } from "../previewBase";
 import { useStore } from "../store";
 
 export type FieldExpressions = Readonly<Record<string, string | null>>;
@@ -29,14 +30,9 @@ export function nextBindings(
   doc: Pick<CadDocument, "parameterBindings">,
   feature: Feature,
   expressions: FieldExpressions | undefined,
-  opening: ParameterBinding[] = doc.parameterBindings,
 ): ParameterBinding[] | null {
   const own = doc.parameterBindings.filter((b) => b.featureId === feature.id);
-  const kept = new Map(
-    opening
-      .filter((b) => b.featureId === feature.id)
-      .map((b) => [b.path, b.expression]),
-  );
+  const kept = new Map(own.map((b) => [b.path, b.expression]));
   for (const [path, expression] of Object.entries(expressions ?? {}))
     if (expression === null) kept.delete(path);
     else kept.set(path, expression);
@@ -55,10 +51,70 @@ export function nextBindings(
   ];
 }
 
-export async function saveBound(
-  feature: Feature,
-  editId: string | undefined,
+const picked = (value: unknown) =>
+  JSON.stringify(value, (key, v) => (key === "sig" ? undefined : v));
+
+export function featureChanges(
+  stored: Feature | undefined,
   patch: Partial<Feature>,
+) {
+  const was: Record<string, unknown> = { targets: [], ...stored };
+  return Object.entries({ targets: [], body: undefined, ...patch }).some(
+    ([k, v]) => picked(was[k]) !== picked(v),
+  );
+}
+
+export function stagedLinks(
+  feature: Feature,
+  expressions: FieldExpressions | undefined,
+): { links?: ParameterBinding[]; relinked: boolean } {
+  const doc = useStore.getState().document;
+  if (!doc) return { relinked: false };
+  const parameterBindings = committedLinks(doc);
+  const next = nextBindings({ parameterBindings }, feature, expressions);
+  return { links: next ?? parameterBindings, relinked: next !== null };
+}
+
+export async function previewLinked(
+  fid: string,
+  patch: Partial<Feature>,
+  expressions: FieldExpressions | undefined,
+  edited?: Feature,
+): Promise<void> {
+  const s = useStore.getState();
+  const stored = s.document?.features.find((f) => f.id === fid);
+  const { links, relinked } = stagedLinks(
+    edited ?? ({ ...stored, ...patch } as Feature),
+    expressions,
+  );
+  if (relinked || featureChanges(stored, patch))
+    return s.updateFeaturePreview(fid, patch, links);
+}
+
+export function saveEdit(
+  fid: string,
+  stored: Feature | undefined,
+  patch: Partial<Feature>,
+  expressions: FieldExpressions | undefined,
+  edited = { ...stored, ...patch } as Feature,
+): Promise<void> | null {
+  const { links, relinked } = stagedLinks(edited, expressions);
+  if (!relinked && !featureChanges(stored, patch)) return null;
+  return useStore.getState().updateFeature(fid, patch, links);
+}
+
+export function saveNew(
+  feature: Feature,
+  expressions: FieldExpressions | undefined,
+): Promise<void> {
+  const s = useStore.getState();
+  const doc = s.document && { parameterBindings: committedLinks(s.document) };
+  const bindings = doc && nextBindings(doc, feature, expressions);
+  return bindings ? saveBound(feature, bindings) : s.addFeature(feature);
+}
+
+async function saveBound(
+  feature: Feature,
   parameterBindings: ParameterBinding[],
 ): Promise<void> {
   const s = useStore.getState();
@@ -66,9 +122,7 @@ export async function saveBound(
   const doc = useStore.getState().document;
   if (!doc) return;
   await s.mutate(async (tx) => {
-    await (editId
-      ? api.updateFeature(doc.id, editId, patch, undefined, tx, 1)
-      : api.addFeature(doc.id, feature, tx, 1));
+    await api.addFeature(doc.id, feature, tx, 1);
     await api.updateParameters(
       doc.id,
       { parameters: doc.parameters, parameterBindings },
