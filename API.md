@@ -380,6 +380,16 @@ module, in load order:
   before storage. `extensions["rockett.kicad"]` holds `{version: 1, data: {links}}`.
   Source and `{version: 1, data}` snapshot hashes are portable
   assets. Original bytes retain a BOM; JSON caps decoded source below 37.5 MiB.
+- Service `rockett.kicad.boardNets` takes a `linkId` string and returns
+  `{nets: [{name, members: [{footprintUuid, reference, pad}]}]}` in board
+  order. It reads pad nets by name from the link's stored original bytes:
+  KiCad 9 `(net <code> "<name>")` and KiCad 10 `(net "<name>")`; an empty
+  name is no net. Invalid input, a link outside the authorised project, or a
+  missing or invalid source refuses with 422.
+- `GET /projects/:id/m/rockett/elec/boards/:linkId/nets` needs view access and
+  returns those nets after `rockett.elec` validates them with its own schema.
+  Without a `rockett.kicad` provider it refuses with 422
+  `Requires module rockett.kicad`; an invalid result refuses with 422.
 - `register.kernelJob(id, entry)` registers a kernel job: `id` starts with
   the module id and a dot, and `entry` is the URL of a file whose default
   export, from `defineKernelJobs`, holds the job under that id.

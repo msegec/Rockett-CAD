@@ -1,0 +1,12 @@
+{
+  "manifestVersion": 1,
+  "id": "rockett.elec",
+  "name": "Electrical",
+  "version": "0.1.0",
+  "apiRange": "^0.11",
+  "licence": "UNLICENSED",
+  "author": "Rockett CAD",
+  "contributes": {
+    "routes": ["rockett.elec.nets"]
+  }
+}

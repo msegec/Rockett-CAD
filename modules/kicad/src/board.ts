@@ -149,3 +149,44 @@ export function readBoard(tree: SexprList) {
     warnings: formatVersion > TESTED_VERSION ? ["untested version"] : [],
   };
 }
+
+const quoted = (atom: unknown) =>
+  typeof atom === "string" && atom.startsWith('"');
+
+function padNet(pad: SexprList) {
+  const field = child(pad, "net");
+  if (!field) return undefined;
+  const coded = field.length === 3 && Number.isSafeInteger(num(field));
+  if (!quoted(field.at(-1)) || (!coded && field.length !== 2))
+    fail("Invalid pad net");
+  return str(field, field.length - 1) || undefined;
+}
+
+export type BoardNet = {
+  name: string;
+  members: { footprintUuid: string; reference: string; pad: string }[];
+};
+
+export function readBoardNets(tree: SexprList): BoardNet[] {
+  if (tree[0] !== "kicad_pcb") fail("Expected kicad_pcb board");
+  const named = new Map<string, BoardNet["members"]>();
+  for (const footprint of children(tree, "footprint")) {
+    const reference = children(footprint, "property").find(
+      (entry) => str(entry) === "Reference",
+    );
+    for (const pad of children(footprint, "pad")) {
+      const name = padNet(pad);
+      if (name === undefined) continue;
+      const footprintUuid = str(child(footprint, "uuid"));
+      if (!footprintUuid) fail("Footprint with pad nets has no uuid");
+      const members = named.get(name) ?? [];
+      named.set(name, members);
+      members.push({
+        footprintUuid,
+        reference: str(reference, 2) ?? "",
+        pad: str(pad) ?? "",
+      });
+    }
+  }
+  return Array.from(named, ([name, members]) => ({ name, members }));
+}

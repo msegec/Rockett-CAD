@@ -39,7 +39,7 @@ export const uploadRoute: Route<
   effect: "document",
 };
 
-function storedData(doc: CadDocument) {
+export function storedData(doc: CadDocument) {
   const stored = doc.extensions[NAMESPACE];
   if (stored === undefined) return { links: {} };
   if (stored.version !== VERSION || !Value.Check(dataSchema, stored.data))
@@ -57,17 +57,19 @@ function storedData(doc: CadDocument) {
   return stored.data;
 }
 
+export function sourceTree(bytes: Uint8Array) {
+  if (bytes.byteLength > SEXPR_LIMITS.bytes)
+    throw new Error("Board input is too large");
+  return parseSexpr(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+}
+
 function uploaded(source: string) {
   try {
     const binary = atob(source);
     if (btoa(binary) !== source)
       throw new Error("Source must be canonical base64");
     const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-    if (bytes.byteLength > SEXPR_LIMITS.bytes)
-      throw new Error("Board input is too large");
-    const tree = parseSexpr(
-      new TextDecoder("utf-8", { fatal: true }).decode(bytes),
-    );
+    const tree = sourceTree(bytes);
     const data = readBoard(tree);
     const metadata: { generator?: string; generatorVersion?: string } = {};
     for (const [field, key] of [
