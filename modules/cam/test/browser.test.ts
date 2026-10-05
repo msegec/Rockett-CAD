@@ -182,6 +182,7 @@ beforeAll(async () => {
     userRoute: () => {},
   };
   await cam.activate({
+    services: { provide: () => () => {} },
     register: {
       routeModule: (module) => {
         module.mount(api);

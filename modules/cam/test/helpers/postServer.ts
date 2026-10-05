@@ -201,6 +201,7 @@ beforeAll(async () => {
     userRoute: keep,
   };
   const context: ServerContext = {
+    services: { provide: () => () => {} },
     register: {
       routeModule: (module) => {
         module.mount(api);

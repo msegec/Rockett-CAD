@@ -152,6 +152,7 @@ beforeAll(async () => {
   const bodies = [body("boss", boss), body("block", block)];
   const edits = new Map<string, (...args: unknown[]) => Promise<unknown>>();
   await cam.activate({
+    services: { provide: () => () => {} },
     register: {
       routeModule: (module) => {
         module.mount({

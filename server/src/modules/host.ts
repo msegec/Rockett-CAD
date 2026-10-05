@@ -1,6 +1,7 @@
 import {
   PLUGIN_API_VERSION,
   type Dispose,
+  type ProjectServiceHandler,
   type ServerContext,
   type StartKernelJob,
 } from "@rockett/plugin-api";
@@ -38,6 +39,7 @@ import {
   type BodyKernel,
 } from "./bodies.js";
 import { moduleFiles } from "./files.js";
+import { provideService } from "./services.js";
 
 type Kernel = Pick<KernelClient, "moduleJob"> & BodyKernel;
 
@@ -90,24 +92,31 @@ function registrars(own: Dispose[], manifest: ModuleManifest) {
       return dispose;
     };
   return {
-    routeModule: track((module: Parameters<typeof registerRouteModule>[0]) =>
-      registerRouteModule(module, moduleId),
-    ),
-    exporter: track(registerExporter),
-    importer: track(registerImporter),
-    featureKind: track(registerFeatureKind),
-    extensionSpec: track(registerExtensionSpec),
-    kernelJob: track((id: string, entry: URL) =>
-      registerKernelJob(moduleId, id, entry),
-    ),
-    setting: track((definition: SettingDefinition) =>
-      registerModuleSetting(manifest, definition),
-    ),
+    register: {
+      routeModule: track((module: Parameters<typeof registerRouteModule>[0]) =>
+        registerRouteModule(module, moduleId),
+      ),
+      exporter: track(registerExporter),
+      importer: track(registerImporter),
+      featureKind: track(registerFeatureKind),
+      extensionSpec: track(registerExtensionSpec),
+      kernelJob: track((id: string, entry: URL) =>
+        registerKernelJob(moduleId, id, entry),
+      ),
+      setting: track((definition: SettingDefinition) =>
+        registerModuleSetting(manifest, definition),
+      ),
+    },
+    services: {
+      provide: track((id: string, handler: ProjectServiceHandler) =>
+        provideService(moduleId, id, handler),
+      ),
+    },
   };
 }
 
 export interface ModuleContext extends ServerContext {
-  register: ReturnType<typeof registrars>;
+  register: ReturnType<typeof registrars>["register"];
 }
 
 export interface HostModule {
@@ -193,7 +202,7 @@ async function load(
     const { id } = check.manifest;
     const { storage } = store.documents.options;
     await module.server.activate({
-      register: registrars(own, check.manifest),
+      ...registrars(own, check.manifest),
       startKernelJob: starter(id, kernel),
       userData: moduleUserData(storage, id),
       files: moduleFiles(storage, id),

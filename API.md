@@ -342,10 +342,23 @@ module, in load order:
 - A manifest that fails `parseManifest` reports `failed` with whichever of
   its identity fields are strings; the rest are empty.
 - `activate` receives `ServerContext` (`plugin-api/src/index.ts`):
-  `register`, `startKernelJob`, `userData`, `files`, `kernelVersion` and
-  `bodies`. `register.routeModule`, `kernelJob` and `setting` take
-  `plugin-api` types; `exporter`, `importer`, `featureKind` and
-  `extensionSpec` take core types. Each call is tracked under one disposer.
+  `register`, `services`, `startKernelJob`, `userData`, `files`,
+  `kernelVersion`, `bodies` and `signFaces`. `register.routeModule`,
+  `kernelJob` and `setting` take `plugin-api` types; `exporter`, `importer`,
+  `featureKind` and `extensionSpec` take core types. Each call is tracked
+  under one disposer.
+- API 0.9.0 adds `services.provide(id, handler)`: the id starts with the
+  module id and a dot, and the call returns its tracked disposer. Duplicate
+  or invalid ids fail activation and remove the module's earlier
+  registrations. Project-route callbacks get `services.get(id)`: `undefined`
+  without a provider, otherwise `(input: unknown) => Promise<unknown>`. Each
+  call resolves the current provider, so a retained callable refuses with 422
+  `unprocessable` after unload or failed activation. The handler receives
+  `(document, input, context)` bound to the authorised project, the
+  authenticated user and read-only `blobs.get`; request fields cannot choose
+  another user or project. Providers and consumers validate their own input
+  and result schemas. User routes get no services; the host stores no
+  service data.
 - `register.setting(definition)` takes a `SettingDefinition` whose key
   starts with `plugin.<moduleId>.`, is listed in `contributes.settings` and
   is not a host key, or the load fails naming the key. Settings routes then

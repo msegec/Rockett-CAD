@@ -119,6 +119,7 @@ beforeAll(async () => {
     ),
   };
   const context: ServerContext = {
+    services: { provide: () => () => {} },
     register: {
       routeModule: (module) => {
         module.mount(api);

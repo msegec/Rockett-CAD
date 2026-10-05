@@ -32,7 +32,7 @@ export type {
 
 export { StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.8.0";
+export const PLUGIN_API_VERSION = "0.9.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -71,8 +71,28 @@ export interface ProjectBlobs {
   put(bytes: Uint8Array): Promise<string>;
 }
 
-export interface ProjectRouteContext extends RouteContext {
+export interface ProjectServiceContext extends RouteContext {
   readonly blobs: Pick<ProjectBlobs, "get">;
+}
+
+export type ProjectServiceHandler = (
+  doc: CadDocument,
+  input: unknown,
+  ctx: ProjectServiceContext,
+) => Promise<unknown>;
+
+export type ProjectService = (input: unknown) => Promise<unknown>;
+
+export interface ServiceProvider {
+  provide(id: string, handler: ProjectServiceHandler): Dispose;
+}
+
+export interface ProjectServices {
+  get(id: string): ProjectService | undefined;
+}
+
+export interface ProjectRouteContext extends ProjectServiceContext {
+  readonly services: ProjectServices;
 }
 
 export interface ProjectMutationContext extends ProjectRouteContext {
@@ -176,6 +196,7 @@ export interface ServerBody extends ProjectBody {
 
 export interface ServerContext {
   readonly register: ServerRegister;
+  readonly services: ServiceProvider;
   readonly startKernelJob: StartKernelJob;
   userData(name: string, version: number): UserData;
   readonly files: ModuleFiles;

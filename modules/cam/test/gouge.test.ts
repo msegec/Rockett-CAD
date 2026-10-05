@@ -120,6 +120,7 @@ async function surface(
   const reads = new Map<string, Read>();
   jobs = [];
   await cam.activate({
+    services: { provide: () => () => {} },
     register: {
       routeModule: (module) => {
         module.mount({

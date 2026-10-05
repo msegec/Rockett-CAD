@@ -164,6 +164,7 @@ async function mounted({
     projectMutation: (route, edit) => routes.set(route.path, edit as Handler),
   };
   const context: ServerContext = {
+    services: { provide: () => () => {} },
     register: {
       routeModule: (module) => {
         module.mount(api);

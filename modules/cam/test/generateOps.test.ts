@@ -223,6 +223,7 @@ async function route() {
   const startKernelJob = (id: string, input: unknown) =>
     kernel.moduleJob(ENTRY, id, input, { shouldStop: () => false });
   await cam.activate({
+    services: { provide: () => () => {} },
     register: {
       routeModule: (module) => {
         module.mount({

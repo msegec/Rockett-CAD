@@ -73,13 +73,15 @@ release workflow remain under development. The core licence is unresolved.
   import or delete JSON posts and download an AI post kit to adapt an old post.
 - Beginner CAM guide and an example plate project ready to generate.
 - First-party modules with an admin enable switch and per-user visibility.
-  The plugin API 0.8.0 supports commands, toolbars, panels, settings pages,
-  routes, scene contributions, kernel jobs and project-scoped source blobs;
+  The plugin API 0.9.0 supports commands, toolbars, panels, settings pages,
+  routes, scene contributions, kernel jobs, project services and source blobs;
   CAM is the first shipped module. Project reads can fetch immutable bytes;
   document mutations can store them within the import byte budget, after
   access and revision checks. Modules declare portable source and snapshot
   assets in their own namespace; save, history, duplicate and `.rockett` files
   preserve exact bytes without features, including absent or disabled modules.
+  Services bind the authorised document, authenticated user and read-only blobs;
+  unload invalidates retained calls.
 
 ### Fixed
 

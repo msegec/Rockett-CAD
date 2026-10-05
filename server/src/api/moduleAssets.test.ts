@@ -1,6 +1,10 @@
 import { afterEach, expect, expectTypeOf, it, vi } from "vitest";
 import { Type } from "typebox";
-import { type RouteModule, type ServerContext } from "@rockett/plugin-api";
+import {
+  PLUGIN_API_VERSION,
+  type RouteModule,
+  type ServerContext,
+} from "@rockett/plugin-api";
 import {
   route,
   SCHEMA_VERSION,
@@ -182,7 +186,7 @@ it.each(["disabled", "absent"])(
       id: namespace,
       name: "Portable",
       version: "1.0.0",
-      apiRange: "^0.8",
+      apiRange: `^${PLUGIN_API_VERSION.split(".").slice(0, 2).join(".")}`,
       licence: "MIT",
       author: "Fixture",
       contributes: {},
@@ -278,7 +282,7 @@ it("binds declarations to the exact dotted manifest namespace through the host",
           id: namespace,
           name: "Portable",
           version: "1.0.0",
-          apiRange: "^0.8",
+          apiRange: `^${PLUGIN_API_VERSION.split(".").slice(0, 2).join(".")}`,
           licence: "MIT",
           author: "Fixture",
           contributes: {},

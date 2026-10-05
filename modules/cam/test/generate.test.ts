@@ -313,6 +313,7 @@ type Edit = (doc: CadDocument, req: unknown, ctx: unknown) => Promise<any>;
 async function mounted(r: Awaited<ReturnType<typeof rig>>) {
   const edits = new Map<string, Edit>();
   await cam.activate({
+    services: { provide: () => () => {} },
     register: {
       routeModule: (module) => {
         module.mount({
