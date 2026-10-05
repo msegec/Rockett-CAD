@@ -37,6 +37,7 @@ server/src/geometry/blend.ts built 209
 server/src/geometry/blend.ts chamferByEnvelope 219
 server/src/geometry/features.ts 969
 server/src/store/projectStore.ts 520
+shared/src/model.ts 502
 shared/src/sketchModify.ts 735
 shared/src/sketchModify.ts joinOffsetEndpoints 110
 shared/src/sketchModify.ts offsetRoundedChain 124

@@ -35,7 +35,10 @@ export interface SketchEntityRef {
 
 export type BodyRef = { kind: "body"; bodyId: string };
 
-export type ProjectionRef = EdgeRef | FaceRef | SketchEntityRef | BodyRef;
+export type SectionRef = { kind: "section"; of: FaceRef | BodyRef };
+
+export type ProjectionRef =
+  EdgeRef | FaceRef | SketchEntityRef | BodyRef | SectionRef;
 
 export type PointRef =
   VertexRef | { kind: "sketchPoint"; sketchId: string; entityId: string };

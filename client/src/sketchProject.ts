@@ -8,9 +8,15 @@ import {
 import { send } from "./api";
 import { useStore, type Selection } from "./store";
 import type { CadViewport } from "./three/CadViewport";
+import type { ProjectPick } from "./commands/sketch";
 
-const PICKS = ["design.edge", "sketch.entity", "design.face"];
-const BODY_PICKS = ["design.body"];
+const PICKS: Record<ProjectPick, string[]> = {
+  entities: ["design.edge", "sketch.entity", "design.face"],
+  bodies: ["design.body"],
+  faceSections: ["design.face"],
+  bodySections: ["design.body"],
+};
+const SECTIONS = new Set<ProjectPick>(["faceSections", "bodySections"]);
 const DEPTH = 16;
 
 type Pointer = Pick<PointerEvent, "clientX" | "clientY">;
@@ -20,9 +26,7 @@ export function projectionPick(
   e: Pointer,
   sketchId: string | undefined,
 ): Selection | undefined {
-  const { active } = useStore.getState();
-  const bodies = active?.id === "design.sketch" && active.state.projectBodies;
-  const picks = bodies ? BODY_PICKS : PICKS;
+  const picks = PICKS[pickMode()];
   for (let depth = 0; depth < DEPTH; depth++) {
     const picked = vp.pick(e.clientX, e.clientY, picks, depth)?.selection;
     if (picked?.kind !== "sketchEntity" || picked.sketchId !== sketchId)
@@ -30,11 +34,17 @@ export function projectionPick(
   }
 }
 
+const pickMode = (): ProjectPick => {
+  const { active } = useStore.getState();
+  return active?.id === "design.sketch" ? active.state.projectPick : "entities";
+};
+
 const LABELS: Record<ProjectionRef["kind"], string> = {
   edge: "edge",
   face: "face",
   body: "body",
   sketchEntity: "sketch curve",
+  section: "section",
 };
 
 function pickedSource(
@@ -43,6 +53,14 @@ function pickedSource(
   draft: SketchFeature,
 ): ProjectionRef | undefined {
   const picked = projectionPick(vp, e, draft.id);
+  const sectioned = SECTIONS.has(pickMode());
+  if (sectioned && picked?.kind === "face")
+    return {
+      kind: "section",
+      of: { kind: "face", bodyId: picked.bodyId, faceName: picked.faceName },
+    };
+  if (sectioned && picked?.kind === "body")
+    return { kind: "section", of: { kind: "body", bodyId: picked.bodyId } };
   if (picked?.kind === "edge")
     return { kind: "edge", bodyId: picked.bodyId, edgeName: picked.edgeName };
   if (picked?.kind === "face")

@@ -485,6 +485,24 @@ faceName }`, or a body, `{ kind: "body", bodyId }`. Either is a group: the
   body with any other surface refuses. A lost face or body blocks the
   sketch through the reference lifecycle, as an edge does. Projection onto a
   surface waits for surface modelling.
+- Schema 40 adds a section, `{ kind: "section", of }`, where `of` is a face
+  or body reference: the curves where that face or body crosses the sketch
+  plane. It is a group like a face or body projection, with the same root,
+  member keys, refresh and lost-relation warning. `bodySection`
+  (`server/src/geometry/bodySection.ts`) cuts with the kernel's plane
+  section, so curves are exact: lines, circles, ellipses, or B-splines on
+  freeform faces. A curve's source is the face it lies on, the lowest name
+  where it lies on two; pieces of one face are `<key>-1` onward by position
+  in the sketch plane. A curve where the face only touches the plane
+  (coplanar, or tangent as a cylinder side is) is left out. The project
+  call refuses a section with no crossing curve: `The sketch plane misses
+this body.` or `only touches this body.`, then `Choose a body the plane
+crosses.` When an upstream change empties a stored section, the sketch
+  keeps the reference and warns `Section <root> is empty: the sketch plane
+misses body <id>.`; the curves return when the source crosses again. The
+  Project selection list picks Face sections and Body sections. Earlier
+  documents read the same, so the step only bumps the version. Slice
+  (PAR-012) stays a view clip and stores nothing.
 - A sketch arc runs counter-clockwise from `start` to `end` about `center`.
   The solver holds both ends at one radius.
 - `editSketchOffset` in `shared/src/sketchOffsets.ts` keeps generated entity

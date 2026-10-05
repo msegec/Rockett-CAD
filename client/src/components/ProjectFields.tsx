@@ -1,22 +1,33 @@
 import { useStore } from "../store";
+import type { ProjectPick } from "../commands/sketch";
+
+const OPTIONS: [ProjectPick, string][] = [
+  ["entities", "Edges and faces"],
+  ["bodies", "Bodies"],
+  ["faceSections", "Face sections"],
+  ["bodySections", "Body sections"],
+];
 
 export function ProjectFields() {
-  const bodies = useStore((s) =>
-    s.active?.id === "design.sketch" ? s.active.state.projectBodies : false,
+  const pick = useStore((s) =>
+    s.active?.id === "design.sketch" ? s.active.state.projectPick : "entities",
   );
   const setSketchState = useStore((s) => s.setSketchState);
   return (
     <select
       className="tb-select"
-      title="Project selection: edges, faces and sketch curves, or whole bodies as their outline"
+      title="Project selection: edges, faces and sketch curves; whole bodies as their outline; or faces and bodies cut where they cross the sketch plane"
       aria-label="Project selection"
-      value={bodies ? "bodies" : "entities"}
+      value={pick}
       onChange={(e) =>
-        setSketchState({ projectBodies: e.target.value === "bodies" })
+        setSketchState({ projectPick: OPTIONS[e.target.selectedIndex]![0] })
       }
     >
-      <option value="entities">Edges and faces</option>
-      <option value="bodies">Bodies</option>
+      {OPTIONS.map(([value, label]) => (
+        <option key={value} value={value}>
+          {label}
+        </option>
+      ))}
     </select>
   );
 }

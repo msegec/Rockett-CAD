@@ -34,8 +34,11 @@ export interface SketchState {
   offsetChain: boolean;
   offsetJoinTolerance: number;
   moveCopy: boolean;
-  projectBodies: boolean;
+  projectPick: ProjectPick;
 }
+
+export type ProjectPick =
+  "entities" | "bodies" | "faceSections" | "bodySections";
 
 export const DEFAULT_RHO = 0.5;
 
@@ -54,7 +57,7 @@ export function sketchState(sketchId: string, tool: SketchTool): SketchState {
     offsetChain: true,
     offsetJoinTolerance: 0.01,
     moveCopy: false,
-    projectBodies: false,
+    projectPick: "entities",
   };
 }
 

@@ -91,8 +91,9 @@ registerCoreSpec(
     refAt("plane", "/plane", f.plane),
     ...f.entities.flatMap((e, i) => {
       if (e.kind === "point" || !e.projection) return [];
-      const path = `/entities/${i}/projection`;
-      const ref = e.projection;
+      const outer = e.projection;
+      const ref = outer.kind === "section" ? outer.of : outer;
+      const path = `/entities/${i}/projection${ref === outer ? "" : "/of"}`;
       if (ref.kind === "body")
         return [refAt("body", `${path}/bodyId`, ref.bodyId)];
       if (ref.kind === "face") return [refAt("face", path, ref)];

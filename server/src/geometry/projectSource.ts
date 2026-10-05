@@ -5,9 +5,8 @@ import {
   projectEdge,
   seenEdgeOn,
   sketchSpaceCurve,
-  type BodyRef,
   type ExactCurve,
-  type FaceRef,
+  type GroupRef,
   type PlaneFrame,
   type ProjectionRef,
   type SketchConstraint,
@@ -19,14 +18,20 @@ import { computeEdgeNames, findFace, type NamedBody } from "./naming.js";
 import { exactCurve } from "./edgeCurve.js";
 import { release, scoped } from "./kernel.js";
 import { bodyOutline, faceEdges, type OutlinePiece } from "./bodyOutline.js";
+import { bodySection, SectionMiss } from "./bodySection.js";
 
 const EDGE_ON_FACE =
   "This face is seen edge-on from the sketch plane. Choose a face visible in the sketch plane.";
 
-export const sourceNoun = (ref: ProjectionRef) =>
-  ref.kind === "sketchEntity" ? "sketch entity" : ref.kind;
+export const sourceNoun = (ref: ProjectionRef): string =>
+  ref.kind === "section"
+    ? sourceNoun(ref.of)
+    : ref.kind === "sketchEntity"
+      ? "sketch entity"
+      : ref.kind;
 
 export function sourceLabel(ref: ProjectionRef): string {
+  if (ref.kind === "section") return `section of ${sourceLabel(ref.of)}`;
   if (ref.kind === "edge") return `edge ${ref.edgeName}`;
   if (ref.kind === "face") return `face ${ref.faceName}`;
   if (ref.kind === "body") return `body ${ref.bodyId}`;
@@ -35,7 +40,7 @@ export function sourceLabel(ref: ProjectionRef): string {
 
 function sourceCurve(
   state: EvalState,
-  ref: Exclude<ProjectionRef, FaceRef | BodyRef>,
+  ref: Exclude<ProjectionRef, GroupRef>,
 ): ExactCurve | undefined {
   if (ref.kind === "sketchEntity") {
     const sketch = state.sketches.get(ref.sketchId);
@@ -65,11 +70,14 @@ function faceCurves(
 
 function groupPieces(
   state: EvalState,
-  ref: FaceRef | BodyRef,
+  ref: GroupRef,
   frame: PlaneFrame,
 ): OutlinePiece[] | undefined {
-  const body = state.bodies.get(ref.bodyId);
+  const body = state.bodies.get(
+    ref.kind === "section" ? ref.of.bodyId : ref.bodyId,
+  );
   if (!body) return undefined;
+  if (ref.kind === "section") return bodySection(body, frame, ref.of);
   return ref.kind === "face"
     ? faceCurves(body, ref.faceName)
     : bodyOutline(body, frame, ref);
@@ -100,6 +108,15 @@ export function projectSource(
   }
 }
 
+function sectioned(...args: Parameters<typeof projectSource>) {
+  try {
+    return projectSource(...args);
+  } catch (error) {
+    if (error instanceof SectionMiss) return error;
+    throw error;
+  }
+}
+
 const place = (e: SketchEntity) =>
   JSON.stringify(
     e.kind === "point" ? [e.x, e.y] : e.kind === "circle" ? e.radius : e.kind,
@@ -113,6 +130,7 @@ export function refreshProjections(
   const stored = new Map(f.entities.map((e) => [e.id, e]));
   const placed = new Map(f.entities.map((e) => [e.id, place(e)]));
   const roots = new Set<string>();
+  const empty: string[] = [];
   let entities = f.entities.map((e) => ({ ...e }));
   let moved = false;
   for (const entity of f.entities) {
@@ -122,7 +140,12 @@ export function refreshProjections(
     const id = group ? groupRoot(entity.id) : entity.id;
     if (roots.has(id)) continue;
     roots.add(id);
-    const projected = projectSource(state, ref, frame, id, entity.construction);
+    const result = sectioned(state, ref, frame, id, entity.construction);
+    if (result instanceof SectionMiss)
+      empty.push(
+        `Section ${id} is empty: the sketch plane ${result.verb} ${sourceLabel(result.of)}.`,
+      );
+    const projected = result instanceof SectionMiss ? [] : result;
     if (!projected)
       throw new Error(
         `Projected ${sourceLabel(ref)} is missing. Restore its source or delete and re-project the reference.`,
@@ -144,7 +167,7 @@ export function refreshProjections(
       const was = stored.get(e.id);
       return e.kind === "point" || !was
         ? e
-        : { ...e, construction: was.construction === true };
+        : Object.assign(e, { construction: was.construction === true });
     });
     const at = entities.findIndex(inGroup);
     moved ||= entities.filter(inGroup).length !== members.length;
@@ -166,6 +189,7 @@ export function refreshProjections(
           ]
         : [];
     })
+    .concat(empty)
     .join(" ");
   const constraints = f.constraints.filter((c) => !gone(c));
   return { entities, constraints, moved, lost };

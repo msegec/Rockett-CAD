@@ -1,4 +1,10 @@
-import type { BodyRef, FaceRef, ProjectionRef, SketchEntity } from "./model.js";
+import type {
+  BodyRef,
+  FaceRef,
+  ProjectionRef,
+  SectionRef,
+  SketchEntity,
+} from "./model.js";
 import type { EdgeInfo, ExactCurve, PlaneFrame, Vec3 } from "./api.js";
 import { sketchBuilder, type SketchBuilder } from "./sketchBuilder.js";
 import { sketchCurves, TAU, type Curve, type XY } from "./sketchCurves.js";
@@ -16,8 +22,10 @@ const EDGE_ON =
 export const seenEdgeOn = (error: unknown) =>
   error instanceof Error && [TO_POINT, EDGE_ON].includes(error.message);
 
-export const isGroupRef = (ref: ProjectionRef): ref is FaceRef | BodyRef =>
-  ref.kind === "face" || ref.kind === "body";
+export type GroupRef = FaceRef | BodyRef | SectionRef;
+
+export const isGroupRef = (ref: ProjectionRef): ref is GroupRef =>
+  ref.kind === "face" || ref.kind === "body" || ref.kind === "section";
 
 export const groupRoot = (memberId: string) => memberId.split(":")[0]!;
 
@@ -42,6 +50,7 @@ export function sourceKey(ref: ProjectionRef): string {
   if (ref.kind === "edge") return `edge/${ref.bodyId}/${ref.edgeName}`;
   if (ref.kind === "face") return `face/${ref.bodyId}/${ref.faceName}`;
   if (ref.kind === "body") return `body/${ref.bodyId}`;
+  if (ref.kind === "section") return `section/${sourceKey(ref.of)}`;
   return `sketch/${ref.sketchId}/${ref.entityId}`;
 }
 
