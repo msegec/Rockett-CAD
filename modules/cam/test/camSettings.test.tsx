@@ -1,5 +1,5 @@
-import { act, createElement as h, Fragment } from "react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { act } from "react";
+import { beforeEach, expect, it } from "vitest";
 import type { MachineProfile } from "../src/shared/machine.js";
 import {
   client,
@@ -8,12 +8,21 @@ import {
   host,
   mine,
   open,
-  root,
   router,
-  runCommand,
   saved,
   serve,
 } from "./helpers/camClient.js";
+import {
+  button,
+  choose,
+  click,
+  field,
+  mountSettings,
+  openMachines,
+  settingsPanel,
+  type,
+  type UserSettings,
+} from "./helpers/settingsPage.js";
 
 const MACHINES = "/api/m/rockett/cam/machines";
 
@@ -21,15 +30,12 @@ const mill: MachineProfile = { ...router, id: "m2", name: "Mill" };
 
 let machines: { data: MachineProfile[]; etag: string };
 let machinePuts: { data: MachineProfile[]; etag: string | null }[];
-let patches: unknown[];
-let userValues: Record<string, unknown>;
-let settings: any;
+let user: UserSettings;
 
 beforeEach(async () => {
   machines = { data: [router, mill], etag: "m0" };
   machinePuts = [];
-  patches = [];
-  userValues = {};
+  user = { values: {}, patches: [] };
   fetchMock.mockImplementation(async (url, init = {}) => {
     if (String(url) !== MACHINES) return serve(url, init);
     if ((init.method ?? "GET") === "GET")
@@ -39,102 +45,11 @@ beforeEach(async () => {
     machines = { data: body.data, etag: `m${machinePuts.length}` };
     return Response.json({ version: 1, ...machines, readOnly: false });
   });
-  const [
-    { Panels },
-    { ConfirmPanel },
-    { SettingsButton },
-    { settingsApi },
-    { useSession },
-    store,
-  ] = await Promise.all([
-    client("shell/panels.tsx"),
-    client("components/ConfirmPanel.tsx"),
-    client("components/SettingsPanel.tsx"),
-    client("settingsApi.ts"),
-    client("session.ts"),
-    client("settings.ts"),
-  ]);
-  settings = store;
-  useSession.setState({
-    kind: "signed-in",
-    user: { id: "u1", username: "mark", role: "admin", status: "active" },
-  });
-  vi.spyOn(settingsApi, "getAppSettings").mockResolvedValue({
-    values: {},
-    version: '"a"',
-  });
-  vi.spyOn(settingsApi, "getUserSettings").mockImplementation(async () => ({
-    values: userValues,
-    version: '"u"',
-  }));
-  vi.spyOn(settingsApi, "patchUserSettings").mockImplementation(
-    async (patch: any) => {
-      patches.push(patch);
-      userValues = { ...userValues, ...patch.set };
-      return { values: userValues, version: `"u${patches.length}"` };
-    },
-  );
-  await settings.loadAppSettings();
-  await settings.loadUserSettings();
-  await act(async () =>
-    root.render(
-      h(Fragment, null, h(Panels), h(SettingsButton), h(ConfirmPanel)),
-    ),
-  );
+  await mountSettings(user);
 });
-
-afterEach(() => {
-  settings.clearSettings();
-  vi.restoreAllMocks();
-});
-
-const settingsPanel = () => host.querySelector(".settings-panel")!;
 
 const heading = () =>
   settingsPanel().querySelector(".settings-heading h2")?.textContent;
-
-const button = (panel: Element, label: string) =>
-  [...panel.querySelectorAll("button")].find(
-    (b) => b.getAttribute("aria-label") === label || b.textContent === label,
-  ) as HTMLButtonElement;
-
-const field = (panel: Element, label: string) =>
-  [...panel.querySelectorAll("label.field")].find(
-    (l) => l.querySelector("span")?.textContent === label,
-  )!;
-
-const setValue = Object.getOwnPropertyDescriptor(
-  HTMLInputElement.prototype,
-  "value",
-)!.set!;
-
-async function type(panel: Element, label: string, text: string) {
-  const input = field(panel, label).querySelector("input")!;
-  await act(async () => {
-    input.dispatchEvent(new FocusEvent("focus"));
-    setValue.call(input, text);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-}
-
-async function choose(panel: Element, label: string, value: string) {
-  const select = field(panel, label).querySelector("select")!;
-  await act(async () => {
-    select.value = value;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-}
-
-async function click(panel: Element, label: string) {
-  await act(async () => button(panel, label).click());
-  await flush();
-}
-
-async function openMachines() {
-  await act(async () => void runCommand("rockett.cam.library"));
-  await flush();
-  return settingsPanel();
-}
 
 it("the Library command opens Settings at CAM, Machines and no Library panel exists", async () => {
   const panel = await openMachines();
@@ -246,7 +161,7 @@ it("a new setup takes the default safe height and clearance, and NC Program star
   await type(panel, "Default safe height (mm)", "22");
   await type(panel, "Default clearance (mm)", "4");
   await flush();
-  expect(userValues).toEqual({
+  expect(user.values).toEqual({
     "plugin.rockett.cam.defaultMachine": "m2",
     "plugin.rockett.cam.safeHeight": 22,
     "plugin.rockett.cam.clearance": 4,

@@ -15,6 +15,10 @@ type Material = { name: string; chart: string; unitPower?: number } & (
 const CHARTS: Record<string, Band[]> = data.charts;
 const MATERIALS: Record<string, Material> = data.materials;
 
+export const MATERIAL_OPTIONS = Object.entries(MATERIALS).map(
+  ([id, { name }]): [string, string] => [id, name],
+);
+
 const POWER_SHARE = 0.8;
 const MIN_STEPDOWN_FRACTION = 0.1;
 const BAND_EDGE = 1e-6;

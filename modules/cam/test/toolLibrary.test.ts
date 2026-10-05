@@ -11,7 +11,11 @@ import type {
   UserData,
 } from "@rockett/plugin-api";
 import cam from "../server.js";
-import { CAM_EXTENSION, migrateCam } from "../src/shared/document.js";
+import {
+  CAM_EXTENSION,
+  CAM_VERSION,
+  migrateCam,
+} from "../src/shared/document.js";
 import type { Preset, Tool } from "../src/shared/tools.js";
 
 type Handler = (body: unknown, doc?: CadDocument) => Promise<unknown>;
@@ -55,6 +59,7 @@ const preset: Preset = {
 
 const routes = new Map<string, Handler>();
 let dataDir = "";
+let presetStore: UserData;
 
 const call = async (
   method: string,
@@ -83,6 +88,7 @@ beforeAll(async () => {
     new LocalStorage(dataDir, fs),
     "rockett.cam",
   );
+  presetStore = userData("presets", 1);
   const add =
     (wrap: (route: Route, handle: any) => Handler) =>
     (route: Route, handle: any) =>
@@ -220,6 +226,25 @@ describe("CAM tool library", () => {
   });
 });
 
+describe("CAM preset library written before CAM-075", () => {
+  it("saves and deletes beside a stored preset with an odd toolId", async () => {
+    const odd = { ...preset, id: "odd", name: "Odd link", toolId: 5 };
+    const current: any = await call("GET", "/m/rockett/cam/presets", undefined);
+    const stored = await presetStore.write(mark, [odd], current?.etag ?? null);
+    const made = { ...preset, id: "new", name: "New", toolId: tool.id };
+    const added: any = await call("PUT", "/m/rockett/cam/presets", {
+      data: [odd, made],
+      etag: stored.etag,
+    });
+    expect(added.data).toEqual([odd, made]);
+    const removed: any = await call("PUT", "/m/rockett/cam/presets", {
+      data: [odd],
+      etag: added.etag,
+    });
+    expect(removed.data).toEqual([odd]);
+  });
+});
+
 describe("CAM document tool copies", () => {
   it("reads a v1 document saved before tool fields unchanged", () => {
     const data = {
@@ -229,6 +254,20 @@ describe("CAM document tool copies", () => {
     const stored = { version: 1, data: structuredClone(data) };
     expect(migrateCam(stored)).toEqual({ status: "ready", data });
     expect(stored).toEqual({ version: 1, data });
+  });
+
+  it.each([
+    ["an empty", ""],
+    ["a numeric", 5],
+  ])("reads a preset copy holding %s toolId as base did", (_name, toolId) => {
+    const data = {
+      setups: [{ id: "s1", name: "Setup 1" }],
+      tools: [{ id: "t1", presets: [{ ...preset, toolId }] }],
+    };
+    expect(migrateCam({ version: CAM_VERSION, data })).toEqual({
+      status: "ready",
+      data,
+    });
   });
 
   it("keeps a copy with a mistyped tool field read only", () => {

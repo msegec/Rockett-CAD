@@ -70,7 +70,7 @@ export function withKind(tool: Tool, kind: Tool["kind"]): Tool {
   return { ...rest, kind, tipAngle: tipAngle ?? TIP_ANGLE };
 }
 
-export const presetSchema = Type.Object({
+const presetBody = {
   id: Type.String({ minLength: 1 }),
   name: Type.String(),
   rpm: Type.Number(),
@@ -81,9 +81,32 @@ export const presetSchema = Type.Object({
   stepoverFraction: Type.Number(),
   coolant,
   profile: Type.Optional(Type.Integer({ minimum: 1, maximum: 5 })),
+};
+
+export const storedPresetSchema = Type.Object(presetBody);
+
+export const presetSchema = Type.Object({
+  ...presetBody,
+  toolId: Type.Optional(Type.String({ minLength: 1 })),
 });
 
 export type Preset = Static<typeof presetSchema>;
+
+export const newPreset = (count: number, toolId?: string): Preset => ({
+  id: crypto.randomUUID(),
+  name: `Preset ${count + 1}`,
+  ...(toolId ? { toolId } : {}),
+  rpm: 18000,
+  cutFeed: 1000,
+  plungeFeed: 300,
+  rampFeed: 300,
+  stepdown: 1,
+  stepoverFraction: 0.4,
+  coolant: "off",
+});
+
+export const presetFits = (preset: Preset, tool: Tool) =>
+  preset.toolId === undefined || preset.toolId === tool.id;
 
 export function validateTool(tool: Tool): string[] {
   const problems: string[] = [];

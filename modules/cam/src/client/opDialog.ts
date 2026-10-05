@@ -20,7 +20,7 @@ import {
   paramsOf,
   pocketParams,
 } from "../shared/params.js";
-import type { Preset, Tool } from "../shared/tools.js";
+import { presetFits, type Preset, type Tool } from "../shared/tools.js";
 import { banner, libraryOf, reason } from "./libraryParts.js";
 import { faceKeys, firstChoices, schemaFields } from "./schemaForm.js";
 import { camRead, editCam, withOperations } from "./setup.js";
@@ -101,7 +101,7 @@ export function setupList(open: OpenProject): List<CamData["setups"][number]> {
 function copyTool(
   data: CamData,
   tool: Tool,
-  preset: Preset,
+  { toolId: _link, ...preset }: Preset,
 ): { tools: CamData["tools"]; toolId: string } {
   const copy = data.tools.find((item) => item.libraryRef?.id === tool.id);
   if (!copy) {
@@ -205,6 +205,14 @@ export function useLibrary<T>(
   return list;
 }
 
+const fitting = (presets: List<Preset>, tool?: Tool): List<Preset> =>
+  presets.status === "ready" && tool
+    ? {
+        status: "ready",
+        items: presets.items.filter((item) => presetFits(item, tool)),
+      }
+    : presets;
+
 export const chosen = <T extends Named>(list: List<T>, id: string) =>
   list.status === "ready"
     ? (list.items.find((item) => item.id === id) ?? list.items[0])
@@ -243,7 +251,7 @@ const listTexts = ({
   },
   preset: {
     loading: "Loading presets...",
-    empty: "No presets in your library.",
+    empty: "No presets for this tool. Add one in Settings, CAM, Tools.",
     failed: "Presets did not load",
   },
 });
@@ -272,7 +280,8 @@ export function operationDialog(
     const setups = setupList(open);
     const setup = chosen(setups, ids.setup);
     const tool = chosen(tools, ids.tool);
-    const preset = chosen(presets, ids.preset);
+    const offered = fitting(presets, tool);
+    const preset = chosen(offered, ids.preset);
     const blank = unset(op.schema, params);
     const hint = faceKeys(op.schema).some((key) => blank.includes(key))
       ? "Select a face in the viewport."
@@ -304,7 +313,7 @@ export function operationDialog(
       banner(saving.error || null),
       picker(ui, "Setup", setups, setup, choose("setup"), texts.setup),
       picker(ui, "Tool", tools, tool, choose("tool"), texts.tool),
-      picker(ui, "Preset", presets, preset, choose("preset"), texts.preset),
+      picker(ui, "Preset", offered, preset, choose("preset"), texts.preset),
       schemaFields(
         ui,
         op.schema,

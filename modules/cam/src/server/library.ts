@@ -21,7 +21,7 @@ import {
   type MachineProfile,
 } from "../shared/machine.js";
 import {
-  presetSchema,
+  storedPresetSchema,
   toolSchema,
   validatePreset,
   validateTool,
@@ -120,7 +120,7 @@ export function mountLibrary(
     api,
     userData("presets", 1),
     "preset",
-    presetSchema,
+    storedPresetSchema,
     validatePreset,
   );
   list<MachineProfile>(

@@ -4,7 +4,7 @@ import type {
   NumberFieldProps,
   OpenProject,
 } from "@rockett/plugin-api";
-import feeds from "../feeds/materials.json";
+import { MATERIAL_OPTIONS } from "../feeds/suggest.js";
 import type { Post } from "../post/schema.js";
 import type { Xyz } from "../shared/ir.js";
 import type { MachineProfile } from "../shared/machine.js";
@@ -31,10 +31,7 @@ const NO_MATERIAL = "";
 
 const MATERIALS: [string, string][] = [
   [NO_MATERIAL, "None"],
-  ...Object.entries(feeds.materials).map(([id, { name }]): [string, string] => [
-    id,
-    name,
-  ]),
+  ...MATERIAL_OPTIONS,
 ];
 
 const STOCK_KINDS: [Stock["kind"], string][] = [

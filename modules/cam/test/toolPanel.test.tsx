@@ -15,6 +15,7 @@ const client = (file: string) => load(`../../../client/src/${file}`);
 const TOOLS = "/api/m/rockett/cam/tools";
 const MACHINES = "/api/m/rockett/cam/machines";
 const POSTS = "/api/m/rockett/cam/posts";
+const PRESETS = "/api/m/rockett/cam/presets";
 
 let stored: { data: Tool[]; etag: string } | null;
 let puts: { data: Tool[]; etag: string | null }[];
@@ -62,6 +63,7 @@ function serve(url: RequestInfo | URL, init: RequestInit = {}) {
     return Response.json({ error: "disk unavailable" }, { status: 500 });
   if (String(url) === MACHINES) return serveMachines(method, init);
   if (String(url) === POSTS) return servePosts(method, init);
+  if (String(url) === PRESETS && method === "GET") return Response.json(null);
   if (String(url) !== TOOLS) throw new Error(`${method} ${url}`);
   if (method === "GET")
     return Response.json(stored && { version: 1, ...stored, readOnly: false });

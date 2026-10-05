@@ -136,7 +136,11 @@ describe("rockett-tools.json", () => {
           { ...flat, name: "Twin" },
           7,
         ],
-        [preset, { ...preset, id: "p2", name: "Still", cutFeed: 0 }],
+        [
+          preset,
+          { ...preset, id: "p2", name: "Still", cutFeed: 0 },
+          { ...preset, id: "p3", name: "Unlinked", toolId: "" },
+        ],
       ),
     );
     expect(result.tools).toEqual([flat]);
@@ -152,6 +156,10 @@ describe("rockett-tools.json", () => {
       { item: "Twin", reason: "id t1 appears twice" },
       { item: "Tool 7", reason: "must be object" },
       { item: "Still", reason: "cutFeed must be greater than 0" },
+      {
+        item: "Unlinked",
+        reason: "toolId must not have fewer than 1 characters",
+      },
     ]);
   });
 });

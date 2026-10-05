@@ -27,15 +27,21 @@ import {
   tree,
   useModuleSetting,
   useStored,
-  type Library,
 } from "./libraryParts.js";
 import { machineForm } from "./machineForm.js";
+import {
+  newPresetButton,
+  otherPresets,
+  presetSection,
+  toolPresets,
+  useDefaultMill,
+} from "./presetForm.js";
 import { newTool, toolFields } from "./toolForm.js";
 
 type Ui = ClientContext["ui"];
 type Item = { id: string; name: string };
 
-type Section<T extends Item> = {
+export type Section<T extends Item> = {
   noun: string;
   title: string;
   create(count: number): T;
@@ -79,12 +85,16 @@ export function useSection<T extends Item>(
   );
   const [editing, setEditing] = useState<T | null>(null);
   const [pending, setPending] = useState(false);
-  const write = (items: T[]) => {
+  const reload = () =>
+    request<UserDataEntry | null>("GET", path)
+      .then(libraryOf<T>)
+      .then((next) => {
+        setLibrary(next);
+        return next;
+      });
+  const write = (items: T[], etag = library!.etag) => {
     setPending(true);
-    return request<UserDataEntry>("PUT", path, {
-      data: items,
-      etag: library!.etag,
-    })
+    return request<UserDataEntry>("PUT", path, { data: items, etag })
       .then(libraryOf<T>)
       .then(
         (next) => {
@@ -112,12 +122,13 @@ export function useSection<T extends Item>(
     pending,
     setError,
     setEditing,
+    reload,
     write,
     remove,
   };
 }
 
-type State<T extends Item> = ReturnType<typeof useSection<T>>;
+export type State<T extends Item> = ReturnType<typeof useSection<T>>;
 
 function sectionForm<T extends Item>(ui: Ui, state: State<T>) {
   const { section, library, editing, pending } = state;
@@ -147,22 +158,28 @@ function sectionList<T extends Item>(
   state: State<T>,
   extra?: ReactNode,
   mark?: (item: T) => ReactNode,
+  after?: (item: T) => ReactNode,
 ) {
   const { section, library, error, pending } = state;
   const plural = section.title.toLowerCase();
   const rows = library?.items.map((item) =>
-    row(
-      { key: item.id, name: item.name },
-      mark?.(item),
-      button("Edit", `Edit ${item.name}`, pending, () =>
-        state.setEditing(item),
+    h(
+      Fragment,
+      { key: item.id },
+      row(
+        { key: item.id, name: item.name },
+        mark?.(item),
+        button("Edit", `Edit ${item.name}`, pending, () =>
+          state.setEditing(item),
+        ),
+        button(
+          "Delete",
+          `Delete ${item.name}`,
+          pending,
+          () => void state.remove(item),
+        ),
       ),
-      button(
-        "Delete",
-        `Delete ${item.name}`,
-        pending,
-        () => void state.remove(item),
-      ),
+      after?.(item),
     ),
   );
   const add = `Add ${section.noun}`;
@@ -260,22 +277,7 @@ export function importDialog(ui: Ui, view: ImportView) {
   );
 }
 
-type Importing = {
-  name: string;
-  result: ToolImport;
-  replace: boolean;
-  presets: Library<Preset>;
-};
-
-const readPresets = ({ request }: ClientContext) =>
-  request<UserDataEntry | null>("GET", "presets").then(libraryOf<Preset>);
-
-const exportLibrary = async (context: ClientContext, tools: Tool[]) =>
-  context.ui.download({
-    fileName: TOOLS_FILE,
-    data: exportTools(tools, (await readPresets(context)).items),
-    type: "application/json",
-  });
+type Importing = { name: string; result: ToolImport; replace: boolean };
 
 async function pickImport(context: ClientContext): Promise<Importing | null> {
   const file = await context.ui.pickFile({
@@ -283,60 +285,55 @@ async function pickImport(context: ClientContext): Promise<Importing | null> {
     maxBytes: Infinity,
   });
   if (!file) return null;
-  return {
-    name: file.name,
-    result: importRockett(file.text),
-    replace: false,
-    presets: await readPresets(context),
-  };
+  return { name: file.name, result: importRockett(file.text), replace: false };
 }
 
-function useTransfer(context: ClientContext, tools: State<Tool>) {
-  const { ui, request } = context;
+function useTransfer(
+  context: ClientContext,
+  tools: State<Tool>,
+  presets: State<Preset>,
+) {
+  const { ui } = context;
   const [importing, setImporting] = useState<Importing | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
   const items = tools.library?.items;
-  const exportFile = (list: Tool[]) =>
-    exportLibrary(context, list).catch((e) =>
-      setError(`Export did not read your presets: ${reason(e)}.`),
-    );
+  const stored = presets.library?.items;
+  const fresh = (doing: string) =>
+    presets.reload().catch((e) => {
+      setError(`${doing} did not read your presets: ${reason(e)}.`);
+      return null;
+    });
   const pick = () =>
     pickImport(context).then(
-      (next) => {
-        if (!next) return;
+      async (next) => {
+        if (!next || !(await fresh("Import"))) return;
         setError(null);
         setImporting(next);
       },
       (e) => setError(`Import did not start: ${reason(e)}.`),
     );
-  const writePresets = async (open: Importing, next: Preset[]) => {
-    setPending(true);
-    try {
-      const stored = await request<UserDataEntry>("PUT", "presets", {
-        data: next,
-        etag: open.presets.etag,
-      });
-      setImporting({ ...open, presets: libraryOf<Preset>(stored) });
-      return true;
-    } catch (e) {
-      setError(`Presets did not save: ${reason(e)}.`);
-      return false;
-    } finally {
-      setPending(false);
-    }
-  };
-  const run = async (open: Importing) => {
-    const { result, replace, presets } = open;
+  const run = async ({ result, replace }: Importing) => {
     const nextTools = merge(items!, result.tools, replace);
     if (nextTools !== items && !(await tools.write(nextTools))) return;
-    const next = merge(presets.items, result.presets, replace);
-    if (next !== presets.items && !(await writePresets(open, next))) return;
+    const read = await fresh("Import");
+    if (!read) return;
+    const next = merge(read.items, result.presets, replace);
+    if (next !== read.items && !(await presets.write(next, read.etag))) return;
     setImporting(null);
   };
-  const busy = pending || tools.pending;
+  const exportFile = async (list: Tool[]) => {
+    const read = await fresh("Export");
+    if (!read) return;
+    ui.download({
+      fileName: TOOLS_FILE,
+      data: exportTools(list, read.items),
+      type: "application/json",
+    });
+  };
+  const busy = tools.pending || presets.pending;
   const buttons =
     items &&
+    stored &&
     h(
       Fragment,
       null,
@@ -352,13 +349,14 @@ function useTransfer(context: ClientContext, tools: State<Tool>) {
   const dialog =
     importing &&
     items &&
+    stored &&
     importDialog(ui, {
       name: importing.name,
       result: importing.result,
       replace: importing.replace,
       tools: items,
-      presets: importing.presets.items,
-      error: error ?? tools.error,
+      presets: stored,
+      error: error ?? tools.error ?? presets.error,
       pending: busy,
       setReplace: (replace) => setImporting({ ...importing, replace }),
       onOk: () => void run(importing),
@@ -374,11 +372,25 @@ export function toolsPage(context: ClientContext) {
   const { ui } = context;
   return function ToolsPage() {
     const tools = useSection(context, TOOLS);
-    const transfer = useTransfer(context, tools);
+    const items = tools.library?.items ?? [];
+    const mill = useDefaultMill(context);
+    const presets = useSection(context, presetSection(items, mill));
+    const transfer = useTransfer(context, tools, presets);
     return (
       transfer.dialog ||
+      sectionForm(ui, presets) ||
       sectionForm(ui, tools) ||
-      sectionList(tools, transfer.buttons)
+      h(
+        Fragment,
+        null,
+        banner(presets.error),
+        sectionList(
+          tools,
+          h(Fragment, null, otherPresets(presets, items), transfer.buttons),
+          (tool) => newPresetButton(presets, tool),
+          (tool) => toolPresets(presets, tool),
+        ),
+      )
     );
   };
 }

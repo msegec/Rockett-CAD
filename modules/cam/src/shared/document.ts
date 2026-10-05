@@ -5,7 +5,7 @@ import { validatePost, type Post } from "../post/schema.js";
 import type { Program, Xy } from "./ir.js";
 import { machineSchema } from "./machine.js";
 import { MIN_TOLERANCE } from "./params.js";
-import { presetSchema, toolSchema } from "./tools.js";
+import { storedPresetSchema, toolSchema } from "./tools.js";
 
 export const CAM_EXTENSION = "rockett.cam";
 export const CAM_VERSION = 3;
@@ -20,7 +20,7 @@ const docTool = Type.Intersect([
     Type.Object({
       libraryRef: entry,
       number: Type.Integer({ minimum: 1 }),
-      presets: Type.Array(presetSchema),
+      presets: Type.Array(storedPresetSchema),
     }),
   ),
 ]);
