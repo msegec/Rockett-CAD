@@ -77,7 +77,7 @@ everything downstream against persistent topology references.
 - **AI post kit**: Download post kit saves a prompt that helps an AI assistant turn your old post into a Rockett post.
 - **Machines**: mill or laser profiles with firmware, travel, spindle rpm and power, acceleration and rigidity; paste GRBL `$$` to fill.
 - **Tools**: flat, ball and bull nose end mills, V-bits, drills and chamfer mills; import and export `rockett-tools.json`.
-- **Feed presets and Suggest**: each tool keeps presets; Suggest fills them from six materials by chipload, scaled by machine rigidity.
+- **Feed presets and Suggest**: Suggest fills presets from six materials by chipload, scaled by machine rigidity; operations re-suggest for the setup's machine.
 
 ### Inspect
 
@@ -143,7 +143,6 @@ with no dates. Next lists the work under way.
 ### Next
 
 - [ ] Beginner CAM guide and an example project ready to generate
-- [ ] Re-suggest feeds and speeds for the machine a setup uses
 
 ### Sketch
 
@@ -213,6 +212,7 @@ with no dates. Next lists the work under way.
 - [x] Manufacture workbench with setups, stock and work zero
 - [x] Machine, post and tool libraries in Settings
 - [x] Feed presets and Suggest, scaled by machine rigidity
+- [x] Re-suggest feeds and speeds for the machine a setup uses
 - [x] Contour, pocket and laser operations
 - [x] Toolpath preview and heightmap simulation with gouge checks
 - [x] NC export through six shipped posts or your own

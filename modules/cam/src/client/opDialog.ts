@@ -13,6 +13,7 @@ import type {
   UserDataEntry,
 } from "@rockett/plugin-api";
 import { signRoute, type CamData } from "../shared/document.js";
+import { machineKind, type MachineProfile } from "../shared/machine.js";
 import { toolRefusal } from "../shared/operations.js";
 import {
   contourParams,
@@ -21,7 +22,8 @@ import {
   pocketParams,
 } from "../shared/params.js";
 import { presetFits, type Preset, type Tool } from "../shared/tools.js";
-import { banner, libraryOf, reason } from "./libraryParts.js";
+import { banner, button, libraryOf, reason } from "./libraryParts.js";
+import { resuggested, useDefaultMill } from "./presetForm.js";
 import { faceKeys, firstChoices, schemaFields } from "./schemaForm.js";
 import { camRead, editCam, withOperations } from "./setup.js";
 
@@ -234,6 +236,74 @@ async function saveOperation(
   );
 }
 
+const RESUGGEST = "Re-suggest for this machine";
+
+type Setup = CamData["setups"][number];
+
+type Again = { key: string } & (
+  { text: string; preset: Preset } | { error: string }
+);
+
+function otherMill(
+  setup: Setup | undefined,
+  mill: ReturnType<typeof useDefaultMill>,
+) {
+  const to = setup?.machine;
+  if (!to || !("machine" in mill) || machineKind(to) !== "mill") return;
+  if (to.libraryRef.id === mill.machine.id) return;
+  return { from: mill.machine, to };
+}
+
+function again(
+  key: string,
+  tool: Tool,
+  preset: Preset,
+  material: string,
+  { from, to }: { from: MachineProfile; to: MachineProfile },
+): Again {
+  try {
+    return { key, ...resuggested(tool, preset, material, from, to) };
+  } catch (e) {
+    if (!(e instanceof RangeError)) throw e;
+    return { key, error: `Re-suggest refused: ${reason(e)}.` };
+  }
+}
+
+function useResuggest(
+  context: ClientContext,
+  setup: Setup | undefined,
+  tool: Tool | undefined,
+  preset: Preset | undefined,
+) {
+  const mill = useDefaultMill(context);
+  const [result, setResult] = useState<Again | null>(null);
+  const machines = otherMill(setup, mill);
+  const id = `${setup?.id}/${tool?.id}/${preset?.id}`;
+  const current = result?.key === id ? result : null;
+  const material = setup?.material;
+  const run = () =>
+    tool &&
+    preset &&
+    material &&
+    machines &&
+    setResult(again(id, tool, preset, material, machines));
+  const hint = !material
+    ? "Re-suggest needs a material on the setup."
+    : current && "text" in current && current.text;
+  return {
+    preset: current && "preset" in current ? current.preset : preset,
+    row:
+      machines &&
+      h(
+        Fragment,
+        { key: "resuggest" },
+        banner(current && "error" in current ? current.error : null),
+        button(RESUGGEST, RESUGGEST, !tool || !preset || !material, run),
+        hint && h("span", { className: "field-hint" }, hint),
+      ),
+  };
+}
+
 export const SETUP_TEXTS: Texts = {
   loading: "Loading setups...",
   empty: "No setups yet. Add one with Setup.",
@@ -256,10 +326,8 @@ const listTexts = ({
   },
 });
 
-export function operationDialog(
-  { ui, project, request }: ClientContext,
-  op: OperationDialog,
-) {
+export function operationDialog(context: ClientContext, op: OperationDialog) {
+  const { ui, project, request } = context;
   const close = () => ui.closePanel(dialogPanel(op));
   const usable = (tool: Tool) => !toolRefusal(op.type, tool.kind);
   const texts = listTexts(op);
@@ -287,6 +355,7 @@ export function operationDialog(
       ? "Select a face in the viewport."
       : null;
     const ready = setup && tool && preset && blank.length === 0;
+    const resuggest = useResuggest(context, setup, tool, preset);
     const save = async () => {
       if (!ready) return;
       setSaving({ pending: true, error: "" });
@@ -294,7 +363,7 @@ export function operationDialog(
         await saveOperation(project, op, {
           setupId: setup.id,
           tool,
-          preset,
+          preset: resuggest.preset ?? preset,
           params,
         });
         close();
@@ -314,6 +383,7 @@ export function operationDialog(
       picker(ui, "Setup", setups, setup, choose("setup"), texts.setup),
       picker(ui, "Tool", tools, tool, choose("tool"), texts.tool),
       picker(ui, "Preset", offered, preset, choose("preset"), texts.preset),
+      resuggest.row,
       schemaFields(
         ui,
         op.schema,

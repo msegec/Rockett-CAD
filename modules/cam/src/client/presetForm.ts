@@ -85,8 +85,30 @@ type SuggestProps = {
 
 type Done = { text: string; values: Partial<Preset> };
 
-function suggested(tool: Tool, material: string, machine: MachineProfile) {
-  const { limits, stepdown, ...feeds } = suggestFeeds(tool, material, machine);
+const SUGGESTED = [
+  "rpm",
+  "cutFeed",
+  "plungeFeed",
+  "rampFeed",
+  "stepdown",
+  "stepoverFraction",
+] as const;
+
+type Kept = Partial<Pick<Preset, (typeof SUGGESTED)[number]>>;
+
+function suggested(
+  tool: Tool,
+  material: string,
+  machine: MachineProfile,
+  kept: Kept = {},
+) {
+  const { rampFeed: _ramp, ...given } = kept;
+  const { limits, stepdown, ...feeds } = suggestFeeds(
+    tool,
+    material,
+    machine,
+    given,
+  );
   const plungeFeed = Math.round(feeds.plungeFeed);
   const values = {
     rpm: Math.round(feeds.rpm),
@@ -95,11 +117,39 @@ function suggested(tool: Tool, material: string, machine: MachineProfile) {
     rampFeed: plungeFeed,
     stepdown,
     stepoverFraction: Math.round(feeds.stepoverFraction * 100) / 100,
+    ...kept,
   };
   const name = MATERIAL_OPTIONS.find(([id]) => id === material)![1];
   const applied = limits.map((limit) => limit.reason).join("; ");
   const text = `Suggested for ${name} on ${machine.name}${applied && `: ${applied}`}.`;
   return { text, values };
+}
+
+export function resuggested(
+  tool: Tool,
+  preset: Preset,
+  material: string,
+  from: MachineProfile,
+  to: MachineProfile,
+) {
+  const base = suggested(tool, material, from).values;
+  const kept = Object.fromEntries(
+    SUGGESTED.filter((key) => preset[key] !== base[key]).map((key) => [
+      key,
+      preset[key],
+    ]),
+  );
+  const { text, values } = suggested(tool, material, to, kept);
+  const problems = rpmProblem({ ...preset, ...values }, { machine: to });
+  return {
+    text: [text, ...problems.map((problem) => `${problem}.`)].join(" "),
+    preset: {
+      ...preset,
+      ...values,
+      id: crypto.randomUUID(),
+      name: `${preset.name} on ${to.name}`,
+    },
+  };
 }
 
 function withinMachine(preset: Preset, machine: MachineProfile): Preset {
