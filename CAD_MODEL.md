@@ -1,25 +1,19 @@
 # CAD model
 
-The document is a recipe. Geometry is rebuilt from it and never saved. This
-file keeps the contracts code cannot show and names the code that owns each.
-
-Parameter shapes live in the types, not here: `CadDocument` in
-`shared/src/documents.ts`, one module per feature in `shared/src/features/`, JSON
-schemas in `shared/src/schema/`.
+Geometry is rebuilt from the document recipe. `shared/src/documents.ts` owns
+`CadDocument`, `shared/src/features/` owns features, and `shared/src/schema/`
+owns validation. This file keeps their durable contracts.
 
 ## Saved projects
 
-Saved projects are user data. A shape change ships a migration, a backup and
-a test that loads the previous schema.
+Saved-data shape changes require a migration, backup and previous-schema proof.
 
-- `SCHEMA_VERSION` in `shared/src/documents.ts` is the document version. A shape
-  change bumps it and adds the step from the old version to
+- Shape changes bump `SCHEMA_VERSION` and add the previous-version step to
   `documentMigrations` in `server/src/store/migrations.ts`.
 - `migrate` refuses a newer file with `TooNewError` and a gap with
   `MissingStepError`.
-- Load migrates in memory. The first save backs up the complete project
-  through `NamespaceBackup` in `server/src/store/jsonStore.ts`, then writes
-  one generation.
+- Load migrates in memory; first save backs up the project through
+  `NamespaceBackup` in `server/src/store/jsonStore.ts`, then writes one generation.
 - Boot lists outdated projects and migrates none: `server/src/index.ts`.
 - Loading never writes. `pinRefs` in `server/src/geometry/pinRefs.ts` pins
   `targets` and `sig` in memory only.
@@ -31,8 +25,13 @@ a test that loads the previous schema.
 - STEP, IGES, BREP, STL, OBJ and 3MF bytes live in the project blob store
   under their sha256 (`server/src/store/blobStore.ts`). The feature holds
   `blob`.
-- `extensions` values keep their `{ version, data }` envelope. The server
-  never reads `data`.
+- `extensions` keeps opaque `{ version, data }` envelopes, including extra fields.
+  `moduleAssets.namespaces` owns module portable SHA-256 references, independent
+  of features and loaded modules. Project mutations declare only their manifest
+  namespace through `assets.set`; the existing blob owner validates bytes before
+  save. Schema 45 to 46 keeps absent maps absent and preserves any older root
+  `moduleAssets` value unchanged in `moduleAssets.legacy`. The first save backs
+  up the complete source; extension envelopes are never reinterpreted.
 - A feature is a `CoreFeature` or an `ExtensionFeature`, whose dotted
   `type` names its module and whose own `version` and `params` its
   `FeatureSpec` owns. Load runs the spec's `migrate` through `migrate`, with

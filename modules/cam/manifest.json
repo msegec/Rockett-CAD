@@ -3,7 +3,7 @@
   "id": "rockett.cam",
   "name": "CAM",
   "version": "0.1.0",
-  "apiRange": "^0.7",
+  "apiRange": "^0.8",
   "licence": "UNLICENSED",
   "author": "Rockett CAD",
   "contributes": {

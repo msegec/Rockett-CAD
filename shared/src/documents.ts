@@ -1,7 +1,7 @@
 import type { Feature, NamingVersion } from "./model.js";
 import type { ParameterUnit } from "./parameters.js";
 
-export const SCHEMA_VERSION = 45;
+export const SCHEMA_VERSION = 46;
 
 export interface UserParameter {
   name: string;
@@ -45,6 +45,11 @@ export interface ExtensionData {
   data: unknown;
 }
 
+export interface ModuleAssets {
+  namespaces: Record<string, string[]>;
+  legacy?: unknown;
+}
+
 export interface CadDocument {
   schemaVersion: number;
   namingVersion: NamingVersion;
@@ -63,6 +68,7 @@ export interface CadDocument {
   counters: Record<string, number>;
   groups: TreeGroup[];
   extensions: Record<string, ExtensionData>;
+  moduleAssets?: ModuleAssets;
 }
 
 export type ParameterEdit = Pick<

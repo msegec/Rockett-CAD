@@ -25,6 +25,7 @@ export * from "./schema/index.js";
 export * from "./schema/features.js";
 export * from "./schema/folders.js";
 export * from "./schema/history.js";
+export * from "./schema/assets.js";
 export * from "./settings.js";
 export { SETTINGS_IMPORT_MAX_BYTES } from "./settingsRoutes.js";
 export * from "./registry.js";

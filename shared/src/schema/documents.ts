@@ -4,10 +4,32 @@ import { featureNameSchema, NAME_LENGTH } from "./coreFeatures.js";
 import { bodyIdSchema, featureIdSchema } from "./refs.js";
 import { parameterStateSchema, validParameterState } from "./parameters.js";
 
+import { moduleAssetHashesSchema, MODULE_ASSET_LIMIT } from "./assets.js";
+
 const id = featureIdSchema;
 const name = featureNameSchema;
 const bodyId = bodyIdSchema;
 const text = featureNameSchema;
+const namespace = Type.String({
+  pattern: "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$",
+  maxLength: NAME_LENGTH,
+});
+
+export const moduleAssetsSchema = Type.Refine(
+  Type.Object({
+    namespaces: Type.Record(namespace, moduleAssetHashesSchema, {
+      additionalProperties: false,
+      maxProperties: MODULE_ASSET_LIMIT,
+    }),
+    legacy: Type.Optional(Type.Unknown()),
+  }),
+  (assets) =>
+    Object.values(assets.namespaces).reduce(
+      (count, hashes) => count + hashes.length,
+      0,
+    ) <= MODULE_ASSET_LIMIT,
+  () => "has too many module asset references",
+);
 
 export const groupsSchema = Type.Refine(
   Type.Array(
@@ -60,11 +82,9 @@ export const documentSchema = Type.Refine(
     ),
     counters: Type.Record(Type.String(), Type.Integer({ minimum: 0 })),
     groups: groupsSchema,
+    moduleAssets: Type.Optional(moduleAssetsSchema),
     extensions: Type.Record(
-      Type.String({
-        pattern: "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$",
-        maxLength: NAME_LENGTH,
-      }),
+      namespace,
       Type.Object({
         version: Type.Integer({ minimum: 0 }),
         data: Type.Unknown(),

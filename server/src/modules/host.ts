@@ -90,7 +90,9 @@ function registrars(own: Dispose[], manifest: ModuleManifest) {
       return dispose;
     };
   return {
-    routeModule: track(registerRouteModule),
+    routeModule: track((module: Parameters<typeof registerRouteModule>[0]) =>
+      registerRouteModule(module, moduleId),
+    ),
     exporter: track(registerExporter),
     importer: track(registerImporter),
     featureKind: track(registerFeatureKind),

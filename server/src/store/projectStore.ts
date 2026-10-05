@@ -3,8 +3,9 @@ import crypto from "node:crypto";
 import {
   createEmptyDocument,
   emptyView,
-  MB,
   withShown,
+  moduleAssetHashes,
+  referencedAssets,
   type CadDocument,
   type ProjectSummary,
   type ProjectView,
@@ -24,49 +25,19 @@ import {
 import { documentMigrations } from "./migrations.js";
 import { SettingsStore } from "./settingsStore.js";
 import type { Storage } from "./storage.js";
-import { isPng, ThumbnailStore } from "./thumbnailStore.js";
+import { ThumbnailStore } from "./thumbnailStore.js";
 import { ViewStore } from "./viewStore.js";
 import { listProjects } from "./projectInventory.js";
 import { TIMING_MS } from "../tunables.js";
 
+import { imageMime, IMAGE_TYPES } from "./projectAssets.js";
+
 export { StoreError };
+export { IMAGE_LIMIT_MB } from "./projectAssets.js";
 
 const LEGACY = "document.json";
 const DOCUMENTS = "documents";
-
-export const IMAGE_LIMIT_MB = 25;
-
-const IMAGE_TYPES: Array<{ mime: string; test: (b: Buffer) => boolean }> = [
-  {
-    mime: "image/png",
-    test: isPng,
-  },
-  {
-    mime: "image/jpeg",
-    test: (b) =>
-      b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
-  },
-  {
-    mime: "image/webp",
-    test: (b) =>
-      b.length > 12 &&
-      b.toString("ascii", 0, 4) === "RIFF" &&
-      b.toString("ascii", 8, 12) === "WEBP",
-  },
-];
-
 const newId = () => crypto.randomBytes(6).toString("hex");
-
-function imageMime(data: Buffer, label: string): string {
-  if (data.length > IMAGE_LIMIT_MB * MB)
-    throw new StoreError(`${label}image is over ${IMAGE_LIMIT_MB} MB`);
-  const type = IMAGE_TYPES.find((t) => t.test(data));
-  if (!type)
-    throw new StoreError(
-      `${label}unsupported image type (PNG, JPEG, WebP only)`,
-    );
-  return type.mime;
-}
 
 function importBlobs(doc: CadDocument): string[] {
   return doc.features.flatMap((f) =>
@@ -242,6 +213,9 @@ export class ProjectStore {
     actor: string | null,
     write?: Write<CadDocument>,
   ): Promise<void> {
+    this.validate(doc);
+    for (const hash of new Set(moduleAssetHashes(doc)))
+      await this.blob(doc.id, hash);
     const snapshot = {
       ...doc,
       modifiedAt: new Date().toISOString(),
@@ -329,7 +303,7 @@ export class ProjectStore {
         path.posix.join(this.documents.dir(copy.id), "blobs", f),
         await this.storage.read(path.posix.join(from, f)),
       );
-    for (const hash of [...importBlobs(src), ...imageBlobs(src)]) {
+    for (const hash of referencedAssets(src)) {
       const bytes = await this.blob(id, hash).catch(() => undefined);
       if (bytes) await this.blobs(copy.id).put(bytes);
     }

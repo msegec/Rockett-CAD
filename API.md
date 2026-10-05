@@ -351,22 +351,22 @@ module, in load order:
   is not a host key, or the load fails naming the key. Settings routes then
   validate its values with its schema. The client part registers the same
   definition, so the Settings panel draws it under the module's section.
-- A route module's `projectRoute`, `projectMutation` and `userRoute`
-  handlers get `params` from the route path and `body` as the route's
-  request type when it has a body schema, `unknown` without one, and
-  `user`, the signed-in user. Project reads also receive `blobs.get(hash)`;
-  document mutations receive `blobs.get(hash)` and `blobs.put(bytes)`.
-  The host binds both to the authorised project, with no project id argument
-  or delete capability. Reads return a private byte copy; writes snapshot
-  the bytes and return their SHA-256 content hash. Invalid or corrupt hashes
-  refuse through the existing blob store. Writes use the configured import
-  byte budget and run after access and `If-Match` checks, inside the project
-  queue. Store the returned hash in the document's extension data to keep
-  the source through save, undo and reload; blob collection preserves
-  unknown extension data. User routes receive no blob capability.
-  A user route needs a session as project
-  routes do and takes no user id from the request. Every route module receives
-  `kernel` at runtime, but only the core `ModuleApi` type declares it.
+- Route callbacks receive typed `params`, `body` and the signed-in `user`.
+  Project reads get `blobs.get(hash)`; mutations also get `blobs.put(bytes)`.
+  Reads copy bytes, writes snapshot them and return their SHA-256 hash.
+  Both bind to the authorised project, without an id argument or delete.
+  Access, `If-Match`, the project queue and import byte budget precede put.
+  Invalid hashes and corrupt bytes refuse through the existing blob store.
+  API 0.8.0 adds mutation-only `assets.set(hashes)`: replace the calling
+  manifest's exact namespace references with a detached array of hashes.
+  The host preserves opaque asset metadata; only this capability declares refs.
+  Bounded, unique hashes must resolve here before document or history commit.
+  `moduleAssets.namespaces` owns portable references; opaque extension JSON
+  stays unchanged. Sources survive save, undo, reopen, duplicate and `.rockett`
+  export/import without a feature, even with the module disabled or absent.
+  Blob collection keeps its conservative extension-data refusal.
+  User routes get neither capability and take no user id from the request.
+  `kernel` exists at runtime but only the core `ModuleApi` declares it.
 - `register.kernelJob(id, entry)` registers a kernel job: `id` starts with
   the module id and a dot, and `entry` is the URL of a file whose default
   export, from `defineKernelJobs`, holds the job under that id.

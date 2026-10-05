@@ -9,12 +9,14 @@ import {
   createRegistry,
   DOCUMENT_EDITS,
   REGISTRY_ID,
+  ValidationError,
   type CadDocument,
   type Route,
 } from "@rockett/shared";
 import type { KernelClient } from "../kernel/client.js";
 import type { ProjectStore } from "../store/projectStore.js";
 import { withinImportBudget } from "./uploads.js";
+import { projectAssets } from "./projectAssets.js";
 
 export type Edit = (
   doc: CadDocument,
@@ -26,14 +28,17 @@ export interface ModuleApi extends RouteModuleApi {
   kernel: KernelClient;
 }
 
-export type RouteModule = ModuleOf<ModuleApi>;
+export type RouteModule = ModuleOf<ModuleApi> & { namespace?: string };
 
 export const routeModules = createRegistry<RouteModule>(
   "route module",
   (module) => module.id,
 );
 
-export const registerRouteModule = routeModules.register;
+export const registerRouteModule = (module: RouteModule, namespace?: string) =>
+  routeModules.register(
+    namespace === undefined ? module : { ...module, namespace },
+  );
 
 export const BODY_ROUTE_MODULE = "bodies";
 
@@ -98,8 +103,10 @@ export function mountRouteModule(router: RouterApi, module: RouteModule): void {
         route,
         mutateProject(async (doc, req, ctx) => {
           const id = req.params.id;
-          return edit(doc, req, {
+          const assets = projectAssets(doc, module.namespace);
+          const result = await edit(doc, req, {
             ...ctx,
+            assets: assets.capability,
             blobs: {
               get: getBlob(id),
               put: async (bytes) => {
@@ -108,6 +115,13 @@ export function mountRouteModule(router: RouterApi, module: RouteModule): void {
               },
             },
           });
+          const document = result.document ?? doc;
+          if (document.id !== id)
+            throw new ValidationError(
+              "A module mutation must keep the authorised project id",
+            );
+          assets.apply(document);
+          return result;
         }),
       );
     },

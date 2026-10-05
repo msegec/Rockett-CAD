@@ -292,6 +292,12 @@ export const documentMigrations: Migrations<CadDocument> = {
     42: (doc) => doc,
     43: (doc) => doc,
     44: (doc) => doc,
+    45: (doc) => ({
+      ...doc,
+      ...(Object.hasOwn(doc, "moduleAssets") && {
+        moduleAssets: { namespaces: {}, legacy: doc.moduleAssets },
+      }),
+    }),
   },
   nested: extensionFeatures,
 };

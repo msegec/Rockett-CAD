@@ -32,7 +32,7 @@ export type {
 
 export { StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.7.0";
+export const PLUGIN_API_VERSION = "0.8.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -77,6 +77,7 @@ export interface ProjectRouteContext extends RouteContext {
 
 export interface ProjectMutationContext extends ProjectRouteContext {
   readonly blobs: ProjectBlobs;
+  readonly assets: { set(hashes: readonly string[]): void };
 }
 
 export interface RouteModuleApi {

@@ -9,7 +9,8 @@ export const TX_ID = /^[\w-]{1,64}$/;
 
 const txId = Type.String({ pattern: TX_ID.source });
 
-export const snapshotHash = Type.String({ pattern: "^[0-9a-f]{64}$" });
+export { blobHashSchema as snapshotHash } from "./assets.js";
+import { blobHashSchema as snapshotHash } from "./assets.js";
 const label = Type.String({ minLength: 1, maxLength: LABEL_LIMIT });
 const markFields = {
   label,

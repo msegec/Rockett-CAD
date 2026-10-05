@@ -1,4 +1,5 @@
 import { Type, type TProperties, type TSchema } from "typebox";
+import { blobHashSchema as blobHash } from "./assets.js";
 import {
   CHAMFER_TYPES,
   FILLET_TYPES,
@@ -257,7 +258,6 @@ const referenceImage = feature("referenceImage", {
 });
 
 const importFilename = Type.String({ minLength: 1, maxLength: 255 });
-const blobHash = Type.String({ pattern: "^[0-9a-f]{64}$" });
 
 const importStep = feature("importStep", {
   filename: importFilename,

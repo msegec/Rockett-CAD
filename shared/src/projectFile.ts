@@ -15,16 +15,21 @@ export interface ProjectFile {
   view?: ProjectView;
 }
 
+export function moduleAssetHashes(doc: CadDocument): string[] {
+  return Object.values(doc.moduleAssets?.namespaces ?? {}).flat();
+}
+
 export function referencedAssets(doc: CadDocument): Set<string> {
-  return new Set(
-    doc.features.flatMap((f) =>
+  return new Set([
+    ...moduleAssetHashes(doc),
+    ...doc.features.flatMap((f) =>
       f.type === "referenceImage"
         ? [f.assetId]
         : f.type === "importStep" || f.type === "importMesh"
           ? [f.blob]
           : [],
     ),
-  );
+  ]);
 }
 
 export const projectFileEnvelope = Type.Object({
