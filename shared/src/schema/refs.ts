@@ -33,14 +33,16 @@ export const edgeRef = Type.Object({
 
 export const bodyRef = Type.Object({ kind: Type.Literal("body"), bodyId });
 
+export const sketchEntityRef = Type.Object({
+  kind: Type.Literal("sketchEntity"),
+  sketchId: id,
+  entityId: id,
+});
+
 export const projectionRef = Type.Union([
   edgeRef,
   faceRef,
-  Type.Object({
-    kind: Type.Literal("sketchEntity"),
-    sketchId: id,
-    entityId: id,
-  }),
+  sketchEntityRef,
   bodyRef,
   Type.Object({
     kind: Type.Literal("section"),

@@ -252,8 +252,46 @@ const cases: Record<string, SpecCase> = {
         direction: "twoSided",
         operation: "newBody",
       },
+      {
+        ...meta,
+        type: "extrude",
+        profiles: [],
+        curves: [
+          { kind: "sketchEntity", sketchId: "ref:sketch", entityId: "l1" },
+        ],
+        distance: 5,
+        thin: { location: "centre", thickness: 1 },
+        direction: "normal",
+        operation: "newBody",
+      },
     ],
     invalid: [
+      [
+        {
+          ...meta,
+          type: "extrude",
+          profiles: [],
+          curves: [{ kind: "sketchEntity", sketchId: "s1", entityId: "l1" }],
+          distance: 5,
+          direction: "normal",
+          operation: "newBody",
+        },
+        "request needs thin to extrude open curves",
+        "",
+      ],
+      [
+        {
+          ...meta,
+          type: "extrude",
+          profiles: [refProfile("p1")],
+          distance: 5,
+          thin: { location: "inside", thickness: 0 },
+          direction: "normal",
+          operation: "newBody",
+        },
+        "thin.thickness must be >= 0.000001",
+        "/thin/thickness",
+      ],
       [
         {
           ...meta,

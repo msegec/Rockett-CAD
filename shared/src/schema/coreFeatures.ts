@@ -1,5 +1,10 @@
 import { Type, type TProperties, type TSchema } from "typebox";
-import { CHAMFER_TYPES, FILLET_TYPES, SHELL_DIRECTIONS } from "../model.js";
+import {
+  CHAMFER_TYPES,
+  FILLET_TYPES,
+  SHELL_DIRECTIONS,
+  THIN_LOCATIONS,
+} from "../model.js";
 import { ownedFields } from "./chamferFields.js";
 import {
   axisRef,
@@ -13,6 +18,7 @@ import {
   pointRef,
   profileRef,
   projectionRef,
+  sketchEntityRef,
 } from "./refs.js";
 import { splineEntities } from "./splineEntity.js";
 import { LINEAR_TOL } from "../tolerance.js";
@@ -280,10 +286,27 @@ const profilesOrFaces = <T extends TSchema>(schema: T) =>
     () => "needs a profile or face",
   );
 
-const extrude = profilesOrFaces(
+const extrudeSource = <T extends TSchema>(schema: T) =>
+  Type.Refine(
+    Type.Refine(
+      schema,
+      (f: { profiles: unknown[]; faces?: unknown[]; curves?: unknown[] }) =>
+        f.profiles.length + (f.faces?.length ?? 0) + (f.curves?.length ?? 0) >=
+        1,
+      () => "needs a profile, face or curve",
+    ),
+    (f: { curves?: unknown[]; thin?: unknown }) =>
+      !f.curves?.length || f.thin !== undefined,
+    () => "needs thin to extrude open curves",
+  );
+
+const extrude = extrudeSource(
   feature("extrude", {
     profiles: profiles(0),
     faces: profileFaces,
+    curves: Type.Optional(
+      Type.Array(sketchEntityRef, { maxItems: MAX_TARGETS, uniqueItems: true }),
+    ),
     distance: Type.Refine(
       coordinate,
       (distance) => Math.abs(distance) >= LINEAR_TOL,
@@ -305,6 +328,12 @@ const extrude = profilesOrFaces(
     ),
     taper,
     taper2: taper,
+    thin: Type.Optional(
+      Type.Object({
+        location: Type.Enum([...THIN_LOCATIONS]),
+        thickness: positive,
+      }),
+    ),
     direction: Type.Enum(["normal", "reverse", "symmetric", "twoSided"]),
     operation,
     targets,

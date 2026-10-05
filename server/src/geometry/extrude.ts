@@ -37,6 +37,7 @@ import {
 } from "./features.js";
 import type { ProfileFace } from "./sketchGeom.js";
 import { taperedPrism } from "./taper.js";
+import { thinSources } from "./thin.js";
 
 const TO_OBJECT_MARGIN = 1;
 const ORIGIN: Vec3 = [0, 0, 0];
@@ -77,9 +78,8 @@ export function evalExtrude(state: EvalState, f: ExtrudeFeature) {
   const dist = Math.abs(f.distance);
   if (dist <= 0) throw new Error("extrude distance must be non-zero");
   const faceRefs = f.faces ?? [];
-  if (f.profiles.length === 0 && faceRefs.length === 0) {
-    throw new Error("select at least one profile or planar face");
-  }
+  if (f.profiles.length + faceRefs.length + (f.curves?.length ?? 0) === 0)
+    throw new Error("select at least one profile, planar face or curve");
   const to = f.extent?.kind === "toObject" ? f.extent.object : null;
   if (to && (f.direction === "symmetric" || f.direction === "twoSided"))
     throw new Error(ONE_SIDE);
@@ -94,7 +94,8 @@ export function evalExtrude(state: EvalState, f: ExtrudeFeature) {
   for (const ref of faceRefs)
     sources.push({ ...faceProfile(state, ref), copy: true });
 
-  const tools = sources.map((s) =>
+  const built = f.thin ? thinSources(state, f, f.thin, sources) : sources;
+  const tools = built.map((s) =>
     f.startObject
       ? startTool(state, f, f.startObject, s)
       : !to
@@ -107,7 +108,7 @@ export function evalExtrude(state: EvalState, f: ExtrudeFeature) {
     state,
     f,
     tools,
-    sources.map((s) => s.pf),
+    built.map((s) => s.pf),
   );
 }
 

@@ -1,7 +1,9 @@
 import type { Static } from "typebox";
 import type { FEATURE_SCHEMAS } from "./schema/features.js";
 import type { SketchFitSpline, SketchSpline } from "./splineModel.js";
+import type { ExtrudeExtent, ExtrudeThin } from "./extrudeModel.js";
 export type { SketchFitSpline, SketchSpline } from "./splineModel.js";
+export * from "./extrudeModel.js";
 
 export type NamingVersion = 1 | 2;
 
@@ -257,13 +259,11 @@ export interface ProfileRef {
   profileId: string;
 }
 
-export type ExtrudeExtent =
-  { kind: "all" } | { kind: "toObject"; object: PlaneRef | BodyRef };
-
 export interface ExtrudeFeature extends ToolFeatureBase {
   type: "extrude";
   profiles: ProfileRef[];
   faces?: FaceRef[];
+  curves?: SketchEntityRef[];
   distance: number;
   distance2?: number;
   startOffset?: number;
@@ -271,6 +271,7 @@ export interface ExtrudeFeature extends ToolFeatureBase {
   extent?: ExtrudeExtent;
   taper?: number;
   taper2?: number;
+  thin?: ExtrudeThin;
   direction: "normal" | "reverse" | "symmetric" | "twoSided";
   operation: BooleanOperation;
 }

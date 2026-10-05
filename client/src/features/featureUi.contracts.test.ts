@@ -396,6 +396,28 @@ const extrudes: Feature[] = [
     direction: "twoSided",
     operation: "newBody",
   },
+  {
+    ...base,
+    id: "ex14",
+    type: "extrude",
+    profiles: [prof],
+    distance: 10,
+    thin: { location: "outside", thickness: 1.5 },
+    direction: "normal",
+    operation: "newBody",
+  },
+  {
+    ...base,
+    id: "ex15",
+    type: "extrude",
+    profiles: [],
+    curves: [{ kind: "sketchEntity", sketchId: "sk1", entityId: "ln1" }],
+    distance: 10,
+    distance2: 4,
+    thin: { location: "centre", thickness: 2 },
+    direction: "twoSided",
+    operation: "newBody",
+  },
 ];
 
 it.each(extrudes.map((f) => [f.id, f] as const))(
@@ -412,6 +434,11 @@ it.each(extrudes.map((f) => [f.id, f] as const))(
 
 it.each([
   [[], {}, "Select at least one profile or planar face"],
+  [
+    [{ kind: "sketchEntity", sketchId: "sk1", entityId: "ln1" }],
+    {},
+    "Select at least one profile or planar face",
+  ],
   [
     [{ kind: "profile", ...prof }],
     { distance: 0 },

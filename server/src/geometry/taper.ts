@@ -26,7 +26,7 @@ export interface Section {
   offset: number;
 }
 
-interface Level {
+export interface Level {
   shape: Shape;
   images: Shape[];
 }
@@ -77,40 +77,46 @@ export function taperedPrism(
   return built;
 }
 
+export function offsetLoops(
+  face: Shape,
+  source: Shape[],
+  offset: number,
+): Level | null {
+  if (offset === 0) return { shape: face, images: source };
+  const k = getKernel();
+  const mk = acquire(
+    new k.BRepOffsetAPI_MakeOffset_2(
+      face,
+      k.GeomAbs_JoinType.GeomAbs_Intersection,
+      false,
+    ),
+  );
+  mk.Perform(offset, 0);
+  if (!mk.IsDone()) return null;
+  const made = source.map((e) =>
+    listToArray(mk.Generated(e)).filter(
+      (g) => g.ShapeType() === k.TopAbs_ShapeEnum.TopAbs_EDGE,
+    ),
+  );
+  if (made.some((m) => m.length !== 1)) return null;
+  return { shape: acquire(mk.Shape()), images: made.map((m) => m[0]!) };
+}
+
 function level(
   face: Shape,
   source: Shape[],
   n: Vec3,
   { at, offset }: Section,
 ): Level | null {
+  const flat = offsetLoops(face, source, offset);
+  if (!flat) return null;
   const k = getKernel();
-  let shape = face;
-  let images = source;
-  if (offset !== 0) {
-    const mk = acquire(
-      new k.BRepOffsetAPI_MakeOffset_2(
-        face,
-        k.GeomAbs_JoinType.GeomAbs_Intersection,
-        false,
-      ),
-    );
-    mk.Perform(offset, 0);
-    if (!mk.IsDone()) return null;
-    shape = acquire(mk.Shape());
-    const made = source.map((e) =>
-      listToArray(mk.Generated(e)).filter(
-        (g) => g.ShapeType() === k.TopAbs_ShapeEnum.TopAbs_EDGE,
-      ),
-    );
-    if (made.some((m) => m.length !== 1)) return null;
-    images = made.map((m) => m[0]!);
-  }
   const trsf = acquire(new k.gp_Trsf_1());
   trsf.SetTranslation_1(vec(n[0] * at, n[1] * at, n[2] * at));
-  const tr = transformOp(shape, trsf);
+  const tr = transformOp(flat.shape, trsf);
   return {
     shape: acquire(tr.Shape()),
-    images: images.map((e) => acquire(tr.ModifiedShape(e))),
+    images: flat.images.map((e) => acquire(tr.ModifiedShape(e))),
   };
 }
 
@@ -124,7 +130,7 @@ function imageWire(lv: Level, source: Shape[], wire: Shape): Shape {
   return getKernel().TopoDS.Wire_1(found);
 }
 
-function cap(face: Shape, source: Shape[], lv: Level): Shape {
+export function cap(face: Shape, source: Shape[], lv: Level): Shape {
   const k = getKernel();
   if (lv.shape.ShapeType() === k.TopAbs_ShapeEnum.TopAbs_FACE)
     return k.TopoDS.Face_1(lv.shape);

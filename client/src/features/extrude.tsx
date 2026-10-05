@@ -25,6 +25,14 @@ import { autoOperation, extrudeOperation } from "../extrudeReach";
 import { ExtrudeGizmo, extrudeGizmoSource } from "../three/ExtrudeGizmo";
 import type { FeatureGizmoContext, GizmoPointer } from "../three/featureGizmos";
 import { dragPreview } from "../toolTargets";
+import {
+  curves,
+  thinPart,
+  thinPrefill,
+  ThinFields,
+  ThinToggle,
+  type ThinParams,
+} from "./extrudeThin";
 import { previewedFeature, useStore, type Selection } from "../store";
 import { formatLength } from "@rockett/shared";
 import { getSetting, useSetting } from "../settings";
@@ -61,10 +69,8 @@ export type ExtrudeParams = InputParams<
     | "targets"
   >
 > &
-  Pick<
-    SharedInputParams,
-    "start" | "startObject" | "extent" | "extentObject"
-  > & {
+  Pick<SharedInputParams, "start" | "startObject" | "extent" | "extentObject"> &
+  ThinParams & {
     autoOperation?: boolean | undefined;
   };
 
@@ -192,6 +198,7 @@ function ExtrudeForm({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
   return (
     <>
       <SelInfo label="Profiles / faces" input="profiles" hint={profileHint} />
+      <ThinToggle params={params} setParams={setParams} />
       <StartFields params={params} setParams={setParams} />
       <SelectField
         label="Extent"
@@ -248,6 +255,7 @@ function ExtrudeForm({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
         />
       )}
       <TaperFields params={params} setParams={setParams} />
+      <ThinFields params={params} setParams={setParams} />
       <OperationField intersect />
     </>
   );
@@ -379,12 +387,16 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
   icon: "⬆",
   title: "Extrude",
   group: "create",
-  picks: [profilesOrFaces, targets, startObject, extentObject],
+  picks: [profilesOrFaces, curves, targets, startObject, extentObject],
+  picksFor: (params) =>
+    extrude.picks.filter((input) => params.thin || input !== curves),
   Form: ExtrudeForm,
   build: (params, selection) => {
     const stored = storedFeature(params.id);
+    const thin = thinPart(params, selection, stored);
+    if ("error" in thin) return thin;
     const sources = profileSources(selection, stored);
-    if ("error" in sources) return sources;
+    if ("error" in sources && !thin.curves?.length) return sources;
     if (distance(params) === 0)
       return { error: "Extrude distance must be non-zero" };
     const extent = params.extent ?? "distance";
@@ -409,7 +421,8 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
       type: "extrude",
       name: params.name ?? "",
       suppressed: false,
-      ...sources,
+      ...("error" in sources ? { profiles: [] } : sources),
+      ...thin,
       distance: distance(params),
       ...((direction === "twoSided" || "distance2" in stored) && {
         distance2: num(params, "distance2", 5),
@@ -431,6 +444,7 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
   },
   prefill: (f) => ({
     params: {
+      ...thinPrefill(f).params,
       id: f.id,
       name: f.name,
       targets: f.targets,
@@ -446,7 +460,11 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
       direction: f.direction,
       operation: f.operation,
     },
-    selection: [...profilePicks(f.profiles), ...facePicks(f.faces ?? [])],
+    selection: [
+      ...profilePicks(f.profiles),
+      ...facePicks(f.faces ?? []),
+      ...thinPrefill(f).picks,
+    ],
   }),
   onParamsChange: (params) =>
     distance(params) === 0

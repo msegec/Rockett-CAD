@@ -690,6 +690,28 @@ owns this and runs after the save's evaluation. Evaluation never writes `sig`.
   narrows. Symmetric and Two sided give two side faces per sketch entity,
   named with the usual `~1` and `~2` suffixes. Construction:
   `server/src/geometry/taper.ts`.
+- `thin` (schema 44) follows Fusion's Thin Extrude: `{ location, thickness }`
+  with `location` `inside`, `outside` or `centre` and `thickness` in mm.
+  Absent is a solid extrude and evaluates as before. Each profile becomes
+  the region between two 2D offsets of its boundary, outward `0` and
+  `-thickness` for `inside`, `thickness` and `0` for `outside`, and half
+  the thickness each way for `centre`. The offset uses intersection joins,
+  so outside corners stay sharp, as in Fusion. Every loop is walled, so a
+  hole gets its own ring. The wall face then takes every Start and extent
+  option unchanged: Distance, Symmetric, Two sided, To object and All trim
+  it with their usual cuts. Disjoint rings give one body each, and a
+  groove cut through a body frees its core as a body. Both sides of a wall
+  take the sketch curve's side name, with `~1` and `~2` in centroid order.
+- `curves` (schema 44) are `SketchEntityRef`s to open sketch curves, allowed
+  only with `thin`. Picked curves join end to end into open chains in any
+  pick order, and each chain is walled along its curves with square ends.
+  A chain runs in its first picked curve's own direction (a line from `p1`
+  to `p2`, an arc from start to end). Seen from the sketch normal,
+  `inside` lies to the left of that direction, as the inside of a
+  counterclockwise loop does, and `outside` to the right. The end faces
+  take fallback names. The spec registers each curve at `/curves/{i}`.
+  Construction: `server/src/geometry/thin.ts`, through the offset step of
+  `taper.ts`.
 - Refusals: a plane parallel to the direction, a plane crossing or touching
   the profile, a body level with the profile, a profile starting inside the
   body, a profile that does not fully meet the body, and All with no body
@@ -697,10 +719,12 @@ owns this and runs after the save's evaluation. Evaluation never writes `sig`.
   a To object plane meeting it over the profile. With a taper: an offset
   that closes the profile or drops one of its edges before the far end of
   the built solid (for To object that end lies past the target), and a
-  Start object not parallel to the profile. Evaluation:
-  `server/src/geometry/extrude.ts`.
-- Not yet: thin walls (PAR-013 remainder), a start or To object on a curved
-  face, and a taper from a slanted Start object.
+  Start object not parallel to the profile. With thin: a wall the profile
+  cannot hold (the offset closes it or drops an edge), picked curves that
+  close a loop (pick its profile) or fork, a missing or construction
+  curve, and any taper. Evaluation: `server/src/geometry/extrude.ts`.
+- Not yet: a start or To object on a curved face, a taper from a slanted
+  Start object, and a taper on a thin extrude.
 
 ## Tool targets
 
