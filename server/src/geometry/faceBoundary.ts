@@ -74,7 +74,7 @@ function interiorContacts(old: Shape, contacts: Shape[], own: Own) {
         distance(vertex) <=
           k.BRep_Tool.Tolerance_2(old) + k.BRep_Tool.Tolerance_3(vertex),
     )
-    .sort((a, b) => a.t - b.t);
+    .toSorted((a, b) => a.t - b.t);
 }
 
 function boundaryVertices(boundary: Shape[], own: Own) {

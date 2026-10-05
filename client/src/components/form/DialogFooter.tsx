@@ -26,14 +26,13 @@ export function DialogFooter({
     return pushKeyContext({
       kind: "overlay",
       handle: (e: KeyEvent) => {
-        const { onOk, onCancel, pending, canOk, escapeAnywhere } =
-          latest.current;
+        const now = latest.current;
         const target = e.target;
         const inside =
           target instanceof Node &&
           ref.current?.parentElement?.contains(target) === true;
-        if (e.key === "Escape" && (inside || escapeAnywhere)) {
-          if (!pending && !e.repeat) onCancel();
+        if (e.key === "Escape" && (inside || now.escapeAnywhere)) {
+          if (!now.pending && !e.repeat) now.onCancel();
           return true;
         }
         if (
@@ -42,7 +41,7 @@ export function DialogFooter({
           target instanceof HTMLInputElement &&
           target.type !== "file"
         ) {
-          if (canOk && !e.repeat) onOk?.();
+          if (now.canOk && !e.repeat) now.onOk?.();
           return true;
         }
         return false;

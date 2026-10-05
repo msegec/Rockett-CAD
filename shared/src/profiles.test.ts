@@ -43,7 +43,9 @@ const ids = (p: {
   outer: { entityId: string }[];
   holes: { entityId: string }[][];
 }) =>
-  [...new Set([...p.outer, ...p.holes.flat()].map((c) => c.entityId))].sort();
+  [
+    ...new Set([...p.outer, ...p.holes.flat()].map((c) => c.entityId)),
+  ].toSorted();
 
 const RECT = ["r1", "r2", "r3", "r4"];
 
@@ -104,7 +106,7 @@ describe("dangling sketch pieces", () => {
     ]);
     const regions = profiles
       .map((p) => ({ ids: ids(p), area: Math.round(p.area * 1e6) / 1e6 }))
-      .sort((a, b) => a.ids.join().localeCompare(b.ids.join()));
+      .toSorted((a, b) => a.ids.join().localeCompare(b.ids.join()));
     expect(regions).toEqual([
       { ids: ["bridge", "r1", "r2", "r4"], area: 2500 },
       { ids: ["bridge", "r2", "r3", "r4"], area: 2500 },
@@ -112,6 +114,9 @@ describe("dangling sketch pieces", () => {
     ]);
   });
 });
+
+const sumY = (p: { polygon: number[] }) =>
+  p.polygon.filter((_, i) => i % 2 === 1).reduce((s, y) => s + y, 0);
 
 describe("profile ids saved with a spur", () => {
   it("resolve to the pruned profile covering the same region", () => {
@@ -153,8 +158,6 @@ describe("profile ids saved with a spur", () => {
       ["c", "d"],
       ["c", "d"],
     ]);
-    const sumY = (p: { polygon: number[] }) =>
-      p.polygon.filter((_, i) => i % 2 === 1).reduce((s, y) => s + y, 0);
     const side = (sign: number) =>
       profiles.find((p) => Math.sign(sumY(p)) === sign)!;
     return {
@@ -190,6 +193,15 @@ describe("profile ids saved with a spur", () => {
   });
 });
 
+const sumX = (p: { polygon: number[] }) =>
+  p.polygon.filter((_, i) => i % 2 === 0).reduce((s, x) => s + x, 0);
+
+const legacyId = (p: Profile) =>
+  profileIdFor(
+    p.outer.map((c) => c.entityId),
+    p.holes.map((h) => h.map((c) => c.entityId)),
+  );
+
 describe("profile ids in a sketch without spurs", () => {
   const chord = Math.sqrt(99.75);
   const strips = (cx: number, cy: number, turn: boolean) => {
@@ -205,8 +217,6 @@ describe("profile ids in a sketch without spurs", () => {
       ...line("L2", 0.5),
     ];
   };
-  const sumX = (p: { polygon: number[] }) =>
-    p.polygon.filter((_, i) => i % 2 === 0).reduce((s, x) => s + x, 0);
 
   it("resolve a legacy id tied between two strips to the right strip", () => {
     const entities = strips(0, 0.5, false);
@@ -228,12 +238,6 @@ describe("profile ids in a sketch without spurs", () => {
       area: 1600,
     });
   });
-
-  const legacyId = (p: Profile) =>
-    profileIdFor(
-      p.outer.map((c) => c.entityId),
-      p.holes.map((h) => h.map((c) => c.entityId)),
-    );
 
   it.each([
     ["two strips", strips(0, 0.5, false)],

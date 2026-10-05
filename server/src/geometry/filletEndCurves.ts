@@ -308,9 +308,9 @@ export function filletEndCurves(
           return;
         }
         const incident = patches
-          .map((patch, index) => ({ patch, index }))
-          .filter(({ patch }) =>
-            vertices(patch.edge)
+          .map((candidate, index) => ({ patch: candidate, index }))
+          .filter((entry) =>
+            vertices(entry.patch.edge)
               .map(own)
               .some((vertex) => vertex.IsSame(old)),
           );

@@ -22,8 +22,8 @@ export function exportBodyIds(s: CommandContext): string[] {
   if (selected.length) return selected;
   const hidden = new Set(s.view.hidden.bodies);
   return (s.evaluation?.bodies ?? [])
-    .filter((body) => !hidden.has(body.bodyId))
-    .map((body) => body.bodyId);
+    .filter((entry) => !hidden.has(entry.bodyId))
+    .map((entry) => entry.bodyId);
 }
 
 export async function downloadExport(
@@ -47,7 +47,7 @@ export const exportCommand: ActiveCommand = {
   enter() {
     const s = useStore.getState();
     const selectionBefore = selectionBeforeCommand(s);
-    const selection = s.selection.filter((s) => body(s));
+    const selection = s.selection.filter((pick) => body(pick));
     exitActive();
     s.clearActive();
     useStore.setState({

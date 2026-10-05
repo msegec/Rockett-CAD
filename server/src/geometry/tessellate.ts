@@ -250,7 +250,7 @@ export function movePayload(
         polyline: along(e.polyline),
         curve: movedCurve(e.curve, at),
       }))
-      .sort((a, b) => compareNames(a.name, b.name)),
+      .toSorted((a, b) => compareNames(a.name, b.name)),
     vertices: nameVertices(
       vertexFacesOf(from).map((v) => ({
         faces: v.faces.map(named),

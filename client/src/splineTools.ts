@@ -152,12 +152,12 @@ export async function setConicRho(id: string, rho: number) {
   const draft = s.draftSketch;
   const conic = draft?.entities.find((e) => e.id === id);
   if (!draft || conic?.kind !== "spline") return;
-  const points = new Map(
+  const byId = new Map(
     draft.entities.flatMap((e) =>
       e.kind === "point" ? [[e.id, e] as const] : [],
     ),
   );
-  const problem = splineProblem({ ...conic, rho }, points);
+  const problem = splineProblem({ ...conic, rho }, byId);
   if (problem) return s.setError(`Conic ${id}: ${problem}`);
   s.updateDraftSketch(
     draft.entities.map((e) => (e === conic ? { ...conic, rho } : e)),

@@ -284,11 +284,11 @@ describe("contour", () => {
     expect(arcs).toHaveLength(4);
     for (const arc of arcs) expect(arc.dir).toBe("cw");
     const [x, y] = ends(section.moves)[0]!;
-    expect(
-      ends(section.moves)
-        .filter(([, , z]) => z === -6)
-        .at(-1),
-    ).toEqual([x, y, -6]);
+    expect(ends(section.moves).findLast(([, , z]) => z === -6)).toEqual([
+      x,
+      y,
+      -6,
+    ]);
   });
 
   it("never emits an arc short enough to read as a full circle", () => {
@@ -361,7 +361,7 @@ describe("contour", () => {
   });
 
   it("offsets a point loop through clipper at the tool radius", () => {
-    for (const loop of [rectangle, [...rectangle].reverse()]) {
+    for (const loop of [rectangle, rectangle.toReversed()]) {
       const section = cut({ loop });
       const points = level(section, -6);
       expect(points.length).toBeGreaterThan(8);

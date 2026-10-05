@@ -373,26 +373,27 @@ describe("spline end relations in the solver", () => {
   });
 });
 
-describe("spline validation", () => {
-  const sketch = (
-    entities: SketchEntity[],
-    constraints: SketchConstraint[] = [],
-  ): SketchFeature => ({
-    id: "sk",
-    type: "sketch",
-    name: "Sketch",
-    suppressed: false,
-    plane: { kind: "origin", plane: "XY" },
-    entities,
-    constraints,
-  });
-  const validate = (f: SketchFeature) => () =>
-    featureSpec("sketch")!.validate(f);
-  const swap = (entities: SketchEntity[], id: string, change: object) =>
-    entities.map((x) =>
-      x.id === id ? ({ ...x, ...change } as SketchEntity) : x,
-    );
+const sketch = (
+  entities: SketchEntity[],
+  constraints: SketchConstraint[] = [],
+): SketchFeature => ({
+  id: "sk",
+  type: "sketch",
+  name: "Sketch",
+  suppressed: false,
+  plane: { kind: "origin", plane: "XY" },
+  entities,
+  constraints,
+});
 
+const validate = (f: SketchFeature) => () => featureSpec("sketch")!.validate(f);
+
+const swap = (entities: SketchEntity[], id: string, change: object) =>
+  entities.map((x) =>
+    x.id === id ? ({ ...x, ...change } as SketchEntity) : x,
+  );
+
+describe("spline validation", () => {
   it("accepts fit splines, conics and tangents at shared ends", () => {
     expect(validate(sketch(fitEntities(), [tangent("fs", "l")]))).not.toThrow();
     expect(

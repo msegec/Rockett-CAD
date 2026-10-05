@@ -367,7 +367,7 @@ export function registerSplitBodies(
       ];
       return { s, key: V.dot(c, normal) };
     })
-    .sort((a, b) => a.key - b.key);
+    .toSorted((a, b) => a.key - b.key);
   state.bodies.delete(bodyId);
   sorted.forEach((item, i) => {
     const id = i === 0 ? bodyId : derivedBodyId(featureId, i + 1);

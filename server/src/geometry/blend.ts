@@ -6,6 +6,7 @@ import { blendNames } from "./blendNaming.js";
 import { rejectBadBlend } from "./blendValidity.js";
 export { cutsThrough } from "./blendValidity.js";
 import { fuseOperation, commonOperation } from "./boolean.js";
+import { V } from "./frames.js";
 import {
   LINEAR_TOL,
   UNIT_DOT_TOL,
@@ -181,8 +182,6 @@ function chamferByEnvelope(
       face,
       edges: edgesOf(face).map(own),
     }));
-    const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-
     const caps: {
       face: Shape;
       edges: Shape[];
@@ -203,7 +202,7 @@ function chamferByEnvelope(
         if (
           !wall ||
           !wp ||
-          Math.abs(dot(wp.normal, plane.normal)) > UNIT_DOT_TOL
+          Math.abs(V.dot(wp.normal, plane.normal)) > UNIT_DOT_TOL
         )
           return false;
         let wallDepth = 0;
@@ -214,7 +213,7 @@ function chamferByEnvelope(
             p[1] - plane.origin[1],
             p[2] - plane.origin[2],
           ];
-          wallDepth = Math.max(wallDepth, -dot(rel, plane.normal));
+          wallDepth = Math.max(wallDepth, -V.dot(rel, plane.normal));
         }
         if (wallDepth < distance - LINEAR_TOL) return false;
         covered.add(chosen.findIndex((s) => s.IsSame(e)));
@@ -334,7 +333,7 @@ function chamferByEnvelope(
       const mids = cap.edges.map((e) => ({ e, c: edgeCentroid(e) }));
       for (const face of facesOf(envelope).map(own)) {
         const c = faceCentroid(face);
-        const depth = -dot(
+        const depth = -V.dot(
           [
             c[0] - cap.plane.origin[0],
             c[1] - cap.plane.origin[1],

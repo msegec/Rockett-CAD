@@ -75,7 +75,7 @@ export function sceneLayers(parent: THREE.Object3D) {
 
   const dispose = () => {
     unmountModules?.();
-    for (const layer of [...layers.values()].reverse()) layer.dispose();
+    for (const layer of [...layers.values()].toReversed()) layer.dispose();
   };
 
   return { addLayer, mountModuleLayers, dispose };

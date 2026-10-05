@@ -61,25 +61,27 @@ describe("typed Fillet inputs", () => {
   });
 });
 
+const edge = (edgeName: string) => ({
+  kind: "edge" as const,
+  bodyId: "body-input",
+  edgeName,
+});
+
+const labels = (params: object) => {
+  const host = document.createElement("div");
+  host.innerHTML = renderToStaticMarkup(
+    createFeatureInputs(fillet, params).renderForm(() => {}),
+  );
+  return [...host.querySelectorAll("label.field > span, button.btn")].map(
+    (node) => node.textContent,
+  );
+};
+
 describe("Fillet sets", () => {
-  const edge = (edgeName: string) => ({
-    kind: "edge" as const,
-    bodyId: "body-input",
-    edgeName,
-  });
   const twoSets: FilletFeature = {
     ...original,
     radius: 1,
     sets: [{ edges: [edge("edge-two")], radius: 3 }],
-  };
-  const labels = (params: object) => {
-    const host = document.createElement("div");
-    host.innerHTML = renderToStaticMarkup(
-      createFeatureInputs(fillet, params).renderForm(() => {}),
-    );
-    return [...host.querySelectorAll("label.field > span, button.btn")].map(
-      (node) => node.textContent,
-    );
   };
 
   it("a prefilled fillet with two sets builds back from either active set", () => {

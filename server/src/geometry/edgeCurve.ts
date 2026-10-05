@@ -37,8 +37,9 @@ export function bsplineCurve(own: Own, s: SpaceSpline) {
     : new k.Geom_BSplineCurve_1(poles, knots, mults, s.degree, periodic);
 }
 
+const range = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+
 function splineData(own: Own, curve: any): SpaceSpline {
-  const range = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
   const poles = range(curve.NbPoles());
   const knots = range(curve.NbKnots());
   return {

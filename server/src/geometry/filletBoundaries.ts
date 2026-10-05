@@ -194,7 +194,7 @@ function attachTerminations(
         if (segment.carrier && segment.source?.IsSame(face)) {
           const old = oldEdges.find((edge) => edge.IsSame(segment.carrier));
           assert(old);
-          const edit = edits.find((edit) => edit.edge.IsSame(old));
+          const edit = edits.find((e) => e.edge.IsSame(old));
           assert(edit);
           curves.transfer(old, segment.edge, face);
           if (beginning(old).IsSame(end.old))
@@ -213,7 +213,7 @@ function attachTerminations(
           );
           assert.equal(incident.length, 1);
           const old = incident[0]!;
-          let edit = edits.find((edit) => edit.edge.IsSame(old));
+          let edit = edits.find((e) => e.edge.IsSame(old));
           if (!edit) {
             edit = { edge: old, replacement: [old] };
             edits.push(edit);
@@ -247,8 +247,8 @@ function attachSourceEdits(
           const replacement =
             occurrence.Orientation_1() === edit.edge.Orientation_1()
               ? edit.replacement
-              : [...edit.replacement]
-                  .reverse()
+              : edit.replacement
+                  .toReversed()
                   .map((edge) => own(k.TopoDS.Edge_1(own(edge.Reversed()))));
           edits.push({ edge: occurrence, replacement });
         }
@@ -328,8 +328,8 @@ function sourceBoundaries(
       const forward = old.Orientation_1() === cached.old.Orientation_1();
       const replacement = forward
         ? [...cached.replacement]
-        : [...cached.replacement]
-            .reverse()
+        : cached.replacement
+            .toReversed()
             .map((edge) => own(k.TopoDS.Edge_1(own(edge.Reversed()))));
       return [{ edge: old, replacement }];
     });
@@ -345,12 +345,12 @@ function sourceBoundaries(
 }
 
 function orientedEndBoundary(
-  edges: Shape[],
+  boundary: Shape[],
   start: Shape,
   curves: Curves,
   own: Own,
 ) {
-  const remaining = [...edges],
+  const remaining = [...boundary],
     ordered: Shape[] = [];
   let current = start;
   while (remaining.length) {

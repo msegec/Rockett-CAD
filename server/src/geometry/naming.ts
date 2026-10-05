@@ -69,7 +69,7 @@ export function sortByPosition<T>(
   const keyOf = version === 1 ? (pos: Vec3) => pos : cell;
   const sorted = items
     .map((item) => ({ item, key: keyOf(positionOf(item)) }))
-    .sort((a, b) => byPosition(a.key, b.key));
+    .toSorted((a, b) => byPosition(a.key, b.key));
   return sorted.map(({ item, key }, i) => ({
     item,
     tied:
@@ -113,7 +113,7 @@ export function orderBodyPieces<T extends BodyPiece>(
     if (pieces[0]!.names.version === 1)
       return pieces
         .map((piece) => ({ piece, v: volumeOf(piece.shape) }))
-        .sort((a, b) => b.v - a.v)
+        .toSorted((a, b) => b.v - a.v)
         .map(({ piece }) => piece);
     const owned = pieces.map((piece) => {
       const names = new Set(faces(piece.shape).map((f) => piece.names.get(f)));
@@ -137,7 +137,7 @@ export function orderBodyPieces<T extends BodyPiece>(
           key: own.reduce((a, b) => (compareNames(a, b) <= 0 ? a : b)),
         };
       })
-      .sort((a, b) => compareNames(a.key, b.key))
+      .toSorted((a, b) => compareNames(a.key, b.key))
       .map(({ piece }) => piece);
   });
 }
@@ -176,9 +176,9 @@ export function nameFromEdges(
     for (const face of faces(shape).map(own)) {
       if (provisional.get(face)) continue;
       const touching = midpoints.filter((m) => lies(m.vertex, face));
-      const [first, ...more] = [...new Set(touching.map((m) => m.name))].sort(
-        compareNames,
-      );
+      const [first, ...more] = [
+        ...new Set(touching.map((m) => m.name)),
+      ].toSorted(compareNames);
       if (first) provisional.set(face, more.length ? `${first}~?1` : first);
     }
   });
@@ -310,7 +310,7 @@ export function historyNames(
     for (const [face, names] of candidates.entries()) {
       const bases = [
         ...new Set(names.map((n) => n.replace(/~\??\d+$/, ""))),
-      ].sort();
+      ].toSorted();
       provisional.set(face, bases[0]!);
     }
     return finalizeNames(resultShape, provisional, featureId);
@@ -354,7 +354,7 @@ export const patternPrefix = (instance: number, featureId: string) =>
   `p${instance}:${featureId}`;
 
 export function edgeName(faceNames: string[]): string {
-  const sorted = [...new Set(faceNames)].sort();
+  const sorted = [...new Set(faceNames)].toSorted();
   return sorted.length >= 2
     ? `e[${sorted.join("|")}]`
     : `e[${sorted[0] ?? "?"}|seam]`;
@@ -414,7 +414,7 @@ export function computeEdgeNames(body: NamedBody) {
       arr.push(e);
       groups.set(e.base, arr);
     }
-    const named = suffixDuplicates(
+    const kept = suffixDuplicates(
       groups,
       (entry) => {
         try {
@@ -425,7 +425,7 @@ export function computeEdgeNames(body: NamedBody) {
       },
       body.names.version,
     ).map(([e, name]) => [name, own.keep(e.edge)] as const);
-    return { byName: new Map(named.sort(([a], [b]) => compareNames(a, b))) };
+    return { byName: new Map(kept.toSorted(([a], [b]) => compareNames(a, b))) };
   });
   for (const edge of result.byName.values()) acquire(edge);
   return result;
@@ -466,7 +466,7 @@ export function nameVertices<T extends VertexFaces>(
 ): Array<[T, string]> {
   const groups = new Map<string, T[]>();
   for (const e of entries) {
-    const joined = [...new Set(e.faces)].sort().join("|");
+    const joined = [...new Set(e.faces)].toSorted().join("|");
     const base = `v[${version === 1 ? joined : nameKey(joined)}]`;
     groups.set(base, [...(groups.get(base) ?? []), e]);
   }

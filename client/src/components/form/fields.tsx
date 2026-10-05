@@ -324,11 +324,11 @@ export function SelInfo({
   onRemove?: (keys: string[]) => void;
 }) {
   const { document, evaluation, command } = useStore(
-    useShallow(({ document, evaluation, active, selection }) => ({
-      document,
-      evaluation,
-      command: active,
-      selection,
+    useShallow((s) => ({
+      document: s.document,
+      evaluation: s.evaluation,
+      command: s.active,
+      selection: s.selection,
     })),
   );
   const active = useStore((s) => activeInput(s)?.key === input);

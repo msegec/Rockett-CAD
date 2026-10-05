@@ -114,6 +114,16 @@ function extent(line: Xyz[], axis: 0 | 1 | 2) {
   return [Math.min(...values), Math.max(...values)];
 }
 
+const planeArc = (plane: "xy" | "zx"): Move => ({
+  kind: "arc",
+  to: plane === "xy" ? [0, 10, 0] : [0, 0, -10],
+  centre: [0, 0, 0],
+  dir: "ccw",
+  plane,
+  feed: 600,
+  role: "cut",
+});
+
 describe("normalise arcs", () => {
   it("expands a full circle through all four extrema within 0.005 mm", () => {
     for (const dir of ["ccw", "cw"] as const) {
@@ -269,21 +279,12 @@ describe("normalise arcs", () => {
       id: "xy",
       capabilities: { arcs: "xy", cycles: false, toolChange: false },
     };
-    const arc = (plane: "xy" | "zx"): Move => ({
-      kind: "arc",
-      to: plane === "xy" ? [0, 10, 0] : [0, 0, -10],
-      centre: [0, 0, 0],
-      dir: "ccw",
-      plane,
-      feed: 600,
-      role: "cut",
-    });
     const start: Move = { kind: "rapid", to: [10, 0, 0] };
-    expect(normalised(program([start, arc("xy")]), xyOnly)).toEqual([
+    expect(normalised(program([start, planeArc("xy")]), xyOnly)).toEqual([
       start,
-      arc("xy"),
+      planeArc("xy"),
     ]);
-    const out = normalised(program([start, arc("zx")]), xyOnly);
+    const out = normalised(program([start, planeArc("zx")]), xyOnly);
     expect(out.slice(1).every((m) => m.kind === "feed")).toBe(true);
     expect(points(out).at(-1)).toEqual([0, 0, -10]);
   });

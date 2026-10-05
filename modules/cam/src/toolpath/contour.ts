@@ -109,7 +109,7 @@ function straightened(loop: RegionLoop): RegionLoop {
 
 function reversed(loop: RegionLoop): RegionLoop {
   const segments = [...pieces(loop)]
-    .reverse()
+    .toReversed()
     .map(({ from, segment }): Segment =>
       segment.kind === "line"
         ? { kind: "line", to: from }

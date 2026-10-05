@@ -148,6 +148,9 @@ function basisAt(flat: number[], span: number, p: number, u: number) {
   return n;
 }
 
+const known = (w: number, h: XY, at: boolean): XY =>
+  at ? [w * h[0], w * h[1]] : [0, 0];
+
 export function interpolateFit(
   fit: XY[],
   [h0, h1]: [XY, XY],
@@ -166,8 +169,6 @@ export function interpolateFit(
   const flat = [0, 0, 0, 0, ...u.slice(1, -1), 1, 1, 1, 1];
   const rows = u.slice(1, -1).map((uk, i) => {
     const [a, b, c] = basisAt(flat, i + 4, 3, uk) as [number, number, number];
-    const known = (w: number, h: XY, at: boolean): XY =>
-      at ? [w * h[0], w * h[1]] : [0, 0];
     const [k0, k1] = [known(a, h0, i === 0), known(c, h1, i === n - 2)];
     const q = fit[i + 1]!;
     return { a, b, c, r: [q[0] - k0[0] - k1[0], q[1] - k0[1] - k1[1]] as XY };

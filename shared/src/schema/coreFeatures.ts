@@ -325,7 +325,7 @@ const picked = <T extends TSchema>(schema: T) =>
   Type.Refine(
     schema,
     (f: Partial<Record<keyof typeof picks, unknown[]>>) =>
-      [f.edges, f.faces, f.features].some((picks) => picks?.length),
+      [f.edges, f.faces, f.features].some((list) => list?.length),
     () => "needs an edge, a face or a feature",
   );
 const blend = <const T extends string, P extends TProperties>(

@@ -211,6 +211,18 @@ it("leaves native input, textarea, select and editable typing untouched", async 
   }
 });
 
+const press = () =>
+  act(async () =>
+    document.body.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "g",
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    ),
+  );
+
 it("shares grouping across mounted trees and keeps the remaining recipient alive", async () => {
   const doc = createEmptyDocument("group-keys", "Group keys");
   doc.features = ["s1", "s2"].map((id) => ({
@@ -252,17 +264,6 @@ it("shares grouping across mounted trees and keeps the remaining recipient alive
   const first = createRoot(firstHost);
   const second = createRoot(secondHost);
   const uninstall = installKeymap();
-  const press = () =>
-    act(async () =>
-      document.body.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "g",
-          ctrlKey: true,
-          bubbles: true,
-          cancelable: true,
-        }),
-      ),
-    );
   try {
     await act(async () => first.render(<ModelTree />));
     await act(async () => second.render(<ModelTree />));

@@ -399,6 +399,14 @@ function line(x1 = 0, y1 = 0, x2 = 1, y2 = 0): Pair[] {
   ];
 }
 
+const splineOf = (entities: SketchEntity[]) =>
+  entities.find((e) => e.kind === "spline")!;
+
+const at = (entities: SketchEntity[], id: string) => {
+  const p = entities.find((e) => e.id === id);
+  return p?.kind === "point" ? [p.x, p.y] : undefined;
+};
+
 describe("spline sketch entity", () => {
   const square = (x: number, y: number, size: number): Pair[][] => [
     line(x, y, x + size, y),
@@ -419,12 +427,6 @@ describe("spline sketch entity", () => {
     const { entities, skipped } = importDxf(dxf(records));
     expect(skipped).toBe(0);
     return entities;
-  };
-  const splineOf = (entities: SketchEntity[]) =>
-    entities.find((e) => e.kind === "spline")!;
-  const at = (entities: SketchEntity[], id: string) => {
-    const p = entities.find((e) => e.id === id);
-    return p?.kind === "point" ? [p.x, p.y] : undefined;
   };
 
   it("imports a SPLINE as poles that share the ends of touching lines", () => {
@@ -505,7 +507,7 @@ describe("spline sketch entity", () => {
   it("refuses to trim the spline or a curve it crosses", () => {
     const entities = imported(arch, line(5, -5, 5, 10), line(20, 0, 30, 0));
     const s = splineOf(entities);
-    const crossing = entities.filter((e) => e.kind === "line")[0]!;
+    const crossing = entities.find((e) => e.kind === "line")!;
     const clear = entities.filter((e) => e.kind === "line")[1]!;
     expect(trimmable(entities, s)).toBe(false);
     expect(trimmable(entities, crossing)).toBe(false);

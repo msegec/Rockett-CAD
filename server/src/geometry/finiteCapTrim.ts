@@ -185,7 +185,7 @@ function sourceEdits(
   const a = vertexPoint(curves.beginning(carrier)),
     b = vertexPoint(curves.ending(carrier)),
     axis = V.sub(b, a);
-  const ordered = [capEnd, moduleEnd].sort((x, y) =>
+  const ordered = [capEnd, moduleEnd].toSorted((x, y) =>
     V.dot(V.sub(vertexPoint(x), vertexPoint(y)), axis),
   );
   const start = ordered[0]!,

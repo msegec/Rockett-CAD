@@ -161,9 +161,8 @@ function openSketch() {
 it("finishes the open sketch through its evaluation owner before changing contexts", async () => {
   registerSecond();
   const document = openSketch();
-  let finish: (
-    result: Awaited<ReturnType<typeof api.evaluate>>,
-  ) => void = () => {};
+  const finish: ((result: Awaited<ReturnType<typeof api.evaluate>>) => void)[] =
+    [];
   const evaluation = {
     bodies: [],
     planes: [],
@@ -174,7 +173,7 @@ it("finishes the open sketch through its evaluation owner before changing contex
   vi.spyOn(api, "evaluate").mockImplementation(
     () =>
       new Promise((resolve) => {
-        finish = resolve;
+        finish.push(resolve);
       }),
   );
   const switching = switchWorkbench(synthetic);
@@ -182,7 +181,7 @@ it("finishes the open sketch through its evaluation owner before changing contex
   expect(useWorkbench.getState().current).toBe("design");
   expect(useWorkbench.getState().switching).toBe(true);
   await switchWorkbench("design");
-  finish(evaluation);
+  finish[0]!(evaluation);
   await switching;
   expect(api.evaluate).toHaveBeenCalledExactlyOnceWith(document.id);
   expect(useStore.getState()).toMatchObject({
@@ -283,9 +282,9 @@ it.each(["target", "project"])(
   async (changed) => {
     registerSecond();
     openSketch();
-    let finish: (
+    const finish: ((
       result: Awaited<ReturnType<typeof api.evaluate>>,
-    ) => void = () => {};
+    ) => void)[] = [];
     const evaluation = {
       bodies: [],
       planes: [],
@@ -296,7 +295,7 @@ it.each(["target", "project"])(
     vi.spyOn(api, "evaluate").mockImplementation(
       () =>
         new Promise((resolve) => {
-          finish = resolve;
+          finish.push(resolve);
         }),
     );
     const switching = switchWorkbench(synthetic);
@@ -308,7 +307,7 @@ it.each(["target", "project"])(
         projectId: "replacement",
         selection: [{ kind: "body", bodyId: "replacement" }],
       });
-    finish(evaluation);
+    finish[0]!(evaluation);
     await switching;
     expect(useWorkbench.getState()).toMatchObject({
       current: "design",

@@ -33,7 +33,7 @@ describe("sketch modifications", () => {
     ];
     const result = extendSketch(es, [], "base", { x: 9, y: 0 });
     const p = points(result.entities),
-      e = result.entities.find((e) => e.id === "base")!;
+      e = result.entities.find((x) => x.id === "base")!;
     expect(e.kind === "line" && p.get(e.p2)!.x).toBe(15);
     expect(() => extendSketch(es, [], "base", { x: 1, y: 0 })).toThrow(
       /No boundary/,

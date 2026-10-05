@@ -119,7 +119,7 @@ export class UserStore {
     use: (record: UserRecord) => R,
   ): Promise<R | undefined> {
     return this.queue.run(KEY, async () => {
-      const record = (await this.read()).users.find((user) => user.id === id);
+      const record = (await this.read()).users.find((entry) => entry.id === id);
       if (record?.status !== "active" || record.passwordHash !== expectedHash)
         return undefined;
       return use(record);

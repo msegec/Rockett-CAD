@@ -72,6 +72,9 @@ const call = async (
   return handle(body, doc);
 };
 
+const body = (route: Route, value: unknown) =>
+  route.body ? parse(route.body, JSON.parse(JSON.stringify(value))) : value;
+
 const project = (data?: unknown): CadDocument =>
   ({
     extensions:
@@ -93,8 +96,6 @@ beforeAll(async () => {
     (wrap: (route: Route, handle: any) => Handler) =>
     (route: Route, handle: any) =>
       routes.set(`${route.method} ${route.path}`, wrap(route, handle));
-  const body = (route: Route, value: unknown) =>
-    route.body ? parse(route.body, JSON.parse(JSON.stringify(value))) : value;
   const api: RouteModuleApi = {
     projectRoute: add(
       (route, handle) => (value, doc) =>

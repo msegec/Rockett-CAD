@@ -256,7 +256,7 @@ describe("bounded elliptical profiles", () => {
     entities.push(line("chord", "ee", "es"));
     const profiles = detectProfiles(entities);
     expect(profiles).toHaveLength(1);
-    expect(profiles[0]!.outer.map((c) => c.entityId).sort()).toEqual([
+    expect(profiles[0]!.outer.map((c) => c.entityId).toSorted()).toEqual([
       "chord",
       "e",
     ]);
@@ -330,7 +330,7 @@ describe("line and ellipse intersections", () => {
     expect(crossingEllipses(entities)).toEqual([]);
     const areas = detectProfiles(entities)
       .map((p) => p.area)
-      .sort((x, y) => x - y);
+      .toSorted((x, y) => x - y);
     expect(areas).toHaveLength(2);
     expect(areas[0]!).toBeCloseTo(segmentArea(10, 5, 4), 0);
     expect(areas[1]!).toBeCloseTo(Math.PI * 50 - segmentArea(10, 5, 4), 0);
@@ -383,7 +383,7 @@ describe("line and ellipse intersections", () => {
     ];
     const areas = detectProfiles(entities)
       .map((p) => p.area)
-      .sort((x, y) => x - y);
+      .toSorted((x, y) => x - y);
     expect(areas).toHaveLength(2);
     expect(areas[0]!).toBeCloseTo((Math.PI * 50) / 4, 0);
     expect(areas[1]!).toBeCloseTo((Math.PI * 50) / 4, 0);

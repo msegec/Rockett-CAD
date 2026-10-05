@@ -162,9 +162,9 @@ function addPoints(group: SketchGroup, sk: SketchRenderInput) {
   }
 }
 
-function buildSketch(sk: SketchRenderInput, renderKey: string): SketchGroup {
+function buildSketch(sk: SketchRenderInput, key: string): SketchGroup {
   const group = new SketchGroup(sk.frame, !!sk.lit);
-  group.userData.renderKey = renderKey;
+  group.userData.renderKey = key;
   if (sk.showProfiles) addProfiles(group, sk);
   addCurves(group, sk);
   if (sk.active) addPoints(group, sk);

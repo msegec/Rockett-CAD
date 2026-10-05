@@ -415,8 +415,8 @@ function failures(
   const { namingVersion } = doc;
   return engine
     .evaluate(doc, doc.features.length, sources)
-    .featureStatuses.flatMap(({ featureId, status, error, refs }) =>
-      status === "error" && error !== undefined
+    .featureStatuses.flatMap(({ featureId, status: state, error, refs }) =>
+      state === "error" && error !== undefined
         ? [{ featureId, namingVersion, error, ...(refs && { refs }) }]
         : [],
     );

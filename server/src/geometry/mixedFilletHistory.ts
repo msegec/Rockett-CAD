@@ -35,8 +35,8 @@ export function mixedFilletHistory(
   const faceHistory = (shape: Shape, method: "Generated" | "Modified") =>
     listToArray(operation[method](shape))
       .map(own)
-      .filter((shape) => shape.ShapeType() === k.TopAbs_ShapeEnum.TopAbs_FACE)
-      .map((shape) => own(k.TopoDS.Face_1(shape)));
+      .filter((face) => face.ShapeType() === k.TopAbs_ShapeEnum.TopAbs_FACE)
+      .map((face) => own(k.TopoDS.Face_1(face)));
   const generated = chosen.map(({ edge }) => faceHistory(edge, "Generated"));
   const unique = otherHistory(generated, chosen, eligible, featureId);
   const corners = cornerHistory(chosen, generated, faceHistory, own);

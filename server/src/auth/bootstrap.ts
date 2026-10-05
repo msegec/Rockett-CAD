@@ -15,12 +15,13 @@ import {
 import { AuthRateLimiter } from "./rateLimit.js";
 import { toPublicUser, type UserStore } from "./userStore.js";
 
+const digest = (value: string) => createHash("sha256").update(value).digest();
+
 export function setupTokenMatches(
   configured: string | undefined,
   supplied: string,
 ): boolean {
   if (!configured) return false;
-  const digest = (value: string) => createHash("sha256").update(value).digest();
   return timingSafeEqual(digest(configured), digest(supplied));
 }
 

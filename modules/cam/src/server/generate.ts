@@ -37,7 +37,9 @@ export type GenerateRequest = Omit<GenerateInput, "bodies"> & {
 export const sorted = (_key: string, value: unknown) =>
   value && typeof value === "object" && !Array.isArray(value)
     ? Object.fromEntries(
-        Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+        Object.entries(value).toSorted(([a], [b]) =>
+          a < b ? -1 : a > b ? 1 : 0,
+        ),
       )
     : value;
 

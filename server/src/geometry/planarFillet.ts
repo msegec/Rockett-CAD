@@ -347,7 +347,7 @@ function ownedFilletTopology(
         source,
       )
     : null;
-  const planeIndices = chosen.flatMap((chosen, index) =>
+  const planeIndices = chosen.flatMap((_, index) =>
     eligibility[index] ? [index] : [],
   );
   const planeChosen = planeIndices.map((index) => chosen[index]!);
@@ -415,16 +415,16 @@ function nativeBoundaryTransition(
         if (
           source.some(
             (face) =>
-              !chosen.some(({ edge }) =>
+              !chosen.some(({ edge: other }) =>
                 edges(face)
                   .map(own)
-                  .some((boundary) => boundary.IsSame(edge)),
+                  .some((boundary) => boundary.IsSame(other)),
               ) && nativeSourceEnd(face, vertex, own),
           )
         )
           return true;
-        const incident = chosen.filter(({ edge }) =>
-          vertices(edge)
+        const incident = chosen.filter(({ edge: other }) =>
+          vertices(other)
             .map(own)
             .some((endpoint) => endpoint.IsSame(vertex)),
         );
@@ -452,12 +452,10 @@ function filletCells(
   selectedCount: number,
 ): Cell[] {
   return replacements
-    .flatMap(({ original: old, face }) =>
-      (history?.replace(old) ?? [face]).map((face) => ({
+    .flatMap(({ original: old, face: rebuilt }) =>
+      (history?.replace(old) ?? [rebuilt]).map((face) => ({
         face,
-        name: body.names.get(
-          original[source.findIndex((face) => face.IsSame(old))]!,
-        ),
+        name: body.names.get(original[source.findIndex((s) => s.IsSame(old))]!),
         made: false,
       })),
     )

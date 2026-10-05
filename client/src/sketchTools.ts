@@ -690,11 +690,11 @@ export function dimensionKey(c: SketchConstraint): string | null {
     case "diameter":
       return `size:${x.entity}`;
     case "distance":
-      return `distance:${[x.a, x.b].sort().join("|")}:${x.axis ?? ""}`;
+      return `distance:${[x.a, x.b].toSorted().join("|")}:${x.axis ?? ""}`;
     case "angle":
-      return `angle:${[x.a, x.b].sort().join("|")}`;
+      return `angle:${[x.a, x.b].toSorted().join("|")}`;
     case "lineDistance":
-      return `lineDistance:${[x.a, x.b].sort().join("|")}`;
+      return `lineDistance:${[x.a, x.b].toSorted().join("|")}`;
     case "pointLineDistance":
       return `pointLine:${x.point}|${x.line}`;
     default:
@@ -755,26 +755,26 @@ export function fmt2(v: number): string {
   return String(Math.round(v * 100) / 100);
 }
 
+const dimField = (key: DimKey, label: string, unit: Units | "°"): DimField => ({
+  key,
+  label,
+  unit,
+  text: "",
+  locked: false,
+});
 /** Which sizes a tool exposes for typing; null = readout only. */
 export function dimFieldsFor(
   tool: string,
   units: Units = "mm",
 ): DimField[] | null {
-  const f = (key: DimKey, label: string, unit: Units | "°"): DimField => ({
-    key,
-    label,
-    unit,
-    text: "",
-    locked: false,
-  });
   switch (tool) {
     case "line":
-      return [f("length", "L", units), f("angle", "∠", "°")];
+      return [dimField("length", "L", units), dimField("angle", "∠", "°")];
     case "rect":
     case "centerRect":
-      return [f("width", "W", units), f("height", "H", units)];
+      return [dimField("width", "W", units), dimField("height", "H", units)];
     case "circle":
-      return [f("diameter", "⌀", units)];
+      return [dimField("diameter", "⌀", units)];
     default:
       return null;
   }
@@ -816,6 +816,7 @@ export function lockedValue(fields: DimField[], key: DimKey): number | null {
   return mm !== null && mm > 0 ? mm : null;
 }
 
+const sgn = (v: number) => (v < 0 ? -1 : 1);
 /**
  * Where the shape's second input effectively is: the cursor, overridden per
  * axis by locked sizes. Axis-aligned results are computed exactly so
@@ -834,7 +835,6 @@ export function resolveDimCursor(
   const dy = c.y - a.y;
   const len = Math.hypot(dx, dy);
   const dir: [number, number] = len > 1e-9 ? [dx / len, dy / len] : [1, 0];
-  const sgn = (v: number) => (v < 0 ? -1 : 1);
   switch (tool) {
     case "line": {
       const L = lockedValue(fields, "length");

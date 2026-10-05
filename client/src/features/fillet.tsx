@@ -226,7 +226,7 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
     const empty = sets.findIndex((set) => blendSelection(set).length === 0);
     if (empty >= 0)
       return { error: `Select an edge, face or feature in set ${empty + 1}` };
-    const [first, ...more] = sets;
+    const [head, ...more] = sets;
     if (more.length > 0 && sizes(params).filletType !== "equalDistance")
       return {
         error: "Only equal distance takes several sets: remove the other sets",
@@ -241,7 +241,7 @@ export const fillet: FeatureUI<FilletFeature, FilletParams> = {
       tangentChain: params.tangentChain ?? true,
     };
     return {
-      ...withFilletSets(base, [first!, ...more]),
+      ...withFilletSets(base, [head!, ...more]),
       ...keptRefs("sets", more, storedFeature(params.id)),
     };
   },

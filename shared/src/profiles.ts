@@ -73,14 +73,15 @@ function fnv(text: string): string {
   return (h >>> 0).toString(36);
 }
 
+const uniq = (ids: string[]) => [...new Set(ids)].toSorted().join(",");
+
 export function profileIdFor(outerIds: string[], holeIds: string[][]): string {
-  const uniq = (ids: string[]) => [...new Set(ids)].sort().join(",");
   const canon =
     uniq(outerIds) +
     "|" +
     holeIds
       .map((h) => uniq(h))
-      .sort()
+      .toSorted()
       .join(";");
   return "p" + fnv(canon);
 }
@@ -130,7 +131,7 @@ function cutsOn(c: Curve, nodes: XY[], [from, to]: [number, number]): Cut[] {
     while (t <= c.a0 + 1e-9) t += TAU;
     if (t < c.a1 - 1e-9) cuts.push({ n, t });
   });
-  return cuts.sort((a, b) => a.t - b.t);
+  return cuts.toSorted((a, b) => a.t - b.t);
 }
 
 function arrange(
@@ -284,8 +285,9 @@ interface HalfEdge {
   visited: boolean;
 }
 
+const angle = (s: number[]) => Math.atan2(s[3]! - s[1]!, s[2]! - s[0]!);
+
 function faceLoops(pieces: Piece[]): Loop[] {
-  const angle = (s: number[]) => Math.atan2(s[3]! - s[1]!, s[2]! - s[0]!);
   const halfEdges: HalfEdge[] = [];
   for (const p of pieces) {
     const rev: number[] = [];
@@ -407,8 +409,9 @@ export function uncovered(rings: number[][]): number[][] {
 const sense = (c: OrientedCurve) => c.entityId + (c.reversed ? "-" : "+");
 
 function orientation(p: Profile): string {
-  const side = (curves: OrientedCurve[]) => curves.map(sense).sort().join(",");
-  return [side(p.outer), ...p.holes.map(side).sort()].join("|");
+  const side = (curves: OrientedCurve[]) =>
+    curves.map(sense).toSorted().join(",");
+  return [side(p.outer), ...p.holes.map(side).toSorted()].join("|");
 }
 
 function distinctIds(profiles: Profile[]): Profile[] {

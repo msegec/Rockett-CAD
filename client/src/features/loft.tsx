@@ -58,12 +58,12 @@ export const loft: FeatureUI<LoftFeature, LoftParams> = {
   picks: [sections, targets],
   Form: LoftForm,
   build: (params, selection) => {
-    const sections: (ProfileRef | FaceRef)[] = selection.flatMap<
+    const refs: (ProfileRef | FaceRef)[] = selection.flatMap<
       ProfileRef | FaceRef
     >((pick) =>
       pick.kind === "face" ? faceRefs([pick]) : profileRefs([pick]),
     );
-    if (sections.length < 2)
+    if (refs.length < 2)
       return { error: "Select at least two profiles or planar faces" };
     const operation = params.operation ?? "join";
     return {
@@ -71,7 +71,7 @@ export const loft: FeatureUI<LoftFeature, LoftParams> = {
       type: "loft",
       name: params.name ?? "",
       suppressed: false,
-      sections,
+      sections: refs,
       operation,
       ...bodyTargets(operation, params),
     };

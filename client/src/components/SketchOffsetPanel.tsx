@@ -60,6 +60,8 @@ function selectConnector(sketchId: string, entityId: string) {
   s.toggleSelection({ kind: "sketchEntity", sketchId, entityId }, true);
 }
 
+const close = () => useStore.getState().setSketchTool("select");
+
 function SketchOffsetPanel({ sketch }: { sketch: SketchState }) {
   const units = useSetting("units.length");
   const draft = useStore((s) => s.draftSketch);
@@ -114,7 +116,6 @@ function SketchOffsetPanel({ sketch }: { sketch: SketchState }) {
 
   useSketchPreview("sketchOffsetPreview", preview.result, editing?.entityIds);
 
-  const close = () => useStore.getState().setSketchTool("select");
   const apply = async () => {
     if (!preview.result || busy || !draft) return;
     const s = useStore.getState();

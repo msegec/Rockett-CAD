@@ -183,7 +183,7 @@ export function joinEvery(
   const kind = operationKind(f);
   const bodies = targets
     ? targets.map((id) => targetBody(state, "join", id, tool.shape))
-    : overlapping(state, tool.shape).sort((a, b) =>
+    : overlapping(state, tool.shape).toSorted((a, b) =>
         compareNames(a.bodyId, b.bodyId),
       );
 

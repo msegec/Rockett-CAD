@@ -226,10 +226,10 @@ function trace(c: SketchCurve, n: number): XY[] {
       c.x1 + ((c.x2 - c.x1) * i) / n,
       c.y1 + ((c.y2 - c.y1) * i) / n,
     ]);
-  const flat = curveSamples(c, n);
-  return Array.from({ length: flat.length / 2 }, (_, i) => [
-    flat[2 * i]!,
-    flat[2 * i + 1]!,
+  const samples = curveSamples(c, n);
+  return Array.from({ length: samples.length / 2 }, (_, i) => [
+    samples[2 * i]!,
+    samples[2 * i + 1]!,
   ]);
 }
 

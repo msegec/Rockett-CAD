@@ -85,8 +85,10 @@ function prefill(f: ReferenceImageFeature) {
 function imageDimensions(file: File): Promise<{ w: number; h: number }> {
   const img = new Image();
   return new Promise((resolve, reject) => {
-    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
-    img.onerror = reject;
+    img.addEventListener("load", () =>
+      resolve({ w: img.naturalWidth, h: img.naturalHeight }),
+    );
+    img.addEventListener("error", reject);
     img.src = URL.createObjectURL(file);
   });
 }

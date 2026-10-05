@@ -40,11 +40,11 @@ export type LinearPatternParams = InputParams<
   AxisParams;
 
 function patternDirection(input: HandleInput): THREE.Vector3 | null {
-  const { params, selection, bodies } = input;
+  const { params, selection } = input;
   const edge = selection.find((s) => s.kind === "edge");
   if ((params.axisSource ?? "origin") === "edge") {
     if (edge?.kind !== "edge") return null;
-    const body = bodies.find((b) => b.bodyId === edge.bodyId);
+    const body = input.bodies.find((b) => b.bodyId === edge.bodyId);
     const pl = (body && meshOf(body))?.edges.find(
       (e) => e.name === edge.edgeName,
     )?.polyline;

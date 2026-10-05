@@ -72,7 +72,7 @@ export function modifiedFaces(
         )
           names.push(name);
       }
-      if (names.length > 0) out[body.bodyId] = names.sort(compareNames);
+      if (names.length > 0) out[body.bodyId] = names.toSorted(compareNames);
     }
 
     return Object.keys(out).length > 0 ? out : undefined;

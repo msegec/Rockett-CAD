@@ -99,6 +99,32 @@ interface DimLabel {
 
 const NUDGE_EVENTS = ["pointerdown", "pointerup", "wheel"];
 
+function activeSketchFrame(): PlaneFrame | null {
+  const s = useStore.getState();
+  if (s.active?.id !== "design.sketch") return null;
+  const sketchId = s.active.state.sketchId;
+  const sk = s.evaluation?.sketches.find((x) => x.featureId === sketchId);
+  return sk?.frame ?? null;
+}
+
+function planarFace(sel: Selection): boolean {
+  return isPlanarFace(sel, useStore.getState());
+}
+
+function buildFromClicks(
+  tool: string,
+  clicks: tools.UV[],
+  construction: boolean,
+): { created: tools.Created | null; chain: boolean } | null {
+  const r = buildFromClicksRaw(tool, clicks, construction);
+  if (r?.created && construction) r.created = tools.asConstruction(r.created);
+  return r;
+}
+
+function selectionRefs(sel: Selection[]) {
+  return { profiles: refsOf(sel, "profile"), faces: refsOf(sel, "face") };
+}
+
 export function ViewportView({
   children,
 }: {
@@ -318,9 +344,9 @@ export function ViewportView({
       if (!layer) return;
       const rect = vp.canvasRect();
       const cam = vp.camera;
-      const children = layer.children;
-      for (let i = 0; i < children.length; i++) {
-        const el = children[i] as HTMLElement;
+      const nodes = layer.children;
+      for (let i = 0; i < nodes.length; i++) {
+        const el = nodes[i] as HTMLElement;
         const label = dimLabelsRef.current[i];
         if (!label) continue;
         const p = worldToClient(rect, cam, label.world);
@@ -683,14 +709,6 @@ export function ViewportView({
       drag.cancel();
     };
   }, []);
-
-  function activeSketchFrame(): PlaneFrame | null {
-    const s = useStore.getState();
-    if (s.active?.id !== "design.sketch") return null;
-    const sketchId = s.active.state.sketchId;
-    const sk = s.evaluation?.sketches.find((x) => x.featureId === sketchId);
-    return sk?.frame ?? null;
-  }
 
   /**
    * Snap targets projected from the body face the active sketch sits on
@@ -1188,10 +1206,6 @@ export function ViewportView({
     if (prevKey !== newKey) s.setHover(picked);
   }
 
-  function planarFace(sel: Selection): boolean {
-    return isPlanarFace(sel, useStore.getState());
-  }
-
   function handlePrimaryDown(e: PointerEvent) {
     const s = useStore.getState();
     if (s.active?.id === "design.sketch") {
@@ -1417,16 +1431,6 @@ export function ViewportView({
       pinTypedDims(tool, result.created, d.fields),
       result.chain,
     );
-  }
-
-  function buildFromClicks(
-    tool: string,
-    clicks: tools.UV[],
-    construction: boolean,
-  ): { created: tools.Created | null; chain: boolean } | null {
-    const r = buildFromClicksRaw(tool, clicks, construction);
-    if (r?.created && construction) r.created = tools.asConstruction(r.created);
-    return r;
   }
 
   async function applyCreated(created: tools.Created, keepChaining: boolean) {
@@ -1944,9 +1948,6 @@ export function ViewportView({
     return pushKeyContext({ kind: "text-entry", handle: onKey });
   }, [units, drawingDimensions]);
 
-  function selectionRefs(sel: Selection[]) {
-    return { profiles: refsOf(sel, "profile"), faces: refsOf(sel, "face") };
-  }
   const peekRef = useRef(false);
   const editingProfiles =
     !!activeFeature &&

@@ -84,7 +84,7 @@ export function nativeOtherEnds(
         shareModuleCurve(edge, native, patch.face, own);
         const old = candidates[0]!;
         let end = ends.find(
-          (end) => end.index === index && end.old.IsSame(old),
+          (known) => known.index === index && known.old.IsSame(old),
         );
         if (!end) {
           end = { index, old, boundary: [] };

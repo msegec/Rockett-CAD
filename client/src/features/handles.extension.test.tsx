@@ -23,6 +23,13 @@ import {
 
 type Params = InputParams<{ width: number; note: string }>;
 
+const current = () => {
+  const state = useStore.getState();
+  if (state.active?.id !== "design.feature")
+    throw new Error("Missing extension command");
+  return state.active.state.inputs;
+};
+
 it("binds an extension's width handle to its rendered input and current lifetime", async () => {
   let stale: FeatureFormProps<Params>["setParams"] | undefined;
   const handle: FeatureHandleDefinition<Params> = {
@@ -73,12 +80,6 @@ it("binds an extension's width handle to its rendered input and current lifetime
   const baseline = useStore.getState();
   const host = document.body.appendChild(document.createElement("div"));
   const root = createRoot(host);
-  const current = () => {
-    const state = useStore.getState();
-    if (state.active?.id !== "design.feature")
-      throw new Error("Missing extension command");
-    return state.active.state.inputs;
-  };
   const render = async () =>
     act(async () => root.render(current().renderForm(setFeatureParams)));
   const previewHandle = () =>

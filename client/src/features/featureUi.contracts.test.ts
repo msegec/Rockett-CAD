@@ -339,6 +339,9 @@ it.each([
   });
 });
 
+const change = (params: SharedInputParams) =>
+  featureUI("extrude")!.create().withParams(params).onParamsChange();
+
 describe("extrude auto-cut", () => {
   const top: Selection = { kind: "face", bodyId: "b1", faceName: "top" };
   const plane = { type: "plane", origin: [0, 0, 10], normal: [0, 0, 1] };
@@ -378,8 +381,6 @@ describe("extrude auto-cut", () => {
       } as never,
     });
   });
-  const change = (params: SharedInputParams) =>
-    featureUI("extrude")!.create().withParams(params).onParamsChange();
 
   it("sets cut for a negative distance into the body", () => {
     expect(change({ distance: -5 })).toEqual({

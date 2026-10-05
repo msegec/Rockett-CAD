@@ -52,8 +52,8 @@ export function originalCarrierMetric(old: Shape, own: Own) {
       xx = V.scale(major, 1 / majorRadius),
       yy = V.scale(minor, 1 / minorRadius);
     carrierDistance = (contact) => {
-      const point = vertexPoint(contact),
-        offset = V.sub(point, origin);
+      const at = vertexPoint(contact),
+        offset = V.sub(at, origin);
       const parameter = Math.atan2(
         V.dot(offset, yy) / minorRadius,
         V.dot(offset, xx) / majorRadius,
@@ -65,7 +65,7 @@ export function originalCarrierMetric(old: Shape, own: Own) {
           V.scale(yy, minorRadius * Math.sin(parameter)),
         ),
       );
-      return V.norm(V.sub(point, expected));
+      return V.norm(V.sub(at, expected));
     };
   }
 
