@@ -2,7 +2,6 @@ import { groupSelectionCommand } from "../treeSelection";
 import { sketchCommand, sketchCommands, sketchGroups } from "./sketch";
 import { constraintCommands } from "./constraints";
 import { sketchCreateCommand } from "./sketchCreate";
-import { measureCommand } from "./measure";
 import { exitActive } from "./active";
 import { featureCommand } from "./featureCommand";
 import { exportCommand } from "./export";
@@ -44,7 +43,7 @@ function cancel(s: CommandContext) {
     return active.state.tool !== "select"
       ? s.setSketchTool("select")
       : s.setSelection([]);
-  if (s.active && s.active.id !== "inspect.measure") return exitActive();
+  if (s.active) return exitActive();
   s.setSelection([]);
 }
 
@@ -221,18 +220,6 @@ for (const [type, label, tooltip, group] of DIALOGS) {
     run: () => openDialog(type),
   });
 }
-
-registerCommand({
-  id: "inspect.measure",
-  label: "Measure",
-  icon: "measure",
-  group: "design.group.inspect",
-  keys: ["I"],
-  keyContext: "design",
-  interaction: measureCommand,
-  active: (s) => s.active?.id === "inspect.measure",
-  run: (s) => (s.active ? exitActive() : measureCommand.enter()),
-});
 
 registerCommand({
   id: "design.importStep",

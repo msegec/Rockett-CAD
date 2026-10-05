@@ -17,8 +17,6 @@ import { installKeymap } from "../commands/keymap";
 import {
   menuCommand,
   menuItems,
-  anyShown,
-  showHide,
   type MenuTargets,
   type Surface,
 } from "../commands/menus";
@@ -34,6 +32,7 @@ import { SurfaceMenu } from "./ContextMenu";
 import { RenameInput } from "./RenameInput";
 import { pickLabel } from "./form/fields";
 import {
+  anyShown,
   registerGroupRecipient,
   groupParts,
   selectSketchRegions,
@@ -41,6 +40,7 @@ import {
   bodySel,
   renameGroup,
   setBodiesVisible,
+  showHide,
   treeClick,
   treeIds,
   treeRange,

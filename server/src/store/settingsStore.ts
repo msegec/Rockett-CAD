@@ -16,7 +16,7 @@ import { ID_RE } from "./manifestStore.js";
 import { ProjectQueue } from "./projectQueue.js";
 import type { Storage } from "./storage.js";
 
-const SETTINGS_VERSION = 1;
+const SETTINGS_VERSION = 2;
 const APP_KEY = "settings";
 const IMPORT_MAX_NODES = 10_000;
 const IMPORT_MAX_DEPTH = 64;
@@ -40,6 +40,79 @@ function checkImportBounds(entries: LayerValues): void {
   }
   if (Buffer.byteLength(JSON.stringify(entries)) > SETTINGS_IMPORT_MAX_BYTES)
     throw new ValidationError("settings import is too large");
+}
+
+type Value = Record<string, unknown>;
+
+const MEASURE = {
+  from: "inspect.measure",
+  command: "rockett.measure.run",
+  panel: "rockett.measure.panel",
+};
+
+const isRecord = (value: unknown): value is Value =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+function renameKey(record: unknown, to: string): unknown {
+  if (!isRecord(record) || !Object.hasOwn(record, MEASURE.from)) return record;
+  const { [MEASURE.from]: value, ...rest } = record;
+  return Object.hasOwn(rest, to) ? rest : { ...rest, [to]: value };
+}
+
+const renameIds = (ids: unknown) =>
+  Array.isArray(ids)
+    ? [
+        ...new Set(
+          ids.map((id) => (id === MEASURE.from ? MEASURE.command : id)),
+        ),
+      ]
+    : ids;
+
+const eachValue = (record: unknown, change: (value: unknown) => unknown) =>
+  isRecord(record)
+    ? Object.fromEntries(
+        Object.entries(record).map(([key, value]) => [key, change(value)]),
+      )
+    : record;
+
+const toolbarIds = (layout: unknown) =>
+  isRecord(layout)
+    ? {
+        ...layout,
+        ...(Object.hasOwn(layout, "order") && {
+          order: eachValue(layout.order, renameIds),
+        }),
+        ...(Object.hasOwn(layout, "hidden") && {
+          hidden: renameIds(layout.hidden),
+        }),
+        ...(Object.hasOwn(layout, "pinned") && {
+          pinned: renameIds(layout.pinned),
+        }),
+      }
+    : layout;
+
+const MEASURE_SETTINGS: Record<string, (value: unknown) => unknown> = {
+  "keys.overrides": (overrides) => renameKey(overrides, MEASURE.command),
+  "toolbar.layout": (layouts) => eachValue(layouts, toolbarIds),
+  "layout.panels": (layouts) =>
+    eachValue(layouts, (panels) => renameKey(panels, MEASURE.panel)),
+};
+
+function moduleMeasure(file: Value): Value {
+  const { values } = file;
+  if (!isRecord(values)) return file;
+  const moved = Object.entries(MEASURE_SETTINGS).filter(([key]) =>
+    Object.hasOwn(values, key),
+  );
+  return {
+    ...file,
+    values: {
+      ...values,
+      ...Object.fromEntries(
+        moved.map(([key, rename]) => [key, rename(values[key])]),
+      ),
+    },
+  };
 }
 
 export type SettingsLayer =
@@ -83,7 +156,7 @@ export class SettingsStore {
           namespace: "settings",
           current: SETTINGS_VERSION,
           field: "version",
-          steps: {},
+          steps: { 1: moduleMeasure },
         },
         validate,
         ...(unbacked && { unbacked }),

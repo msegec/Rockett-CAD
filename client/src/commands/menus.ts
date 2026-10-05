@@ -21,7 +21,7 @@ import {
   groupItems,
   selectSketchRegions,
   setBodiesVisible,
-  setFeaturesVisible,
+  showHide,
   ungroup,
 } from "../treeSelection";
 import { alignCameraToActiveSketch, type ViewportRef } from "../viewportRef";
@@ -139,28 +139,6 @@ export function menuCommand<T>(
     when: (ctx) => "target" in ctx,
     run: (ctx) => run(ctx as Targeted<T>),
   };
-}
-
-type State = Pick<CommandContext, "document" | "evaluation" | "view">;
-
-export function anyShown(s: State, kind: Kind, ids: string[]): boolean {
-  if (kind === "body") {
-    const hidden = new Set(s.view.hidden.bodies);
-    return (s.evaluation?.bodies ?? []).some(
-      (b) => ids.includes(b.bodyId) && !hidden.has(b.bodyId),
-    );
-  }
-  const hidden = new Set(s.view.hidden.features);
-  return (s.document?.features ?? []).some(
-    (f) => f.type === "sketch" && ids.includes(f.id) && !hidden.has(f.id),
-  );
-}
-
-export function showHide(kind: Kind, ids: string[]): void {
-  const visible = !anyShown(useStore.getState(), kind, ids);
-  void (kind === "body"
-    ? setBodiesVisible(Object.fromEntries(ids.map((id) => [id, visible])))
-    : setFeaturesVisible(ids, visible));
 }
 
 function showBodies(s: CommandContext, visible: (id: string) => boolean) {
@@ -338,7 +316,7 @@ for (const command of [
   ),
   menuCommand<Picked>("design.menu.measure", "Measure", (s) => {
     s.setSelection([s.target.sel]);
-    void runCommand("inspect.measure", s.viewport);
+    void runCommand(MEASURE, s.viewport);
   }),
 ])
   registerCommand(command);
@@ -358,6 +336,11 @@ function place<S extends Surface>(surface: S, entries: Placed<S>[]) {
   }
 }
 
+const MEASURE = "rockett.measure.run";
+const measure = {
+  command: "design.menu.measure",
+  when: () => commandById(MEASURE) !== undefined,
+};
 const notSketching = (s: CommandContext) => s.active?.id !== "design.sketch";
 const relations = MENU_RELATIONS.map(({ type }) => ({
   command: `design.menu.relation.${type}`,
@@ -480,18 +463,18 @@ place("design.viewport.face", [
   { command: "design.menu.shellFace", when: planar },
   { command: "design.menu.exportDxf", when: canExportDxf },
   "design.menu.hideBody",
-  "design.menu.measure",
+  measure,
 ]);
 place("design.viewport.edge", [
   "design.menu.fillet",
   "design.menu.chamfer",
-  "design.menu.measure",
+  measure,
 ]);
 place("design.viewport.region", [
   { command: "design.menu.extrudeRegion", label: regionsLabel("Extrude") },
   { command: "design.menu.revolveRegion", label: regionsLabel("Revolve") },
 ]);
-place("design.viewport.pick", ["design.menu.measure"]);
+place("design.viewport.pick", [measure]);
 
 function draftKind(s: MenuContext<"design.viewport.draftCurve">) {
   return s.draftSketch?.entities.find((x) => x.id === s.target.entityId)?.kind;

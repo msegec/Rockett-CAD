@@ -166,14 +166,6 @@ export const ICONS = {
       <circle cx="12" cy="12" r="0.75" fill="currentColor" />
     </>,
   ),
-  measure: svg(
-    <>
-      <g transform="rotate(-45 12 12)">
-        <rect x="2" y="8.5" width="20" height="7" rx="1" />
-        <path d="M5 8.5v3M8.5 8.5v2M12 8.5v4M15.5 8.5v2M19 8.5v3" />
-      </g>
-    </>,
-  ),
   importStep: svg(
     <>
       <path d="M3 15v4.5A1.5 1.5 0 0 0 4.5 21h15a1.5 1.5 0 0 0 1.5-1.5V15" />

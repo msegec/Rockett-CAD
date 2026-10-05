@@ -81,7 +81,7 @@ beforeEach(() => {
 });
 afterEach(() => useStore.setState(initial, true));
 
-it.each(["design.chamfer", "design.export", "inspect.measure"])(
+it.each(["design.chamfer", "design.export", "design.sketch.create"])(
   "opening a healthy sketch replaces %s",
   async (id) => {
     await runCommand(id);
@@ -94,7 +94,7 @@ it.each(["design.chamfer", "design.export", "inspect.measure"])(
   },
 );
 
-it.each(["design.chamfer", "design.export", "inspect.measure"])(
+it.each(["design.chamfer", "design.export", "design.sketch.create"])(
   "starting a sketch replaces %s after the mutation succeeds",
   async (id) => {
     await runCommand(id);

@@ -211,9 +211,7 @@ export function useSelectionMeasures(): string[] {
         : evaluation?.sketches.find((s) => s.featureId === id)?.entities,
   };
   const wanted =
-    bodies === evaluation?.bodies &&
-    active?.id !== "inspect.measure" &&
-    active?.id !== "module.pick"
+    bodies === evaluation?.bodies && active?.id !== "module.pick"
       ? exactRefs(selection)
       : null;
   const over = (wanted?.length ?? 0) > MEASURE_MAX_REFS;

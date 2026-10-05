@@ -72,7 +72,7 @@ function registerSecond() {
       id: "fixture.command",
       label: "Fixture action",
       group: "fixture.group",
-      icon: "measure",
+      icon: "fit",
       keys: ["Q"],
       keyContext: synthetic,
       run: keyRun,
@@ -90,7 +90,7 @@ it("hides the existing select control with one workbench and reacts to registrat
   ).toEqual(["Design", "Fixture"]);
 });
 
-it("switches the toolbar and key context, clears selection and exits Measure", async () => {
+it("switches the toolbar and key context, clears selection and exits the active command", async () => {
   registerSecond();
   await act(async () =>
     root.render(
@@ -102,11 +102,12 @@ it("switches the toolbar and key context, clears selection and exits Measure", a
   );
   expect(host.textContent).toContain("CREATE");
   await act(async () => {
-    await runCommand("inspect.measure");
+    await runCommand("design.sketch.create");
     useStore
       .getState()
       .setSelection([{ kind: "face", bodyId: "fixture", faceName: "face" }]);
   });
+  expect(useStore.getState().active?.id).toBe("design.sketch.create");
   const select = host.querySelector("select")!;
   await act(async () => {
     select.value = synthetic;
@@ -265,7 +266,7 @@ it("commits edited sketch geometry before the final evaluation and context chang
 it("rejects unknown registrations without changing selection or command state", async () => {
   const selection = [{ kind: "body" as const, bodyId: "fixture" }];
   useStore.getState().setSelection(selection);
-  await runCommand("inspect.measure");
+  await runCommand("design.sketch.create");
   const state = useStore.getState();
   await expect(switchWorkbench("fixture.absent")).rejects.toThrow(
     "Unknown workbench: fixture.absent",

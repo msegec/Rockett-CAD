@@ -1,4 +1,4 @@
-import type { Command } from "./commands/registry";
+import type { Command, CommandContext } from "./commands/registry";
 import {
   bodyMadeBy,
   newId,
@@ -101,6 +101,32 @@ export const setFeaturesVisible = (ids: string[], visible: boolean) =>
     bodies: {},
     features: Object.fromEntries(ids.map((id) => [id, visible])),
   });
+
+type State = Pick<CommandContext, "document" | "evaluation" | "view">;
+
+export function anyShown(
+  s: State,
+  kind: TreeGroup["kind"],
+  ids: string[],
+): boolean {
+  if (kind === "body") {
+    const hidden = new Set(s.view.hidden.bodies);
+    return (s.evaluation?.bodies ?? []).some(
+      (b) => ids.includes(b.bodyId) && !hidden.has(b.bodyId),
+    );
+  }
+  const hidden = new Set(s.view.hidden.features);
+  return (s.document?.features ?? []).some(
+    (f) => f.type === "sketch" && ids.includes(f.id) && !hidden.has(f.id),
+  );
+}
+
+export function showHide(kind: TreeGroup["kind"], ids: string[]): void {
+  const visible = !anyShown(useStore.getState(), kind, ids);
+  void (kind === "body"
+    ? setBodiesVisible(Object.fromEntries(ids.map((id) => [id, visible])))
+    : setFeaturesVisible(ids, visible));
+}
 
 export async function deleteFeatures(ids: string[]) {
   await inOneStep(ids.map((fid) => (id, tx) => api.deleteFeature(id, fid, tx)));

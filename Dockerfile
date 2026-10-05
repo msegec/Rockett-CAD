@@ -15,6 +15,7 @@ COPY plugin-api/package.json plugin-api/package.json
 COPY modules/cam/package.json modules/cam/package.json
 COPY modules/kicad/package.json modules/kicad/package.json
 COPY modules/elec/package.json modules/elec/package.json
+COPY modules/measure/package.json modules/measure/package.json
 RUN npm ci --ignore-scripts --no-audit --no-fund
 
 FROM deps AS server
@@ -59,6 +60,7 @@ COPY plugin-api/package.json plugin-api/package.json
 COPY modules/cam/package.json modules/cam/package.json
 COPY modules/kicad/package.json modules/kicad/package.json
 COPY modules/elec/package.json modules/elec/package.json
+COPY modules/measure/package.json modules/measure/package.json
 RUN npm ci --omit=dev --workspace server --ignore-scripts --no-audit --no-fund \
   && npm cache clean --force
 COPY THIRD-PARTY-NOTICES.md ./

@@ -16,7 +16,6 @@ import { HistoryPanel } from "../components/HistoryPanel";
 import { ShortcutSheet } from "../components/ShortcutSheet";
 import { DraggablePanel } from "../components/DraggablePanel";
 import { FeatureDialog } from "../components/FeatureDialog";
-import { MeasurePanel } from "../components/MeasurePanel";
 import { SketchOffset } from "../components/SketchOffsetPanel";
 import { SketchMove } from "../components/SketchMovePanel";
 
@@ -112,12 +111,6 @@ registerPanel({
     s.active.state.tool === "select" &&
     s.active.state.moveCopy,
   component: SketchMove,
-});
-registerPanel({
-  id: "inspect.measure",
-  title: "Measure",
-  when: (s) => activeCommand(s)?.panel === "inspect.measure",
-  component: MeasurePanel,
 });
 registerPanel({
   id: HELP_PANEL,

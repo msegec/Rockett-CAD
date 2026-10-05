@@ -57,7 +57,6 @@ registerWorkbench({
     "design.export",
     "design.feature",
     "sketch.offset",
-    "inspect.measure",
     "design.help",
     "design.history",
   ],
