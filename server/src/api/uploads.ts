@@ -70,7 +70,10 @@ export const receiveProjectFile = (uploads: Uploads, bytes: number) =>
     staging(uploads),
   );
 
-export function withinImportBudget(file: Staged, bytes: number): void {
+export function withinImportBudget(
+  file: Pick<Staged, "size">,
+  bytes: number,
+): void {
   if (file.size > bytes)
     throw new StoreError(
       `This file is ${megabytes(file.size)}; imports are limited to ${megabytes(bytes)}.`,

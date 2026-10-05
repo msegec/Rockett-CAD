@@ -73,8 +73,11 @@ release workflow remain under development. The core licence is unresolved.
   import or delete JSON posts and download an AI post kit to adapt an old post.
 - Beginner CAM guide and an example plate project ready to generate.
 - First-party modules with an admin enable switch and per-user visibility.
-  The plugin API 0.6.0 supports commands, toolbars, panels, settings pages,
-  routes, scene contributions and kernel jobs; CAM is the first shipped module.
+  The plugin API 0.7.0 supports commands, toolbars, panels, settings pages,
+  routes, scene contributions, kernel jobs and project-scoped source blobs;
+  CAM is the first shipped module. Project reads can fetch immutable bytes;
+  document mutations can store them within the import byte budget, after
+  access and revision checks.
 
 ### Fixed
 

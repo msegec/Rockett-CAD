@@ -298,7 +298,7 @@ key grammar, so removed plugin values survive:
   `/projects/:id/m/<moduleId>/`, or mounting throws. Its `userRoute` mounts
   under `/m/<moduleId>/` for the signed-in user; one with an `effect` or an
   `:id` parameter throws. A route refuses with
-  `throw new StoreError(reason, "unprocessable")`, which plugin API 0.6.0
+  `throw new StoreError(reason, "unprocessable")`, which the plugin API
   exports: 422 with the one-line reason.
 - `registerExporter` (`server/src/geometry/exporters.ts`) and
   `registerImporter` (`server/src/api/importers.ts`) return a disposer.
@@ -354,7 +354,17 @@ module, in load order:
 - A route module's `projectRoute`, `projectMutation` and `userRoute`
   handlers get `params` from the route path and `body` as the route's
   request type when it has a body schema, `unknown` without one, and
-  `{ user }`, the signed-in user. A user route needs a session as project
+  `user`, the signed-in user. Project reads also receive `blobs.get(hash)`;
+  document mutations receive `blobs.get(hash)` and `blobs.put(bytes)`.
+  The host binds both to the authorised project, with no project id argument
+  or delete capability. Reads return a private byte copy; writes snapshot
+  the bytes and return their SHA-256 content hash. Invalid or corrupt hashes
+  refuse through the existing blob store. Writes use the configured import
+  byte budget and run after access and `If-Match` checks, inside the project
+  queue. Store the returned hash in the document's extension data to keep
+  the source through save, undo and reload; blob collection preserves
+  unknown extension data. User routes receive no blob capability.
+  A user route needs a session as project
   routes do and takes no user id from the request. Every route module receives
   `kernel` at runtime, but only the core `ModuleApi` type declares it.
 - `register.kernelJob(id, entry)` registers a kernel job: `id` starts with

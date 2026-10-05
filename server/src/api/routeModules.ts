@@ -14,6 +14,7 @@ import {
 } from "@rockett/shared";
 import type { KernelClient } from "../kernel/client.js";
 import type { ProjectStore } from "../store/projectStore.js";
+import { withinImportBudget } from "./uploads.js";
 
 export type Edit = (
   doc: CadDocument,
@@ -48,6 +49,7 @@ const projectPrefix = (id: string) =>
 type RouterApi = {
   kernel: KernelClient;
   store: ProjectStore;
+  importBytes: number;
   on(route: Route, ...handlers: RequestHandler[]): void;
   wrap(
     fn: (req: any, res: any, ctx: RouteContext) => Promise<void>,
@@ -56,7 +58,9 @@ type RouterApi = {
 };
 
 export function mountRouteModule(router: RouterApi, module: RouteModule): void {
-  const { kernel, store, on, wrap, mutateProject } = router;
+  const { kernel, store, importBytes, on, wrap, mutateProject } = router;
+  const getBlob = (id: string) => async (hash: string) =>
+    Uint8Array.from(await store.blob(id, hash));
   const inside = (route: Route, start = projectPrefix(module.id)) => {
     if (!route.path.startsWith(start))
       throw new Error(
@@ -74,7 +78,13 @@ export function mountRouteModule(router: RouterApi, module: RouteModule): void {
       on(
         inside(route),
         wrap(async (req, res, ctx) => {
-          res.json(await read(await store.load(req.params.id), req, ctx));
+          const doc = await store.load(req.params.id);
+          res.json(
+            await read(doc, req, {
+              ...ctx,
+              blobs: { get: getBlob(req.params.id) },
+            }),
+          );
         }),
       );
     },
@@ -84,7 +94,22 @@ export function mountRouteModule(router: RouterApi, module: RouteModule): void {
         throw new Error(
           `route module ${module.id} must declare ${route.path} as a document edit`,
         );
-      on(route, mutateProject(edit));
+      on(
+        route,
+        mutateProject(async (doc, req, ctx) => {
+          const id = req.params.id;
+          return edit(doc, req, {
+            ...ctx,
+            blobs: {
+              get: getBlob(id),
+              put: async (bytes) => {
+                withinImportBudget({ size: bytes.byteLength }, importBytes);
+                return store.blobs(id).put(Buffer.from(bytes));
+              },
+            },
+          });
+        }),
+      );
     },
     userRoute: (route, handle) => {
       inside(route, moduleSegment(module.id));
