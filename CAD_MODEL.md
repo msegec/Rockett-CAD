@@ -671,14 +671,36 @@ owns this and runs after the save's evaluation. Evaluation never writes `sig`.
   object runs between it and the target plane in whichever order they lie,
   or from it to a body. The new start face is `f:{featureId}:cap:start`.
   The spec registers it at `/startObject`, as for the extent object.
+- `taper` and `taper2` (schema 43) follow Fusion's Taper Angle: degrees,
+  strictly between -90 and 90, absent is 0 and evaluates as before. The
+  sign is Fusion's: negative tapers inward, so the solid narrows away from
+  its start, and positive tapers outward. `taper` is side 1 and both halves
+  of Symmetric; `taper2` is side 2 of Two sided and unused otherwise. The
+  taper is measured from the start: the profile plane, the offset start or
+  a Start object parallel to the profile. Every extent takes it; To object
+  and All trim the tapered solid with the same half-space or body cut, so a
+  slanted end face still lies on its plane.
+- The kernel build binds no draft or drafted prism, so each section is the
+  profile's 2D offset by distance times tan angle (intersection joins), the
+  sections of each profile loop are ruled, and the sides and end caps are
+  sewn into one solid. A sketch line gives a side on its exact plane; a
+  circle or arc gives a cone, so round corners stay concentric and tangent;
+  other curves, such as splines, give a ruled B-spline side to the kernel's
+  offset curve. Holes taper with the profile, widening as the outside
+  narrows. Symmetric and Two sided give two side faces per sketch entity,
+  named with the usual `~1` and `~2` suffixes. Construction:
+  `server/src/geometry/taper.ts`.
 - Refusals: a plane parallel to the direction, a plane crossing or touching
   the profile, a body level with the profile, a profile starting inside the
   body, a profile that does not fully meet the body, and All with no body
   ahead. With a start object: a start plane parallel to the direction, and
-  a To object plane meeting it over the profile. Evaluation:
+  a To object plane meeting it over the profile. With a taper: an offset
+  that closes the profile or drops one of its edges before the far end of
+  the built solid (for To object that end lies past the target), and a
+  Start object not parallel to the profile. Evaluation:
   `server/src/geometry/extrude.ts`.
-- Not yet: taper angles and thin walls (PAR-013 remainder), and a start or
-  To object on a curved face.
+- Not yet: thin walls (PAR-013 remainder), a start or To object on a curved
+  face, and a taper from a slanted Start object.
 
 ## Tool targets
 

@@ -289,6 +289,7 @@ export const documentMigrations: Migrations<CadDocument> = {
     39: (doc) => doc,
     40: (doc) => doc,
     41: (doc) => doc,
+    42: (doc) => doc,
   },
   nested: extensionFeatures,
 };

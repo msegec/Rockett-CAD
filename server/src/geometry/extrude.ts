@@ -36,6 +36,7 @@ import {
   resolveProfiles,
 } from "./features.js";
 import type { ProfileFace } from "./sketchGeom.js";
+import { taperedPrism } from "./taper.js";
 
 const TO_OBJECT_MARGIN = 1;
 const ORIGIN: Vec3 = [0, 0, 0];
@@ -58,6 +59,8 @@ const START_PARALLEL =
   "the Start object is parallel to the extrude direction; pick a plane the profile can reach";
 const MEETS_START =
   "the To object plane meets the Start object over the profile; pick planes apart there";
+const TAPER_SLANTED =
+  "a taper needs a Start object parallel to the profile; use Profile plane or Offset";
 
 interface Plane {
   origin: Vec3;
@@ -113,7 +116,47 @@ function prismTool(state: EvalState, f: ExtrudeFeature, s: Source) {
   const n = V.scale(s.n, sgn);
   const base = (f.startOffset ?? 0) * sgn;
   const [ahead, behind] = spans(state, f, s.pf, n, base);
-  return buildPrism(f.id, s.pf, n, ahead + behind, base - behind, s.copy);
+  return prismOf(f, s, n, ahead + behind, base - behind, base);
+}
+
+const tan = (deg = 0) => Math.tan((deg * Math.PI) / 180);
+
+function slopes(f: ExtrudeFeature): [number, number] {
+  const ahead = tan(f.taper);
+  if (f.direction === "symmetric") return [ahead, ahead];
+  return [ahead, f.direction === "twoSided" ? tan(f.taper2) : 0];
+}
+
+function prismOf(
+  f: ExtrudeFeature,
+  s: Source,
+  n: Vec3,
+  length: number,
+  base: number,
+  anchor = base,
+): ToolResult {
+  const [ahead, behind] = slopes(f);
+  if (ahead === 0 && behind === 0)
+    return buildPrism(f.id, s.pf, n, length, base, s.copy);
+  const end = base + length;
+  const inside = anchor - base > LINEAR_TOL && end - anchor > LINEAR_TOL;
+  const at = [base, ...(inside ? [anchor] : []), end];
+  return taperedPrism(
+    f.id,
+    s.pf,
+    n,
+    at.map((t) => ({
+      at: t,
+      offset: t >= anchor ? (t - anchor) * ahead : (anchor - t) * behind,
+    })),
+  );
+}
+
+function anchorOf(f: ExtrudeFeature, s: Source, n: Vec3, plane: Plane) {
+  if (slopes(f).every((k) => k === 0)) return 0;
+  const [lo, hi] = tRange(s.pf, n, plane);
+  if (hi - lo > LINEAR_TOL) throw new Error(TAPER_SLANTED);
+  return lo;
 }
 
 function spans(
@@ -181,14 +224,7 @@ function planeTool(
   const side = -above * Math.sign(slope);
   const reach = Math.max(Math.abs(lo), Math.abs(hi)) / Math.abs(slope);
   const n = V.scale(s.n, side);
-  const prism = buildPrism(
-    f.id,
-    s.pf,
-    n,
-    reach + TO_OBJECT_MARGIN,
-    offset * side,
-    s.copy,
-  );
+  const prism = prismOf(f, s, n, reach + TO_OBJECT_MARGIN, offset * side);
   return kernelCall("extrude to object", () =>
     clipAtPlane(prism, frame.origin, V.scale(m, above), f.id),
   );
@@ -259,7 +295,7 @@ function bodyTool(
   const side = lo + hi > 0 ? 1 : -1;
   const n = V.scale(s.n, side);
   const length = (side > 0 ? hi : -lo) + TO_OBJECT_MARGIN;
-  const prism = buildPrism(f.id, s.pf, n, length, offset * side, s.copy);
+  const prism = prismOf(f, s, n, length, offset * side);
   const near = start * side;
   return stopAtBody(
     f.id,
@@ -321,12 +357,13 @@ function startTool(
     );
     if (lo <= LINEAR_TOL && hi >= -LINEAR_TOL) throw new Error(MEETS_START);
     const n = V.scale(s.n, lo > 0 ? 1 : -1);
+    const lower = facing(start, n, START_PARALLEL);
     return between(
       f,
       s,
       n,
-      facing(start, n, START_PARALLEL),
-      facing(target, n, PARALLEL),
+      [lower, facing(target, n, PARALLEL)],
+      anchorOf(f, s, n, lower),
     );
   }
   if (f.extent?.kind === "all" && f.direction === "symmetric")
@@ -336,11 +373,12 @@ function startTool(
   const plane = facing(start, n, START_PARALLEL);
   const [ahead, behind] = spans(state, f, s.pf, n, 0);
   const lower = shifted(plane, n, -behind);
+  const anchor = anchorOf(f, s, n, plane);
   if (f.extent?.kind !== "all")
-    return between(f, s, n, lower, shifted(plane, n, ahead));
+    return between(f, s, n, [lower, shifted(plane, n, ahead)], anchor);
   if (!(ahead > tRange(s.pf, n, plane)[1] + LINEAR_TOL))
     throw new Error(NOTHING_AHEAD);
-  return between(f, s, n, lower, ahead);
+  return between(f, s, n, [lower, ahead], anchor);
 }
 
 function startToBody(
@@ -361,7 +399,7 @@ function startToBody(
     along(body.shape, n)[1] - along(s.pf.face, n)[0] + TO_OBJECT_MARGIN;
   if (!(far > tRange(s.pf, n, lower)[1] + LINEAR_TOL))
     throw new Error(misses(bodyId));
-  const prism = between(f, s, n, lower, far);
+  const prism = between(f, s, n, [lower, far], anchorOf(f, s, n, lower));
   const end = along(prism.shape, n)[1];
   return stopAtBody(
     f.id,
@@ -411,15 +449,15 @@ function between(
   f: ExtrudeFeature,
   s: Source,
   n: Vec3,
-  lower: Plane,
-  upper: Plane | number,
+  [lower, upper]: [Plane, Plane | number],
+  anchor: number,
 ): ToolResult {
   const base = tRange(s.pf, n, lower)[0] - TO_OBJECT_MARGIN;
   const end =
     typeof upper === "number"
       ? upper
       : tRange(s.pf, n, upper)[1] + TO_OBJECT_MARGIN;
-  const prism = buildPrism(f.id, s.pf, n, end - base, base, s.copy);
+  const prism = prismOf(f, s, n, end - base, base, anchor);
   return kernelCall("extrude from object", () => {
     const started = clipAtPlane(
       prism,

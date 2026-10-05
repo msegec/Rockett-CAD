@@ -35,7 +35,7 @@ everything downstream against persistent topology references.
 ### Model
 
 - **Solid features**: extrude, revolve, sweep, loft, emboss and deboss from sketch profiles; extrude, revolve and ordered loft sections also take planar faces.
-- **Extrude extents**: start on the profile plane, an offset or a plane or face; end at a distance, To object or All.
+- **Extrude extents**: start on the profile, an offset, plane or face; end at a distance, To object or All; taper per side.
 - **Tool targets**: join, cut and intersect act on bodies you pick from the list or by click; Auto takes visible ones.
 - **Modify**: rule, variable and multi-radius fillets, chamfers (equal, two distances or distance and angle), shell, combine, split and press/pull bodies.
 - **Move**: translate bodies, turn them about an axis, edge or sketch line, or add the moved copy as a new body.

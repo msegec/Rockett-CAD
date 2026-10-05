@@ -241,6 +241,17 @@ const cases: Record<string, SpecCase> = {
         direction: "normal",
         operation: "join",
       },
+      {
+        ...meta,
+        type: "extrude",
+        profiles: [refProfile("p1")],
+        distance: 5,
+        distance2: 2,
+        taper: -5,
+        taper2: 3,
+        direction: "twoSided",
+        operation: "newBody",
+      },
     ],
     invalid: [
       [
@@ -254,6 +265,19 @@ const cases: Record<string, SpecCase> = {
         },
         "distance must be non-zero",
         "/distance",
+      ],
+      [
+        {
+          ...meta,
+          type: "extrude",
+          profiles: [refProfile("p1")],
+          distance: 5,
+          taper: 90,
+          direction: "normal",
+          operation: "newBody",
+        },
+        "taper must be < 90",
+        "/taper",
       ],
     ],
   },

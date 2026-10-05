@@ -46,6 +46,13 @@ const degrees = Type.Number({
   maximum: 360,
   parameterUnit: "deg",
 });
+const taper = Type.Optional(
+  Type.Number({
+    exclusiveMinimum: -90,
+    exclusiveMaximum: 90,
+    parameterUnit: "deg",
+  }),
+);
 const bodies = Type.Array(bodyId, { minItems: 1 });
 const targets = Type.Optional(
   Type.Array(bodyId, { maxItems: MAX_TARGETS, uniqueItems: true }),
@@ -296,6 +303,8 @@ const extrude = profilesOrFaces(
         }),
       ]),
     ),
+    taper,
+    taper2: taper,
     direction: Type.Enum(["normal", "reverse", "symmetric", "twoSided"]),
     operation,
     targets,

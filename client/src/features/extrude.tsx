@@ -6,6 +6,7 @@ import {
   type PlaneRef,
 } from "@rockett/shared";
 import {
+  AngleField,
   LengthField,
   OperationField,
   SelectField,
@@ -53,6 +54,8 @@ export type ExtrudeParams = InputParams<
     | "distance"
     | "distance2"
     | "startOffset"
+    | "taper"
+    | "taper2"
     | "direction"
     | "operation"
     | "targets"
@@ -156,6 +159,33 @@ function StartFields({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
   );
 }
 
+const twoSided = (params: ExtrudeParams) =>
+  params.extent !== "toObject" && (params.direction ?? "normal") === "twoSided";
+
+function TaperFields({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
+  return (
+    <>
+      <AngleField
+        label="Taper angle"
+        value={num(params, "taper", 0)}
+        onChange={(v) => setParams({ taper: v })}
+        bind="/taper"
+      />
+      {twoSided(params) && (
+        <AngleField
+          label="Taper angle 2"
+          value={num(params, "taper2", 0)}
+          onChange={(v) => setParams({ taper2: v })}
+          bind="/taper2"
+        />
+      )}
+      <div className="field-hint">
+        Negative narrows the solid, positive widens it
+      </div>
+    </>
+  );
+}
+
 function ExtrudeForm({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
   const units = useSetting("units.length");
   const extent = params.extent ?? "distance";
@@ -208,16 +238,16 @@ function ExtrudeForm({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
           onChange={(v) => setParams({ direction: v })}
         />
       )}
-      {extent !== "toObject" &&
-        (params.direction ?? "normal") === "twoSided" && (
-          <LengthField
-            label="Distance 2"
-            units={units}
-            value={num(params, "distance2", 5)}
-            onChange={(v) => setParams({ distance2: v })}
-            bind="/distance2"
-          />
-        )}
+      {twoSided(params) && (
+        <LengthField
+          label="Distance 2"
+          units={units}
+          value={num(params, "distance2", 5)}
+          onChange={(v) => setParams({ distance2: v })}
+          bind="/distance2"
+        />
+      )}
+      <TaperFields params={params} setParams={setParams} />
       <OperationField intersect />
     </>
   );
@@ -371,6 +401,8 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
         ? "normal"
         : chosen;
     const startOffset = offsetOf(params);
+    const taper = num(params, "taper", 0);
+    const taper2 = num(params, "taper2", 0);
     const operation = params.operation ?? "join";
     return {
       id: params.id ?? newId("extrude"),
@@ -383,6 +415,11 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
         distance2: num(params, "distance2", 5),
       }),
       ...((startOffset !== 0 || "startOffset" in stored) && { startOffset }),
+      ...((taper !== 0 || "taper" in stored) && { taper }),
+      ...(((direction === "twoSided" && taper2 !== 0) ||
+        "taper2" in stored) && {
+        taper2,
+      }),
       ...(start === "object" && startPlane && { startObject: startPlane }),
       ...(extent === "all" && { extent: { kind: "all" as const } }),
       ...(extent === "toObject" &&
@@ -400,6 +437,8 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
       distance: f.distance,
       distance2: f.distance2,
       startOffset: f.startOffset ?? 0,
+      taper: f.taper ?? 0,
+      taper2: f.taper2 ?? 0,
       start: f.startObject ? "object" : f.startOffset ? "offset" : "profile",
       startObject: f.startObject ? planePicks(f.startObject) : [],
       extent: f.extent?.kind,
