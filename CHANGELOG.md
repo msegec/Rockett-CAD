@@ -16,6 +16,8 @@ release workflow remain under development. The core licence is unresolved.
 
 ### Added
 
+- KiCad board upload API stores original bytes and parsed snapshots as portable
+  project assets, with undo and a KiCad 9 minimum.
 - Accounts with first-admin setup, username or email sign-in, password changes,
   TOTP, persistent sessions and an offline password-reset command. Cloudflare
   Access can map a verified identity to an existing account.

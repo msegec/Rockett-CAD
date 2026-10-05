@@ -10,14 +10,14 @@ import server from "../server.js";
 
 const root = resolve(import.meta.dirname, "../..");
 
-describe("KiCad first-party module shell", () => {
-  it("registers a compatible server shell without claiming contributions", () => {
+describe("KiCad first-party module", () => {
+  it("registers a compatible upload route with declared contributions", () => {
     expect(parseManifest(manifest, PLUGIN_API_VERSION).status).toBe(
       "compatible",
     );
     expect(manifest.id).toBe("rockett.kicad");
     expect(manifest.licence).toBe("UNLICENSED");
-    expect(manifest.contributes).toEqual({});
+    expect(manifest.contributes).toEqual({ routes: ["rockett.kicad.upload"] });
     expect(
       serverModules.find((entry) => entry.manifest.id === manifest.id),
     ).toEqual({ manifest, server });

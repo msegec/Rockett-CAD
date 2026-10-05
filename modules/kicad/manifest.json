@@ -6,5 +6,7 @@
   "apiRange": "^0.10",
   "licence": "UNLICENSED",
   "author": "Rockett CAD",
-  "contributes": {}
+  "contributes": {
+    "routes": ["rockett.kicad.upload"]
+  }
 }

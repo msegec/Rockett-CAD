@@ -365,21 +365,21 @@ module, in load order:
   validate its values with its schema. The client part registers the same
   definition, so the Settings panel draws it under the module's section.
 - Route callbacks receive typed `params`, `body` and the signed-in `user`.
-  Project reads get `blobs.get(hash)`; mutations also get `blobs.put(bytes)`.
-  Reads copy bytes, writes snapshot them and return their SHA-256 hash.
-  Both bind to the authorised project, without an id argument or delete.
-  Access, `If-Match`, the project queue and import byte budget precede put.
-  Invalid hashes and corrupt bytes refuse through the existing blob store.
-  API 0.8.0 adds mutation-only `assets.set(hashes)`: replace the calling
-  manifest's exact namespace references with a detached array of hashes.
-  The host preserves opaque asset metadata; only this capability declares refs.
-  Bounded, unique hashes must resolve here before document or history commit.
-  `moduleAssets.namespaces` owns portable references; opaque extension JSON
-  stays unchanged. Sources survive save, undo, reopen, duplicate and `.rockett`
-  export/import without a feature, even with the module disabled or absent.
-  Blob collection keeps its conservative extension-data refusal.
-  User routes get neither capability and take no user id from the request.
-  `kernel` exists at runtime but only the core `ModuleApi` declares it.
+  Project reads get `blobs.get(hash)`; mutations add `blobs.put(bytes)`.
+  Reads copy bytes; writes snapshot them and return SHA-256. Both bind to the authorised project, with no id argument or delete.
+  Access, `If-Match`, queue and import byte budget precede put; bad hashes and corrupt bytes refuse through the blob store.
+  API 0.8.0's mutation-only `assets.set(hashes)` replaces exact manifest namespace refs with a detached array.
+  Only this capability declares bounded, unique hashes that must resolve here before document/history commit; opaque metadata stays.
+  `moduleAssets.namespaces` owns portable refs; opaque extension JSON stays.
+  Sources survive save, undo, reopen, duplicate and `.rockett` export/import without a feature, including disabled or absent modules.
+  Blob collection conservatively refuses extension data.
+  User routes get neither capability and take no user id; only core `ModuleApi` declares the runtime `kernel`.
+- `POST /projects/:id/m/rockett/kicad/upload` takes `{source}` as canonical
+  base64 original `.kicad_pcb` bytes and `If-Match`; returns `linkId` with the
+  normal edit response. KiCad 9 is the floor; invalid UTF-8 or boards get 400
+  before storage. `extensions["rockett.kicad"]` holds `{version: 1, data: {links}}`.
+  Source and `{version: 1, data}` snapshot hashes are portable
+  assets. Original bytes retain a BOM; JSON caps decoded source below 37.5 MiB.
 - `register.kernelJob(id, entry)` registers a kernel job: `id` starts with
   the module id and a dot, and `entry` is the URL of a file whose default
   export, from `defineKernelJobs`, holds the job under that id.
