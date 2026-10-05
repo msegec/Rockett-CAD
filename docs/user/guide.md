@@ -259,6 +259,199 @@ the sketch or body name. A curved face does not offer it.
 Every change saves automatically, with the full parametric history in a
 readable JSON format.
 
+## CAM
+
+CAM turns a model into an NC file, the program a CNC machine runs. This
+section assumes you have never run one. Read it all before your first cut.
+
+### Words
+
+- **Stock**: the raw block or sheet you cut the part from.
+- **WCS and zero**: the work coordinate system. Its origin is the zero point.
+  Every X, Y and Z in the NC file is measured from it. You set the same point
+  on the machine before cutting.
+- **Setup**: one way the stock is held on the machine. It holds the stock
+  size, the zero, the material, the machine and the operations.
+- **Machine**: your CNC's limits: travel, spindle speeds, feeds and how stiff
+  it is.
+- **Post**: the translator that writes the NC file in your controller's
+  dialect, such as GRBL 1.1 or LinuxCNC.
+- **Tool**: a cutter: its kind, diameter, flute length and flutes.
+- **Preset**: the feeds and speeds for one tool: spindle speed, cut, plunge
+  and ramp feeds, stepdown and stepover.
+- **Feeds and speeds**: how fast the spindle turns (rpm) and how fast the
+  tool moves (mm/min). Wrong values break tools or burn the material.
+- **Stepdown**: how deep each pass goes. **Stepover**: how far apart side by
+  side passes are, as a fraction of the diameter.
+- **Operation**: one job in a setup, such as a pocket or a contour.
+- **Toolpath**: the moves an operation generates.
+- **NC file**: the G-code program, made from every toolpath through the post.
+
+### From part to NC file
+
+The first time, make a simple part: a 50 by 30 mm rectangle on the XY plane,
+extruded 10 mm.
+
+1. On the project list, type a name in **New project name…** and click
+   **Create**.
+2. Model the part. Click **XY Plane** in the tree, **Create Sketch**, then
+   **Rect**. Click the origin, move the pointer up and right, type 50, Tab,
+   30 and Enter, then **Finish Sketch**. Click **Sketch1** in the tree, then
+   **Extrude**, set **Distance (mm)** to 10 and click **OK**.
+3. Add your machine. Open your user menu in the top bar, choose
+   **Settings**, then **Machines** under CAM, and click **Add machine**. Fill
+   in its travel and spindle speeds from its manual. Set **Rigidity**:
+   **Light** for a hobby router, **Medium** for a stiff router, **Rigid** for
+   a mill. Click **OK**. The first machine is the default until you click
+   **Make default** on another.
+4. Add a tool. Choose **Tools** and click **Add tool**. The default is a 6 mm
+   flat end mill with 2 flutes; change it to match your cutter, then **OK**.
+5. Add a preset. Click **New preset** on the tool's row. Pick the
+   **Material** and click **Suggest**. Lower **Stepdown (mm)** to a quarter
+   of the diameter, 1.5 for a 6 mm tool, and click **OK**. Close Settings.
+6. Switch the **Workbench** menu in the top bar to **Manufacture**.
+7. Click **Setup**. Choose the **Material** and check the **Machine**. Under
+   **Stock**, **Box around bodies** adds a margin on each side. Set **-Z (mm)**
+   and **+Z (mm)** to 0 when your stock is exactly as thick as the part. Leave
+   **WCS** at **Stock corner, front left, top**. Click **OK**.
+8. Click the part's top face, then **Contour**. Pick the **Tool** and
+   **Preset**, keep **Side** at **Outside** and set **Bottom offset (mm)** to
+   10, the part height. Click **OK**.
+9. Right-click **Contour 1** in the tree and choose **Generate**. Its chip
+   turns from **never** to **fresh**.
+10. Click **Contour 1** to draw its toolpath, then **Simulate** in the bottom
+    bar. Wait for **No gouges**.
+11. Click **NC Program**. Every setup starts ticked. Check the **Machine** and
+    **Post**, and click **Export**. The browser downloads the NC file.
+
+There is no edit or delete for a setup or an operation yet. To change one,
+make a new one, then Suppress the old operation from its right-click menu or
+untick the old setup in NC Program.
+
+### Operations
+
+Each operation is a toolbar button. Select its face first.
+
+- **Contour** cuts around the outline of one flat face that points up.
+  **Outside** cuts around a part to free it from the stock; **Inside** cuts
+  along the inside of the outline. It needs a flat or bull nose end mill that
+  is centre cutting.
+- **Pocket** clears all material down to a flat floor face. Holes in that
+  floor stay as islands. The tool enters in a helix or a ramp at **Ramp angle
+  (°)**; 2 to 5 degrees is gentle. Use it for recesses and for blind holes.
+- **Laser** cuts or engraves the outline and holes of a face with a laser
+  machine. Its tool is a flat end mill whose diameter is the beam's kerf. Set
+  **Power**, **Feed** and **Passes**; **Z step (mm)** lowers each pass.
+
+Facing, drilling and 3D finishing have no dialog yet. Mill a hole as a Pocket
+on its floor; a through hole has no floor, so it cannot be cut yet. Order the
+operations so the part stays held: holes and pockets first, the outside
+contour last. **Move up** and **Move down** on the right-click menu change the
+order.
+
+### Cut depth
+
+Every cut starts at the top of the stock. Pocket stops at its floor face.
+Contour stops **Bottom offset** below the face you picked, not below the
+stock.
+
+So a Contour on the top face with Bottom offset 0 cuts at the top surface
+and removes nothing. With no stock above the part it is refused:
+`stock top must be above the cut depth`. To cut the part out, set Bottom
+offset to the part height. If the stock has a **-Z** margin, that much stays
+under the part as a skin.
+
+There are no tabs yet, so a through cut frees the part on its last pass.
+Hold it down outside the toolpath with screws, clamps or tape. Or set Bottom
+offset a few tenths of a mm under the part height and cut the thin skin by
+hand afterwards.
+
+A cut deeper than the tool's flute length is refused.
+
+### Safe first settings
+
+- Use **Suggest** in the preset. It reads the material chart for your tool on
+  the default machine and keeps rpm and feeds inside the machine's limits.
+  Its note says what it limited.
+- Set the machine's **Rigidity** honestly. **Light** takes 70% of the chart's
+  chip load and a stepdown of half the diameter; **Medium** 90% and one
+  diameter; **Rigid** the full chart and one diameter.
+- Start with a stepdown of a quarter of the diameter and a stepover of 0.4.
+  Suggest sets stepover to 1, a full width slot; 0.4 is gentler in a pocket.
+  Raise them only after a clean cut.
+- Keep **Safe height** at 15 mm and **Clearance** at 3 mm unless your clamps
+  are taller. Both are measured above the stock top.
+- Wood and plastic forgive more than aluminium. Make your first cut in MDF or
+  softwood.
+
+### Simulation and checks
+
+Clicking an operation draws its toolpath: dashed lines are rapid moves in the
+air, solid lines cut. Drag **Moves shown** to step through it. **Simulate**
+removes the moves from a model of the stock and reports `No gouges`, or
+`Gouges:` with how deep the tool cut into the part. Gouged cells turn red.
+
+An operation's chip says **never**, **fresh**, **stale** after the model or
+its inputs change, **error** with the reason in its tooltip, **missing
+reference** or **suppressed**. **Generate all stale** regenerates every stale
+operation. Nothing regenerates by itself.
+
+NC Program runs more checks and lists any problem under **Export blocked**.
+**Generate first** regenerates an operation that is not fresh. It checks that
+rapids miss the stock, that rpm is inside the machine's spindle range, that
+feeds stay under the machine's maximum per axis, that a tool which is not
+centre cutting never plunges, and that a mill program never runs on a laser.
+It does not check machine travel for a setup made in the dialog, so check
+that the part fits your machine yourself.
+
+### When it refuses
+
+Generate and Export say why they refuse. The common ones:
+
+| Message                                               | What to do                                                                        |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `operation … needs a tool`                            | The operation has no tool. Add one in Settings, CAM, Tools, then a new operation. |
+| `operation … needs a preset of its tool`              | The tool has no preset, or it was deleted. Add a preset with **New preset**.      |
+| `… params: must have required properties face`        | No face was picked. Click the face before the toolbar button.                     |
+| `operation … is suppressed; unsuppress it first`      | Right-click it and choose **Unsuppress**.                                         |
+| `… rpm is outside the machine's … to … rpm`           | The preset's spindle speed is outside the machine's range. Press Suggest again.   |
+| `stock top must be above the cut depth`               | Bottom offset is 0 on the top face. Set it to the depth you want.                 |
+| `a … mm deep cut is past the … mm flute length of …`  | Cut less deep or use a longer tool.                                               |
+| `face … does not face up in the setup`                | Pick a flat face that points up, not a wall or the bottom.                        |
+| `… leaves no path: the loop is smaller than the tool` | The shape is smaller than the tool. Use a smaller tool.                           |
+| `no helix or ramp entry fits at …`                    | The pocket is too small for the tool to enter. Use a smaller tool.                |
+| `… is not centre cutting and cannot plunge`           | The tool cannot plunge. Use a centre cutting end mill.                            |
+| `… is not cached; generate it again`                  | Click **Generate first**. Opened project files carry no toolpaths.                |
+| `a rapid passes through the stock or its clearance`   | Raise **Safe height** or **Clearance** in a new setup.                            |
+
+### Before you cut
+
+Rockett never marks a program safe to run. On the machine:
+
+1. Clamp the stock flat and tight, with every clamp outside the toolpath.
+2. Fit the tool you chose, and check its diameter and stick out.
+3. Set zero where the WCS says: X and Y at the front left corner of the stock
+   and Z on its top, for the default WCS. Use the same G54 offset.
+4. Check the spindle turns clockwise seen from above.
+5. Air cut first: raise Z zero 20 mm above the stock and run the program. The
+   tool must stay clear of everything.
+6. Keep a hand on the stop button for the whole first cut, and wear eye and
+   ear protection.
+
+### Example project
+
+[cam-plate.rockett](../../examples/cam-plate.rockett) is a 100 by 60 by 10 mm
+MDF plate with a 4 mm deep pocket and two 15 mm holes 6 mm deep. It has a
+setup with an example machine and GRBL post, a 6 mm flat end mill with an MDF
+preset, and four operations: two Pockets for the holes, a Pocket and an
+outside Contour. The holes are 15 mm because a Pocket's helix entry needs
+room: a 6 mm tool cannot enter a 10 mm hole.
+
+On the project list click **Open project file** and choose it. Switch to
+**Manufacture**, right-click each operation and choose **Generate**. Then
+follow steps 10 and 11 above. Before cutting it, make a new setup with your
+own machine.
+
 ## Workspace
 
 ### Viewport controls

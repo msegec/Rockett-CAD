@@ -78,6 +78,7 @@ everything downstream against persistent topology references.
 - **Machines**: mill or laser profiles with firmware, travel, spindle rpm and power, acceleration and rigidity; paste GRBL `$$` to fill.
 - **Tools**: flat, ball and bull nose end mills, V-bits, drills and chamfer mills; import and export `rockett-tools.json`.
 - **Feed presets and Suggest**: Suggest fills presets from six materials by chipload, scaled by machine rigidity; operations re-suggest for the setup's machine.
+- **CAM example**: [examples/cam-plate.rockett](examples/cam-plate.rockett) opens a plate ready to generate; the [guide](docs/user/guide.md#cam) walks a first CNC program.
 
 ### Inspect
 
@@ -138,11 +139,7 @@ everything downstream against persistent topology references.
 ## Roadmap
 
 Ticked items ship today. Unticked items are planned, in no promised order and
-with no dates. Next lists the work under way.
-
-### Next
-
-- [ ] Beginner CAM guide and an example project ready to generate
+with no dates.
 
 ### Sketch
 
@@ -213,6 +210,7 @@ with no dates. Next lists the work under way.
 - [x] Machine, post and tool libraries in Settings
 - [x] Feed presets and Suggest, scaled by machine rigidity
 - [x] Re-suggest feeds and speeds for the machine a setup uses
+- [x] Beginner CAM guide and an example project ready to generate
 - [x] Contour, pocket and laser operations
 - [x] Toolpath preview and heightmap simulation with gouge checks
 - [x] NC export through six shipped posts or your own
