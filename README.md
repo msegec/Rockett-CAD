@@ -131,7 +131,7 @@ everything downstream against persistent topology references.
 
 ### Modules and plugins
 
-- **CAM module**: CAM ships as a first-party module on the plugin API, version 0.5.0.
+- **CAM module**: CAM ships as a first-party module on the plugin API, version 0.6.0.
 - **Module switches**: in a module's Settings section, an admin turns it off from the next restart, and each user can hide it.
 - **Plugin API**: modules built into the app add commands, toolbars, panels, workbenches, viewport layers, settings pages, menus and kernel jobs.
 - **REST API**: a signed-in session can script projects, features, history, settings, import and export over JSON; see [API.md](API.md).

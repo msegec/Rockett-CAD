@@ -12,7 +12,7 @@ change gets a `Schema N` line in the section that ships it.
 ## 0.3.0 (Unreleased)
 
 This snapshot extends 0.2.0. CAD foundations and the complete CAD-to-CAM
-release workflow remain under development.
+release workflow remain under development. The core licence is unresolved.
 
 ### Added
 
@@ -44,6 +44,16 @@ release workflow remain under development.
 - Sketch regions from linked planar face boundaries, regular polygons at a set
   angle, point-to-line and line-to-line dimensions, driven dimensions,
   over-constraint refusal and drag-to-trim.
+- Fit-point, control-point and conic spline tools, exact spline profiles and
+  extrudes, and tangent or smooth joins. Sketch relations add symmetry about
+  a line and curvature-continuous smooth joins.
+- Editable copies of exact planar face boundaries, including holes; copied
+  curves stay unchanged when the source changes. Project links earlier sketch
+  curves, B-spline edges, faces and body outlines; Face sections and Body
+  sections link their intersections with the sketch plane.
+- Extrude starts at the profile plane, an offset or an object and ends at a
+  distance, To object or All. Each side can taper. Thin extrude makes inside,
+  outside or centred walls on profiles or open sketch curves.
 - Timeline wheel scrolling, keyboard actions, body selection and feature peeks
   highlighting created or modified faces. Design and sketch toolbars scroll
   with the wheel; the viewport reads out hovered and selected items.
@@ -51,11 +61,20 @@ release workflow remain under development.
   format registries.
 - Cancellable kernel jobs, progress reporting and crash recovery that blocks
   dependent geometry and exports until the failed feature is edited.
-- CAM building blocks: setups, stock, WCS, tools, presets, validated IR,
-  facing, polygon operations, a mesh drop-cutter and an adaptive WASM bridge.
-  Declarative posts include GRBL 1.1, grblHAL, LinuxCNC, FluidNC, Mach3,
-  Mach4 and Marlin. These are implementation pieces, not a qualified machining
-  workflow or permission to run a machine.
+- Manufacture workbench with setups, stock, work zero, Contour, Pocket and
+  Laser operations, status and cycle time, stale toolpath generation, move
+  preview and heightmap simulation with gouge checks.
+- CAM machine, tool, post and feed-preset libraries in Settings. Setups choose
+  a machine, post, material and tolerance. Suggest fills feeds and speeds for
+  flat, bull nose and ball nose tools; Rigidity scales chipload and stepdown.
+  Re-suggest adapts a preset to the setup's machine without changing the library.
+- NC export as one file or a zip through GRBL 1.1, grblHAL, LinuxCNC, FluidNC,
+  Mach3, Mach4 and Marlin posts, with millimetre or inch output. Users can
+  import or delete JSON posts and download an AI post kit to adapt an old post.
+- Beginner CAM guide and an example plate project ready to generate.
+- First-party modules with an admin enable switch and per-user visibility.
+  The plugin API 0.6.0 supports commands, toolbars, panels, settings pages,
+  routes, scene contributions and kernel jobs; CAM is the first shipped module.
 
 ### Fixed
 
@@ -81,6 +100,13 @@ release workflow remain under development.
   keep personal scope. Body rename requests require a string name.
 - Trim ends at its actual cutter; deleting constraints moves no geometry.
   Old region IDs still render, and unsettled sketches warn before the next edit.
+- Kernel and preview sketch regions use the same face rule, including holes.
+  Lost relations on projected sets warn and stay stored; deleting or suppressing
+  their source blocks evaluation instead of using stale geometry.
+- Generate returns a refusal reason for missing or failed geometry and invalid
+  CAM inputs. NC checks accept a feed exactly at the machine's axis limit.
+- Missing-module features and data are preserved through save and reload;
+  evaluation names the required module with `Requires module <id>`.
 - View saves survive project closure; deleted features lose stale view IDs;
   blocked bodies keep their groups. View/settings writes accept weak ETags,
   and view-only members can save their own view.
@@ -88,8 +114,7 @@ release workflow remain under development.
   active supports. Shape lookup compares identity even when kernel hashes collide.
 - Deleting saved server projects, readable or unreadable, requires confirmation
   and a matching revision or content tag; stale requests are refused. The naming
-  report skips
-  projects with an interrupted migration and exits nonzero.
+  report skips projects with an interrupted migration and exits nonzero.
 - Sign-in/setup failures are rate-limited by address, including behind an
   explicitly trusted proxy. Common passwords are refused, malformed sessions
   are moved aside, health diagnostics require access and request contents stay
@@ -106,6 +131,9 @@ release workflow remain under development.
   affected components; history reads one snapshot and appends one record.
 - The server shuts down gracefully on SIGTERM and the viewport redraws after
   WebGL context recovery.
+- Mesh imports stay as mesh bodies until a feature needs B-Rep. Binary mesh
+  transfer and disk-backed caching support million-triangle display; distant
+  bodies use coarser meshes and hover picking skips bodies away from the ray.
 
 ### Changed
 
@@ -167,6 +195,25 @@ release workflow remain under development.
   fillets load and build unchanged.
 - Schema 36: sketches may hold splines, imported from DXF with their exact
   degree, poles, weights and knots; earlier documents load unchanged.
+- Schema 37: sketches store fit-spline points and tangent handles, and conic
+  defining points and rho; earlier documents load unchanged.
+- Schema 38: projections may reference curves in earlier sketches; earlier
+  edge projections load unchanged.
+- Schema 39: projections may reference faces and body outlines as linked
+  groups; earlier documents load unchanged.
+- Schema 40: projections may store face or body sections at the sketch plane;
+  earlier documents load unchanged.
+- Schema 41: Extrude stores To object or All extents; an absent extent keeps
+  the earlier Distance behaviour.
+- Schema 42: Extrude may reference a start object; earlier documents keep
+  their profile-plane or offset start.
+- Schema 43: Extrude may store a taper angle for each side; absent angles
+  keep straight walls.
+- Schema 44: Extrude may store thin-wall location and thickness, and open
+  sketch-curve references; earlier documents load unchanged.
+- Schema 45: sketch relations add symmetric and smooth kinds; earlier
+  documents load unchanged. All steps from schema 36 to 45 preserve existing
+  document fields; the store backs up the source before saving a migration.
 
 ### Known limits
 
@@ -175,11 +222,20 @@ release workflow remain under development.
   some composed parts; a fillet meeting two earlier fillets can fail.
 - Loft face sections must be planar and have one outline; faces with holes and
   face-based lofts that fail solid validation are refused.
-- CAM operation coverage, the manufacture workflow, simulation, qualified
-  machine output and complete CAD-to-CAM release acceptance remain unfinished.
+- Thin extrude with taper is refused. Body outlines currently require planar
+  and cylindrical faces; other surfaces can use face or edge projection.
+- Spline and conic tools use keyboard shortcuts; toolbar buttons remain planned.
+- CAM still needs the facing, drilling, adaptive, parallel, waterline and rest
+  operation dialogs, an operation planner, hold-down placement, flip setups,
+  setup checklists, improved links and Vectric tool import. A GRBL air cut and
+  complete CAD-to-CAM release acceptance remain unfinished.
 - Assemblies, PCB/electrical workbenches, additive workflows beyond current
   export, broader collaboration and full Fusion capability parity remain later
   work. This snapshot does not claim their completion.
+- Drawings, sheet metal, additional exchange formats and further sketch,
+  modelling, inspection and workspace options remain planned in the README Roadmap.
+- Third-party module installation, a Modules page, missing-module timeline controls,
+  module-data migrations and a plugin author guide remain unfinished.
 
 ## 0.2.0 (2026-09-23)
 
