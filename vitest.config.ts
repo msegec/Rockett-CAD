@@ -50,6 +50,8 @@ export const projects = [
     environment: "node",
     include: ["client/test/browser/**/*.test.ts"],
     exclude: [],
+    maxWorkers: "25%",
+    sequence: { groupOrder: 1 },
     testTimeout: 60_000,
     hookTimeout: 60_000,
     expect: { poll: { timeout: BROWSER_WAIT_MS } },
