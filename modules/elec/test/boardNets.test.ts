@@ -17,7 +17,7 @@ const modules = resolve(import.meta.dirname, "../..");
 const provider = serverModules.find(
   (entry) => entry.manifest.id === "rockett.kicad",
 )!;
-const elec = { manifest, server };
+const elec = { manifest, server, folder: new URL("../", import.meta.url) };
 const fixture = (version: number) =>
   readFileSync(
     resolve(modules, `kicad/test/fixtures/outline-kicad${version}.kicad_pcb`),

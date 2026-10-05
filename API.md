@@ -38,7 +38,7 @@ nothing else is: `server/src/api/routes.ts`.
 | `GET`, `PATCH /projects/:id/settings`                                             | `server/src/api/settingsRoutes.ts` |
 | `GET /health`                                                                     | `server/src/api/systemRoutes.ts`   |
 | `GET /formats`                                                                    | `server/src/api/systemRoutes.ts`   |
-| `GET /modules`                                                                    | `server/src/api/routes.ts`         |
+| `GET /modules`, `GET /modules/:id/licence`                                        | `server/src/api/routes.ts`         |
 | `GET`, `POST /projects`                                                           | `server/src/api/projectRoutes.ts`  |
 | `GET`, `DELETE /projects/:id`                                                     | `server/src/api/projectRoutes.ts`  |
 | `POST /projects/:id/duplicate`, `/rename`                                         | `server/src/api/projectRoutes.ts`  |
@@ -324,6 +324,12 @@ module, in load order:
   }
 ]
 ```
+
+`GET /modules/:id/licence` returns `{ "text": "..." }`, the `LICENSE` file in
+the folder the host loaded the module from (`HostModule.folder`). It is 404
+when no module has that id, or when the module has no folder or no `LICENSE`
+file. The Modules settings page shows it beside a line naming
+`THIRD-PARTY-NOTICES.md`.
 
 - `status` is `loaded`, `failed`, `incompatible` or `disabled`.
 - `error` is null for `loaded` and `disabled`. Otherwise it is the manifest

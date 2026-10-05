@@ -11,6 +11,7 @@ import { registerSettingsRoutes } from "./settingsRoutes.js";
 import type { UserStore } from "../auth/userStore.js";
 import type { FriendStore } from "../auth/friendStore.js";
 export { sendError } from "./apiErrors.js";
+import { fail } from "./apiErrors.js";
 import { createRouterContext } from "./routerContext.js";
 import { createProjectMutations } from "./projectMutations.js";
 import "./measureRoutes.js";
@@ -28,7 +29,7 @@ import { previewRoutes } from "./previewRoutes.js";
 import { historyRoutes } from "./historyRoutes.js";
 import { documentRoutes } from "./documentRoutes.js";
 import { bodyRoutes } from "./bodyRoutes.js";
-import { listModules } from "../modules/host.js";
+import { listModules, moduleLicence } from "../modules/host.js";
 
 export function createApiRouter(
   store: ProjectStore,
@@ -59,6 +60,12 @@ export function createApiRouter(
   systemRoutes(api);
   on(ROUTES.modules, (_req, res) => {
     res.json(listModules());
+  });
+  on(ROUTES.moduleLicence, (req, res) => {
+    moduleLicence(String(req.params.id)).then(
+      (text) => res.json({ text }),
+      (error: unknown) => fail(req, res, error),
+    );
   });
   projectRoutes(api);
   evaluationRoutes(api);

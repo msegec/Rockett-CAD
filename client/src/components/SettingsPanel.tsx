@@ -33,6 +33,7 @@ import {
 } from "./SettingControl";
 import { SettingsTransfer } from "./SettingsTransfer";
 import { confirm } from "./ConfirmPanel";
+import { ModulesPage } from "./ModulesPage";
 
 const scopes: SettingScope[] = ["app", "user", "project"];
 
@@ -46,6 +47,13 @@ export interface SettingsPageEntry {
 const pages = createRegistry<SettingsPageEntry>("settings page", (p) => p.id);
 
 export const registerSettingsPage = pages.register;
+
+registerSettingsPage({
+  id: "modules",
+  section: "app",
+  title: "Modules",
+  component: ModulesPage,
+});
 
 type SettingsAt = { section: string; page: string | null; opened: number };
 

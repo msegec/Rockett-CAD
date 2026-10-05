@@ -20,7 +20,7 @@ describe("KiCad first-party module", () => {
     expect(manifest.contributes).toEqual({ routes: ["rockett.kicad.upload"] });
     expect(
       serverModules.find((entry) => entry.manifest.id === manifest.id),
-    ).toEqual({ manifest, server });
+    ).toEqual({ manifest, server, folder: new URL("../", import.meta.url) });
     expect(server.activate).toBeTypeOf("function");
     expect(client.activate).toBeTypeOf("function");
     expect(readFileSync(resolve(root, "kicad/LICENSE"), "utf8")).toContain(

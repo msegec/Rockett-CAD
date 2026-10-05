@@ -8,8 +8,24 @@ import measureManifest from "./measure/manifest.json";
 import measureServer from "./measure/server.js";
 
 export const serverModules = [
-  { manifest: camManifest, server: camServer },
-  { manifest: kicadManifest, server: kicadServer },
-  { manifest: elecManifest, server: elecServer },
-  { manifest: measureManifest, server: measureServer },
+  {
+    manifest: camManifest,
+    server: camServer,
+    folder: new URL("./cam/", import.meta.url),
+  },
+  {
+    manifest: kicadManifest,
+    server: kicadServer,
+    folder: new URL("./kicad/", import.meta.url),
+  },
+  {
+    manifest: elecManifest,
+    server: elecServer,
+    folder: new URL("./elec/", import.meta.url),
+  },
+  {
+    manifest: measureManifest,
+    server: measureServer,
+    folder: new URL("./measure/", import.meta.url),
+  },
 ];

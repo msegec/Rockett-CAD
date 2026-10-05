@@ -68,6 +68,9 @@ RUN --mount=type=bind,from=notices,source=/app,target=/build \
   sh /build/scripts/check-notices.sh --collect /app/licences
 
 COPY --from=server /app/server/dist/*.mjs /app/server/dist/blend.wasm ./
+COPY modules/elec/LICENSE elec/LICENSE
+COPY modules/kicad/LICENSE kicad/LICENSE
+COPY modules/measure/LICENSE measure/LICENSE
 COPY --from=client /app/client/dist client/dist
 
 # Non-root user; /data is the single persistent volume.

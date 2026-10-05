@@ -268,6 +268,10 @@ export const ROUTES = {
   ...settingsRoutes(route),
   formats: route<never, Formats>()("GET", "/formats"),
   modules: route<never, ModuleInfo[]>()("GET", "/modules"),
+  moduleLicence: route<never, { text: string }>()(
+    "GET",
+    "/modules/:id/licence",
+  ),
   listProjects: route<never, ProjectSummary[]>()("GET", "/projects"),
   createProject: route<{ name?: string; folderId?: string }, ProjectResponse>()(
     "POST",

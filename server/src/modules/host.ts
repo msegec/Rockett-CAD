@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   PLUGIN_API_VERSION,
   type Dispose,
@@ -154,6 +157,7 @@ export interface ModuleContext extends ServerContext {
 export interface HostModule {
   manifest: unknown;
   server: { activate(context: ModuleContext): void | Promise<void> };
+  folder?: URL;
 }
 
 const ABOUT = ["id", "name", "version", "licence", "author"] as const;
@@ -252,8 +256,26 @@ async function load(
 }
 
 let loaded: readonly ModuleInfo[] = [];
+let homes = new Map<string, URL>();
 
 export const listModules = () => loaded;
+
+export async function moduleLicence(id: string): Promise<string> {
+  if (!loaded.some((module) => module.id === id))
+    throw new StoreError(`module ${id} is not installed`, "not_found");
+  const folder = homes.get(id);
+  const missing = new StoreError(
+    `module ${id} has no LICENSE file`,
+    "not_found",
+  );
+  if (!folder) throw missing;
+  try {
+    return await readFile(path.join(fileURLToPath(folder), "LICENSE"), "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw missing;
+    throw error;
+  }
+}
 
 export async function loadModules(
   modules: readonly HostModule[],
@@ -263,15 +285,20 @@ export async function loadModules(
 ): Promise<Dispose> {
   const disposers: Dispose[] = [];
   const reports: ModuleInfo[] = [];
+  const found = new Map<string, URL>();
   const app = await store.settings.read({ scope: "app" });
   for (const module of modules) {
     const own: Dispose[] = [];
-    reports.push(await load(module, own, kernel, store, folders, app));
+    const report = await load(module, own, kernel, store, folders, app);
+    reports.push(report);
+    if (module.folder) found.set(report.id, module.folder);
     disposers.push(() => disposeAll(own));
   }
   loaded = reports;
+  homes = found;
   return () => {
     disposeAll(disposers);
     loaded = [];
+    homes = new Map();
   };
 }
