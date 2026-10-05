@@ -117,7 +117,6 @@ export function orderBodyPieces<T extends BodyPiece>(
         .map(({ piece }) => piece);
     const owned = pieces.map((piece) => {
       const names = new Set(faces(piece.shape).map((f) => piece.names.get(f)));
-
       names.delete(undefined);
       if (piece.region) names.add(`r:${piece.region}`);
       return [...names] as string[];
@@ -230,9 +229,8 @@ export function finalizeNames(
       }
     }
     const result = new NameMap(active);
-    for (const [f, name] of suffixDuplicates(byName, faceCentroid, active)) {
+    for (const [f, name] of suffixDuplicates(byName, faceCentroid, active))
       result.set(f, name);
-    }
     if (unnamed.length > 0) {
       const sorted = sortByPosition(unnamed, faceCentroid, active);
       const taken = new Set(result.values());
@@ -335,6 +333,8 @@ export const sideName = (featureId: string, entityId: string) =>
 
 export const capName = (featureId: string, end: "start" | "end") =>
   `f:${featureId}:cap:${end}`;
+
+export const labelName = (id: string, label: string) => `f:${id}:l:${label}`;
 
 export const blendFaceName = (
   featureId: string,

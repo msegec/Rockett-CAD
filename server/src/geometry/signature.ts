@@ -15,6 +15,7 @@ import {
   finalizeNames,
   findFace,
   geometryName,
+  labelName,
   namingVersion,
   type NameMap,
   type NamedBody,
@@ -146,7 +147,20 @@ export function geometryNames(shape: Shape, featureId: string): NameMap {
   });
 }
 
-export const sourceNames = (shape: Shape, featureId: string): NameMap =>
-  namingVersion() === 1
-    ? finalizeNames(shape, new ShapeMap(), featureId)
-    : geometryNames(shape, featureId);
+export function sourceNames(
+  shape: Shape,
+  featureId: string,
+  labels?: ShapeMap<string>,
+): NameMap {
+  const names =
+    namingVersion() === 1
+      ? finalizeNames(shape, new ShapeMap(), featureId)
+      : geometryNames(shape, featureId);
+  if (!labels?.size) return names;
+  return scoped(() => {
+    acquire({ delete: () => names.release() });
+    for (const [face, label] of labels.entries())
+      names.set(face, labelName(featureId, label));
+    return finalizeNames(shape, names, featureId);
+  });
+}

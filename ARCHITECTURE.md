@@ -42,8 +42,8 @@ That bundle's `features` export lists the `defineTimelineFeature`
 definitions the module's server entry registers through
 `register.timelineFeature`; the host installs each type in the worker.
 Each spawn replays the installed list, and an install or removal drops warm
-results. A feature callback returns one solid; core validates and
-names it, and a failure keeps the previous body
+results. A feature callback returns one solid, optionally with face
+labels; core validates and names it, and a failure keeps the previous body
 (`server/src/modules/features.ts`).
 A worker crash quarantines the running feature, blocks its
 dependents and exports, and restarts with a bounded backoff:

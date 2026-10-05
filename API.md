@@ -360,6 +360,14 @@ module, in load order:
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.14.0 lets `evaluate` return `{shape, faces: [[face, label], ...]}`
+  instead of a bare solid. Each label is 1 to 64 characters of `a-z`, `0-9`,
+  `_`, `:` and `-`, starting with a letter or digit, for example `top`,
+  `bottom` or `edge:3`. Core names that face `f:<featureId>:l:<label>` under
+  either naming version, so the name survives parameter edits, placement
+  changes and reopening. Unlabelled faces keep the names a bare solid gets.
+  A duplicate label, a face labelled twice, an invalid label or a face the
+  shape does not contain fails the feature and keeps the previous body.
 - API 0.13.0 adds `defineTimelineFeature({spec, evaluate})` and
   `await register.timelineFeature(feature, new URL("./kernel.ts", import.meta.url))`.
   One definition owns the feature's spec, schema-typed params and optional
