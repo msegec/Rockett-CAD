@@ -195,6 +195,39 @@ const cases: Record<string, SpecCase> = {
         operation: "join",
         targets: ["ref:b1", "ref:b2"],
       },
+      {
+        ...meta,
+        type: "extrude",
+        profiles: [refProfile("p1")],
+        distance: 5,
+        extent: {
+          kind: "toObject",
+          object: { kind: "face", face: refFace("F2") },
+        },
+        direction: "normal",
+        operation: "join",
+      },
+      {
+        ...meta,
+        type: "extrude",
+        profiles: [refProfile("p1")],
+        distance: 5,
+        extent: {
+          kind: "toObject",
+          object: { kind: "body", bodyId: "ref:b3" },
+        },
+        direction: "normal",
+        operation: "cut",
+      },
+      {
+        ...meta,
+        type: "extrude",
+        profiles: [refProfile("p1")],
+        distance: 5,
+        extent: { kind: "all" },
+        direction: "symmetric",
+        operation: "cut",
+      },
     ],
     invalid: [
       [

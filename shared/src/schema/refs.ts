@@ -31,7 +31,7 @@ export const edgeRef = Type.Object({
   sig,
 });
 
-const bodyRef = Type.Object({ kind: Type.Literal("body"), bodyId });
+export const bodyRef = Type.Object({ kind: Type.Literal("body"), bodyId });
 
 export const projectionRef = Type.Union([
   edgeRef,

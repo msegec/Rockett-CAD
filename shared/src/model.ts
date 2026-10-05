@@ -257,28 +257,17 @@ export interface ProfileRef {
   profileId: string;
 }
 
+export type ExtrudeExtent =
+  { kind: "all" } | { kind: "toObject"; object: PlaneRef | BodyRef };
+
 export interface ExtrudeFeature extends ToolFeatureBase {
   type: "extrude";
   profiles: ProfileRef[];
-  /**
-   * Planar body faces used directly as extrusion profiles (Fusion-style
-   * face extrude / boss from surface). Each face extrudes along its own
-   * outward normal.
-   */
   faces?: FaceRef[];
-  /**
-   * Signed distance in mm along the resolved direction; a negative value
-   * extrudes to the opposite side (the dialog switches Join → Cut when a
-   * negative value is typed, Fusion-style). Never zero.
-   */
   distance: number;
   distance2?: number;
-  /**
-   * Start offset in mm along the profile / face normal (Fusion "Start →
-   * Offset"): the extrusion begins on a plane this far from the sketch or
-   * face instead of on it. Signed; default 0.
-   */
   startOffset?: number;
+  extent?: ExtrudeExtent;
   direction: "normal" | "reverse" | "symmetric" | "twoSided";
   operation: BooleanOperation;
 }

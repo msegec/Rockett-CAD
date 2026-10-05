@@ -306,6 +306,52 @@ const extrudes: Feature[] = [
     direction: "reverse",
     operation: "join",
   },
+  {
+    ...base,
+    id: "ex6",
+    type: "extrude",
+    profiles: [prof],
+    distance: 10,
+    extent: { kind: "all" },
+    direction: "symmetric",
+    operation: "cut",
+  },
+  {
+    ...base,
+    id: "ex7",
+    type: "extrude",
+    profiles: [prof],
+    distance: 10,
+    extent: {
+      kind: "toObject",
+      object: { kind: "face", face: face("b1", "f3") },
+    },
+    direction: "normal",
+    operation: "join",
+  },
+  {
+    ...base,
+    id: "ex8",
+    type: "extrude",
+    profiles: [prof],
+    distance: 10,
+    extent: { kind: "toObject", object: { kind: "body", bodyId: "b2" } },
+    direction: "normal",
+    operation: "newBody",
+  },
+  {
+    ...base,
+    id: "ex9",
+    type: "extrude",
+    profiles: [prof],
+    distance: 10,
+    extent: {
+      kind: "toObject",
+      object: { kind: "origin", plane: "XZ" },
+    },
+    direction: "reverse",
+    operation: "newBody",
+  },
 ];
 
 it.each(extrudes.map((f) => [f.id, f] as const))(

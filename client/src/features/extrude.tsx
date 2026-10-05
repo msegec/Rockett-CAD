@@ -1,17 +1,30 @@
 import type { FeatureHandleDefinition } from "../three/featureHandles";
-import { newId, type ExtrudeFeature } from "@rockett/shared";
+import {
+  newId,
+  type BodyRef,
+  type ExtrudeFeature,
+  type PlaneRef,
+} from "@rockett/shared";
 import {
   LengthField,
   OperationField,
   SelectField,
   SelInfo,
 } from "../components/form/fields";
-import { profilesOrFaces, targets } from "../commands/featureCommand";
+import {
+  featureParams,
+  planar,
+  profilesOrFaces,
+  setFeatureParams,
+  targets,
+  type PickInput,
+} from "../commands/featureCommand";
+import { fromRef, refsOf } from "../selection/kinds";
 import { autoOperation, extrudeOperation } from "../extrudeReach";
 import { ExtrudeGizmo, extrudeGizmoSource } from "../three/ExtrudeGizmo";
 import type { FeatureGizmoContext, GizmoPointer } from "../three/featureGizmos";
 import { dragPreview } from "../toolTargets";
-import { previewedFeature, useStore } from "../store";
+import { previewedFeature, useStore, type Selection } from "../store";
 import { formatLength } from "@rockett/shared";
 import { getSetting, useSetting } from "../settings";
 import {
@@ -21,6 +34,7 @@ import {
   profilePicks,
   profileHint,
   profileSources,
+  selectedPlane,
   storedFeature,
 } from "./inputs";
 import {
@@ -28,6 +42,7 @@ import {
   type FeatureFormProps,
   type FeatureUI,
   type InputParams,
+  type SharedInputParams,
 } from "./registry";
 
 export type ExtrudeParams = InputParams<
@@ -42,18 +57,51 @@ export type ExtrudeParams = InputParams<
     | "operation"
     | "targets"
   >
-> & { autoOperation?: boolean | undefined };
+> &
+  Pick<SharedInputParams, "extent" | "extentObject"> & {
+    autoOperation?: boolean | undefined;
+  };
+
+const objectPlane = planar("extentObject", true);
+
+const extentObject = {
+  ...objectPlane,
+  providers: [...objectPlane.providers, "design.body"],
+  optional: true,
+  param: {
+    read: (s) => featureParams(s).extentObject ?? [],
+    write: (next) => setFeatureParams({ extentObject: next }),
+  },
+} satisfies PickInput;
+
+const objectRef = (picks: Selection[]): PlaneRef | BodyRef | null => {
+  const [bodyId] = refsOf(picks, "body");
+  return bodyId ? { kind: "body", bodyId } : selectedPlane(picks);
+};
+
+const objectPicks = (extent: ExtrudeFeature["extent"]): Selection[] =>
+  extent?.kind !== "toObject"
+    ? []
+    : extent.object.kind === "body"
+      ? [fromRef("body", extent.object.bodyId)]
+      : extent.object.kind === "face"
+        ? [fromRef("face", extent.object.face)]
+        : [fromRef("plane", extent.object)];
 
 const handle = {
   param: "distance",
   fallback: 10,
 } satisfies FeatureHandleDefinition<ExtrudeParams>;
 
+const byDistance = (params: ExtrudeParams) =>
+  (params.extent ?? "distance") === "distance";
+
 const distance = (params: ExtrudeParams) =>
   num(params, handle.param, handle.fallback);
 
 function ExtrudeForm({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
   const units = useSetting("units.length");
+  const extent = params.extent ?? "distance";
   return (
     <>
       <SelInfo label="Profiles / faces" input="profiles" hint={profileHint} />
@@ -67,37 +115,61 @@ function ExtrudeForm({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
       <div className="field-hint">
         0 = start on the sketch / face; ± moves the start plane along its normal
       </div>
-      <LengthField
-        label="Distance"
-        units={units}
-        autoFocus
-        value={distance(params)}
-        onChange={(v) => setParams({ distance: v })}
-        bind="/distance"
-      />
-      <div className="field-hint">
-        Negative = the other side (Cut when it meets a body)
-      </div>
       <SelectField
-        label="Direction"
-        value={params.direction ?? "normal"}
+        label="Extent"
+        value={extent}
         options={[
-          ["normal", "One side"],
-          ["reverse", "Reversed"],
-          ["symmetric", "Symmetric"],
-          ["twoSided", "Two sided"],
+          ["distance", "Distance"],
+          ["toObject", "To object"],
+          ["all", "All"],
         ]}
-        onChange={(v) => setParams({ direction: v })}
+        onChange={(v) => setParams({ extent: v })}
       />
-      {(params.direction ?? "normal") === "twoSided" && (
-        <LengthField
-          label="Distance 2"
-          units={units}
-          value={num(params, "distance2", 5)}
-          onChange={(v) => setParams({ distance2: v })}
-          bind="/distance2"
+      {extent === "distance" && (
+        <>
+          <LengthField
+            label="Distance"
+            units={units}
+            autoFocus
+            value={distance(params)}
+            onChange={(v) => setParams({ distance: v })}
+            bind="/distance"
+          />
+          <div className="field-hint">
+            Negative = the other side (Cut when it meets a body)
+          </div>
+        </>
+      )}
+      {extent === "toObject" && (
+        <SelInfo
+          label="Object"
+          input="extentObject"
+          hint="click a plane, planar face or body to stop on"
         />
       )}
+      {extent !== "toObject" && (
+        <SelectField
+          label="Direction"
+          value={params.direction ?? "normal"}
+          options={[
+            ["normal", "One side"],
+            ["reverse", "Reversed"],
+            ["symmetric", "Symmetric"],
+            ["twoSided", "Two sided"],
+          ]}
+          onChange={(v) => setParams({ direction: v })}
+        />
+      )}
+      {extent !== "toObject" &&
+        (params.direction ?? "normal") === "twoSided" && (
+          <LengthField
+            label="Distance 2"
+            units={units}
+            value={num(params, "distance2", 5)}
+            onChange={(v) => setParams({ distance2: v })}
+            bind="/distance2"
+          />
+        )}
       <OperationField intersect />
     </>
   );
@@ -147,7 +219,7 @@ function extrudeGizmo({
   label,
 }: FeatureGizmoContext<ExtrudeParams>) {
   const source = extrudeGizmoSource();
-  if (!source) return;
+  if (!source || !byDistance(params())) return;
   if (previewedFeature(useStore.getState())) {
     source.profile = undefined;
     source.faceGhost = undefined;
@@ -229,7 +301,7 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
   icon: "⬆",
   title: "Extrude",
   group: "create",
-  picks: [profilesOrFaces, targets],
+  picks: [profilesOrFaces, targets, extentObject],
   Form: ExtrudeForm,
   build: (params, selection) => {
     const stored = storedFeature(params.id);
@@ -237,7 +309,15 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
     if ("error" in sources) return sources;
     if (distance(params) === 0)
       return { error: "Extrude distance must be non-zero" };
-    const direction = params.direction ?? "normal";
+    const extent = params.extent ?? "distance";
+    const object = objectRef(params.extentObject ?? []);
+    if (extent === "toObject" && !object)
+      return { error: "Select a plane, planar face or body to extrude to" };
+    const chosen = params.direction ?? "normal";
+    const direction =
+      extent === "toObject" && (chosen === "symmetric" || chosen === "twoSided")
+        ? "normal"
+        : chosen;
     const startOffset = num(params, "startOffset", 0);
     const operation = params.operation ?? "join";
     return {
@@ -251,6 +331,9 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
         distance2: num(params, "distance2", 5),
       }),
       ...((startOffset !== 0 || "startOffset" in stored) && { startOffset }),
+      ...(extent === "all" && { extent: { kind: "all" as const } }),
+      ...(extent === "toObject" &&
+        object && { extent: { kind: "toObject" as const, object } }),
       direction,
       operation,
       ...bodyTargets(operation, params),
@@ -264,6 +347,8 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
       distance: f.distance,
       distance2: f.distance2,
       startOffset: f.startOffset ?? 0,
+      extent: f.extent?.kind,
+      extentObject: objectPicks(f.extent),
       direction: f.direction,
       operation: f.operation,
     },

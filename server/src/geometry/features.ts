@@ -38,8 +38,6 @@ import {
   ORIGIN_AXES,
   type AxisRef,
   type ConstructionPlaneFeature,
-  type EmbossFeature,
-  type ExtrudeFeature,
   type FaceRef,
   type ImportStepFeature,
   type LinearPatternFeature,
@@ -169,7 +167,7 @@ export function resolveAxis(
   return { origin, direction: V.normalize(V.sub(target, origin)) };
 }
 
-function resolveProfiles(
+export function resolveProfiles(
   state: EvalState,
   refs: ProfileRef[],
 ): { faces: ProfileFace[]; sketch: EvaluatedSketch } {
@@ -254,7 +252,7 @@ export function evalSketch(
 }
 
 /** Build prism tool(s) for extrude-like features. */
-function buildPrism(
+export function buildPrism(
   featureId: string,
   profileFace: ProfileFace,
   direction: Vec3,
@@ -329,7 +327,7 @@ function buildPrism(
   });
 }
 
-function faceProfile(
+export function faceProfile(
   state: EvalState,
   ref: FaceRef,
 ): { pf: ProfileFace; n: Vec3 } {
@@ -346,60 +344,7 @@ function faceProfile(
   };
 }
 
-export function evalExtrude(state: EvalState, f: ExtrudeFeature) {
-  const dist = Math.abs(f.distance);
-  if (dist <= 0) throw new Error("extrude distance must be non-zero");
-  const faceRefs = f.faces ?? [];
-  if (f.profiles.length === 0 && faceRefs.length === 0) {
-    throw new Error("select at least one profile or planar face");
-  }
-
-  // Each extrusion source: a face shape + the direction it extrudes along.
-  const sources: { pf: ProfileFace; n: Vec3; copy: boolean }[] = [];
-
-  if (f.profiles.length > 0) {
-    const { faces: profileFaces, sketch } = resolveProfiles(state, f.profiles);
-    for (const pf of profileFaces) {
-      sources.push({ pf, n: sketch.frame.normal, copy: false });
-    }
-  }
-
-  for (const ref of faceRefs)
-    sources.push({ ...faceProfile(state, ref), copy: true });
-
-  // A negative distance flips the side (typing -5 in the dialog extrudes
-  // 5 mm the other way — the usual way to start a cut into a body).
-  const flip = f.distance < 0 ? -1 : 1;
-  // "Start → Offset": the extrusion begins on a plane `startOffset` along the
-  // profile's own normal (independent of direction / sign of distance).
-  const startOffset = f.startOffset ?? 0;
-  const tools: ToolResult[] = [];
-  for (const { pf, n: n0, copy } of sources) {
-    const sgn = (f.direction === "reverse" ? -1 : 1) * flip;
-    const n: Vec3 = [sgn * n0[0], sgn * n0[1], sgn * n0[2]];
-    // buildPrism's base offset is measured along `n`, so convert the offset
-    // along n0 into that frame
-    const base = startOffset * sgn;
-    if (f.direction === "normal" || f.direction === "reverse") {
-      tools.push(buildPrism(f.id, pf, n, dist, base, copy));
-    } else if (f.direction === "symmetric") {
-      tools.push(buildPrism(f.id, pf, n, dist, base - dist / 2, copy));
-    } else {
-      // twoSided: `distance` on the (possibly flipped) primary side, distance2 behind
-      const d2 = Math.abs(f.distance2 ?? 0);
-      tools.push(buildPrism(f.id, pf, n, dist + d2, base - d2, copy));
-    }
-  }
-
-  return applyProfileTools(
-    state,
-    f,
-    tools,
-    sources.map((s) => s.pf),
-  );
-}
-
-function applyProfileTools(
+export function applyProfileTools(
   state: EvalState,
   f: ToolFeature,
   tools: ToolResult[],
@@ -921,23 +866,6 @@ export function evalReferenceImage(
 ): void {
   const frame = resolvePlaneFrame(state, f.plane);
   state.planes.set(f.id, { frame, size: 0 });
-}
-
-export function evalEmboss(state: EvalState, f: EmbossFeature) {
-  // Emboss = extrude the sketch profiles by `depth` and join (emboss) or
-  // cut (deboss) into the underlying body.
-  const pseudo: ExtrudeFeature = {
-    id: f.id,
-    name: f.name,
-    suppressed: false,
-    type: "extrude",
-    profiles: f.profiles,
-    distance: Math.abs(f.depth),
-    direction: f.mode === "emboss" ? "normal" : "reverse",
-    operation: f.mode === "emboss" ? "join" : "cut",
-    ...(f.targets && { targets: f.targets }),
-  };
-  return evalExtrude(state, pseudo);
 }
 
 export { evaluateFeature } from "./featureKinds.js";

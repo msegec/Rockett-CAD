@@ -643,6 +643,29 @@ timeline marker refreshes when the timeline rolls forward over it. A preview
 refreshes at commit. `refreshSigs` in `server/src/api/projectMutations.ts`
 owns this and runs after the save's evaluation. Evaluation never writes `sig`.
 
+## Extrude
+
+- `distance` is signed mm along the resolved direction and never zero; a
+  negative value extrudes to the other side. `faces` are planar body faces
+  used as profiles, each along its own outward normal. `startOffset` moves
+  the start plane along the profile normal, signed, default 0.
+- `extent` (schema 41) follows Fusion's Extent. Absent is Distance and
+  evaluates as before. `{ kind: "all" }` runs through the farthest point of
+  every body along the direction, measured exactly in the direction's frame;
+  Symmetric runs through all on both sides, Two sided only on side 1.
+  `{ kind: "toObject", object }` stops on a `PlaneRef` (origin, construction
+  plane or planar face, extended as an infinite plane) or a `BodyRef`. The
+  object picks the side, so `direction` and the distance sign are unused,
+  and Symmetric or Two sided is refused. The new end face is
+  `f:{featureId}:cap:end`. The spec registers the object at `/extent/object`
+  or `/extent/object/bodyId`, so the reference lifecycle and repair reach it.
+- Refusals: a plane parallel to the direction, a plane crossing or touching
+  the profile, a body level with the profile, a profile starting inside the
+  body, a profile that does not fully meet the body, and All with no body
+  ahead. Evaluation: `server/src/geometry/extrude.ts`.
+- Not yet: a start object, taper angles and thin walls (PAR-013 remainder),
+  and To object on a curved face.
+
 ## Tool targets
 
 Extrude, revolve, sweep, loft and emboss may store `targets`. Stored targets

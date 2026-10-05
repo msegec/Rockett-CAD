@@ -8,8 +8,6 @@ import {
 import {
   evalCircularPattern,
   evalConstructionPlane,
-  evalEmboss,
-  evalExtrude,
   evalImportMesh,
   evalImportStep,
   evalLinearPattern,
@@ -21,6 +19,7 @@ import {
   type FeatureOutcome,
 } from "./features.js";
 import { evalChamfer, evalFillet } from "./blend.js";
+import { evalEmboss, evalExtrude } from "./extrude.js";
 import { evalLoft } from "./loft.js";
 import { evalMove } from "./move.js";
 import { evalShell } from "./shell.js";

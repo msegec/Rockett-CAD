@@ -4,6 +4,7 @@ import { ownedFields } from "./chamferFields.js";
 import {
   axisRef,
   bodyIdSchema,
+  bodyRef,
   edgeRef,
   faceRef,
   featureIdSchema,
@@ -285,6 +286,15 @@ const extrude = profilesOrFaces(
       Type.Number({ minimum: 0, maximum: MAX_DIM, parameterUnit: "mm" }),
     ),
     startOffset: Type.Optional(coordinate),
+    extent: Type.Optional(
+      Type.Union([
+        Type.Object({ kind: Type.Literal("all") }),
+        Type.Object({
+          kind: Type.Literal("toObject"),
+          object: Type.Union([planeRef, bodyRef]),
+        }),
+      ]),
+    ),
     direction: Type.Enum(["normal", "reverse", "symmetric", "twoSided"]),
     operation,
     targets,
