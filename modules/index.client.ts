@@ -1,5 +1,7 @@
 import camManifest from "./cam/manifest.json";
 import camClient from "./cam/client";
+import kicadManifest from "./kicad/manifest.json";
+import kicadClient from "./kicad/client";
 
 export const clientModules = [
   {
@@ -11,4 +13,5 @@ export const clientModules = [
       eager: true,
     }),
   },
+  { manifest: kicadManifest, client: kicadClient, icons: {} },
 ];

@@ -1,0 +1,9 @@
+{
+  "name": "@rockett/module-kicad",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@rockett/plugin-api": "0.1.0"
+  }
+}
