@@ -38,9 +38,11 @@ responsive during a long regeneration; `ROCKETT_KERNEL=inprocess` runs it on
 the main thread. A module kernel job runs in the same worker from its
 `modules/<id>/kernel.ts`, which `server/build.sh` bundles as
 `<id>.kernel.mjs` beside `kernel-worker.mjs` (`server/src/modules/host.ts`).
-That bundle's `features` export installs module timeline features in the
-worker: each spawn replays the installed list, and an install or removal
-drops warm results. A feature callback returns one solid; core validates and
+That bundle's `features` export lists the `defineTimelineFeature`
+definitions the module's server entry registers through
+`register.timelineFeature`; the host installs each type in the worker.
+Each spawn replays the installed list, and an install or removal drops warm
+results. A feature callback returns one solid; core validates and
 names it, and a failure keeps the previous body
 (`server/src/modules/features.ts`).
 A worker crash quarantines the running feature, blocks its

@@ -122,7 +122,7 @@ const RUN: {
   async features(_id, bundles) {
     const wanted = new Map(
       bundles.map((bundle) => [
-        JSON.stringify([bundle.moduleId, bundle.entry]),
+        JSON.stringify([bundle.moduleId, bundle.entry, bundle.type]),
         bundle,
       ]),
     );

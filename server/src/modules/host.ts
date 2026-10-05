@@ -5,6 +5,7 @@ import {
   type ServerRegister,
   type ServerContext,
   type StartKernelJob,
+  type TimelineFeature,
 } from "@rockett/plugin-api";
 import {
   createRegistry,
@@ -117,11 +118,20 @@ function registrars(own: Dispose[], manifest: ModuleManifest, kernel: Kernel) {
       kernelJob: track((id: string, entry: URL) =>
         registerKernelJob(moduleId, id, entry),
       ),
-      async timelineFeatures(entry: URL) {
-        const dispose = await kernel.installFeatures({
-          moduleId,
-          entry: jobEntry(moduleId, entry),
-        });
+      async timelineFeature(feature: TimelineFeature, entry: URL) {
+        const { type } = feature.spec;
+        checkModuleType(moduleId, type, "timeline feature");
+        const spec = registerExtensionSpec(feature.spec);
+        const kind = await kernel
+          .installFeatures({ moduleId, entry: jobEntry(moduleId, entry), type })
+          .catch((error: unknown) => {
+            spec();
+            throw error;
+          });
+        const dispose = () => {
+          kind();
+          spec();
+        };
         own.push(dispose);
         return dispose;
       },

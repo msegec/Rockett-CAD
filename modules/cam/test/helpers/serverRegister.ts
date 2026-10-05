@@ -7,5 +7,6 @@ export const serverRegister = (
   routeModule,
   extensionSpec: registerExtensionSpec,
   kernelJob: () => () => {},
+  timelineFeature: async () => () => {},
   setting: () => () => {},
 });

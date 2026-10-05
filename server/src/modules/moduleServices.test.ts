@@ -17,7 +17,9 @@ import {
 } from "@rockett/plugin-api";
 import { parseManifest, route } from "@rockett/shared";
 import cam from "../../../modules/cam/manifest.json";
+import elec from "../../../modules/elec/manifest.json";
 import kicad from "../../../modules/kicad/manifest.json";
+import measure from "../../../modules/measure/manifest.json";
 import { cookieConfig } from "../auth/cookie.js";
 import { requireSession } from "../auth/middleware.js";
 import { DUMMY_HASH } from "../auth/password.js";
@@ -419,10 +421,10 @@ it("leaves input and result schema refusal with the provider and consumer", asyn
   }
 });
 
-it("advances the host API and both first-party ranges together without workspace bumps", () => {
-  expect(PLUGIN_API_VERSION).toBe("0.12.0");
+it("advances the host API and every first-party range together without workspace bumps", () => {
+  expect(PLUGIN_API_VERSION).toBe("0.13.0");
   const [major, minor] = PLUGIN_API_VERSION.split(".").map(Number);
-  for (const firstParty of [cam, kicad]) {
+  for (const firstParty of [cam, elec, kicad, measure]) {
     expect(firstParty.apiRange).toBe(`^${major}.${minor}`);
     expect(parseManifest(firstParty, PLUGIN_API_VERSION).status).toBe(
       "compatible",

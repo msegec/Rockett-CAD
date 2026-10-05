@@ -3,6 +3,7 @@ import type { Group, Object3D } from "three";
 import type {
   BodyPayload,
   CadDocument,
+  ExtensionSpec,
   FaceRef as CoreFaceRef,
   FeatureStatus,
   registerExtensionSpec,
@@ -10,6 +11,7 @@ import type {
   MeasureRequest,
   MeasureResult,
   PathParams,
+  ResolvedFeatureInputs,
   Route,
   SettingDefinition,
   User,
@@ -40,7 +42,7 @@ export type {
 
 export { StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.12.0";
+export const PLUGIN_API_VERSION = "0.13.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -170,8 +172,35 @@ export type StartKernelJob = (
   run?: KernelJobRun,
 ) => Promise<unknown>;
 
+type ParamsSchema = Parameters<typeof registerExtensionSpec>[0]["params"];
+
+export interface TimelineFeatureScope<
+  S extends ParamsSchema,
+> extends KernelJobScope {
+  readonly params: Parameters<
+    NonNullable<ExtensionSpec<S>["resolveInputs"]>
+  >[0]["params"];
+  readonly inputs?: {
+    readonly identity: ResolvedFeatureInputs["identity"];
+    readonly assets: readonly Uint8Array[];
+  };
+}
+
+export interface TimelineFeature<S extends ParamsSchema = ParamsSchema> {
+  readonly spec: ExtensionSpec<S>;
+  evaluate(scope: TimelineFeatureScope<S>): unknown;
+}
+
+export const defineTimelineFeature = <S extends ParamsSchema>(
+  feature: TimelineFeature<S>,
+) => feature;
+
 export interface ServerRegister {
   extensionSpec: typeof registerExtensionSpec;
+  timelineFeature<S extends ParamsSchema>(
+    feature: TimelineFeature<S>,
+    entry: URL,
+  ): Promise<Dispose>;
   routeModule(module: RouteModule): Dispose;
   kernelJob(id: string, entry: URL): Dispose;
   setting(definition: SettingDefinition): Dispose;

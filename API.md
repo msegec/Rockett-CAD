@@ -344,7 +344,8 @@ module, in load order:
 - `activate` receives `ServerContext` (`plugin-api/src/index.ts`):
   `register`, `services`, `startKernelJob`, `userData`, `files`,
   `kernelVersion`, `bodies` and `signFaces`. `register.routeModule`,
-  `kernelJob`, `setting` and `extensionSpec` take `plugin-api` types;
+  `kernelJob`, `timelineFeature`, `setting` and `extensionSpec` take
+  `plugin-api` types;
   `exporter`, `importer` and `featureKind` take core types. Each call is
   tracked under one disposer.
 - API 0.9.0 adds `services.provide(id, handler)`: the id starts with the
@@ -359,6 +360,17 @@ module, in load order:
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.13.0 adds `defineTimelineFeature({spec, evaluate})` and
+  `await register.timelineFeature(feature, new URL("./kernel.ts", import.meta.url))`.
+  One definition owns the feature's spec, schema-typed params and optional
+  `resolveInputs`. The module's server entry registers it and its `kernel.ts`
+  lists it in a `features` export. The host registers the spec under the
+  module's id, then the kernel installs the listed definition of that type;
+  a foreign type, a missing list or an unlisted type fails activation and
+  keeps nothing. `evaluate` receives the kernel job scope, a detached copy of
+  params and the committed `inputs` with asset bytes, and returns one solid.
+  Disable, unload or a missing module reports `Requires module`; missing
+  asset bytes refuse with 404 and corrupt bytes with 500, keeping the document.
 - API 0.12.0 types `register.extensionSpec(spec)`. It registers a feature type
   under the module's id before the type's last dot and infers its params from
   the schema. Its optional `resolveInputs` receives detached immutable JSON

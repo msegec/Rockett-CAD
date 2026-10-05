@@ -1,12 +1,9 @@
-import type { TSchema } from "typebox";
-import type { KernelJobScope } from "@rockett/plugin-api";
+import type { TimelineFeature } from "@rockett/plugin-api";
 import {
   featureModule,
   REGISTRY_ID,
   registerExtensionSpec,
   type ExtensionFeature,
-  type ExtensionSpec,
-  type ResolvedFeatureInputs,
 } from "@rockett/shared";
 import { engineCache } from "../geometry/engine.js";
 import {
@@ -30,19 +27,7 @@ import { sourceNames } from "../geometry/signature.js";
 export interface FeatureBundle {
   moduleId: string;
   entry: string;
-}
-
-export interface TimelineScope<P> extends KernelJobScope {
-  readonly params: P;
-  readonly inputs?: {
-    readonly identity: ResolvedFeatureInputs["identity"];
-    readonly assets: readonly Uint8Array[];
-  };
-}
-
-export interface TimelineFeature<P = Record<string, unknown>> {
-  spec: ExtensionSpec<TSchema>;
-  evaluate(scope: TimelineScope<P>): unknown;
+  type: string;
 }
 
 export function checkModuleType(moduleId: string, type: string, what: string) {
@@ -111,27 +96,26 @@ function kindOf({ spec, evaluate }: TimelineFeature): FeatureKind {
 }
 
 export async function installFeatureBundle(
-  { moduleId, entry }: FeatureBundle,
+  { moduleId, entry, type }: FeatureBundle,
   withSpecs: boolean,
 ): Promise<() => void> {
+  checkModuleType(moduleId, type, "timeline feature");
   const { features } = (await import(entry)) as { features?: unknown };
   if (!Array.isArray(features))
     throw new Error(`${entry} has no timeline feature list`);
+  const feature = (features as TimelineFeature[]).find(
+    (listed) => listed?.spec?.type === type,
+  );
+  if (typeof feature?.evaluate !== "function" || !feature.spec)
+    throw new Error(`${entry} has no timeline feature ${type}`);
   const disposers: Array<() => void> = [];
   const dispose = () => {
     for (const undo of disposers.splice(0).toReversed()) undo();
     engineCache.clear();
   };
   try {
-    for (const feature of features as TimelineFeature[]) {
-      if (typeof feature?.evaluate !== "function" || !feature.spec)
-        throw new Error(
-          `${entry} lists a timeline feature without spec and evaluate`,
-        );
-      checkModuleType(moduleId, feature.spec.type, "timeline feature");
-      if (withSpecs) disposers.push(registerExtensionSpec(feature.spec));
-      disposers.push(registerFeatureKind(kindOf(feature)));
-    }
+    if (withSpecs) disposers.push(registerExtensionSpec(feature.spec));
+    disposers.push(registerFeatureKind(kindOf(feature)));
   } catch (error) {
     dispose();
     throw error;
