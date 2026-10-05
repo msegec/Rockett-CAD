@@ -1,7 +1,7 @@
 import {
   documentSchema,
-  featureModule,
   featureSpec,
+  opaqueFeature,
   parse,
   unloadedFeatureSchema,
   ValidationError,
@@ -50,9 +50,8 @@ export function validateBuilt(f: Feature): void {
 
 function validateStored(f: Feature): void {
   record(f, "feature");
-  const unloaded =
-    typeof f.type === "string" && !featureSpec(f.type) && featureModule(f.type);
-  if (!unloaded) return validateFeature(f);
+  if (typeof f.type !== "string" || !opaqueFeature(f))
+    return validateFeature(f);
   const { params } = parse(unloadedFeatureSchema, f, "feature");
   if (Buffer.byteLength(JSON.stringify(params)) > MODULE_DATA_MAX_BYTES)
     throw new ValidationError(

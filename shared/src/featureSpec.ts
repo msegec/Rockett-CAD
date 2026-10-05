@@ -79,8 +79,21 @@ export function featureModule(type: string): string | undefined {
   return type.slice(0, type.lastIndexOf("."));
 }
 
+export function newerFeature(f: Feature): string | undefined {
+  const spec = featureSpec(f.type);
+  const version = "version" in f ? f.version : undefined;
+  if (!spec || typeof version !== "number" || version <= spec.version)
+    return undefined;
+  return `${f.type} version ${version} is newer than this module reads (${spec.version})`;
+}
+
+export const opaqueFeature = (f: Feature): boolean =>
+  featureSpec(f.type)
+    ? newerFeature(f) !== undefined
+    : featureModule(f.type) !== undefined;
+
 export function featureRefs(f: Feature): FeatureRef[] {
-  if (!featureSpec(f.type) && featureModule(f.type)) return [];
+  if (opaqueFeature(f)) return [];
   return specOf(f.type).refs(f);
 }
 

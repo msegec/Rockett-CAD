@@ -1,11 +1,13 @@
 import {
   compareNames,
+  createRegistry,
   featureSpec,
   MANIFEST_VERSION,
   SCHEMA_VERSION,
   UNITS_LENGTH,
   VIEW_VERSION,
   type CadDocument,
+  type ExtensionData,
   type FeatureSpec,
   type ProjectManifest,
   type ProjectView,
@@ -98,6 +100,47 @@ function featureMigrations({
   return { namespace: type, current: version, field: "version", steps };
 }
 
+function kept<T>(table: Migrations<T>, value: Value): Value {
+  try {
+    return migrate(table, value) as Value;
+  } catch (error) {
+    if (error instanceof TooNewError) return value;
+    throw error;
+  }
+}
+
+const dataTables = createRegistry<Migrations<ExtensionData>>(
+  "module data migrations",
+  (table) => table.namespace,
+);
+
+export function registerDataMigrations(
+  namespace: string,
+  current: number,
+  steps: Readonly<Record<number, (data: unknown) => unknown>>,
+): () => void {
+  const wrapped: Migrations<ExtensionData>["steps"] = {};
+  for (const [from, step] of Object.entries(steps)) {
+    const version = Number(from);
+    if (
+      !Number.isInteger(version) ||
+      version < 1 ||
+      version >= current ||
+      typeof step !== "function"
+    )
+      throw new Error(
+        `${namespace} migration ${from} must be a function from a data version below ${current}`,
+      );
+    wrapped[version] = (entry) => ({ ...entry, data: step(entry.data) });
+  }
+  return dataTables.register({
+    namespace,
+    current,
+    field: "version",
+    steps: wrapped,
+  });
+}
+
 function extensionFeatures(doc: Value): Value {
   const features = doc.features;
   if (!Array.isArray(features)) return doc;
@@ -106,12 +149,26 @@ function extensionFeatures(doc: Value): Value {
       typeof feature.type === "string" && feature.type.includes(".")
         ? featureSpec(feature.type)
         : undefined;
-    return spec ? migrate(featureMigrations(spec), feature) : feature;
+    return spec ? kept(featureMigrations(spec), feature) : feature;
   });
   return migrated.every((feature, i) => feature === features[i])
     ? doc
     : { ...doc, features: migrated };
 }
+
+function extensionData(doc: Value): Value {
+  const extensions = doc.extensions as Record<string, Value> | undefined;
+  if (typeof extensions !== "object" || extensions === null) return doc;
+  const migrated = Object.entries(extensions).map(([id, entry]) => {
+    const table = dataTables.get(id);
+    return [id, table ? kept(table, entry) : entry] as const;
+  });
+  return migrated.every(([id, entry]) => entry === extensions[id])
+    ? doc
+    : { ...doc, extensions: Object.fromEntries(migrated) };
+}
+
+const moduleData = (doc: Value): Value => extensionData(extensionFeatures(doc));
 
 function dataBlob(
   feature: Value,
@@ -300,7 +357,7 @@ export const documentMigrations: Migrations<CadDocument> = {
     }),
     46: (doc) => doc,
   },
-  nested: extensionFeatures,
+  nested: moduleData,
 };
 
 export const viewMigrations: Migrations<ProjectView> = {

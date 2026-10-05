@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   PLUGIN_API_VERSION,
+  type DataMigrations,
   type Dispose,
   type ProjectServiceHandler,
   type ServerRegister,
@@ -35,6 +36,7 @@ import { registerExporter } from "../geometry/exporters.js";
 import { registerFeatureKind } from "../geometry/featureKinds.js";
 import type { KernelClient } from "../kernel/client.js";
 import type { FolderStore } from "../store/folderStore.js";
+import { registerDataMigrations } from "../store/migrations.js";
 import { moduleUserData } from "../store/moduleData.js";
 import { StoreError, type ProjectStore } from "../store/projectStore.js";
 import {
@@ -156,7 +158,10 @@ export interface ModuleContext extends ServerContext {
 
 export interface HostModule {
   manifest: unknown;
-  server: { activate(context: ModuleContext): void | Promise<void> };
+  server: {
+    activate(context: ModuleContext): void | Promise<void>;
+    migrations?: DataMigrations;
+  };
   folder?: URL;
 }
 
@@ -235,7 +240,12 @@ async function load(
   if (check.status === "incompatible")
     return { ...info, status: "incompatible", error: check.reason };
   try {
-    const { id } = check.manifest;
+    const { id, dataVersion } = check.manifest;
+    const { migrations } = module.server;
+    if (dataVersion === undefined && migrations !== undefined)
+      throw new Error(`${id} exports migrations but declares no dataVersion`);
+    if (dataVersion !== undefined)
+      own.push(registerDataMigrations(id, dataVersion, migrations ?? {}));
     const { storage } = store.documents.options;
     await module.server.activate({
       ...registrars(own, check.manifest, kernel),

@@ -366,6 +366,18 @@ file. The Modules settings page shows it beside a line naming
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.15.0 adds an optional manifest `dataVersion`, an integer from 1, and
+  an optional `migrations` member on the server entry,
+  `{[from]: (data) => data}`, keyed by the data version each step upgrades
+  from. On load the host runs them on `extensions[<moduleId>].data` up to
+  `dataVersion`, with the document migrations; the first save backs the
+  project up first. A key
+  outside 1 to `dataVersion - 1`, a step that is not a function, or
+  `migrations` without `dataVersion` fails activation. A gap in the steps
+  makes the project unreadable, as a core gap does. Data or a feature newer
+  than the module is kept as stored; the feature evaluates to
+  `<type> version <n> is newer than this module reads (<m>)`, and the module's
+  routes see the stored `version`.
 - API 0.14.0 lets `evaluate` return `{shape, faces: [[face, label], ...]}`
   instead of a bare solid. Each label is 1 to 64 characters of `a-z`, `0-9`,
   `_`, `:` and `-`, starting with a letter or digit, for example `top`,

@@ -53,6 +53,7 @@ const moduleManifestSchema = Type.Object({
     maxLength: NAME_LENGTH,
   }),
   author: text,
+  dataVersion: Type.Optional(Type.Integer({ minimum: 1 })),
   contributes: contributions,
 });
 

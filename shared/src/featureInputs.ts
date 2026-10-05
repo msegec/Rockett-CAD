@@ -1,5 +1,5 @@
 import type { CadDocument, Feature } from "./model.js";
-import { featureModule, featureSpec } from "./featureSpec.js";
+import { featureModule, featureSpec, newerFeature } from "./featureSpec.js";
 import { MODULE_DATA_MAX_BYTES } from "./units.js";
 import { ValidationError } from "./schema/validation.js";
 import { resolveDocumentParameters } from "./parameters.js";
@@ -107,7 +107,7 @@ export function resolvedFeatureInputs(
   doc: Pick<CadDocument, "extensions">,
 ): ResolvedFeatureInputs | undefined {
   const resolve = featureSpec(feature.type)?.resolveInputs;
-  if (!resolve) return;
+  if (!resolve || newerFeature(feature)) return;
   if (!("params" in feature))
     throw new ValidationError("only module features resolve extension inputs");
   const moduleId = featureModule(feature.type);

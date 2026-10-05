@@ -42,7 +42,7 @@ export type {
 
 export { StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.14.0";
+export const PLUGIN_API_VERSION = "0.15.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -477,8 +477,13 @@ export interface ClientContext {
   ): Promise<T>;
 }
 
+export type DataMigrations = Readonly<
+  Record<number, (data: unknown) => unknown>
+>;
+
 export interface ServerModule {
   activate(context: ServerContext): void | Promise<void>;
+  migrations?: DataMigrations;
 }
 
 export interface ClientModule {

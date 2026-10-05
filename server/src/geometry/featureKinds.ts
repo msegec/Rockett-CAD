@@ -1,6 +1,7 @@
 import {
   createRegistry,
   featureModule,
+  newerFeature,
   type Feature,
   type ResolvedFeatureInputs,
 } from "@rockett/shared";
@@ -52,6 +53,8 @@ export function evaluateFeature(
         : `unknown feature type ${feature.type}`,
     );
   }
+  const newer = newerFeature(feature);
+  if (newer) throw new Error(newer);
   const previous = { ...state };
   Object.assign(state, cloneState(state));
   try {

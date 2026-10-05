@@ -31,12 +31,20 @@ Saved-data shape changes require a migration, backup and previous-schema proof.
   namespace through `assets.set`; the existing blob owner validates bytes before
   save. Schema 45 to 46 keeps absent maps absent and preserves any older root
   `moduleAssets` value unchanged in `moduleAssets.legacy`. The first save backs
-  up the complete source; extension envelopes are never reinterpreted.
+  up the complete source; core never reinterprets an extension envelope.
 - A feature is a `CoreFeature` or an `ExtensionFeature`, whose dotted
   `type` names its module and whose own `version` and `params` its
   `FeatureSpec` owns. Load runs the spec's `migrate` through `migrate`, with
   the type as namespace (`documentMigrations.nested`). Core features carry no
   `version` and load unchanged; an unregistered type stays as stored.
+- A feature newer than its spec also stays as stored. Validation, references
+  and bindings treat it as unregistered (`opaqueFeature` in
+  `shared/src/featureSpec.ts`), and evaluation fails it with
+  `<type> version <n> is newer than this module reads (<m>)`.
+- A module whose manifest declares `dataVersion` migrates its
+  `extensions[<moduleId>]` envelope in the same nested pass, through the
+  `migrations` of its server entry. A newer envelope stays as stored. Like
+  every step, the first save backs up the project before writing.
 
 ### Schema steps
 
