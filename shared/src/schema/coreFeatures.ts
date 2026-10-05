@@ -14,18 +14,20 @@ import {
   edgeRef,
   faceRef,
   featureIdSchema,
+  MAX_TARGETS,
+  oneTargetForm,
   originAxis,
   planeRef,
   pointRef,
   profileRef,
   projectionRef,
   sketchEntityRef,
+  toolTargets,
 } from "./refs.js";
 import { splineEntities } from "./splineEntity.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
 export const MAX_DIM = 100_000;
-export const MAX_TARGETS = 10_000;
 export const NAME_LENGTH = 200;
 
 export const featureNameSchema = Type.String({
@@ -61,9 +63,6 @@ const taper = Type.Optional(
   }),
 );
 const bodies = Type.Array(bodyId, { minItems: 1 });
-const targets = Type.Optional(
-  Type.Array(bodyId, { maxItems: MAX_TARGETS, uniqueItems: true }),
-);
 const profiles = (minItems: number) => Type.Array(profileRef, { minItems });
 const patternCount = Type.Number({ minimum: 2, parameterUnit: "unitless" });
 
@@ -78,6 +77,11 @@ const feature = <const T extends string, P extends TProperties>(
     suppressed: Type.Boolean(),
     ...properties,
   });
+
+const toolFeature = <const T extends string, P extends TProperties>(
+  type: T,
+  properties: P,
+) => oneTargetForm(feature(type, { ...properties, ...toolTargets }));
 
 export const extensionFeatureSchema = <P extends TSchema>(
   type: string,
@@ -271,11 +275,10 @@ const importMesh = feature("importMesh", {
   blob: blobHash,
 });
 
-const emboss = feature("emboss", {
+const emboss = toolFeature("emboss", {
   profiles: profiles(1),
   depth: positive,
   mode: Type.Enum(["emboss", "deboss"]),
-  targets,
 });
 
 const profileFaces = Type.Optional(Type.Array(faceRef));
@@ -303,7 +306,7 @@ const extrudeSource = <T extends TSchema>(schema: T) =>
   );
 
 const extrude = extrudeSource(
-  feature("extrude", {
+  toolFeature("extrude", {
     profiles: profiles(0),
     faces: profileFaces,
     curves: Type.Optional(
@@ -338,32 +341,28 @@ const extrude = extrudeSource(
     ),
     direction: Type.Enum(["normal", "reverse", "symmetric", "twoSided"]),
     operation,
-    targets,
   }),
 );
 
 const revolve = profilesOrFaces(
-  feature("revolve", {
+  toolFeature("revolve", {
     profiles: profiles(0),
     faces: profileFaces,
     axis: axisRef,
     angle: degrees,
     operation,
-    targets,
   }),
 );
 
-const sweep = feature("sweep", {
+const sweep = toolFeature("sweep", {
   profiles: profiles(1),
   pathSketchId: id,
   operation,
-  targets,
 });
 
-const loft = feature("loft", {
+const loft = toolFeature("loft", {
   sections: Type.Array(Type.Union([profileRef, faceRef]), { minItems: 2 }),
   operation,
-  targets,
 });
 
 const picks = {

@@ -760,6 +760,14 @@ no `targets` and no body, every tool operation makes a new body; only a join
 reports `[]`, so a cut or intersect never pins an empty list
 (`applyToolOperation` in `server/src/geometry/boolean.ts`).
 
+Schema 47 adds the Auto form, `autoTargets: { exclude, features }`: the
+bodies hidden at creation and the ids of the features whose bodies existed
+then. A tool stores `targets` or `autoTargets`, never both, so an explicit
+pick stays `targets`. Earlier documents read the same and the step changes
+only the version. `pinTargets` never adds `targets` beside `autoTargets`, and
+evaluation does not read it yet: such a tool evaluates as one without
+`targets`.
+
 ## Loft sections
 
 Loft stores profile and planar-face references in picked order. Face sections

@@ -298,6 +298,7 @@ export const documentMigrations: Migrations<CadDocument> = {
         moduleAssets: { namespaces: {}, legacy: doc.moduleAssets },
       }),
     }),
+    46: (doc) => doc,
   },
   nested: extensionFeatures,
 };

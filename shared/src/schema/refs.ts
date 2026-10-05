@@ -1,4 +1,4 @@
-import { Type } from "typebox";
+import { Type, type TSchema } from "typebox";
 import { ORIGIN_AXES, REF_SIGNATURE_TYPES } from "../model.js";
 
 export const featureIdSchema = Type.String({ minLength: 1, maxLength: 100 });
@@ -80,3 +80,28 @@ export const profileRef = Type.Object({
   sketchId: id,
   profileId: Type.String({ minLength: 1, maxLength: 200 }),
 });
+
+export const MAX_TARGETS = 10_000;
+
+export const toolTargets = {
+  targets: Type.Optional(
+    Type.Array(bodyId, { maxItems: MAX_TARGETS, uniqueItems: true }),
+  ),
+  autoTargets: Type.Optional(
+    Type.Object(
+      {
+        exclude: Type.Array(bodyId, { uniqueItems: true }),
+        features: Type.Array(id, { uniqueItems: true }),
+      },
+      { additionalProperties: false },
+    ),
+  ),
+};
+
+export const oneTargetForm = <T extends TSchema>(schema: T) =>
+  Type.Refine(
+    schema,
+    (f: { targets?: unknown; autoTargets?: unknown }) =>
+      f.targets === undefined || f.autoTargets === undefined,
+    () => "has both targets and autoTargets",
+  );

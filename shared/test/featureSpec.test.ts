@@ -200,6 +200,15 @@ const cases: Record<string, SpecCase> = {
         type: "extrude",
         profiles: [refProfile("p1")],
         distance: 5,
+        direction: "normal",
+        operation: "cut",
+        autoTargets: { exclude: ["b1"], features: ["f1"] },
+      },
+      {
+        ...meta,
+        type: "extrude",
+        profiles: [refProfile("p1")],
+        distance: 5,
         extent: {
           kind: "toObject",
           object: { kind: "face", face: refFace("F2") },
@@ -321,16 +330,27 @@ const cases: Record<string, SpecCase> = {
   },
   revolve: {
     producesGeometry: true,
-    valid: axes.map((axis) => ({
-      ...meta,
-      type: "revolve",
-      profiles: [refProfile("p1")],
-      faces: [refFace("F1")],
-      axis,
-      angle: 90,
-      operation: "cut",
-      targets: ["ref:b1"],
-    })),
+    valid: [
+      ...axes.map((axis): Feature => ({
+        ...meta,
+        type: "revolve",
+        profiles: [refProfile("p1")],
+        faces: [refFace("F1")],
+        axis,
+        angle: 90,
+        operation: "cut",
+        targets: ["ref:b1"],
+      })),
+      {
+        ...meta,
+        type: "revolve",
+        profiles: [refProfile("p1")],
+        axis: axes[0]!,
+        angle: 90,
+        operation: "intersect",
+        autoTargets: { exclude: ["b1"], features: ["f1"] },
+      },
+    ],
     invalid: [
       [
         {
@@ -356,6 +376,14 @@ const cases: Record<string, SpecCase> = {
         depth: 1,
         mode: "deboss",
         targets: ["ref:b1"],
+      },
+      {
+        ...meta,
+        type: "emboss",
+        profiles: [refProfile("p1")],
+        depth: 1,
+        mode: "emboss",
+        autoTargets: { exclude: ["b1"], features: ["f1"] },
       },
     ],
     invalid: [
@@ -383,6 +411,14 @@ const cases: Record<string, SpecCase> = {
         operation: "join",
         targets: ["ref:b1"],
       },
+      {
+        ...meta,
+        type: "sweep",
+        profiles: [refProfile("p1")],
+        pathSketchId: "ref:path",
+        operation: "cut",
+        autoTargets: { exclude: ["b1"], features: ["f1"] },
+      },
     ],
     invalid: [
       [
@@ -407,6 +443,13 @@ const cases: Record<string, SpecCase> = {
         sections: [refProfile("p1"), refProfile("p2")],
         operation: "newBody",
         targets: ["ref:b1"],
+      },
+      {
+        ...meta,
+        type: "loft",
+        sections: [refProfile("p1"), refProfile("p2")],
+        operation: "join",
+        autoTargets: { exclude: ["b1"], features: ["f1"] },
       },
     ],
     invalid: [

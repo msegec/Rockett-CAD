@@ -29,6 +29,7 @@ export function unsignedRefs(
 export function lacksTargets(feature: Feature): boolean {
   return (
     !("targets" in feature) &&
+    !("autoTargets" in feature) &&
     "targets" in (featureSpec(feature.type)?.paramsSchema.properties ?? {})
   );
 }

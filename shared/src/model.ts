@@ -164,8 +164,14 @@ interface FeatureBase {
   suppressed: boolean;
 }
 
+export interface AutoTargets {
+  exclude: string[];
+  features: string[];
+}
+
 interface ToolFeatureBase extends FeatureBase {
   targets?: string[];
+  autoTargets?: AutoTargets;
 }
 
 interface BlendFeatureBase extends FeatureBase {

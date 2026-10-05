@@ -230,6 +230,9 @@ release workflow remain under development. The core licence is unresolved.
 - Schema 46 adds an optional module asset reference map. Migration preserves unknown
   extension envelopes and wraps any pre-existing root `moduleAssets` value
   unchanged in `moduleAssets.legacy`, after a backup on the first save.
+- Schema 47: join, cut and intersect tools may store the Auto target form,
+  `autoTargets`, beside explicit `targets`; earlier documents load unchanged
+  after a backup on the first save.
 
 ### Known limits
 
