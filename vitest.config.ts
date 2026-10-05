@@ -64,6 +64,7 @@ export default defineConfig({
   test: {
     allowOnly: false,
     passWithNoTests: false,
+    maxWorkers: "50%",
     projects: projects.map((test) => ({ test })),
   },
 });
