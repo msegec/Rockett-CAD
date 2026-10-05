@@ -90,14 +90,14 @@ function rates(move: Move, at: Xyz | undefined): Xyz | undefined {
   if (move.kind === "feed") {
     const d = move.to.map((v, i) => Math.abs(v - at[i]!));
     const length = Math.hypot(...d);
-    return length ? (d.map((v) => (move.feed * v) / length) as Xyz) : undefined;
+    return length ? (d.map((v) => move.feed * (v / length)) as Xyz) : undefined;
   }
   const rise = Math.abs(
     inPlane(move.to, move.plane)[2] - inPlane(at, move.plane)[2],
   );
   const length = Math.hypot(radii(at, move)[0] * arcSweep(at, move), rise);
   const out: Xyz = [move.feed, move.feed, move.feed];
-  out[NORMAL[move.plane]] = length ? (move.feed * rise) / length : 0;
+  out[NORMAL[move.plane]] = length ? move.feed * (rise / length) : 0;
   return out;
 }
 

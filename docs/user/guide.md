@@ -399,7 +399,7 @@ operation. Nothing regenerates by itself.
 NC Program runs more checks and lists any problem under **Export blocked**.
 **Generate first** regenerates an operation that is not fresh. It checks that
 rapids miss the stock, that rpm is inside the machine's spindle range, that
-feeds stay under the machine's maximum per axis, that a tool which is not
+feeds stay at or under the machine's maximum per axis, that a tool which is not
 centre cutting never plunges, and that a mill program never runs on a laser.
 It does not check machine travel for a setup made in the dialog, so check
 that the part fits your machine yourself.

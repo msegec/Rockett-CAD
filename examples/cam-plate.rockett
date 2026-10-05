@@ -442,7 +442,7 @@
                   "id": "p-mdf",
                   "name": "MDF, gentle",
                   "rpm": 15339,
-                  "cutFeed": 2900,
+                  "cutFeed": 3000,
                   "plungeFeed": 1000,
                   "rampFeed": 1000,
                   "stepdown": 1.5,
