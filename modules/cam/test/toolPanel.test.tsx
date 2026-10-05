@@ -402,6 +402,32 @@ it("a pasted $$ missing $122 fills $110 and lists $122", async () => {
   expect(saved).not.toHaveProperty("accelZ");
 });
 
+it("a mill's Rigidity reads Rigid when unset and saves the pick", async () => {
+  const form = await editRouter(router);
+  const select = field(form, "Rigidity").querySelector("select")!;
+  expect([...select.options].map((o) => [o.value, o.textContent])).toEqual([
+    ["light", "Light"],
+    ["medium", "Medium"],
+    ["rigid", "Rigid"],
+  ]);
+  expect(select.value).toBe("rigid");
+  await choose(form, "Rigidity", "light");
+  expect(form.textContent).toContain(
+    "Suggest takes 70% of the chart chip load and a stepdown of 0.5 x D.",
+  );
+  await click(form, "OK");
+  expect(machinePuts[0]!.data[0]).toEqual({ ...router, rigidity: "light" });
+});
+
+it("a laser has no Rigidity", async () => {
+  const form = await editRouter({
+    ...router,
+    kind: "laser",
+    laserPowerMax: 1000,
+  });
+  expect(field(form, "Rigidity")).toBeUndefined();
+});
+
 it("refuses a $$ with $30 below the stored minimum", async () => {
   const form = await editRouter({ ...router, rpmMin: 10000 });
   await paste(form, "$30=5000.\n$110=5000.000\n");

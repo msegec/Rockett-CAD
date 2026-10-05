@@ -1,20 +1,11 @@
 import { createElement as h } from "react";
 import type { ClientUi, NumberFieldProps } from "@rockett/plugin-api";
-import { withKind, type Tool } from "../shared/tools.js";
+import { TOOL_KINDS, withKind, type Tool } from "../shared/tools.js";
 
 export { newTool } from "../shared/tools.js";
 
 type Kind = Tool["kind"];
 type LengthKey = "diameter" | "fluteLength" | "overallLength" | "shankDiameter";
-
-const KINDS: [Kind, string][] = [
-  ["flat", "Flat end mill"],
-  ["ball", "Ball end mill"],
-  ["bull", "Bull nose end mill"],
-  ["vbit", "V-bit"],
-  ["drill", "Drill"],
-  ["chamfer", "Chamfer mill"],
-];
 
 const LENGTHS: [LengthKey, string][] = [
   ["fluteLength", "Flute length"],
@@ -50,7 +41,7 @@ export function toolFields(
       key: "kind",
       label: "Kind",
       value: tool.kind,
-      options: KINDS,
+      options: TOOL_KINDS,
       onChange: (kind) => edit(withKind(tool, kind)),
     }),
     length("diameter", "Diameter", { above: 0 }),

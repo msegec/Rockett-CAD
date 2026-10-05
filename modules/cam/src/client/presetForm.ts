@@ -43,6 +43,8 @@ const FEEDS = [
 
 const UNCHECKED = "so Suggest is off and rpm is not checked";
 
+const FIRST_MATERIAL = MATERIAL_OPTIONS[0]![0];
+
 export function useDefaultMill({ request, settings }: ClientContext): Mill {
   const machines = useStored<MachineProfile>(request, "machines", "Machines");
   useModuleSetting(settings, DEFAULT_MACHINE.key);
@@ -100,6 +102,32 @@ function suggested(tool: Tool, material: string, machine: MachineProfile) {
   return { text, values };
 }
 
+function withinMachine(preset: Preset, machine: MachineProfile): Preset {
+  const { min, max } = spindleRange(machine);
+  return {
+    ...preset,
+    rpm: Math.min(Math.max(preset.rpm, min), max),
+    cutFeed: Math.min(preset.cutFeed, machine.maxFeedX, machine.maxFeedY),
+    plungeFeed: Math.min(preset.plungeFeed, machine.maxFeedZ),
+    rampFeed: Math.min(preset.rampFeed, machine.maxFeedZ),
+  };
+}
+
+function seeded(count: number, tool: Tool | undefined, mill: Mill): Preset {
+  const preset = newPreset(count, tool?.id);
+  if (!("machine" in mill)) return preset;
+  if (!tool) return withinMachine(preset, mill.machine);
+  try {
+    return {
+      ...preset,
+      ...suggested(tool, FIRST_MATERIAL, mill.machine).values,
+    };
+  } catch (e) {
+    if (!(e instanceof RangeError)) throw e;
+    return withinMachine(preset, mill.machine);
+  }
+}
+
 const holds = (preset: Preset, done: Done | null) =>
   done &&
   Object.entries(done.values).every(
@@ -107,7 +135,7 @@ const holds = (preset: Preset, done: Done | null) =>
   );
 
 function Suggest({ ui, preset, tool, mill, edit }: SuggestProps) {
-  const [material, setMaterial] = useState(MATERIAL_OPTIONS[0]![0]);
+  const [material, setMaterial] = useState(FIRST_MATERIAL);
   const [done, setDone] = useState<Done | null>(null);
   const [error, setError] = useState<string | null>(null);
   const machine = "machine" in mill ? mill.machine : undefined;
@@ -237,7 +265,7 @@ const presetFields =
 export const presetSection = (tools: Tool[], mill: Mill): Section<Preset> => ({
   noun: "preset",
   title: "Presets",
-  create: (count) => newPreset(count),
+  create: (count) => seeded(count, undefined, mill),
   problems: (preset) => [
     ...validatePreset(preset),
     ...rpmProblem(preset, mill),
@@ -259,10 +287,10 @@ const presetRow = (state: State<Preset>, preset: Preset) =>
     ),
   );
 
-export const newPresetButton = (state: State<Preset>, tool: Tool) =>
+export const newPresetButton = (state: State<Preset>, tool: Tool, mill: Mill) =>
   state.library &&
   button("New preset", `New preset for ${tool.name}`, state.pending, () =>
-    state.setEditing(newPreset(state.library!.items.length, tool.id)),
+    state.setEditing(seeded(state.library!.items.length, tool, mill)),
   );
 
 export function toolPresets(state: State<Preset>, tool: Tool): ReactNode {

@@ -38,12 +38,27 @@ const kindSchema = Type.Union([Type.Literal("mill"), Type.Literal("laser")]);
 
 export type MachineKind = Static<typeof kindSchema>;
 
+const rigiditySchema = Type.Union([
+  Type.Literal("light"),
+  Type.Literal("medium"),
+  Type.Literal("rigid"),
+]);
+
+export type Rigidity = Static<typeof rigiditySchema>;
+
+export const RIGIDITY_OPTIONS: [Rigidity, string][] = [
+  ["light", "Light"],
+  ["medium", "Medium"],
+  ["rigid", "Rigid"],
+];
+
 export const machineSchema = Type.Object({
   id: Type.String({ minLength: 1 }),
   name: Type.String(),
   firmware: firmwareSchema,
   post: Type.String({ minLength: 1 }),
   kind: Type.Optional(kindSchema),
+  rigidity: Type.Optional(rigiditySchema),
   xMin: travel("X min"),
   xMax: travel("X max"),
   yMin: travel("Y min"),
@@ -141,6 +156,9 @@ const AXES = [
 
 export const machineKind = (machine: MachineProfile): MachineKind =>
   machine.kind ?? "mill";
+
+export const machineRigidity = (machine: MachineProfile): Rigidity =>
+  machine.rigidity ?? "rigid";
 
 export const spindleRange = (machine: MachineProfile) => ({
   min: machine.measuredRpmMin ?? machine.rpmMin,

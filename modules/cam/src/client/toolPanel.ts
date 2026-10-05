@@ -387,7 +387,7 @@ export function toolsPage(context: ClientContext) {
         sectionList(
           tools,
           h(Fragment, null, otherPresets(presets, items), transfer.buttons),
-          (tool) => newPresetButton(presets, tool),
+          (tool) => newPresetButton(presets, tool, mill),
           (tool) => toolPresets(presets, tool),
         ),
       )

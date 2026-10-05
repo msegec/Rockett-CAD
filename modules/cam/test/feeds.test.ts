@@ -138,8 +138,17 @@ describe("suggestFeeds", () => {
       suggestFeeds({ ...quarter, diameter: 1 }, "aluminium6061", router),
     ).toThrow(/smaller than the 1.5875 mm/);
     expect(() =>
-      suggestFeeds({ ...quarter, kind: "ball" }, "mdf", router),
-    ).toThrow(/flat end mill/);
+      suggestFeeds({ ...quarter, kind: "vbit", tipAngle: 60 }, "mdf", router),
+    ).toThrow(
+      "the feed charts cover flat, bull nose and ball nose end mills, not a V-bit",
+    );
+    expect(() =>
+      suggestFeeds(
+        { ...quarter, kind: "chamfer", tipAngle: 90 },
+        "mdf",
+        router,
+      ),
+    ).toThrow(/not a chamfer mill$/);
   });
 
   it("gives a 7/32 inch bit in wood the 7/32 inch chip load", () => {
@@ -172,6 +181,141 @@ describe("suggestFeeds", () => {
     const outside = result.limits.find(({ limit }) => limit === "outsideChart");
     expect(outside?.reason).toMatch(
       /above the 15.875 mm the MDF chart ends at/,
+    );
+  });
+});
+
+const six: Tool = {
+  ...quarter,
+  name: "6 mm 2 flute",
+  diameter: 6,
+  flutes: 2,
+};
+
+const rated: MachineProfile = { ...router, ratedWatts: 800, ratedRpm: 24000 };
+
+const watts = (result: Suggestion, tool: Tool) =>
+  (data.materials.aluminium6061.unitPower *
+    result.stepdown *
+    result.stepoverFraction *
+    tool.diameter *
+    result.cutFeed) /
+  60;
+
+describe("suggestFeeds rigidity and tool kinds", () => {
+  it("gives a 6 mm 2 flute end mill in 6061 on Rigid today's Suggest exactly", () => {
+    const today = {
+      router: {
+        rpm: 9702.08533088194,
+        cutFeed: 1478.5978044264077,
+        plungeFeed: 739.2989022132039,
+        stepdown: 6,
+        stepoverFraction: 1,
+        limits: [
+          {
+            limit: "powerUnchecked",
+            reason: "the machine has no rated spindle power",
+          },
+        ],
+      },
+      rated: {
+        rpm: 9702.08533088194,
+        cutFeed: 1478.5978044264077,
+        plungeFeed: 739.2989022132039,
+        stepdown: 2.1872265966754156,
+        stepoverFraction: 1,
+        limits: [
+          {
+            limit: "power",
+            reason:
+              "cutting takes 710 W, above 80% of the 323 W the spindle gives at 9702 rpm; stepdown 2.19 mm, stepover 100%",
+          },
+        ],
+      },
+    };
+    for (const [name, machine] of [
+      ["router", router],
+      ["rated", rated],
+    ] as const) {
+      const before = today[name];
+      expect(suggestFeeds(six, "aluminium6061", machine)).toEqual(before);
+      expect(
+        suggestFeeds(six, "aluminium6061", { ...machine, rigidity: "rigid" }),
+      ).toEqual(before);
+    }
+  });
+
+  it("scales chip load by ISCAR's stability factor and stepdown to half the diameter on Light", () => {
+    const band = 0.1397;
+    for (const [rigidity, chip, depth] of [
+      ["light", 0.7, 0.5],
+      ["medium", 0.9, 1],
+    ] as const) {
+      const result = suggestFeeds(six, "mdf", { ...unbounded, rigidity });
+      expect(result.rpm).toBe(18000);
+      expect(chipload(result, six)).toBeCloseTo(chip * band, 9);
+      expect(result.stepdown).toBeCloseTo(depth * six.diameter, 9);
+      expect(result.limits[0]).toEqual({
+        limit: "rigidity",
+        reason:
+          rigidity === "light"
+            ? "Light rigidity takes 70% of the chart chip load and a stepdown of 0.5 x D"
+            : "Medium rigidity takes 90% of the chart chip load and a stepdown of 1 x D",
+      });
+    }
+  });
+
+  it("still holds rpm, feed and power caps after Light and Medium scale", () => {
+    for (const rigidity of ["light", "medium"] as const) {
+      const slow = { ...rated, rpmMax: 7600, maxFeedX: 900, rigidity };
+      const result = suggestFeeds(six, "aluminium6061", slow);
+      expect(result.rpm).toBeLessThanOrEqual(7600);
+      expect(result.cutFeed).toBeLessThanOrEqual(900);
+      expect(result.plungeFeed).toBeLessThanOrEqual(slow.maxFeedZ);
+      expect(watts(result, six)).toBeLessThanOrEqual(
+        0.8 * availableWatts(slow, result.rpm)! + 1e-9,
+      );
+      expect(kinds(result)).toContain("rpmMax");
+    }
+    const light = suggestFeeds(six, "aluminium6061", {
+      ...rated,
+      ratedWatts: 200,
+      rigidity: "light",
+    });
+    expect(light.stepdown).toBeLessThan(3);
+    expect(kinds(light)).toContain("power");
+  });
+
+  it("gives a 6 mm bull nose with a 0.5 mm corner the flat chart's feeds", () => {
+    const bull: Tool = { ...six, kind: "bull", cornerRadius: 0.5 };
+    for (const material of ["aluminium6061", "mdf", "softwood"])
+      expect(suggestFeeds(bull, material, router)).toEqual(
+        suggestFeeds(six, material, router),
+      );
+  });
+
+  it("cuts a 6 mm ball nose at 1 mm stepdown at its effective diameter", () => {
+    const ball: Tool = { ...six, kind: "ball" };
+    const effective = 2 * Math.sqrt(1 * (6 - 1));
+    const result = suggestFeeds(ball, "aluminium6061", unbounded, {
+      stepdown: 1,
+    });
+    const flat = suggestFeeds(
+      { ...six, diameter: effective },
+      "aluminium6061",
+      unbounded,
+    );
+    expect(result.rpm).toBeCloseTo((182.88 * 1000) / (Math.PI * effective), 9);
+    expect(result.rpm).toBe(flat.rpm);
+    expect(result.cutFeed).toBe(flat.cutFeed);
+    expect(result.stepdown).toBe(1);
+    expect(result.limits[0]).toEqual({
+      limit: "ballNose",
+      reason:
+        "a ball nose at 1 mm stepdown cuts at its 4.47 mm effective diameter",
+    });
+    expect(suggestFeeds(ball, "aluminium6061", unbounded)).toEqual(
+      suggestFeeds(six, "aluminium6061", unbounded),
     );
   });
 });

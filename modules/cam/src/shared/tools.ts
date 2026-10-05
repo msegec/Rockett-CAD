@@ -42,6 +42,15 @@ export const toolSchema = Type.Union([
 
 export type Tool = Static<typeof toolSchema>;
 
+export const TOOL_KINDS: [Tool["kind"], string][] = [
+  ["flat", "Flat end mill"],
+  ["ball", "Ball end mill"],
+  ["bull", "Bull nose end mill"],
+  ["vbit", "V-bit"],
+  ["drill", "Drill"],
+  ["chamfer", "Chamfer mill"],
+];
+
 export const MM_PER_INCH = 25.4;
 
 const CORNER_RADIUS = 1;

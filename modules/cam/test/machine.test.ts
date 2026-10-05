@@ -11,10 +11,14 @@ import type {
   ServerContext,
   UserData,
 } from "@rockett/plugin-api";
+import { Type } from "typebox";
+import { Value } from "typebox/value";
 import { mountLibrary } from "../src/server/library.js";
 import { machineFields } from "../src/client/machineForm.js";
+import { CAM_VERSION, migrateCam } from "../src/shared/document.js";
 import {
   FIRMWARE,
+  machineSchema,
   newMachine,
   type MachineProfile,
 } from "../src/shared/machine.js";
@@ -192,6 +196,36 @@ describe("machine library", () => {
     expect(saved).toMatchObject({ version: 1, data: [machine] });
     expect(await call("GET", "machines")).toEqual(saved);
     expect(await call("GET", "tools")).toEqual(before);
+  });
+
+  it("stores a machine's rigidity and refuses an unknown one by schema", async () => {
+    const light = { ...machine, id: "m9", rigidity: "light" };
+    const current = (await call("GET", "machines")) as { etag: string } | null;
+    const saved = await call("PUT", "machines", {
+      data: [light],
+      etag: current?.etag ?? null,
+    });
+    expect(saved).toMatchObject({ data: [light] });
+    await expect(
+      call("PUT", "machines", {
+        data: [{ ...machine, rigidity: "wobbly" }],
+        etag: null,
+      }),
+    ).rejects.toMatchObject({ code: "validation" });
+  });
+
+  it("a setup copy with a rigidity still reads under the schema from before it", () => {
+    const light = { ...machine, rigidity: "light" as const };
+    const before = Type.Omit(machineSchema, ["rigidity"]);
+    expect(Value.Check(before, light)).toBe(true);
+    const data = {
+      setups: [{ id: "s1", machine: { ...light, libraryRef: { id: "m1" } } }],
+      tools: [],
+    };
+    expect(migrateCam({ version: CAM_VERSION, data })).toEqual({
+      status: "ready",
+      data,
+    });
   });
 
   it("refuses an axis whose max is not above its min", async () => {

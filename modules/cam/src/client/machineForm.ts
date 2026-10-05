@@ -1,13 +1,17 @@
 import { createElement as h, Fragment } from "react";
 import type { ClientUi } from "@rockett/plugin-api";
 import type { Post } from "../post/schema.js";
+import { rigidityTerms } from "../feeds/suggest.js";
 import { POSTS } from "../server/posts.js";
 import {
   machineKind,
+  machineRigidity,
   machineSchema,
+  RIGIDITY_OPTIONS,
   withFirmware,
   type MachineKind,
   type MachineProfile,
+  type Rigidity,
 } from "../shared/machine.js";
 import { GrblPaste } from "./grblPaste.js";
 import { banner, unqualified } from "./libraryParts.js";
@@ -62,6 +66,24 @@ function laserProps(
   };
 }
 
+const rigidityFields = (ui: ClientUi, machine: MachineProfile, edit: Edit) =>
+  machineKind(machine) === "mill"
+    ? [
+        h(ui.SelectField<Rigidity>, {
+          key: "rigidity",
+          label: "Rigidity",
+          value: machineRigidity(machine),
+          options: RIGIDITY_OPTIONS,
+          onChange: (rigidity) => edit({ ...machine, rigidity }),
+        }),
+        h(
+          "span",
+          { key: "rigidityHint", className: "field-hint" },
+          `Suggest ${rigidityTerms(machineRigidity(machine))}.`,
+        ),
+      ]
+    : [];
+
 const laserFields = (ui: ClientUi, machine: MachineProfile, edit: Edit) =>
   machineKind(machine) === "laser"
     ? [
@@ -89,6 +111,7 @@ export const machineForm =
       options: KINDS,
       onChange: (kind) => edit({ ...machine, kind }),
     }),
+    ...rigidityFields(ui, machine, edit),
     h(Fragment, { key: "postsError" }, banner(postsError)),
     h(ui.SelectField<string>, {
       key: "post",

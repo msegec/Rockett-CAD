@@ -316,6 +316,83 @@ it("an out-of-range rpm refuses with the machine limit", async () => {
   expect(presetPuts[0]!.data).toEqual([{ ...presets.data[0], rpm: 20000 }]);
 });
 
+const slowMill: MachineProfile = {
+  ...shop,
+  name: "Machine 1",
+  rpmMin: 1500,
+  rpmMax: 7600,
+};
+
+const bull: Tool = {
+  ...flat,
+  id: "lib-bull",
+  name: "Tool 2",
+  kind: "bull",
+  cornerRadius: 0.5,
+};
+
+const FIX = "Fix before saving";
+
+it("a new preset for a bull nose on a 1500 to 7600 rpm machine opens inside its range, and Suggest covers it", async () => {
+  machines = [slowMill];
+  tools = { data: [bull], etag: "t0" };
+  const panel = await openTools();
+  await click(panel, "New preset for Tool 2");
+  const rpm = Number(value(panel, "Spindle speed (rpm)"));
+  expect(rpm).toBeGreaterThanOrEqual(1500);
+  expect(rpm).toBeLessThanOrEqual(7600);
+  const { limits, ...suggested } = suggestFeeds(
+    bull,
+    "aluminium6061",
+    slowMill,
+  );
+  expect(limits.map((l) => l.limit)).toContain("rpmMax");
+  expect(rpm).toBe(Math.round(suggested.rpm));
+  expect(value(panel, "Cut feed (mm/min)")).toBe(
+    String(Math.round(suggested.cutFeed)),
+  );
+  expect(hintText(panel).join(" ")).not.toContain(FIX);
+  expect(button(panel, "OK").disabled).toBe(false);
+
+  await click(panel, "Suggest");
+  expect(panel.textContent).not.toContain("Suggest refused");
+  expect(hintText(panel).join(" ")).toContain(
+    "Suggested for Aluminium 6061 on Machine 1",
+  );
+  await click(panel, "OK");
+  expect(presetPuts[0]!.data[1]).toMatchObject({
+    toolId: bull.id,
+    rpm: Math.round(suggested.rpm),
+  });
+});
+
+it("a new preset for a tool Suggest refuses opens from the defaults clamped into the machine", async () => {
+  machines = [{ ...slowMill, maxFeedX: 800, maxFeedZ: 200 }];
+  const vbit: Tool = {
+    ...flat,
+    id: "lib-v",
+    name: "V",
+    kind: "vbit",
+    tipAngle: 60,
+  };
+  tools = { data: [vbit], etag: "t0" };
+  const panel = await openTools();
+  await click(panel, "New preset for V");
+  expect(shown(panel)).toEqual({
+    rpm: "7600",
+    cutFeed: "800",
+    plungeFeed: "200",
+    rampFeed: "200",
+    stepdown: "1",
+    stepoverFraction: "0.4",
+  });
+  expect(hintText(panel).join(" ")).not.toContain(FIX);
+  await click(panel, "Suggest");
+  expect(panel.textContent).toContain(
+    "Suggest refused: the feed charts cover flat, bull nose and ball nose end mills, not a V-bit.",
+  );
+});
+
 it("with one machine and no default setting, Suggest uses that machine", async () => {
   await mountSettings({
     values: { "plugin.rockett.cam.defaultMachine": null },

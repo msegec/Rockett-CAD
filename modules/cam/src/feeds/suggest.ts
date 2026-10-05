@@ -1,10 +1,13 @@
 import data from "./materials.json";
 import {
   availableWatts,
+  machineRigidity,
+  RIGIDITY_OPTIONS,
   spindleRange,
   type MachineProfile,
+  type Rigidity,
 } from "../shared/machine.js";
-import type { Preset, Tool } from "../shared/tools.js";
+import { TOOL_KINDS, type Preset, type Tool } from "../shared/tools.js";
 
 type Band = { from: number; chipload: number };
 
@@ -23,6 +26,24 @@ const POWER_SHARE = 0.8;
 const MIN_STEPDOWN_FRACTION = 0.1;
 const BAND_EDGE = 1e-6;
 
+const RIGIDITY: Record<Rigidity, { chipload: number; stepdown: number }> = {
+  light: { chipload: 0.7, stepdown: 0.5 },
+  medium: { chipload: 0.9, stepdown: 1 },
+  rigid: { chipload: 1, stepdown: 1 },
+};
+
+export function rigidityTerms(rigidity: Rigidity) {
+  const { chipload, stepdown } = RIGIDITY[rigidity];
+  return `takes ${Math.round(chipload * 100)}% of the chart chip load and a stepdown of ${stepdown} x D`;
+}
+
+const CHARTED = new Set<Tool["kind"]>(["flat", "bull", "ball"]);
+
+function kindInWords(kind: Tool["kind"]) {
+  const label = TOOL_KINDS.find(([id]) => id === kind)![1];
+  return `a ${label.replace(/^[A-Z](?=[a-z])/, (first) => first.toLowerCase())}`;
+}
+
 export type Feeds = Pick<
   Preset,
   "rpm" | "cutFeed" | "plungeFeed" | "stepdown" | "stepoverFraction"
@@ -38,6 +59,8 @@ export type Limit = {
     | "power"
     | "powerUnchecked"
     | "outsideChart"
+    | "rigidity"
+    | "ballNose"
     | "preset";
   reason: string;
 };
@@ -49,10 +72,21 @@ function checkTool(tool: Tool) {
     throw new RangeError("flutes must be a whole number of at least 1");
   if (!(Number.isFinite(tool.diameter) && tool.diameter > 0))
     throw new RangeError("diameter must be above 0 and finite");
-  if (tool.kind !== "flat")
+  if (!CHARTED.has(tool.kind))
     throw new RangeError(
-      `the feed charts cover a flat end mill, not a ${tool.kind}`,
+      `the feed charts cover flat, bull nose and ball nose end mills, not ${kindInWords(tool.kind)}`,
     );
+}
+
+function cuttingDiameter(tool: Tool, stepdown: number, limits: Limit[]) {
+  if (tool.kind !== "ball" || !(stepdown > 0 && stepdown < tool.diameter / 2))
+    return tool.diameter;
+  const effective = 2 * Math.sqrt(stepdown * (tool.diameter - stepdown));
+  limits.push({
+    limit: "ballNose",
+    reason: `a ball nose at ${Number(stepdown.toFixed(2))} mm stepdown cuts at its ${effective.toFixed(2)} mm effective diameter`,
+  });
+  return effective;
 }
 
 function chartBand(
@@ -105,15 +139,15 @@ function spindleSpeed(
 
 function feedAtCap(
   tool: Tool,
-  band: Band,
+  chipload: number,
   rpm: number,
   machine: MachineProfile,
   limits: Limit[],
 ) {
   const cap = Math.min(machine.maxFeedX, machine.maxFeedY);
-  const cutFeed = rpm * tool.flutes * band.chipload;
+  const cutFeed = rpm * tool.flutes * chipload;
   if (cutFeed <= cap) return { rpm, cutFeed };
-  const slower = cap / (tool.flutes * band.chipload);
+  const slower = cap / (tool.flutes * chipload);
   const { min } = spindleRange(machine);
   if (slower >= min) {
     limits.push({
@@ -177,9 +211,19 @@ export function suggestFeeds(
     : undefined;
   if (!entry) throw new RangeError(`no feeds for material ${material}`);
   const limits: Limit[] = [];
-  const band = chartBand(entry, tool.diameter, limits);
-  const speed = spindleSpeed(entry, tool.diameter, machine, limits);
-  const { rpm, cutFeed } = feedAtCap(tool, band, speed, machine, limits);
+  const rigidity = machineRigidity(machine);
+  const factor = RIGIDITY[rigidity];
+  if (rigidity !== "rigid")
+    limits.push({
+      limit: "rigidity",
+      reason: `${RIGIDITY_OPTIONS.find(([id]) => id === rigidity)![1]} rigidity ${rigidityTerms(rigidity)}`,
+    });
+  const stepdown = tool.diameter * factor.stepdown;
+  const diameter = cuttingDiameter(tool, preset.stepdown ?? stepdown, limits);
+  const band = chartBand(entry, diameter, limits);
+  const speed = spindleSpeed(entry, diameter, machine, limits);
+  const chipload = band.chipload * factor.chipload;
+  const { rpm, cutFeed } = feedAtCap(tool, chipload, speed, machine, limits);
   let plungeFeed = cutFeed / tool.flutes;
   if (plungeFeed > machine.maxFeedZ) {
     limits.push({
@@ -192,7 +236,7 @@ export function suggestFeeds(
     entry,
     tool,
     machine,
-    { rpm, cutFeed, plungeFeed, stepdown: tool.diameter, stepoverFraction: 1 },
+    { rpm, cutFeed, plungeFeed, stepdown, stepoverFraction: 1 },
     limits,
   );
   const set = Object.keys(preset);
