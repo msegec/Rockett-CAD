@@ -1,6 +1,6 @@
 import {
   BOUNDARY_NOT_COPIED,
-  projectEdge,
+  isGroupRef,
   ValidationError,
   type CadDocument,
   type EdgeRef,
@@ -41,7 +41,7 @@ import { resolvePlaneFrame, type EvalState } from "../geometry/features.js";
 import { bodyLabel } from "../geometry/featureState.js";
 import { faceNamesOf, withNamingVersion } from "../geometry/naming.js";
 import { resolveRefs } from "../geometry/resolve.js";
-import { sourceCurve } from "../geometry/projectSource.js";
+import { projectSource, sourceNoun } from "../geometry/projectSource.js";
 import { faceDrawing } from "../geometry/dxf.js";
 import { signRefs } from "../geometry/signature.js";
 import { planNamingUpgrade } from "../geometry/upgradeNaming.js";
@@ -177,14 +177,17 @@ const ANSWERS: {
     return asValidation(() => tangentEdges(body, [edge]));
   },
   projectEdge(state, { plane, edge: ref, entityId }) {
-    const curve = sourceCurve(state, ref);
-    if (!curve)
-      throw new ValidationError(
-        `This ${ref.kind === "edge" ? "edge" : "sketch entity"} is not available before the sketch. Choose geometry from an earlier feature.`,
-      );
-    return asValidation(() =>
-      projectEdge(curve, resolvePlaneFrame(state, plane), entityId, ref),
+    if (isGroupRef(ref) && entityId.includes(":"))
+      throw new ValidationError("A face or body projection id has no colon.");
+    const frame = resolvePlaneFrame(state, plane);
+    const projected = asValidation(() =>
+      projectSource(state, ref, frame, entityId),
     );
+    if (!projected)
+      throw new ValidationError(
+        `This ${sourceNoun(ref)} is not available before the sketch. Choose geometry from an earlier feature.`,
+      );
+    return projected;
   },
   copyFace(state, { face: ref }) {
     const body = state.bodies.get(ref.bodyId);

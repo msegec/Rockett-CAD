@@ -33,11 +33,13 @@ export const edgeRef = Type.Object({
 
 export const projectionRef = Type.Union([
   edgeRef,
+  faceRef,
   Type.Object({
     kind: Type.Literal("sketchEntity"),
     sketchId: id,
     entityId: id,
   }),
+  Type.Object({ kind: Type.Literal("body"), bodyId }),
 ]);
 
 export const pointRef = Type.Union([

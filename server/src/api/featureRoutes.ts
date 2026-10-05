@@ -1,6 +1,7 @@
 import {
   bindingHolds,
   dropUnownedBlendFields,
+  groupRoot,
   lacksTargets,
   nextFeatureName,
   parameterBindingsBody,
@@ -181,6 +182,10 @@ function projectEdgeRoute(context: ApiRoutes) {
       if (!sketch || sketch.type !== "sketch")
         throw new ValidationError("Sketch not found");
       const { edge, entityId } = req.body;
+      if (sketch.entities.some((e) => groupRoot(e.id) === entityId))
+        throw new ValidationError(
+          `This sketch already has ${entityId}. Project it under a new id.`,
+        );
       res.json({
         entities: await kernel.stateQuery(doc, {
           kind: "projectEdge",

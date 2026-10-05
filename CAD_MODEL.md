@@ -462,6 +462,29 @@ input bound, not a tolerance.
   point placed by a positional snap holds no relation and stays. Earlier
   documents read the same, so the step only bumps the version, which makes
   an older server refuse a newer file by version.
+- Schema 39 lets a projection name a face, `{ kind: "face", bodyId,
+faceName }`, or a body, `{ kind: "body", bodyId }`. Either is a group: the
+  project call takes a colon-free root id, and every member curve
+  `<root>:<key>` stores the same reference, so evaluation in
+  `refreshProjections` (`server/src/geometry/projectSource.ts`) rebuilds the
+  whole group and adds or drops members as the source gains or loses edges.
+  A relation on a dropped member stays stored, leaves the solve, and the
+  sketch reports a `warning`: `Relation <id> lost its projected curve
+<member>; re-attach or delete it.` The project call refuses a root the
+  sketch already holds. A member's key is the first 8 hex digits of the
+  SHA-256 of its source, never its position, so it survives a resize and a
+  neighbour's change; seam edges are skipped, and a face seen edge-on
+  refuses. A face member's source is its edge name. A body projects its
+  outline (`bodyOutline` in `server/src/geometry/bodyOutline.ts`): the union
+  of the shadows of its planar faces and of its cylindrical faces split at
+  their silhouettes, with holes kept as inner loops, as exact lines, circles
+  and ellipses. An outline curve's source is the body edge it lies on, or
+  for a silhouette the cylinder's face name and side (`<face>/+` or
+  `<face>/-`); where several project onto it, the lowest key wins. Pieces of
+  one source split by the union are `<key>-1` onward along the source. A
+  body with any other surface refuses. A lost face or body blocks the
+  sketch through the reference lifecycle, as an edge does. Projection onto a
+  surface waits for surface modelling.
 - A sketch arc runs counter-clockwise from `start` to `end` about `center`.
   The solver holds both ends at one radius.
 - `editSketchOffset` in `shared/src/sketchOffsets.ts` keeps generated entity

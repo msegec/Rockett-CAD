@@ -7,6 +7,7 @@ import {
   entityPointIds,
   solveSketch,
   trimSketchPieces,
+  withGroups,
 } from "@rockett/shared";
 import type { State } from "./store";
 
@@ -87,7 +88,7 @@ export function sketchEdits(
     async deleteSketchEntities(entityIds) {
       const { draftSketch } = get();
       if (!draftSketch || entityIds.length === 0) return;
-      const idSet = new Set(entityIds);
+      const idSet = withGroups(draftSketch.entities, entityIds);
 
       const gone = (e: SketchEntity) =>
         idSet.has(e.id) || entityPointIds(e).some((id) => idSet.has(id));

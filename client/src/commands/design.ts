@@ -14,6 +14,7 @@ import { StepImportButton } from "../components/StepImportButton";
 import { SketchInsertButtons } from "../components/SketchInsertButtons";
 import { PolygonFields } from "../components/PolygonFields";
 import { ConicFields } from "../components/ConicFields";
+import { ProjectFields } from "../components/ProjectFields";
 import { selectedConic } from "../splineTools";
 import { EVERY_WORKBENCH } from "@rockett/plugin-api";
 import {
@@ -61,6 +62,16 @@ registerCommand({
   when: (s) =>
     s.active?.id === "design.sketch" && s.active.state.tool === "polygon",
   Control: PolygonFields,
+});
+
+registerCommand({
+  id: "design.sketch.projectFields",
+  label: "Project",
+  group: "design.sketch.group.sketch",
+  before: "design.sketch.construction",
+  when: (s) =>
+    s.active?.id === "design.sketch" && s.active.state.tool === "project",
+  Control: ProjectFields,
 });
 
 registerCommand({

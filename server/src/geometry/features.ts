@@ -31,7 +31,6 @@ import {
   findProfile,
   solveSketch,
   settledEntities,
-  projectEdge,
   derivedBodyId,
   ANGULAR_TOL_DEG,
   LINEAR_TOL,
@@ -96,7 +95,7 @@ import { ShapeMap } from "./shapeMap.js";
 
 import { V, frameFromPlane, offsetFrame, uvTo3d } from "./frames.js";
 import { geometryNames } from "./signature.js";
-import { sourceCurve, sourceLabel } from "./projectSource.js";
+import { refreshProjections } from "./projectSource.js";
 import { readImport } from "./importers.js";
 import { placeImport } from "./stepImport.js";
 import { type EvalContext } from "./featureKinds.js";
@@ -230,48 +229,17 @@ function registerNewBodies(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Tool-solid creation (extrude / revolve / sweep / loft share this plumbing)
-// ---------------------------------------------------------------------------
-
 export function evalSketch(
   state: EvalState,
   f: SketchFeature,
 ): FeatureOutcome | void {
   const frame = resolvePlaneFrame(state, f.plane);
-  let entities = f.entities.map((e) => ({ ...e }));
-  const place = (e: SketchEntity) =>
-    JSON.stringify(
-      e.kind === "point" ? [e.x, e.y] : e.kind === "circle" ? e.radius : e.kind,
-    );
-  const stored = new Map(f.entities.map((e) => [e.id, place(e)]));
-  let moved = false;
-  for (const entity of f.entities) {
-    if (entity.kind === "point" || !entity.projection) continue;
-    const ref = entity.projection;
-    const curve = sourceCurve(state, ref);
-    if (!curve)
-      throw new Error(
-        `Projected ${sourceLabel(ref)} is missing. Restore its source or delete and re-project the reference.`,
-      );
-    const projected = projectEdge(
-      curve,
-      frame,
-      entity.id,
-      ref,
-      entity.construction,
-    );
-    if (projected.at(-1)!.kind !== entity.kind)
-      throw new Error(
-        `Projected ${sourceLabel(ref)} changed curve type. Re-project this reference.`,
-      );
-    moved ||= projected.some((e) => stored.get(e.id) !== place(e));
-    const replacements = new Map(projected.map((e) => [e.id, e]));
-    entities = entities.map((e) => replacements.get(e.id) ?? e);
-    for (const e of projected)
-      if (!entities.some((old) => old.id === e.id)) entities.push(e);
-  }
-  const solved = solveSketch({ entities, constraints: f.constraints });
+  const { entities, constraints, moved, lost } = refreshProjections(
+    state,
+    f,
+    frame,
+  );
+  const solved = solveSketch({ entities, constraints });
   const placed = moved ? settledEntities(solved, entities) : entities;
   state.sketches.set(f.id, {
     featureId: f.id,
@@ -281,7 +249,7 @@ export function evalSketch(
     dof: solved.dof,
     profiles: detectProfiles(placed),
   });
-  const warning = regionWarning(placed);
+  const warning = [lost, regionWarning(placed)].filter(Boolean).join(" ");
   if (warning) return { warning };
 }
 

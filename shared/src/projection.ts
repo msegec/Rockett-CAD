@@ -1,4 +1,4 @@
-import type { ProjectionRef, SketchEntity } from "./model.js";
+import type { BodyRef, FaceRef, ProjectionRef, SketchEntity } from "./model.js";
 import type { EdgeInfo, ExactCurve, PlaneFrame, Vec3 } from "./api.js";
 import { sketchBuilder, type SketchBuilder } from "./sketchBuilder.js";
 import { sketchCurves, TAU, type Curve, type XY } from "./sketchCurves.js";
@@ -12,6 +12,38 @@ const TO_POINT =
   "This edge projects to a point. Choose an edge visible in the sketch plane.";
 const EDGE_ON =
   "This edge is seen edge-on and projects to a line. Choose an edge visible in the sketch plane.";
+
+export const seenEdgeOn = (error: unknown) =>
+  error instanceof Error && [TO_POINT, EDGE_ON].includes(error.message);
+
+export const isGroupRef = (ref: ProjectionRef): ref is FaceRef | BodyRef =>
+  ref.kind === "face" || ref.kind === "body";
+
+export const groupRoot = (memberId: string) => memberId.split(":")[0]!;
+
+export function withGroups(
+  entities: readonly SketchEntity[],
+  ids: readonly string[],
+): Set<string> {
+  const picked = new Set(ids);
+  const grouped = (e: SketchEntity) =>
+    e.kind !== "point" && !!e.projection && isGroupRef(e.projection);
+  const roots = new Set(
+    entities
+      .filter((e) => picked.has(e.id) && grouped(e))
+      .map((e) => groupRoot(e.id)),
+  );
+  for (const e of entities)
+    if (grouped(e) && roots.has(groupRoot(e.id))) picked.add(e.id);
+  return picked;
+}
+
+export function sourceKey(ref: ProjectionRef): string {
+  if (ref.kind === "edge") return `edge/${ref.bodyId}/${ref.edgeName}`;
+  if (ref.kind === "face") return `face/${ref.bodyId}/${ref.faceName}`;
+  if (ref.kind === "body") return `body/${ref.bodyId}`;
+  return `sketch/${ref.sketchId}/${ref.entityId}`;
+}
 
 const dot = (a: readonly number[], b: readonly number[]) =>
   a.reduce((v, x, i) => v + x * b[i]!, 0);

@@ -34,6 +34,7 @@ export interface SketchState {
   offsetChain: boolean;
   offsetJoinTolerance: number;
   moveCopy: boolean;
+  projectBodies: boolean;
 }
 
 export const DEFAULT_RHO = 0.5;
@@ -53,6 +54,7 @@ export function sketchState(sketchId: string, tool: SketchTool): SketchState {
     offsetChain: true,
     offsetJoinTolerance: 0.01,
     moveCopy: false,
+    projectBodies: false,
   };
 }
 
@@ -75,7 +77,7 @@ export const sketchHints: Record<SketchTool, string> = {
   dimension:
     "Click an entity or two points · Ctrl-click a line, then a line or point · right-click a dimension to change its kind",
   project:
-    "Click a model edge to create a linked purple reference · source must precede this sketch",
+    "Click a model edge, face or earlier sketch curve, or a body with Bodies chosen, to create a linked purple reference · source must precede this sketch",
   trim: "Click a section between intersections, or drag across sections, to remove",
   extend: "Click near the endpoint to extend to the next boundary",
   offset:

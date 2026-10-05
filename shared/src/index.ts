@@ -8,6 +8,7 @@ export {
   ellipseAxes,
   ELLIPSE_UNSUPPORTED,
   entityPointIds,
+  onRound,
   sampleArc,
   curveDistance,
   sketchCurves,

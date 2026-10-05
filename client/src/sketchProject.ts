@@ -1,6 +1,7 @@
 import {
   newId,
   ROUTES,
+  sourceKey,
   type ProjectionRef,
   type SketchFeature,
 } from "@rockett/shared";
@@ -8,7 +9,8 @@ import { send } from "./api";
 import { useStore, type Selection } from "./store";
 import type { CadViewport } from "./three/CadViewport";
 
-const PICKS = ["design.edge", "sketch.entity"];
+const PICKS = ["design.edge", "sketch.entity", "design.face"];
+const BODY_PICKS = ["design.body"];
 const DEPTH = 16;
 
 type Pointer = Pick<PointerEvent, "clientX" | "clientY">;
@@ -18,17 +20,22 @@ export function projectionPick(
   e: Pointer,
   sketchId: string | undefined,
 ): Selection | undefined {
+  const { active } = useStore.getState();
+  const bodies = active?.id === "design.sketch" && active.state.projectBodies;
+  const picks = bodies ? BODY_PICKS : PICKS;
   for (let depth = 0; depth < DEPTH; depth++) {
-    const picked = vp.pick(e.clientX, e.clientY, PICKS, depth)?.selection;
+    const picked = vp.pick(e.clientX, e.clientY, picks, depth)?.selection;
     if (picked?.kind !== "sketchEntity" || picked.sketchId !== sketchId)
       return picked;
   }
 }
 
-const sourceKey = (ref: ProjectionRef) =>
-  ref.kind === "edge"
-    ? `edge/${ref.bodyId}/${ref.edgeName}`
-    : `sketch/${ref.sketchId}/${ref.entityId}`;
+const LABELS: Record<ProjectionRef["kind"], string> = {
+  edge: "edge",
+  face: "face",
+  body: "body",
+  sketchEntity: "sketch curve",
+};
 
 function pickedSource(
   vp: CadViewport,
@@ -38,6 +45,9 @@ function pickedSource(
   const picked = projectionPick(vp, e, draft.id);
   if (picked?.kind === "edge")
     return { kind: "edge", bodyId: picked.bodyId, edgeName: picked.edgeName };
+  if (picked?.kind === "face")
+    return { kind: "face", bodyId: picked.bodyId, faceName: picked.faceName };
+  if (picked?.kind === "body") return { kind: "body", bodyId: picked.bodyId };
   if (picked?.kind === "sketchEntity")
     return {
       kind: "sketchEntity",
@@ -64,7 +74,7 @@ export async function projectPicked(
       )
     )
       throw new Error(
-        `This ${source.kind === "edge" ? "edge" : "sketch curve"} is already projected into the sketch.`,
+        `This ${LABELS[source.kind]} is already projected into the sketch.`,
       );
     const { entities: added } = await send(
       ROUTES.projectEdge,

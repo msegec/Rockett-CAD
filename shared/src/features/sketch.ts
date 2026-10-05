@@ -92,9 +92,13 @@ registerCoreSpec(
     ...f.entities.flatMap((e, i) => {
       if (e.kind === "point" || !e.projection) return [];
       const path = `/entities/${i}/projection`;
-      return e.projection.kind === "edge"
-        ? [refAt("edge", path, e.projection)]
-        : [refAt("sketchEntity", path, e.projection)];
+      const ref = e.projection;
+      if (ref.kind === "body")
+        return [refAt("body", `${path}/bodyId`, ref.bodyId)];
+      if (ref.kind === "face") return [refAt("face", path, ref)];
+      return ref.kind === "edge"
+        ? [refAt("edge", path, ref)]
+        : [refAt("sketchEntity", path, ref)];
     }),
   ],
   { producesGeometry: false, check: sketchReferences },
