@@ -8,7 +8,15 @@ import type {
 type SplineLike = SketchSpline | SketchFitSpline;
 type Pair = [string, string];
 
-export type SplineJoint = { end: Pair; other: Pair; radial: boolean };
+export type SplineJoint = {
+  end: Pair;
+  other: Pair;
+  radial: boolean;
+  curves: Pair;
+};
+
+export const SMOOTH_NEEDS =
+  "smooth needs a spline and the line, arc or spline at its end";
 
 export const splineLike = (e: SketchEntity | undefined): e is SplineLike =>
   e?.kind === "spline" || e?.kind === "fitSpline";
@@ -29,7 +37,7 @@ export function splineEnds(e: SplineLike): Pair[] {
 function jointAt(
   o: SketchEntity | undefined,
   same: (id: string) => boolean,
-): Omit<SplineJoint, "end"> | undefined {
+): Omit<SplineJoint, "end" | "curves"> | undefined {
   if (o?.kind === "line") {
     if (same(o.p1)) return { other: [o.p1, o.p2], radial: false };
     if (same(o.p2)) return { other: [o.p2, o.p1], radial: false };
@@ -46,7 +54,7 @@ function jointAt(
 export function splineTangent(
   entities: SketchEntity[],
   constraints: SketchConstraint[],
-  c: { a: string; b: string },
+  c: { type: string; a: string; b: string },
 ): SplineJoint | string | undefined {
   const find = (id: string) => entities.find((e) => e.id === id);
   const [a, b] = [find(c.a), find(c.b)];
@@ -62,7 +70,7 @@ export function splineTangent(
     );
   for (const end of splineEnds(spline)) {
     const joint = other !== spline && jointAt(other, linked(end[0]));
-    if (joint) return { end, ...joint };
+    if (joint) return { end, ...joint, curves: [spline.id, other!.id] };
   }
-  return `tangent constraints on ${spline.kind} ${spline.id} need a shared end with a line, arc or spline`;
+  return `${c.type} constraints on ${spline.kind} ${spline.id} need a shared end with a line, arc or spline`;
 }

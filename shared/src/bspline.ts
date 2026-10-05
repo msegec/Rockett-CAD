@@ -101,6 +101,33 @@ export function bsplinePoint(s: BSpline, u: number): XY {
   return [x! / w!, y! / w!];
 }
 
+export function endDerivatives(s: BSpline, atStart: boolean): [XY, XY] {
+  const p = s.degree;
+  const flat = s.knots.flatMap((k, i) =>
+    Array<number>(s.multiplicities[i]!).fill(k),
+  );
+  const order = <T>(v: T[]) => (atStart ? v : v.toReversed());
+  const t = atStart ? flat : flat.map((k) => -k).toReversed();
+  const poles = order(s.poles);
+  const w = order(s.weights ?? s.poles.map(() => 1));
+  const H = (i: number) => [w[i]! * poles[i]![0], w[i]! * poles[i]![1], w[i]!];
+  const step = (i: number, f: number) =>
+    H(i + 1).map((v, c) => (f * (v - H(i)[c]!)) / (t[i + p + 1]! - t[i + 1]!));
+  const d1 = step(0, p);
+  const d2 =
+    p < 2
+      ? [0, 0, 0]
+      : step(1, p).map(
+          (v, c) => ((p - 1) * (v - d1[c]!)) / (t[p + 1]! - t[2]!),
+        );
+  const [x, y, w0] = H(0) as [number, number, number];
+  const c1 = [0, 1].map((c) => (d1[c]! - (d1[2]! * [x, y][c]!) / w0) / w0);
+  const c2 = [0, 1].map(
+    (c) => (d2[c]! - 2 * d1[2]! * c1[c]! - (d2[2]! * [x, y][c]!) / w0) / w0,
+  );
+  return [c1, c2] as [XY, XY];
+}
+
 export function bsplineParams(s: BSpline, segments: number): number[] {
   const out = [s.knots[0]!];
   for (let i = 1; i < s.knots.length; i++) {

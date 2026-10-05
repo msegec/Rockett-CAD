@@ -532,7 +532,9 @@ misses body <id>.`; the curves return when the source crosses again. The
   exact `gp_Elips` edge between snapped ends: `shared/test/ellipse.test.ts`,
   `shared/test/ellipticalArc.test.ts`.
 - The solver skips a dimension with `driven: true`. The field is optional, so
-  sketches saved without it load unchanged with no schema step.
+  sketches saved without it load unchanged with no schema step. A driven
+  dimension shows its measured value in parentheses and follows the geometry
+  its driving dimensions set.
 - `shared/src/solver.ts` minimises constraint residuals with
   Levenberg-Marquardt on a numeric Jacobian, the same code in the browser
   and on the server; degrees of freedom are variables minus Jacobian rank. A
@@ -551,7 +553,7 @@ misses body <id>.`; the curves return when the source crosses again. The
 - Schema 36 adds the sketch `spline`: `degree`, `poles` as point ids,
   optional `weights`, `knots`, `multiplicities` and optional `periodic`.
   Validation refuses what `bsplineProblem` refuses, and constraints on the
-  curve itself other than an end tangent; constraints on its poles stay. `importDxf` builds one from a
+  curve itself other than an end tangent or smooth; constraints on its poles stay. `importDxf` builds one from a
   SPLINE whose normal is Z, passing scale only to `sketchBuilder`. An open
   spline is clamped, so its end poles are its ends and share the points of
   touching curves; a periodic one closes on itself. Dragging a pole moves the
@@ -564,7 +566,7 @@ misses body <id>.`; the curves return when the source crosses again. The
   samples each knot span and refines the nearest gap; it is not an exact
   intersection. `pieceEdge` builds the exact `Geom_BSplineCurve` edge, so
   sides name after the spline and solids keep its exact data. Trim, extend,
-  offset, dimensions, relations other than an end tangent, and sweep paths
+  offset, dimensions, relations other than an end tangent or smooth, and sweep paths
   refuse it. DXF export samples it, since the R12 writer has no SPLINE
   entity: `shared/test/spline.test.ts`.
 - Schema 37 adds `fitSpline` and the spline's optional `rho`, storing
@@ -581,6 +583,22 @@ misses body <id>.`; the curves return when the source crosses again. The
   point or coincident; `splineTangent` in `shared/src/splineJoints.ts` finds
   it and the solver holds the end directions parallel, or perpendicular to
   the radius for an arc: `shared/test/splineConstraints.test.ts`.
+- Schema 45 adds two relations; earlier documents read the same, so the step
+  only bumps the version. `symmetric` holds `a` and `b`, two points, two lines
+  or two circles or arcs, mirrored across the line `line`: points and centres
+  mirror exactly, circles and arcs keep equal radii, and each line's mirror
+  lies on the other line, as infinite lines. `smooth` is Fusion's curvature
+  continuous (G2) join between a spline and the line, arc or spline at its
+  end, found as for an end tangent: it holds the tangent and matches the
+  curvature vectors at the join (zero for a line, towards the centre for an
+  arc). `endDerivatives` in `shared/src/bspline.ts` gives the end derivatives
+  of a clamped, possibly rational spline; `shared/src/solverRelations.ts`
+  owns both relations' rows and the symmetric pairing rule that validation
+  shares. The curvature row compares second derivatives scaled by speed, so a
+  handle cannot cross its end, normalised by the stored geometry. Adding
+  Smooth replaces a Tangent on the same pair. Both appear in the sketch
+  selection's right-click menu; toolbar buttons wait for icons:
+  `shared/test/sketchSymmetric.test.ts`, `shared/test/splineSmooth.test.ts`.
 
 ## Frame conventions
 

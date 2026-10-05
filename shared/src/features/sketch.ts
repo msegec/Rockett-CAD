@@ -9,7 +9,8 @@ import {
   entityPointIds,
 } from "../sketchCurves.js";
 import { constraintEntityRefs } from "../sketchTransform.js";
-import { splineLike, splineTangent } from "../splineJoints.js";
+import { SYMMETRIC_NEEDS, symmetricKind } from "../solverRelations.js";
+import { SMOOTH_NEEDS, splineLike, splineTangent } from "../splineJoints.js";
 import { LINEAR_TOL } from "../tolerance.js";
 
 const MIN_OFFSET_MM = 1e-7;
@@ -71,8 +72,12 @@ function sketchReferences(f: SketchFeature): void {
     (c.type === "tangent" && [c.a, c.b].some((id) => kinds.get(id) === "line"));
   for (const c of f.constraints) {
     const joint =
-      c.type === "tangent" && splineTangent(f.entities, f.constraints, c);
+      (c.type === "tangent" || c.type === "smooth") &&
+      splineTangent(f.entities, f.constraints, c);
     if (typeof joint === "string") throw new ValidationError(joint);
+    if (c.type === "smooth" && !joint) throw new ValidationError(SMOOTH_NEEDS);
+    if (c.type === "symmetric" && !symmetricKind((id) => kinds.get(id), c))
+      throw new ValidationError(SYMMETRIC_NEEDS);
     for (const id of constraintEntityRefs(c))
       if (
         (["spline", "fitSpline"].includes(kinds.get(id)!) && !joint) ||

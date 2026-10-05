@@ -23,7 +23,9 @@ export type RelationType =
   | "concentric"
   | "midpoint"
   | "collinear"
-  | "fix";
+  | "fix"
+  | "symmetric"
+  | "smooth";
 
 export const CONSTRAINTS: Array<{
   type: RelationType & IconId;
@@ -61,11 +63,38 @@ export const CONSTRAINTS: Array<{
   { type: "fix", label: "Fix", title: "Fix point" },
 ];
 
+export const MENU_RELATIONS: Array<{
+  type: RelationType;
+  label: string;
+  title: string;
+}> = [
+  ...CONSTRAINTS,
+  {
+    type: "symmetric",
+    label: "Symmetric",
+    title:
+      "Symmetric (2 points, 2 lines or 2 circles or arcs, then the symmetry line)",
+  },
+  {
+    type: "smooth",
+    label: "Smooth",
+    title: "Smooth, curvature continuous (a spline and the curve at its end)",
+  },
+];
+
+const pairOf = (c: SketchConstraint) =>
+  "a" in c && "b" in c ? [c.a, c.b].toSorted().join() : null;
+
 export async function addSketchConstraints(constraints: SketchConstraint[]) {
   const s = useStore.getState();
   if (!s.draftSketch) return;
+  const smoothed = new Set(
+    constraints.flatMap((c) => (c.type === "smooth" ? [pairOf(c)] : [])),
+  );
   s.updateDraftSketch(s.draftSketch.entities, [
-    ...s.draftSketch.constraints,
+    ...s.draftSketch.constraints.filter(
+      (c) => c.type !== "tangent" || !smoothed.has(pairOf(c)),
+    ),
     ...constraints,
   ]);
   await s.commitDraftSketch();
@@ -115,7 +144,8 @@ function splineRelation(
   ids: string[],
   type: RelationType,
 ): SketchConstraint | null {
-  if (type !== "tangent" || ids.length !== 2) return null;
+  if ((type !== "tangent" && type !== "smooth") || ids.length !== 2)
+    return null;
   const c = { id: newId("c"), type, a: ids[0]!, b: ids[1]! } as const;
   const joint = splineTangent(draft.entities, draft.constraints, c);
   return typeof joint === "object" ? c : null;
@@ -179,6 +209,15 @@ export function constraintFor(
       return point && line ? { id, type, point, line } : null;
     case "fix":
       return point ? { id, type, point } : null;
+    case "symmetric": {
+      const axis = lines.at(-1);
+      const [a, b] = points.length ? points : circle ? circleLikes : lines;
+      return axis && a && b && axis !== b
+        ? { id, type, a, b, line: axis }
+        : null;
+    }
+    case "smooth":
+      return null;
   }
 }
 
@@ -195,6 +234,8 @@ const WHOLE: Record<
   concentric: ["0,0,2"],
   midpoint: ["1,1,0"],
   fix: ["1,0,0"],
+  symmetric: ["2,1,0", "0,3,0", "0,1,2"],
+  smooth: [],
 };
 
 const refs = (c: SketchConstraint) =>
@@ -214,17 +255,20 @@ export function relationsFor(draft: Draft, ids: string[]): Relation[] {
   const curves = circleLikes.length + ellipses.length;
   if (ids.length === 0) return [];
   if (splines.length) {
-    const c = splineRelation(draft, ids, "tangent");
-    const fresh = c && !draft.constraints.some((k) => refs(k) === refs(c));
-    return fresh
-      ? [{ type: "tangent", label: "Tangent", constraints: [c] }]
-      : [];
+    const held = new Set(draft.constraints.map(refs));
+    const smooth = splineRelation(draft, ids, "smooth");
+    if (smooth && held.has(refs(smooth))) return [];
+    return (["tangent", "smooth"] as const).flatMap((type): Relation[] => {
+      const c = splineRelation(draft, ids, type);
+      const label = type === "smooth" ? "Smooth" : "Tangent";
+      return c && !held.has(refs(c)) ? [{ type, label, constraints: [c] }] : [];
+    });
   }
   if (points.length + lines.length + curves !== ids.length) return [];
   const counts = `${points.length},${lines.length},${curves}`;
   const existing = new Set(draft.constraints.map(refs));
   const fresh = (c: SketchConstraint | null) => c && !existing.has(refs(c));
-  return CONSTRAINTS.flatMap(({ type, label }): Relation[] => {
+  return MENU_RELATIONS.flatMap(({ type, label }): Relation[] => {
     if (type === "horizontal" || type === "vertical") {
       if (lines.length !== ids.length) return [];
       if (

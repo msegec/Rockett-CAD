@@ -7,8 +7,8 @@ import type {
   SketchPoint,
   SketchSolveStatus,
 } from "./model.js";
-import { OverConstrainedError } from "./solverError.js";
-export { OverConstrainedError } from "./solverError.js";
+import { OverConstrainedError, SolverModelError } from "./solverError.js";
+export { OverConstrainedError, SolverModelError } from "./solverError.js";
 import {
   ellipseLevel,
   ellipseLineGap,
@@ -27,6 +27,7 @@ import {
 } from "./leastSquares.js";
 import { driving, firstRedundant } from "./solverRank.js";
 import { jointRow, lineOffset, stayRows, turn } from "./solverRows.js";
+import { relationRows } from "./solverRelations.js";
 import { splineTangent } from "./splineJoints.js";
 
 export interface SolveInput {
@@ -215,6 +216,7 @@ function buildProblem(input: SolveInput): Problem {
     settle();
   }
 
+  const shape = { px, py, lineEnds, radius, centerOf };
   for (const c of input.constraints) {
     starts.push(residuals.length);
     if (!driving(c)) continue;
@@ -284,6 +286,10 @@ function buildProblem(input: SolveInput): Problem {
         }
         break;
       }
+      case "smooth":
+      case "symmetric":
+        residuals.push(...relationRows(input, c, shape));
+        break;
       case "concentric": {
         const A = centerOf(c.a),
           B = centerOf(c.b);
@@ -362,10 +368,7 @@ function buildProblem(input: SolveInput): Problem {
         break;
       }
       case "distance": {
-        const ax = px(c.a),
-          ay = py(c.a),
-          bx = px(c.b),
-          by = py(c.b);
+        const [ax, ay, bx, by] = [px(c.a), py(c.a), px(c.b), py(c.b)];
         const v = c.value;
         if (c.axis === "x") {
           residuals.push((x) => Math.abs(bx(x) - ax(x)) - v);
@@ -451,8 +454,6 @@ function buildProblem(input: SolveInput): Problem {
     numVars: space.vars.length,
   };
 }
-
-export class SolverModelError extends Error {}
 
 function solveTouching(
   input: SolveInput,

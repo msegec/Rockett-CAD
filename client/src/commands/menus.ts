@@ -8,7 +8,7 @@ import {
   type TreeGroup,
 } from "@rockett/shared";
 import {
-  CONSTRAINTS,
+  MENU_RELATIONS,
   addSketchConstraints,
   relationsFor,
   sketchSelectionIds,
@@ -279,7 +279,7 @@ for (const command of [
     "Upgrade naming…",
     ({ target }) => target.upgradeNaming?.(),
   ),
-  ...CONSTRAINTS.map(({ type, label }): Command => ({
+  ...MENU_RELATIONS.map(({ type, label }): Command => ({
     id: `design.menu.relation.${type}`,
     label,
     run: (s) => {
@@ -359,7 +359,7 @@ function place<S extends Surface>(surface: S, entries: Placed<S>[]) {
 }
 
 const notSketching = (s: CommandContext) => s.active?.id !== "design.sketch";
-const relations = CONSTRAINTS.map(({ type }) => ({
+const relations = MENU_RELATIONS.map(({ type }) => ({
   command: `design.menu.relation.${type}`,
   when: (s: CommandContext) => relation(s, type) !== undefined,
 }));

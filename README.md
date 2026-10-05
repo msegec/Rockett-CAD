@@ -19,7 +19,7 @@ everything downstream against persistent topology references.
 ### Sketch
 
 - **Sketcher**: draw lines, rectangles, circles, arcs, polygons, slots, points and construction geometry.
-- **Constraints and dimensions**: editable or driven dimensions, remaining degrees of freedom, refused over-constraints; unsettled sketches warn before the next edit.
+- **Constraints and dimensions**: editable or driven dimensions, symmetry, remaining degrees of freedom, refused over-constraints; unsettled sketches warn before the next edit.
 - **Dimension kinds**: point to line, parallel lines, line to line or axis angles; right-click a dimension for horizontal, vertical or radius.
 - **Line angles**: a typed angle is kept; double-click a line to edit its length and angle.
 - **Regions**: crossing curves and linked planar face boundaries split sketches into selectable regions.
@@ -29,7 +29,7 @@ everything downstream against persistent topology references.
 - **Project, trim and extend**: link edges, faces, body outlines and earlier sketch curves, trim pieces by click or drag (T), extend curves to boundaries.
 - **Insert DXF and SVG**: bring DXF lines, arcs, circles, ellipses, splines and points, or SVG paths and shapes, into the sketch as editable geometry.
 - **Ellipses**: draw or import from DXF, including elliptical arcs; constrain tangent lines, project tilted circles, extrude exactly.
-- **Splines**: sketch keys N, B and K draw fit-point, control-point and conic splines; import DXF splines, join ends tangent, extrude exactly.
+- **Splines**: sketch keys N, B and K draw fit-point, control-point and conic splines; DXF import, smooth or tangent joins, exact extrudes.
 - **Edit in place**: history rolls back while editing; Finish Sketch restores it, or Extrude opens with the selected region.
 
 ### Model

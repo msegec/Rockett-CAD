@@ -15,3 +15,5 @@ export class OverConstrainedError extends ValidationError {
     super(`${constraintName(constraint)} would over-constrain the sketch.`);
   }
 }
+
+export class SolverModelError extends Error {}

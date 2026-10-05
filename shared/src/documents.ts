@@ -1,7 +1,7 @@
 import type { Feature, NamingVersion } from "./model.js";
 import type { ParameterUnit } from "./parameters.js";
 
-export const SCHEMA_VERSION = 44;
+export const SCHEMA_VERSION = 45;
 
 export interface UserParameter {
   name: string;
