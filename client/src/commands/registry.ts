@@ -21,6 +21,7 @@ export type CommandContext = ReturnType<typeof useStore.getState> & {
 interface CommandBase extends Base<CommandContext> {
   interaction?: ActiveCommand;
   description?: string;
+  active?(ctx: CommandContext): boolean;
 }
 
 interface CommandButton {
@@ -30,7 +31,6 @@ interface CommandButton {
   primary?: true;
   iconOnly?: true;
   explainsRefusal?: true;
-  active?(ctx: CommandContext): boolean;
   run(ctx: CommandContext): unknown;
   Control?: never;
 }

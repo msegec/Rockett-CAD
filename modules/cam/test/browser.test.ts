@@ -234,6 +234,10 @@ function projectView(data: unknown = camData) {
   const view: ProjectView = {
     get: () => open,
     selection: () => [],
+    picks: () => [],
+    select() {},
+    pick: () => () => {},
+    measure: () => Promise.reject(new Error("measure is not used here")),
     subscribe: () => () => {},
     read: (route, params) =>
       routes.get(route.path)!(

@@ -224,6 +224,10 @@ function fakeProject() {
   const project: ProjectView = {
     get: () => open,
     selection: () => [],
+    picks: () => [],
+    select() {},
+    pick: () => () => {},
+    measure: () => Promise.reject(new Error("measure is not used here")),
     subscribe(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

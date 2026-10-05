@@ -51,6 +51,12 @@ export function formatLength(
   return `${digits === undefined ? roundedLength(mm, units) : round(fromMm(mm, units), digits)} ${units}`;
 }
 
+const POWER_MARK = { 2: "²", 3: "³" } as const;
+
+export function formatPower(value: number, units: Units, power: 2 | 3): string {
+  return `${formatLength(value / UNIT_TO_MM[units] ** (power - 1), units)}${POWER_MARK[power]}`;
+}
+
 export function formatAngle(deg: number, digits: number): string {
   return `${round(deg, digits)}°`;
 }

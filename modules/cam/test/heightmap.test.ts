@@ -220,6 +220,10 @@ function camProject(programs: Record<string, Program>): ProjectView {
     get: () => open,
     subscribe: () => () => {},
     selection: () => [],
+    picks: () => [],
+    select() {},
+    pick: () => () => {},
+    measure: () => Promise.reject(new Error("measure is not used here")),
     read: (async (
       route: { path: string },
       { operationId }: { operationId: string },

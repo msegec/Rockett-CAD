@@ -72,6 +72,10 @@ async function projectView(id: string): Promise<ProjectView> {
   return {
     get: () => open,
     selection: () => [],
+    picks: () => [],
+    select() {},
+    pick: () => () => {},
+    measure: () => Promise.reject(new Error("measure is not used here")),
     subscribe: () => () => {},
     read: () => Promise.reject(new Error("read is not used here")),
     async mutate(route, body) {

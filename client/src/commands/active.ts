@@ -1,3 +1,4 @@
+import type { PickMode } from "@rockett/plugin-api";
 import { useStore, type Selection } from "../store";
 import { commandById, type CommandContext } from "./registry";
 import type { ViewportRef } from "../viewportRef";
@@ -10,7 +11,8 @@ export type Active =
   | { id: "inspect.measure"; state: MeasureState; editTarget?: string }
   | { id: "design.sketch.create"; state?: never }
   | { id: "design.feature"; state: FeatureCommandState }
-  | { id: "design.export"; state: { selectionBefore: Selection[] } };
+  | { id: "design.export"; state: { selectionBefore: Selection[] } }
+  | { id: "module.pick"; state: PickMode };
 
 export type PickModifiers = Pick<
   PointerEvent,
@@ -41,6 +43,9 @@ export function activeCommand(
 ) {
   return active ? commandById(active.id)?.interaction : undefined;
 }
+
+export const activeOwner = ({ active }: CommandContext) =>
+  active?.id === "module.pick" ? active.state.command : active?.id;
 
 export function exitActive() {
   activeCommand()?.exit();

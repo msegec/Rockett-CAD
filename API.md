@@ -484,11 +484,29 @@ module, in load order:
   path parameter of `.` or `..`, or no open project, rejects before a
   request goes out. A reply that lands after the open project changed
   rejects.
+- API 0.10.0 adds `project.picks()`, `select(refs)`, `pick(mode)` and
+  `measure(refs)`. A pick ref is a `MeasureRequest` ref: `body`, `face`,
+  `edge` or `vertex`. `picks()` lists the selection as unsigned pick refs,
+  the same array until the selection changes; `select(refs)` replaces it.
+  `pick({ command, kinds, hint, onPick, onEnd })` starts a viewport pick
+  mode owned by `command`, which must start with the module id and a dot,
+  or the call throws. Hover and
+  clicks take only `kinds`; each click calls `onPick` with the picked ref,
+  or `null` on empty space, and the module sets the selection itself. The
+  viewport shows `hint`, and the command's toolbar button shows active.
+  Escape, the command's own key, another command, a project or document
+  change, the returned disposer or unload ends the mode once, calling
+  `onEnd`. `measure(refs)` posts to `/projects/:id/measure` for the open
+  project and resolves its `MeasureResult`, under the same access rule and
+  open-project checks as `read`.
 - `ui` passes the core `DraggablePanel`, `DialogFooter`, `NumField`,
   `LengthField`, `AngleField`, `SelectField`, `CheckField`, `TextField`,
   `TextAreaField` and `ContextMenu`, so a module dialog uses the KIT fields
   and a module right-click menu is the core menu. `LengthField`
-  takes millimetres and shows the user's length unit. `ui.openPanel(id)`
+  takes millimetres and shows the user's length unit. The
+  `ui.useFormatLength()` hook returns `(mm, power?)`, formatted as core
+  formats lengths, or areas and volumes for power 2 and 3, in the user's
+  length unit, and redraws when the unit changes. `ui.openPanel(id)`
   and `ui.closePanel(id)` open and close a core panel.
 - A number field's `value` may be `undefined`, which shows a blank box.
   With `onClear`, clearing the box calls it, so the module can store

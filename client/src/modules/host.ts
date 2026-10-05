@@ -1,4 +1,4 @@
-import { createElement, type ComponentType } from "react";
+import { createElement, useCallback, type ComponentType } from "react";
 import type {
   ClientContext,
   ClientUi,
@@ -8,6 +8,8 @@ import type {
   ModuleSettings,
   NumberFieldProps,
   OpenProject,
+  PickMode,
+  PickRef,
   ProjectView,
   RouteResponse,
   SettingDefinition,
@@ -17,6 +19,8 @@ import type {
 import {
   checkModuleSetting,
   DOCUMENT_EDITS,
+  formatLength,
+  formatPower,
   moduleHiddenSetting,
   moduleHostSettings,
   nameSection,
@@ -28,7 +32,8 @@ import {
   type Route,
   type SettingOwner,
 } from "@rockett/shared";
-import { request, send, type MutationResponse } from "../api";
+import { api, request, send, type MutationResponse } from "../api";
+import { activeOwner } from "../commands/active";
 import {
   registerCommand,
   registerToolbarGroup,
@@ -45,6 +50,8 @@ import {
   registerSettingsPage,
 } from "../components/SettingsPanel";
 import { DialogFooter } from "../components/form/DialogFooter";
+import { measureRef } from "../components/selectionMeasure";
+import { pickMode } from "./pick";
 import {
   AngleField,
   CheckField,
@@ -130,6 +137,11 @@ function iconed(moduleId: string, command: ModuleCommand): Command {
   return { ...command, icon };
 }
 
+const owned = (command: Command): Command => ({
+  ...command,
+  active: (s) => activeOwner(s) === command.id,
+});
+
 function registerModuleLayer(moduleId: string, layer: Layer) {
   if (!layer.id.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(layer.id))
     throw new Error(
@@ -175,8 +187,21 @@ let picked: { from: State["selection"]; faces: readonly FaceRef[] } = {
   from: [],
   faces: [],
 };
+let refs: { from: State["selection"]; refs: readonly PickRef[] } = {
+  from: [],
+  refs: [],
+};
 
-const project: ProjectView = {
+async function inOpenProject<T>(call: (id: string) => Promise<T>) {
+  const { projectId } = useStore.getState();
+  if (!projectId) throw new Error("No project is open.");
+  const reply = await call(projectId);
+  if (useStore.getState().projectId !== projectId)
+    throw new Error("The open project changed.");
+  return reply;
+}
+
+const project: Omit<ProjectView, "pick"> = {
   get() {
     const now = useStore.getState();
     if (!changed(now, seen)) return open;
@@ -201,22 +226,28 @@ const project: ProjectView = {
     picked = { from: selection, faces };
     return faces;
   },
+  picks() {
+    const { selection } = useStore.getState();
+    if (selection !== refs.from)
+      refs = {
+        from: selection,
+        refs: selection.flatMap((s) => measureRef(s) ?? []),
+      };
+    return refs.refs;
+  },
+  select: (picks) => useStore.getState().setSelection([...picks]),
   subscribe: (listener) =>
     useStore.subscribe((now, before) => {
       if (changed(now, before) || now.selection !== before.selection)
         listener();
     }),
-  async read(route, params) {
-    const { projectId } = useStore.getState();
-    if (!projectId) throw new Error("No project is open.");
-    if (route.method !== "GET")
-      throw new Error(`${route.path} is not a GET route`);
-    const get = route as Route<string, unknown, RouteResponse<typeof route>>;
-    const reply = await send(get, { ...params, id: projectId });
-    if (useStore.getState().projectId !== projectId)
-      throw new Error("The open project changed.");
-    return reply;
-  },
+  read: (route, params) =>
+    inOpenProject(async (id) => {
+      if (route.method !== "GET")
+        throw new Error(`${route.path} is not a GET route`);
+      const get = route as Route<string, unknown, RouteResponse<typeof route>>;
+      return send(get, { ...params, id });
+    }),
   async mutate(route, body) {
     const { projectId, mutate } = useStore.getState();
     if (!projectId) throw new Error("No project is open.");
@@ -225,10 +256,20 @@ const project: ProjectView = {
     const edit = route as Route<string, unknown, MutationResponse>;
     await mutate((tx) => send(edit, { id: projectId }, { body, tx }));
   },
+  measure: (picks) => inOpenProject((id) => api.measure(id, [...picks])),
 };
 
 const ModuleLengthField = (props: NumberFieldProps & { label: string }) =>
   createElement(LengthField, { ...props, units: useSetting("units.length") });
+
+function useFormatLength() {
+  const units = useSetting("units.length");
+  return useCallback(
+    (mm: number, power?: 2 | 3) =>
+      power ? formatPower(mm, units, power) : formatLength(mm, units),
+    [units],
+  );
+}
 
 const ui: ClientUi = {
   DraggablePanel,
@@ -236,6 +277,7 @@ const ui: ClientUi = {
   NumField,
   LengthField: ModuleLengthField,
   AngleField,
+  useFormatLength,
   SelectField,
   CheckField,
   TextField,
@@ -326,7 +368,8 @@ function moduleContext(own: Dispose[], manifest: SettingOwner) {
   const command = shown(registerCommand);
   const workbench = shown(registerWorkbench);
   const register = {
-    command: (item: ModuleCommand) => command(guarded(iconed(moduleId, item))),
+    command: (item: ModuleCommand) =>
+      command(guarded(owned(iconed(moduleId, item)))),
     toolbarGroup: shown(registerToolbarGroup),
     panel: shown(registerPanel),
     workbench: (item: Workbench) => workbench(guardedWorkbench(item)),
@@ -342,7 +385,14 @@ function moduleContext(own: Dispose[], manifest: SettingOwner) {
   };
   return {
     register,
-    project: { ...project, subscribe: track(project.subscribe) },
+    project: {
+      ...project,
+      subscribe: track(project.subscribe),
+      pick(mode: PickMode) {
+        const release = track(pickMode)(moduleId, mode, () => release());
+        return release;
+      },
+    },
     ui,
     settings: moduleSettings(
       manifest,

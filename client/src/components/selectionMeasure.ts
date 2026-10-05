@@ -1,8 +1,8 @@
 import {
   formatAngle,
   formatLength,
+  formatPower,
   MEASURE_MAX_REFS,
-  UNIT_TO_MM,
   type BodyPayload,
   type CadDocument,
   type MeasureRequest,
@@ -12,7 +12,6 @@ import {
 } from "@rockett/shared";
 import { useEffect, useState } from "react";
 import { api } from "../api";
-import { measurable } from "../commands/measure";
 import { previewBodies } from "../previewBase";
 import { useSetting } from "../settings";
 import { dimensionFor, measureDimension, type DimTarget } from "../sketchTools";
@@ -92,18 +91,28 @@ function sketchPair(selection: Selection[], scene: Scene): Pair | undefined {
 
 type ExactRef = MeasureRequest["refs"][number];
 
-const exact = (pick: Selection): pick is ExactRef =>
-  measurable(pick) || pick.kind === "body";
+export function measureRef(pick: Selection): ExactRef | undefined {
+  switch (pick.kind) {
+    case "body":
+      return { kind: "body", bodyId: pick.bodyId };
+    case "face":
+      return { kind: "face", bodyId: pick.bodyId, faceName: pick.faceName };
+    case "edge":
+      return { kind: "edge", bodyId: pick.bodyId, edgeName: pick.edgeName };
+    case "vertex":
+      return {
+        kind: "vertex",
+        bodyId: pick.bodyId,
+        vertexName: pick.vertexName,
+      };
+  }
+}
 
 function exactRefs(selection: Selection[]): ExactRef[] | null {
-  const refs = selection.filter(exact);
+  const refs = selection.flatMap((pick) => measureRef(pick) ?? []);
   if (selection.length === 2 && refs.length === 2) return refs;
   const summed = refs.filter((r) => r.kind === "face" || r.kind === "body");
   return summed.length > 0 ? summed : null;
-}
-
-function formatPower(mm: number, units: Units, power: 2 | 3): string {
-  return `${formatLength(mm / UNIT_TO_MM[units] ** (power - 1), units)}${power === 2 ? "²" : "³"}`;
 }
 
 function total(
@@ -202,7 +211,9 @@ export function useSelectionMeasures(): string[] {
         : evaluation?.sketches.find((s) => s.featureId === id)?.entities,
   };
   const wanted =
-    bodies === evaluation?.bodies && active?.id !== "inspect.measure"
+    bodies === evaluation?.bodies &&
+    active?.id !== "inspect.measure" &&
+    active?.id !== "module.pick"
       ? exactRefs(selection)
       : null;
   const over = (wanted?.length ?? 0) > MEASURE_MAX_REFS;

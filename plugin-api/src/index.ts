@@ -6,6 +6,8 @@ import type {
   FaceRef as CoreFaceRef,
   FeatureStatus,
   Health,
+  MeasureRequest,
+  MeasureResult,
   PathParams,
   Route,
   SettingDefinition,
@@ -32,7 +34,7 @@ export type {
 
 export { StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.9.0";
+export const PLUGIN_API_VERSION = "0.10.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -310,15 +312,29 @@ export interface OpenProject {
 
 export type ProjectRoute = Route<`/projects/:id/${string}`>;
 
+export type PickRef = MeasureRequest["refs"][number];
+
+export interface PickMode {
+  command: string;
+  kinds: readonly PickRef["kind"][];
+  hint: string;
+  onPick(ref: PickRef | null): void;
+  onEnd?(): void;
+}
+
 export interface ProjectView {
   get(): OpenProject;
   selection(): readonly FaceRef[];
+  picks(): readonly PickRef[];
+  select(refs: readonly PickRef[]): void;
+  pick(mode: PickMode): Dispose;
   subscribe(listener: () => void): Dispose;
   read<R extends ProjectRoute>(
     route: R,
     params: Omit<PathParams<R["path"]>, "id">,
   ): Promise<RouteResponse<R>>;
   mutate<R extends ProjectRoute>(route: R, body: RouteBody<R>): Promise<void>;
+  measure(refs: readonly PickRef[]): Promise<MeasureResult>;
 }
 
 export type ContextMenuItem = {
@@ -355,6 +371,7 @@ export interface ClientUi {
   NumField: ComponentType<NumberFieldProps>;
   LengthField: ComponentType<NumberFieldProps & { label: string }>;
   AngleField: ComponentType<NumberFieldProps & { label: string }>;
+  useFormatLength(): (mm: number, power?: 2 | 3) => string;
   SelectField<T extends string>(props: {
     label: string;
     value: T;

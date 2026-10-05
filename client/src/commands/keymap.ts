@@ -1,5 +1,5 @@
 import { createRegistry } from "@rockett/shared";
-import { activeCommand } from "./active";
+import { activeCommand, activeOwner } from "./active";
 import type { ViewportRef } from "../viewportRef";
 import { getSetting, useSetting } from "../settings";
 import { useStore } from "../store";
@@ -291,7 +291,7 @@ export function handleKey(e: KeyEvent, viewport?: ViewportRef): void {
     const binding = bindings.find(
       (b) =>
         (b.context === context ||
-          (b.command.id === s.active?.id &&
+          (b.command.id === activeOwner(s) &&
             context === activeCommand(s)?.keyContext)) &&
         b.chords.includes(chord) &&
         runnable(b.command, s),

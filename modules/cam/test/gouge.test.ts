@@ -367,6 +367,10 @@ function project(floor: number, top: unknown, tolerance?: number): ProjectView {
     get: () => open,
     subscribe: () => () => {},
     selection: () => [],
+    picks: () => [],
+    select() {},
+    pick: () => () => {},
+    measure: () => Promise.reject(new Error("measure is not used here")),
     read: (async (
       route: { path: string },
       params: { operationId?: string; tolerance?: string },
