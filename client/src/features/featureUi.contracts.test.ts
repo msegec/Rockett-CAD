@@ -352,6 +352,27 @@ const extrudes: Feature[] = [
     direction: "reverse",
     operation: "newBody",
   },
+  {
+    ...base,
+    id: "ex10",
+    type: "extrude",
+    profiles: [prof],
+    distance: 10,
+    startObject: { kind: "construction", featureId: "cp1" },
+    direction: "symmetric",
+    operation: "newBody",
+  },
+  {
+    ...base,
+    id: "ex11",
+    type: "extrude",
+    profiles: [prof],
+    distance: 10,
+    startObject: { kind: "face", face: face("b1", "f3") },
+    extent: { kind: "toObject", object: { kind: "origin", plane: "XY" } },
+    direction: "normal",
+    operation: "join",
+  },
 ];
 
 it.each(extrudes.map((f) => [f.id, f] as const))(
@@ -372,6 +393,11 @@ it.each([
     [{ kind: "profile", ...prof }],
     { distance: 0 },
     "Extrude distance must be non-zero",
+  ],
+  [
+    [{ kind: "profile", ...prof }],
+    { start: "object" },
+    "Select a plane or planar face to start on",
   ],
 ] as const)("extrude refuses %j with %j", (selection, params, error) => {
   useStore.setState({ document: lineDocument() });

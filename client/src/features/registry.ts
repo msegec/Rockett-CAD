@@ -57,6 +57,8 @@ export type SharedInputParams = InputParams<{
   radius: number;
   activeSet: number;
   between: Selection[];
+  start: "profile" | "offset" | "object";
+  startObject: Selection[];
   extent: "distance" | "toObject" | "all";
   extentObject: Selection[];
   thickness: number;

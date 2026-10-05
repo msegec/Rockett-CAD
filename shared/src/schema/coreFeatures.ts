@@ -286,6 +286,7 @@ const extrude = profilesOrFaces(
       Type.Number({ minimum: 0, maximum: MAX_DIM, parameterUnit: "mm" }),
     ),
     startOffset: Type.Optional(coordinate),
+    startObject: Type.Optional(planeRef),
     extent: Type.Optional(
       Type.Union([
         Type.Object({ kind: Type.Literal("all") }),

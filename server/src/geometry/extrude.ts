@@ -54,6 +54,15 @@ const startsInside = (bodyId: string) =>
   `the profile starts inside body ${bodyId}; move it or use Distance`;
 const misses = (bodyId: string) =>
   `the profile does not fully meet body ${bodyId}`;
+const START_PARALLEL =
+  "the Start object is parallel to the extrude direction; pick a plane the profile can reach";
+const MEETS_START =
+  "the To object plane meets the Start object over the profile; pick planes apart there";
+
+interface Plane {
+  origin: Vec3;
+  normal: Vec3;
+}
 
 interface Source {
   pf: ProfileFace;
@@ -83,11 +92,13 @@ export function evalExtrude(state: EvalState, f: ExtrudeFeature) {
     sources.push({ ...faceProfile(state, ref), copy: true });
 
   const tools = sources.map((s) =>
-    !to
-      ? prismTool(state, f, s)
-      : to.kind === "body"
-        ? bodyTool(state, f, to.bodyId, s)
-        : planeTool(state, f, to, s),
+    f.startObject
+      ? startTool(state, f, f.startObject, s)
+      : !to
+        ? prismTool(state, f, s)
+        : to.kind === "body"
+          ? bodyTool(state, f, to.bodyId, s)
+          : planeTool(state, f, to, s),
   );
   return applyProfileTools(
     state,
@@ -188,6 +199,7 @@ function clipAtPlane(
   origin: Vec3,
   toProfile: Vec3,
   featureId: string,
+  cap: "start" | "end" = "end",
 ): ToolResult {
   const k = getKernel();
   const box = bboxOf(prism.shape, false);
@@ -214,14 +226,18 @@ function clipAtPlane(
   if (!op.IsDone()) throw new Error("trimming at the To object plane failed");
   return namedResult(
     op,
-    [prism, { shape: halfSpace, names: endNames(halfSpace, featureId) }],
+    [prism, { shape: halfSpace, names: endNames(halfSpace, featureId, cap) }],
     featureId,
   );
 }
 
-function endNames(shape: Shape, featureId: string) {
+function endNames(
+  shape: Shape,
+  featureId: string,
+  cap: "start" | "end" = "end",
+) {
   const names = new NameMap(namingVersion());
-  for (const face of facesOf(shape)) names.set(face, capName(featureId, "end"));
+  for (const face of facesOf(shape)) names.set(face, capName(featureId, cap));
   return names;
 }
 
@@ -245,26 +261,177 @@ function bodyTool(
   const length = (side > 0 ? hi : -lo) + TO_OBJECT_MARGIN;
   const prism = buildPrism(f.id, s.pf, n, length, offset * side, s.copy);
   const near = start * side;
+  return stopAtBody(
+    f.id,
+    prism,
+    body.shape,
+    bodyId,
+    (p) => along(p, n)[0] - near <= LINEAR_TOL,
+    (p) => along(p, n)[1] - near >= length - LINEAR_TOL,
+  );
+}
+
+function stopAtBody(
+  featureId: string,
+  prism: ToolResult,
+  body: Shape,
+  bodyId: string,
+  atStart: (piece: Shape) => boolean,
+  atFar: (piece: Shape) => boolean,
+): ToolResult {
   const cut = kernelCall("extrude to object", () => {
-    const op = cutOperation(prism.shape, body.shape);
+    const op = cutOperation(prism.shape, body);
     if (!op.IsDone()) throw new Error("cutting at the To object body failed");
-    const pieces = solids(acquire(op.Shape())).filter(
-      (p) => along(p, n)[0] - near <= LINEAR_TOL,
-    );
+    const pieces = solids(acquire(op.Shape())).filter(atStart);
     if (pieces.length !== 1) return { error: startsInside(bodyId) };
     const piece = pieces[0]!;
-    if (along(piece, n)[1] - near >= length - LINEAR_TOL)
-      return { error: misses(bodyId) };
+    if (atFar(piece)) return { error: misses(bodyId) };
     const names = propagateNames(
       op,
-      [prism, { shape: body.shape, names: endNames(body.shape, f.id) }],
+      [prism, { shape: body, names: endNames(body, featureId) }],
       piece,
-      f.id,
+      featureId,
     );
     return { shape: piece, names };
   });
   if ("error" in cut) throw new Error(cut.error);
   return cut;
+}
+
+function startTool(
+  state: EvalState,
+  f: ExtrudeFeature,
+  object: PlaneRef,
+  s: Source,
+): ToolResult {
+  const frame = resolvePlaneFrame(state, object);
+  const start = {
+    origin: V.add(frame.origin, V.scale(s.n, f.startOffset ?? 0)),
+    normal: frame.normal,
+  };
+  const to = f.extent?.kind === "toObject" ? f.extent.object : null;
+  if (to?.kind === "body") return startToBody(state, f, start, to.bodyId, s);
+  if (to) {
+    const target = resolvePlaneFrame(state, to);
+    const [lo, hi] = gap(
+      s.pf,
+      s.n,
+      facing(start, s.n, START_PARALLEL),
+      facing(target, s.n, PARALLEL),
+    );
+    if (lo <= LINEAR_TOL && hi >= -LINEAR_TOL) throw new Error(MEETS_START);
+    const n = V.scale(s.n, lo > 0 ? 1 : -1);
+    return between(
+      f,
+      s,
+      n,
+      facing(start, n, START_PARALLEL),
+      facing(target, n, PARALLEL),
+    );
+  }
+  if (f.extent?.kind === "all" && f.direction === "symmetric")
+    return prismTool(state, f, s);
+  const sgn = (f.direction === "reverse" ? -1 : 1) * (f.distance < 0 ? -1 : 1);
+  const n = V.scale(s.n, sgn);
+  const plane = facing(start, n, START_PARALLEL);
+  const [ahead, behind] = spans(state, f, s.pf, n, 0);
+  const lower = shifted(plane, n, -behind);
+  if (f.extent?.kind !== "all")
+    return between(f, s, n, lower, shifted(plane, n, ahead));
+  if (!(ahead > tRange(s.pf, n, plane)[1] + LINEAR_TOL))
+    throw new Error(NOTHING_AHEAD);
+  return between(f, s, n, lower, ahead);
+}
+
+function startToBody(
+  state: EvalState,
+  f: ExtrudeFeature,
+  start: Plane,
+  bodyId: string,
+  s: Source,
+): ToolResult {
+  const body = state.bodies.get(bodyId);
+  if (!body) throw new Error(missing(bodyId));
+  const plane = facing(start, s.n, START_PARALLEL);
+  const [lo, hi] = along(body.shape, plane.normal, plane.origin);
+  if (Math.abs(lo + hi) / 2 <= LINEAR_TOL) throw new Error(level(bodyId));
+  const n = V.scale(s.n, lo + hi > 0 ? 1 : -1);
+  const lower = facing(start, n, START_PARALLEL);
+  const far =
+    along(body.shape, n)[1] - along(s.pf.face, n)[0] + TO_OBJECT_MARGIN;
+  if (!(far > tRange(s.pf, n, lower)[1] + LINEAR_TOL))
+    throw new Error(misses(bodyId));
+  const prism = between(f, s, n, lower, far);
+  const end = along(prism.shape, n)[1];
+  return stopAtBody(
+    f.id,
+    prism,
+    body.shape,
+    bodyId,
+    (p) => along(p, lower.normal, lower.origin)[0] <= LINEAR_TOL,
+    (p) => along(p, n)[1] >= end - LINEAR_TOL,
+  );
+}
+
+function facing(plane: Plane, n: Vec3, parallel: string): Plane {
+  const k = V.dot(n, plane.normal);
+  if (Math.abs(k) < UNIT_DOT_TOL) throw new Error(parallel);
+  return k > 0 ? plane : { ...plane, normal: V.scale(plane.normal, -1) };
+}
+
+function shifted(plane: Plane, n: Vec3, t: number): Plane {
+  return { ...plane, origin: V.add(plane.origin, V.scale(n, t)) };
+}
+
+function tRange(pf: ProfileFace, n: Vec3, plane: Plane): [number, number] {
+  const k = V.dot(n, plane.normal);
+  const [lo, hi] = along(pf.face, plane.normal, plane.origin);
+  return [-hi / k, -lo / k];
+}
+
+function gap(
+  pf: ProfileFace,
+  n: Vec3,
+  lower: Plane,
+  upper: Plane,
+): [number, number] {
+  const kl = V.dot(n, lower.normal);
+  const ku = V.dot(n, upper.normal);
+  const w = V.sub(V.scale(lower.normal, 1 / kl), V.scale(upper.normal, 1 / ku));
+  const c =
+    V.dot(upper.normal, upper.origin) / ku -
+    V.dot(lower.normal, lower.origin) / kl;
+  const size = V.norm(w);
+  if (size < LINEAR_TOL) return [c, c];
+  const [lo, hi] = along(pf.face, V.scale(w, 1 / size));
+  return [c + size * lo, c + size * hi];
+}
+
+function between(
+  f: ExtrudeFeature,
+  s: Source,
+  n: Vec3,
+  lower: Plane,
+  upper: Plane | number,
+): ToolResult {
+  const base = tRange(s.pf, n, lower)[0] - TO_OBJECT_MARGIN;
+  const end =
+    typeof upper === "number"
+      ? upper
+      : tRange(s.pf, n, upper)[1] + TO_OBJECT_MARGIN;
+  const prism = buildPrism(f.id, s.pf, n, end - base, base, s.copy);
+  return kernelCall("extrude from object", () => {
+    const started = clipAtPlane(
+      prism,
+      lower.origin,
+      lower.normal,
+      f.id,
+      "start",
+    );
+    return typeof upper === "number"
+      ? started
+      : clipAtPlane(started, upper.origin, V.scale(upper.normal, -1), f.id);
+  });
 }
 
 export function evalEmboss(state: EvalState, f: EmbossFeature) {

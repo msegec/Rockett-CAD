@@ -659,12 +659,26 @@ owns this and runs after the save's evaluation. Evaluation never writes `sig`.
   and Symmetric or Two sided is refused. The new end face is
   `f:{featureId}:cap:end`. The spec registers the object at `/extent/object`
   or `/extent/object/bodyId`, so the reference lifecycle and repair reach it.
+- `startObject` (schema 42) follows Fusion's Start Object: a `PlaneRef`,
+  extended as an infinite plane, that the solid starts on instead of the
+  profile plane. Absent is Profile plane, or Offset when `startOffset` is
+  set, and evaluates as before. The profile is projected along its normal
+  onto the plane, so on a slanted plane the start face lies on it and a
+  Distance end face is the start plane moved by the distance. `startOffset`
+  still moves the start along the profile normal. Every extent combines
+  with it: Distance, Symmetric and Two sided measure from the plane; All
+  runs from it through the farthest body (Symmetric All ignores it); To
+  object runs between it and the target plane in whichever order they lie,
+  or from it to a body. The new start face is `f:{featureId}:cap:start`.
+  The spec registers it at `/startObject`, as for the extent object.
 - Refusals: a plane parallel to the direction, a plane crossing or touching
   the profile, a body level with the profile, a profile starting inside the
   body, a profile that does not fully meet the body, and All with no body
-  ahead. Evaluation: `server/src/geometry/extrude.ts`.
-- Not yet: a start object, taper angles and thin walls (PAR-013 remainder),
-  and To object on a curved face.
+  ahead. With a start object: a start plane parallel to the direction, and
+  a To object plane meeting it over the profile. Evaluation:
+  `server/src/geometry/extrude.ts`.
+- Not yet: taper angles and thin walls (PAR-013 remainder), and a start or
+  To object on a curved face.
 
 ## Tool targets
 

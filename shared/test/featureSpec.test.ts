@@ -228,6 +228,19 @@ const cases: Record<string, SpecCase> = {
         direction: "symmetric",
         operation: "cut",
       },
+      {
+        ...meta,
+        type: "extrude",
+        profiles: [refProfile("p1")],
+        distance: 5,
+        startObject: { kind: "construction", featureId: "ref:plane" },
+        extent: {
+          kind: "toObject",
+          object: { kind: "face", face: refFace("F2") },
+        },
+        direction: "normal",
+        operation: "join",
+      },
     ],
     invalid: [
       [

@@ -267,6 +267,7 @@ export interface ExtrudeFeature extends ToolFeatureBase {
   distance: number;
   distance2?: number;
   startOffset?: number;
+  startObject?: PlaneRef;
   extent?: ExtrudeExtent;
   direction: "normal" | "reverse" | "symmetric" | "twoSided";
   operation: BooleanOperation;

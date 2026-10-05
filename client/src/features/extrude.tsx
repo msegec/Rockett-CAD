@@ -58,21 +58,34 @@ export type ExtrudeParams = InputParams<
     | "targets"
   >
 > &
-  Pick<SharedInputParams, "extent" | "extentObject"> & {
+  Pick<
+    SharedInputParams,
+    "start" | "startObject" | "extent" | "extentObject"
+  > & {
     autoOperation?: boolean | undefined;
   };
 
-const objectPlane = planar("extentObject", true);
+const objectInput = (
+  key: "startObject" | "extentObject",
+  more: readonly string[],
+): PickInput => {
+  const plane = planar(key, true);
+  return {
+    ...plane,
+    providers: [...plane.providers, ...more],
+    optional: true,
+    param: {
+      read: (s) => featureParams(s)[key] ?? [],
+      write: (next) => setFeatureParams({ [key]: next }),
+    },
+  };
+};
 
-const extentObject = {
-  ...objectPlane,
-  providers: [...objectPlane.providers, "design.body"],
-  optional: true,
-  param: {
-    read: (s) => featureParams(s).extentObject ?? [],
-    write: (next) => setFeatureParams({ extentObject: next }),
-  },
-} satisfies PickInput;
+const startObject = objectInput("startObject", []);
+const extentObject = objectInput("extentObject", ["design.body"]);
+
+const planePicks = (ref: PlaneRef): Selection[] =>
+  ref.kind === "face" ? [fromRef("face", ref.face)] : [fromRef("plane", ref)];
 
 const objectRef = (picks: Selection[]): PlaneRef | BodyRef | null => {
   const [bodyId] = refsOf(picks, "body");
@@ -84,20 +97,64 @@ const objectPicks = (extent: ExtrudeFeature["extent"]): Selection[] =>
     ? []
     : extent.object.kind === "body"
       ? [fromRef("body", extent.object.bodyId)]
-      : extent.object.kind === "face"
-        ? [fromRef("face", extent.object.face)]
-        : [fromRef("plane", extent.object)];
+      : planePicks(extent.object);
 
 const handle = {
   param: "distance",
   fallback: 10,
 } satisfies FeatureHandleDefinition<ExtrudeParams>;
 
-const byDistance = (params: ExtrudeParams) =>
-  (params.extent ?? "distance") === "distance";
+const byDistanceFromPlane = (params: ExtrudeParams) =>
+  (params.extent ?? "distance") === "distance" && startOf(params) !== "object";
 
 const distance = (params: ExtrudeParams) =>
   num(params, handle.param, handle.fallback);
+
+const startOf = (params: ExtrudeParams) =>
+  params.start ?? (num(params, "startOffset", 0) !== 0 ? "offset" : "profile");
+
+const offsetOf = (params: ExtrudeParams) =>
+  startOf(params) === "offset" ? num(params, "startOffset", 0) : 0;
+
+function StartFields({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
+  const units = useSetting("units.length");
+  const start = startOf(params);
+  return (
+    <>
+      <SelectField
+        label="Start"
+        value={start}
+        options={[
+          ["profile", "Profile plane"],
+          ["offset", "Offset"],
+          ["object", "Object"],
+        ]}
+        onChange={(v) => setParams({ start: v })}
+      />
+      {start === "offset" && (
+        <>
+          <LengthField
+            label="Start offset"
+            units={units}
+            value={num(params, "startOffset", 0)}
+            onChange={(v) => setParams({ startOffset: v })}
+            bind="/startOffset"
+          />
+          <div className="field-hint">
+            ± moves the start plane along the profile normal
+          </div>
+        </>
+      )}
+      {start === "object" && (
+        <SelInfo
+          label="Start object"
+          input="startObject"
+          hint="click a plane or planar face to start on"
+        />
+      )}
+    </>
+  );
+}
 
 function ExtrudeForm({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
   const units = useSetting("units.length");
@@ -105,16 +162,7 @@ function ExtrudeForm({ params, setParams }: FeatureFormProps<ExtrudeParams>) {
   return (
     <>
       <SelInfo label="Profiles / faces" input="profiles" hint={profileHint} />
-      <LengthField
-        label="Start offset"
-        units={units}
-        value={num(params, "startOffset", 0)}
-        onChange={(v) => setParams({ startOffset: v })}
-        bind="/startOffset"
-      />
-      <div className="field-hint">
-        0 = start on the sketch / face; ± moves the start plane along its normal
-      </div>
+      <StartFields params={params} setParams={setParams} />
       <SelectField
         label="Extent"
         value={extent}
@@ -219,7 +267,7 @@ function extrudeGizmo({
   label,
 }: FeatureGizmoContext<ExtrudeParams>) {
   const source = extrudeGizmoSource();
-  if (!source || !byDistance(params())) return;
+  if (!source || !byDistanceFromPlane(params())) return;
   if (previewedFeature(useStore.getState())) {
     source.profile = undefined;
     source.faceGhost = undefined;
@@ -230,7 +278,7 @@ function extrudeGizmo({
     source,
     sign() * distance(params()),
     (params().operation ?? "join") === "cut",
-    num(params(), "startOffset", 0),
+    offsetOf(params()),
   );
   let dragging = false;
   return {
@@ -240,7 +288,7 @@ function extrudeGizmo({
     sync() {
       gizmo.setCut((params().operation ?? "join") === "cut");
       if (dragging) return;
-      gizmo.setStartOffset(num(params(), "startOffset", 0));
+      gizmo.setStartOffset(offsetOf(params()));
       const value = Number(params().distance);
       if (Number.isFinite(value)) gizmo.update(sign() * value);
     },
@@ -301,7 +349,7 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
   icon: "⬆",
   title: "Extrude",
   group: "create",
-  picks: [profilesOrFaces, targets, extentObject],
+  picks: [profilesOrFaces, targets, startObject, extentObject],
   Form: ExtrudeForm,
   build: (params, selection) => {
     const stored = storedFeature(params.id);
@@ -310,6 +358,10 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
     if (distance(params) === 0)
       return { error: "Extrude distance must be non-zero" };
     const extent = params.extent ?? "distance";
+    const start = startOf(params);
+    const startPlane = selectedPlane(params.startObject ?? []);
+    if (start === "object" && !startPlane)
+      return { error: "Select a plane or planar face to start on" };
     const object = objectRef(params.extentObject ?? []);
     if (extent === "toObject" && !object)
       return { error: "Select a plane, planar face or body to extrude to" };
@@ -318,7 +370,7 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
       extent === "toObject" && (chosen === "symmetric" || chosen === "twoSided")
         ? "normal"
         : chosen;
-    const startOffset = num(params, "startOffset", 0);
+    const startOffset = offsetOf(params);
     const operation = params.operation ?? "join";
     return {
       id: params.id ?? newId("extrude"),
@@ -331,6 +383,7 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
         distance2: num(params, "distance2", 5),
       }),
       ...((startOffset !== 0 || "startOffset" in stored) && { startOffset }),
+      ...(start === "object" && startPlane && { startObject: startPlane }),
       ...(extent === "all" && { extent: { kind: "all" as const } }),
       ...(extent === "toObject" &&
         object && { extent: { kind: "toObject" as const, object } }),
@@ -347,6 +400,8 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
       distance: f.distance,
       distance2: f.distance2,
       startOffset: f.startOffset ?? 0,
+      start: f.startObject ? "object" : f.startOffset ? "offset" : "profile",
+      startObject: f.startObject ? planePicks(f.startObject) : [],
       extent: f.extent?.kind,
       extentObject: objectPicks(f.extent),
       direction: f.direction,
@@ -361,7 +416,7 @@ export const extrude: FeatureUI<ExtrudeFeature, ExtrudeParams> = {
           extrudeOperation(
             params.direction ?? "normal",
             distance(params),
-            num(params, "startOffset", 0),
+            offsetOf(params),
             num(params, "distance2", 5),
           ),
         ),
