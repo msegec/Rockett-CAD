@@ -42,6 +42,8 @@ import {
 } from "./featureState.js";
 import type { EvalContext } from "./featureKinds.js";
 import { V } from "./frames.js";
+import { meshCutRefused } from "./cutValidation.js";
+import { MESH_LIMITS } from "../tunables.js";
 
 export interface TriangleMesh {
   key: string;
@@ -311,6 +313,13 @@ function lazyBody(bodyId: string, mesh: TriangleMesh): StateBody {
 
 export const namesOf = (body: NamedBody): Iterable<string> =>
   body.mesh?.names ?? body.names.values();
+
+export function cutShape(body: NamedBody): Shape {
+  const triangles = body.mesh?.names.length ?? 0;
+  if (triangles > MESH_LIMITS.cutTriangles)
+    throw new Error(meshCutRefused(triangles, MESH_LIMITS.cutTriangles));
+  return body.shape;
+}
 
 export const boundsOf = (body: NamedBody) =>
   body.mesh?.bbox ?? bboxOf(body.shape);

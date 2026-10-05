@@ -623,7 +623,10 @@ per triangle named `x{n}` as version 2 names unnamed faces, with no edges or
 vertices, and sews into a solid only when a feature, an export or a
 measurement reads its shape. The solid keeps each triangle's name. Version 1
 documents and open or multi-part meshes sew on import. An import over 1,000,000 triangles is
-refused before any meshing, and the import read budget bounds file bytes.
+refused before any meshing, and the import read budget bounds file bytes. A cut
+through a mesh body over `MESH_LIMITS.cutTriangles` triangles, sized from the
+measured kernel heap per triangle and the 4 GiB WASM heap, errors before it
+runs the boolean and keeps the previous body.
 
 ## Naming upgrade
 

@@ -26,6 +26,7 @@ import {
 } from "./kernel.js";
 import { propagateNames, findFace, type NamedBody } from "./naming.js";
 import { removesVolume } from "./cutValidation.js";
+import { cutShape } from "./meshBody.js";
 import { bboxOverlap, zeroThicknessWarning } from "./joinCheck.js";
 import {
   registerBodySolids,
@@ -250,7 +251,7 @@ export function applyToolOperation(
     if (bodies.length === 0)
       throw new Error("cut tool does not intersect any body");
     const warnings = bodies.map((body) => {
-      const op = checkedCut(body.shape, tool.shape, "boolean cut failed");
+      const op = checkedCut(cutShape(body), tool.shape, "boolean cut failed");
       if (!op) return undefined;
       const result = acquire(op.Shape());
       const names = propagateNames(op, [body, tool], result, featureId);
@@ -314,7 +315,7 @@ export function evalCombine(state: EvalState, f: CombineFeature) {
       if (f.operation === "join") {
         op = fuseOperation(current.shape, tool.shape);
       } else if (f.operation === "cut") {
-        op = checkedCut(current.shape, tool.shape, "boolean cut failed");
+        op = checkedCut(cutShape(current), tool.shape, "boolean cut failed");
       } else {
         op = commonOperation(current.shape, tool.shape);
       }

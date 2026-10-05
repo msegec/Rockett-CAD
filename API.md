@@ -597,6 +597,7 @@ package that understates its expanded sizes fails as 400 at evaluation.
 | Import and project file upload, disk  | `ROCKETT_UPLOAD_MAX_MB`, `IMPORT_LIMITS` in `server/src/tunables.ts`                |
 | Import and project file read, heap    | `ROCKETT_IMPORT_BUDGET_MB`, `IMPORT_LIMITS` in `server/src/tunables.ts`             |
 | Mesh import triangles                 | `MAX_MESH_TRIANGLES`, `server/src/geometry/importers.ts`                            |
+| Cut through a mesh body, triangles    | `MESH_LIMITS.cutTriangles`, `server/src/tunables.ts`                                |
 | 3MF expanded package                  | `MAX_3MF_EXPANDED`, `server/src/geometry/read3mf.ts`                                |
 | 3MF component placements              | `MAX_3MF_COMPONENTS`, `server/src/geometry/read3mf.ts`                              |
 | Browser project file                  | `PROJECT_FILE_LIMIT_MB`, `shared/src/projectFile.ts`                                |

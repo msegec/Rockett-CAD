@@ -25,6 +25,9 @@ export const CUT_EMPTY =
 export const CUT_OVERREACH =
   "cut removed more than its tool holds: the kernel dropped part of the body; the previous body has been kept";
 
+export const meshCutRefused = (triangles: number, limit: number) =>
+  `cut through a mesh of ${triangles.toLocaleString("en-US")} triangles needs more memory than the kernel has: a cut can take a mesh of up to ${limit.toLocaleString("en-US")} triangles; the previous body has been kept`;
+
 const SPREAD = [0.5, 0.25, 0.75, 0.1, 0.9];
 
 export function interiorUV(face: Shape, surface: any): [number, number] | null {

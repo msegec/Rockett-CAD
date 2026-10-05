@@ -9,6 +9,8 @@ import {
 } from "@rockett/shared";
 
 const WASM_HEAP_MAX = 4096 * MB;
+const KERNEL_HEAP_START = 100 * MB;
+const CUT_HEAP_PER_MESH_TRIANGLE = 9860;
 const hostMemory = Math.min(
   process.constrainedMemory() || Infinity,
   totalmem(),
@@ -56,6 +58,12 @@ export const HISTORY_LIMITS = {
 
 export const ENGINE_CACHE = {
   bytes: Math.min(hostMemory / 4, WASM_HEAP_MAX / 2),
+} as const;
+
+export const MESH_LIMITS = {
+  cutTriangles: Math.floor(
+    (WASM_HEAP_MAX - KERNEL_HEAP_START) / CUT_HEAP_PER_MESH_TRIANGLE,
+  ),
 } as const;
 
 export const JOB_LIMITS = {
