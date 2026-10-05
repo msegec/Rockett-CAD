@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 import { DEFAULT_PORT } from "../shared/src/routes.ts";
@@ -11,9 +11,66 @@ const alias = {
   ),
 };
 
+const SHARED = ["react", "react/jsx-runtime", "react-dom/client", "three"];
+
+const FACADE = "\0facade:";
+
+function pluginImportMap(): Plugin {
+  return {
+    name: "plugin-import-map",
+    apply: "build",
+    options(options) {
+      const facades = Object.fromEntries(
+        SHARED.map((spec) => [spec.replace("/", "-"), FACADE + spec]),
+      );
+      return {
+        ...options,
+        input: {
+          index: path.resolve(import.meta.dirname, "index.html"),
+          ...facades,
+        },
+        preserveEntrySignatures: "exports-only",
+      };
+    },
+    resolveId(id) {
+      if (id.startsWith(FACADE)) return id;
+    },
+    async load(id) {
+      if (!id.startsWith(FACADE)) return;
+      const spec = id.slice(FACADE.length);
+      const names = Object.keys(await import(spec)).filter(
+        (name) => name !== "module.exports",
+      );
+      return `export { ${names.join(", ")} } from ${JSON.stringify(spec)};`;
+    },
+    transformIndexHtml: {
+      order: "post",
+      handler(_html, { bundle }) {
+        const imports: Record<string, string> = {};
+        for (const chunk of Object.values(bundle ?? {}))
+          if (
+            chunk.type === "chunk" &&
+            chunk.facadeModuleId?.startsWith(FACADE)
+          )
+            imports[chunk.facadeModuleId.slice(FACADE.length)] =
+              `/${chunk.fileName}`;
+        return [
+          {
+            tag: "script",
+            attrs: { type: "importmap" },
+            children: JSON.stringify({ imports }),
+            injectTo: "head-prepend",
+          },
+        ];
+      },
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
+    pluginImportMap(),
     {
       name: "paint-bg0",
       transformIndexHtml() {

@@ -3,6 +3,7 @@ import express, {
   type Express,
   type Router,
 } from "express";
+import { createHash } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { Server } from "node:http";
@@ -92,6 +93,20 @@ function serveClient(clientDir: string): Router {
   return router;
 }
 
+const IMPORT_MAP = /<script\b[^>]*\btype=["']?importmap\b[^>]*>/i;
+
+async function scriptSources(clientDir: string | undefined) {
+  if (!clientDir) return "'self'";
+  const index = path.join(clientDir, "index.html");
+  const [, ...maps] = (await readFile(index, "utf8")).split(IMPORT_MAP);
+  if (maps.length === 0) return "'self'";
+  const map =
+    maps.length === 1 ? maps[0]?.match(/^([^]*?)<\/script>/i)?.[1] : undefined;
+  if (map === undefined)
+    throw new Error(`${index} has an import map the CSP cannot hash`);
+  return `'self' 'sha256-${createHash("sha256").update(map).digest("base64")}'`;
+}
+
 const answerError: ErrorRequestHandler = (err: unknown, req, res, _next) => {
   const status =
     typeof err === "object" &&
@@ -161,6 +176,7 @@ export async function createApp({
   trustProxy = trustProxyConfig(process.env.ROCKETT_TRUST_PROXY),
   meshDir,
 }: AppDeps): Promise<{ app: Express; sweep: () => Promise<void> }> {
+  const scriptSrc = await scriptSources(clientDir);
   await store.uploads.empty();
   const app = express();
   const projects = new ProjectQueue();
@@ -170,8 +186,7 @@ export async function createApp({
   app.set("trust proxy", trustProxy);
   app.use((_req, res, next) => {
     res.set({
-      "Content-Security-Policy":
-        "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+      "Content-Security-Policy": `default-src 'none'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "same-origin",
       "X-Frame-Options": "DENY",
