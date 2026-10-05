@@ -92,6 +92,38 @@ function on(s: BoardSegment, p: BoardPoint) {
   );
 }
 
+export type BoardBounds = { min: BoardPoint; max: BoardPoint };
+
+export function segmentBounds(segment: BoardSegment): BoardBounds {
+  validateSegment(segment);
+  const points = [segment.from, segment.to];
+  if (segment.kind === "arc") {
+    const radius = gap(segment.from, segment.centre);
+    for (const [dx, dy] of [
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+      [0, -1],
+    ] as const) {
+      const point: BoardPoint = [
+        finite(segment.centre[0] + dx * radius),
+        finite(segment.centre[1] + dy * radius),
+      ];
+      if (on(segment, point)) points.push(point);
+    }
+  }
+  return {
+    min: [
+      Math.min(...points.map((p) => p[0])),
+      Math.min(...points.map((p) => p[1])),
+    ],
+    max: [
+      Math.max(...points.map((p) => p[0])),
+      Math.max(...points.map((p) => p[1])),
+    ],
+  };
+}
+
 type Line = Extract<BoardSegment, { kind: "line" }>;
 type Arc = Extract<BoardSegment, { kind: "arc" }>;
 type Collision = { points: BoardPoint[]; overlap: boolean };
