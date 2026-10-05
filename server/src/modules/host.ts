@@ -8,7 +8,6 @@ import {
 } from "@rockett/plugin-api";
 import {
   createRegistry,
-  featureModule,
   moduleEnabledSetting,
   moduleHostSettings,
   parseManifest,
@@ -40,10 +39,11 @@ import {
   moduleBodies,
   type BodyKernel,
 } from "./bodies.js";
+import { checkModuleType } from "./features.js";
 import { moduleFiles } from "./files.js";
 import { provideService } from "./services.js";
 
-type Kernel = Pick<KernelClient, "moduleJob"> & BodyKernel;
+type Kernel = Pick<KernelClient, "moduleJob" | "installFeatures"> & BodyKernel;
 
 declare const KERNEL_BUNDLES: Readonly<Record<string, string>>;
 
@@ -89,21 +89,14 @@ function registerExtensionSpecOwned(
   moduleId: string,
 ): ServerRegister["extensionSpec"] {
   return (spec) => {
-    if (!spec.type.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(spec.type))
-      throw new Error(
-        `extension spec ${spec.type} must start with ${moduleId}. and name a valid id`,
-      );
-    if (featureModule(spec.type) !== moduleId)
-      throw new Error(
-        `extension spec ${spec.type} must belong to module ${moduleId}`,
-      );
+    checkModuleType(moduleId, spec.type, "extension spec");
     const dispose = registerExtensionSpec(spec);
     own.push(dispose);
     return dispose;
   };
 }
 
-function registrars(own: Dispose[], manifest: ModuleManifest) {
+function registrars(own: Dispose[], manifest: ModuleManifest, kernel: Kernel) {
   const moduleId = manifest.id;
   const track =
     <A extends unknown[]>(register: (...args: A) => Dispose) =>
@@ -124,6 +117,14 @@ function registrars(own: Dispose[], manifest: ModuleManifest) {
       kernelJob: track((id: string, entry: URL) =>
         registerKernelJob(moduleId, id, entry),
       ),
+      async timelineFeatures(entry: URL) {
+        const dispose = await kernel.installFeatures({
+          moduleId,
+          entry: jobEntry(moduleId, entry),
+        });
+        own.push(dispose);
+        return dispose;
+      },
       setting: track((definition: SettingDefinition) =>
         registerModuleSetting(manifest, definition),
       ),
@@ -223,7 +224,7 @@ async function load(
     const { id } = check.manifest;
     const { storage } = store.documents.options;
     await module.server.activate({
-      ...registrars(own, check.manifest),
+      ...registrars(own, check.manifest, kernel),
       startKernelJob: starter(id, kernel),
       userData: moduleUserData(storage, id),
       files: moduleFiles(storage, id),

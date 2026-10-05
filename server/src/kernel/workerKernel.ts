@@ -11,6 +11,7 @@ import type { Sources } from "../geometry/importers.js";
 import type { ImportUpload } from "../api/importers.js";
 import type { EvaluateHooks } from "../geometry/engine.js";
 import type { CrashFeature } from "../geometry/resolve.js";
+import type { FeatureBundle } from "../modules/features.js";
 import { jobContext, type Job } from "./jobs.js";
 import type {
   ExportJob,
@@ -69,6 +70,7 @@ export class WorkerKernel implements KernelClient {
   private readonly quarantined = new Map<string, CrashFeature[]>();
   private restartTimes: number[] = [];
   private closed = false;
+  private readonly bundles = new Set<FeatureBundle>();
 
   constructor(
     private readonly store: Pick<ProjectStore, "sources">,
@@ -186,6 +188,8 @@ export class WorkerKernel implements KernelClient {
       case "ready":
         this.kernelVersion = message.version;
         this.restarting = false;
+        if (this.bundles.size)
+          this.call("features", [[...this.bundles]]).catch(() => undefined);
         return;
       case "ask":
         void this.answer(message.id, message.held).catch((error: unknown) => {
@@ -453,6 +457,18 @@ export class WorkerKernel implements KernelClient {
         check();
       },
     );
+  }
+
+  async installFeatures(bundle: FeatureBundle) {
+    const sync = () => this.call("features", [[...this.bundles]]);
+    this.bundles.add(bundle);
+    await sync().catch((error: unknown) => {
+      this.bundles.delete(bundle);
+      throw error;
+    });
+    return () => {
+      if (this.bundles.delete(bundle)) sync().catch(() => undefined);
+    };
   }
 
   drop(docId: string) {

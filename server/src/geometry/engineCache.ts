@@ -39,6 +39,9 @@ export function lruEngines<T extends CachedEngine>(
       engines.get(docId)?.invalidate();
       engines.delete(docId);
     },
+    clear(): void {
+      for (const docId of engines.keys()) cache.drop(docId);
+    },
   };
   return cache;
 }

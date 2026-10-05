@@ -15,6 +15,7 @@ import {
   finalizeNames,
   findFace,
   geometryName,
+  namingVersion,
   type NameMap,
   type NamedBody,
 } from "./naming.js";
@@ -144,3 +145,8 @@ export function geometryNames(shape: Shape, featureId: string): NameMap {
     return finalizeNames(shape, provisional, featureId);
   });
 }
+
+export const sourceNames = (shape: Shape, featureId: string): NameMap =>
+  namingVersion() === 1
+    ? finalizeNames(shape, new ShapeMap(), featureId)
+    : geometryNames(shape, featureId);

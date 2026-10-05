@@ -48,6 +48,11 @@ import { planNamingUpgrade } from "../geometry/upgradeNaming.js";
 import { tangentEdges } from "../geometry/tangentEdges.js";
 import { sizeLimit } from "../geometry/sizeLimit.js";
 import type { Sources } from "../geometry/importers.js";
+import {
+  installFeatureBundle,
+  synchronous,
+  type FeatureBundle,
+} from "../modules/features.js";
 import { importers, importFile, type ImportUpload } from "../api/importers.js";
 import {
   EXPORT_QUALITY,
@@ -143,6 +148,7 @@ export interface KernelClient {
     input: unknown,
     hooks?: EvaluateHooks,
   ): Promise<unknown>;
+  installFeatures(bundle: FeatureBundle): Promise<() => void>;
   drop(docId: string): void;
   version(): Health["kernelVersion"];
   status(): Health["kernel"];
@@ -444,32 +450,24 @@ export class InProcessKernel implements KernelClient {
     if (typeof job !== "function")
       throw new Error(`${entry} has no kernel job ${id}`);
     const oc = getKernel();
-    return scoped((own) => {
-      const result: unknown = job(input as never, {
-        oc,
-        own,
-        progress(done, total, label) {
-          if (hooks.shouldStop?.())
-            throw new Error(`kernel job ${id} cancelled`);
-          hooks.onProgress?.(done, total, label);
-        },
-      });
-      if (
-        result instanceof Object &&
-        typeof Reflect.get(result, "then") === "function"
-      ) {
-        Promise.resolve(result).catch((error: unknown) =>
-          console.error(
-            `[rockett] kernel job ${id} failed after it was refused`,
-            error,
-          ),
-        );
-        throw new Error(
-          `kernel job ${id} must return synchronously, not a promise`,
-        );
-      }
-      return result;
-    });
+    return scoped((own) =>
+      synchronous<unknown>(
+        job(input as never, {
+          oc,
+          own,
+          progress(done, total, label) {
+            if (hooks.shouldStop?.())
+              throw new Error(`kernel job ${id} cancelled`);
+            hooks.onProgress?.(done, total, label);
+          },
+        }),
+        `kernel job ${id}`,
+      ),
+    );
+  }
+
+  installFeatures(bundle: FeatureBundle) {
+    return installFeatureBundle(bundle, false);
   }
 
   drop(docId: string) {

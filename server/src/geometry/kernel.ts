@@ -14,7 +14,11 @@ export type Shape = any; // TopoDS_Shape
 
 let oc: OC | null = null;
 let range: any = null;
-let cancel: { indicator: any; owner: HandleScope } | null = null;
+let cancel: {
+  indicator: any;
+  owner: HandleScope;
+  isCancelled: () => boolean;
+} | null = null;
 let initPromise: Promise<OC> | null = null;
 
 export async function initKernel(): Promise<OC> {
@@ -259,6 +263,8 @@ export function progress(): any {
   return cancel.owner.acquire(cancel.indicator.Start());
 }
 
+export const cancelRequested = (): boolean => cancel?.isCancelled() ?? false;
+
 export function cancellable<T>(
   isCancelled: (() => boolean) | undefined,
   fn: () => T,
@@ -269,6 +275,7 @@ export function cancellable<T>(
   const scope = {
     indicator: owner.acquire(new (getKernel().CancelIndicator)(isCancelled)),
     owner,
+    isCancelled,
   };
   cancel = scope;
   let failed = false;

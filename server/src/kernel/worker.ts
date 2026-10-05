@@ -9,6 +9,7 @@ import {
   engineFor,
   type EvaluateHooks,
 } from "../geometry/engine.js";
+import { installFeatureBundle } from "../modules/features.js";
 import { InProcessKernel } from "./client.js";
 import {
   fromWire,
@@ -31,6 +32,7 @@ const post = (message: FromWorker, transfer: Transferable[] = []) =>
   port.postMessage(message, transfer);
 
 const asks = new Map<number, (settled: Settled<Payload>) => void>();
+const installed = new Map<string, () => void>();
 
 let busy = 0;
 const waiting: Array<() => void> = [];
@@ -117,6 +119,27 @@ const RUN: {
   planNamingUpgrade: (id, ...args) => kernelFor(id).planNamingUpgrade(...args),
   moduleJob: (id, entry, job, input, stop) =>
     kernelFor(id).moduleJob(entry, job, input, reporting(id, stop)),
+  async features(_id, bundles) {
+    const wanted = new Map(
+      bundles.map((bundle) => [
+        JSON.stringify([bundle.moduleId, bundle.entry]),
+        bundle,
+      ]),
+    );
+    for (const [key, dispose] of installed)
+      if (!wanted.has(key)) {
+        installed.delete(key);
+        dispose();
+      }
+    const failures: unknown[] = [];
+    for (const [key, bundle] of wanted)
+      if (!installed.has(key))
+        await installFeatureBundle(bundle, true).then(
+          (dispose) => installed.set(key, dispose),
+          (error: unknown) => failures.push(error),
+        );
+    if (failures.length) throw failures[0];
+  },
 };
 
 const TRANSFER: {
@@ -133,6 +156,8 @@ const booted = initKernel().then(() =>
   post({ type: "ready", version: kernelVersion() }),
 );
 
+let installing: Promise<unknown> = Promise.resolve();
+
 async function serve({ id, method, args }: Call) {
   busy++;
   await booted;
@@ -142,8 +167,10 @@ async function serve({ id, method, args }: Call) {
   ) => Promise<Calls[Method]["result"]>;
   const transfer = TRANSFER[method] as
     ((value: Calls[Method]["result"]) => Transferable[]) | undefined;
+  const result = installing.then(() => run(id, ...args));
+  if (method === "features") installing = result.catch(() => undefined);
   try {
-    const value = await run(id, ...args);
+    const value = await result;
     post(
       { type: "reply", id, settled: { ok: true, value } },
       transfer?.(value),

@@ -17,6 +17,7 @@ import { StoreError } from "../store/projectStore.js";
 import type { Sources } from "../geometry/importers.js";
 import type { EvaluateHooks } from "../geometry/engine.js";
 import type { CrashFeature } from "../geometry/resolve.js";
+import type { FeatureBundle } from "../modules/features.js";
 import type {
   ExportJob,
   Imported,
@@ -62,6 +63,7 @@ export interface Calls {
     args: [entry: string, id: string, input: unknown, stop: Int32Array];
     result: unknown;
   };
+  features: { args: [bundles: FeatureBundle[]]; result: void };
 }
 
 export type Method = keyof Calls;

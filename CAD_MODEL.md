@@ -107,7 +107,7 @@ only the Naming upgrade changes a stored version.
 | Mirror or pattern copy, version 1           | `m:{featureId}:{name}`, `p{i}:{featureId}:{name}`       |
 | Mirror or pattern copy, version 2           | `m:{featureId}:{key}{~n}`, `p{i}:{featureId}:{key}{~n}` |
 | Move copy                                   | as the pattern copy with `i` 1                          |
-| STEP, IGES or BREP import face, version 2   | `f:{featureId}:g:{surface}:{key}`                       |
+| STEP, IGES, BREP or module face, version 2  | `f:{featureId}:g:{surface}:{key}`                       |
 | Anything the history cannot attribute       | `f:{featureId}:x{n}`                                    |
 
 - Names follow the kernel history (`propagateNames`, `historyNames`).

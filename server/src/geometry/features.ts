@@ -92,7 +92,7 @@ import { transformCopy } from "./mesh.js";
 import { ShapeMap } from "./shapeMap.js";
 
 import { V, frameFromPlane, offsetFrame, uvTo3d } from "./frames.js";
-import { geometryNames } from "./signature.js";
+import { sourceNames } from "./signature.js";
 import { refreshProjections } from "./projectSource.js";
 import { readImport } from "./importers.js";
 import { placeImport } from "./stepImport.js";
@@ -853,11 +853,7 @@ export function evalImportStep(
   f: ImportStepFeature,
 ): FeatureOutcome | void {
   const read = readImport(f, sources);
-  const names =
-    namingVersion() === 1
-      ? finalizeNames(read.shape, new ShapeMap(), f.id)
-      : geometryNames(read.shape, f.id);
-  return placeImport(state, `b:${f.id}`, read, names);
+  return placeImport(state, `b:${f.id}`, read, sourceNames(read.shape, f.id));
 }
 
 export function evalReferenceImage(
