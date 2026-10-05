@@ -12,7 +12,7 @@ import {
 } from "../src/shared/document.js";
 import { validateProgram, type Program } from "../src/shared/ir.js";
 import { MIN_TOLERANCE } from "../src/shared/params.js";
-import { box, brep, cylinder, oc, startKernel } from "./helpers/kernel.js";
+import { box, brep, cylinder, fuse, startKernel } from "./helpers/kernel.js";
 
 const ENTRY = new URL("../kernel.ts", import.meta.url).href;
 const CENTRE = [30, 30];
@@ -139,14 +139,10 @@ beforeAll(async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "rockett-cam-surface-"));
   dirs.push(dir);
   const boss = brep((own) =>
-    own(
-      own(
-        new oc.BRepAlgoAPI_Fuse_3(
-          box(own, [0, 0, 0], [50, 50, FLOOR]),
-          cylinder(own, [25, 25, FLOOR], [0, 0, 1], 15),
-          own(new oc.Message_ProgressRange_1()),
-        ),
-      ).Shape(),
+    fuse(
+      own,
+      box(own, [0, 0, 0], [50, 50, FLOOR]),
+      cylinder(own, [25, 25, FLOOR], [0, 0, 1], 15),
     ),
   );
   const block = brep((own) => box(own, [0, 0, 0], [50, 50, 24]));

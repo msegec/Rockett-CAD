@@ -57,6 +57,17 @@ export function cut(own: Own, body: Shape, tool: Shape): Shape {
   return own(op.Shape());
 }
 
+export function fuse(own: Own, body: Shape, tool: Shape): Shape {
+  const op = own(
+    new oc.BRepAlgoAPI_Fuse_3(
+      body,
+      tool,
+      own(new oc.Message_ProgressRange_1()),
+    ),
+  );
+  return own(op.Shape());
+}
+
 export function box(own: Own, at: [number, number, number], size: number[]) {
   const corner = own(new oc.gp_Pnt_3(...at));
   return own(
@@ -66,12 +77,18 @@ export function box(own: Own, at: [number, number, number], size: number[]) {
   );
 }
 
-export function cylinder(own: Own, at: number[], axis: number[], r: number) {
+export function cylinder(
+  own: Own,
+  at: number[],
+  axis: number[],
+  r: number,
+  height = 20,
+) {
   const frame = own(
     new oc.gp_Ax2_4(
       own(new oc.gp_Pnt_3(at[0], at[1], at[2])),
       own(new oc.gp_Dir_5(axis[0], axis[1], axis[2])),
     ),
   );
-  return own(own(new oc.BRepPrimAPI_MakeCylinder_3(frame, r, 20)).Shape());
+  return own(own(new oc.BRepPrimAPI_MakeCylinder_3(frame, r, height)).Shape());
 }
