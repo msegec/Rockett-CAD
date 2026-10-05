@@ -30,6 +30,7 @@ export * from "./settings.js";
 export { SETTINGS_IMPORT_MAX_BYTES } from "./settingsRoutes.js";
 export * from "./registry.js";
 export * from "./featureSpec.js";
+export * from "./featureInputs.js";
 import "./features/shell.js";
 import "./features/extrude.js";
 import "./features/revolve.js";

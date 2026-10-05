@@ -75,7 +75,7 @@ release workflow remain under development. The core licence is unresolved.
   import or delete JSON posts and download an AI post kit to adapt an old post.
 - Beginner CAM guide and an example plate project ready to generate.
 - First-party modules with an admin enable switch and per-user visibility.
-  The plugin API 0.11.0 supports commands, toolbars, panels, settings pages,
+  The plugin API 0.12.0 supports commands, toolbars, panels, settings pages,
   routes, scene contributions, kernel jobs, project services, source blobs,
   viewport pick modes, length and angle formatting, measure queries, saved
   module panel positions and the core error line;
@@ -85,7 +85,9 @@ release workflow remain under development. The core licence is unresolved.
   assets in their own namespace; save, history, duplicate and `.rockett` files
   preserve exact bytes without features, including absent or disabled modules.
   Services bind the authorised document, authenticated user and read-only blobs;
-  unload invalidates retained calls.
+  unload invalidates retained calls. Module features can resolve committed
+  extension inputs and source assets; source replacement refreshes warm
+  geometry and CAM fingerprints, and undo restores them.
 
 ### Fixed
 

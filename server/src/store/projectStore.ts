@@ -11,6 +11,7 @@ import {
   type ProjectView,
   type ProjectViewBody,
 } from "@rockett/shared";
+import { imageBlobs, projectSources } from "../modules/featureInputs.js";
 import { UserStore } from "../auth/userStore.js";
 import { build } from "../build.js";
 import { BlobStore, HASH_RE, PendingBlobs, Uploads } from "./blobStore.js";
@@ -38,18 +39,6 @@ export { IMAGE_LIMIT_MB } from "./projectAssets.js";
 const LEGACY = "document.json";
 const DOCUMENTS = "documents";
 const newId = () => crypto.randomBytes(6).toString("hex");
-
-function importBlobs(doc: CadDocument): string[] {
-  return doc.features.flatMap((f) =>
-    f.type === "importStep" || f.type === "importMesh" ? [f.blob] : [],
-  );
-}
-
-function imageBlobs(doc: CadDocument): string[] {
-  return doc.features.flatMap((f) =>
-    f.type === "referenceImage" && HASH_RE.test(f.assetId) ? [f.assetId] : [],
-  );
-}
 
 export class ProjectStore {
   readonly documents: JsonStore<CadDocument, PendingBlobs>;
@@ -437,15 +426,7 @@ export class ProjectStore {
     doc: CadDocument,
     held: ReadonlyMap<string, Uint8Array> = new Map(),
   ): Promise<Map<string, Uint8Array>> {
-    const out = new Map<string, Uint8Array>();
-    for (const hash of importBlobs(doc)) {
-      if (out.has(hash)) continue;
-      const bytes =
-        held.get(hash) ??
-        (await this.blob(doc.id, hash).catch(() => undefined));
-      if (bytes) out.set(hash, bytes);
-    }
-    return out;
+    return projectSources(doc, held, (id, hash) => this.blob(id, hash));
   }
 
   private assetDir(projectId: string): string {

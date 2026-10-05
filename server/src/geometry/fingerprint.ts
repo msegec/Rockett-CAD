@@ -116,7 +116,7 @@ export function bodyFingerprint(
   const { version, commit } = build();
   return sha256(
     JSON.stringify({
-      features: features.map(featureKey),
+      features: features.map((feature) => featureKey(feature, doc, sources)),
       sources: features.flatMap((f) =>
         f.type === "importStep" || f.type === "importMesh"
           ? [source(f.blob)]

@@ -1,3 +1,4 @@
+import { serverRegister } from "./helpers/serverRegister.js";
 import { beforeAll, describe, expect, it } from "vitest";
 import type {
   CadDocument,
@@ -142,14 +143,10 @@ beforeAll(async () => {
   };
   await cam.activate({
     services: { provide: () => () => {} },
-    register: {
-      routeModule: (module) => {
-        module.mount(api);
-        return () => {};
-      },
-      kernelJob: () => () => {},
-      setting: () => () => {},
-    },
+    register: serverRegister((module) => {
+      module.mount(api);
+      return () => {};
+    }),
     startKernelJob: (id: string, input: unknown, run: KernelJobRun = {}) => {
       jobs.push(id);
       return kernel.moduleJob(ENTRY, id, input, {

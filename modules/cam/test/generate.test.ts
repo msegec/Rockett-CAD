@@ -1,3 +1,4 @@
+import { serverRegister } from "./helpers/serverRegister.js";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -314,18 +315,14 @@ async function mounted(r: Awaited<ReturnType<typeof rig>>) {
   const edits = new Map<string, Edit>();
   await cam.activate({
     services: { provide: () => () => {} },
-    register: {
-      routeModule: (module) => {
-        module.mount({
-          projectRoute: (route, read) => edits.set(route.path, read as Edit),
-          userRoute: () => {},
-          projectMutation: (route, edit) => edits.set(route.path, edit as Edit),
-        });
-        return () => {};
-      },
-      kernelJob: () => () => {},
-      setting: () => () => {},
-    },
+    register: serverRegister((module) => {
+      module.mount({
+        projectRoute: (route, read) => edits.set(route.path, read as Edit),
+        userRoute: () => {},
+        projectMutation: (route, edit) => edits.set(route.path, edit as Edit),
+      });
+      return () => {};
+    }),
     startKernelJob: r.context.startKernelJob,
     userData: () => ({ read: async () => null, write: async () => null! }),
     files: r.files,

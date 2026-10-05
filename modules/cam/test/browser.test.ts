@@ -1,3 +1,4 @@
+import { serverRegister } from "./helpers/serverRegister.js";
 import { readFileSync } from "node:fs";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type {
@@ -183,14 +184,10 @@ beforeAll(async () => {
   };
   await cam.activate({
     services: { provide: () => () => {} },
-    register: {
-      routeModule: (module) => {
-        module.mount(api);
-        return () => {};
-      },
-      kernelJob: () => () => {},
-      setting: () => () => {},
-    },
+    register: serverRegister((module) => {
+      module.mount(api);
+      return () => {};
+    }),
     startKernelJob: async (_id: string, input: unknown) => {
       const { id } = (input as { operation: { id: string } }).operation;
       jobs.push(id);

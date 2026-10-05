@@ -344,9 +344,9 @@ module, in load order:
 - `activate` receives `ServerContext` (`plugin-api/src/index.ts`):
   `register`, `services`, `startKernelJob`, `userData`, `files`,
   `kernelVersion`, `bodies` and `signFaces`. `register.routeModule`,
-  `kernelJob` and `setting` take `plugin-api` types; `exporter`, `importer`,
-  `featureKind` and `extensionSpec` take core types. Each call is tracked
-  under one disposer.
+  `kernelJob`, `setting` and `extensionSpec` take `plugin-api` types;
+  `exporter`, `importer` and `featureKind` take core types. Each call is
+  tracked under one disposer.
 - API 0.9.0 adds `services.provide(id, handler)`: the id starts with the
   module id and a dot, and the call returns its tracked disposer. Duplicate
   or invalid ids fail activation and remove the module's earlier
@@ -359,6 +359,21 @@ module, in load order:
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.12.0 types `register.extensionSpec(spec)`. It registers a feature type
+  under the module's id before the type's last dot and infers its params from
+  the schema. Its optional `resolveInputs` receives detached immutable JSON
+  params and only the owning module's committed extension envelope, as
+  `extensions[<moduleId>]`. It returns immutable canonical JSON `identity` and
+  unique SHA-256 `assets`. Inputs and output use the shared module-data byte
+  bound and a nesting bound. Project source delivery checks each unique asset
+  in that project's blob store, including held sources. Missing or corrupt
+  bytes refuse. Geometry keys, implicit-target aliases, crash quarantine and
+  body fingerprints include the same resolved inputs; core keys stay
+  unchanged. The existing evaluator context receives `inputs` without changing
+  saved params. An extension-only replacement invalidates warm geometry and
+  CAM identity; undo restores both. Source delivery and project files resolve
+  named numeric bindings before selecting module assets. No resolved state is
+  saved, and unloading the spec removes its resolver.
 - `register.setting(definition)` takes a `SettingDefinition` whose key
   starts with `plugin.<moduleId>.`, is listed in `contributes.settings` and
   is not a host key, or the load fails naming the key. Settings routes then

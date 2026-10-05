@@ -1,3 +1,4 @@
+import { serverRegister } from "./helpers/serverRegister.js";
 import * as THREE from "three";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type {
@@ -121,18 +122,14 @@ async function surface(
   jobs = [];
   await cam.activate({
     services: { provide: () => () => {} },
-    register: {
-      routeModule: (module) => {
-        module.mount({
-          projectRoute: (r, read) => reads.set(r.path, read as Read),
-          userRoute: () => {},
-          projectMutation: () => {},
-        });
-        return () => {};
-      },
-      kernelJob: () => () => {},
-      setting: () => () => {},
-    },
+    register: serverRegister((module) => {
+      module.mount({
+        projectRoute: (r, read) => reads.set(r.path, read as Read),
+        userRoute: () => {},
+        projectMutation: () => {},
+      });
+      return () => {};
+    }),
     startKernelJob: (id: string, input: unknown) => {
       jobs.push(id);
       return kernel.moduleJob(ENTRY, id, input, { shouldStop: () => false });

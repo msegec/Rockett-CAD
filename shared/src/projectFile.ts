@@ -1,3 +1,7 @@
+import {
+  resolvedFeatureInputs,
+  resolvedModuleInputFeatures,
+} from "./featureInputs.js";
 import { Type } from "typebox";
 import type { ProjectView } from "./api.js";
 import type { CadDocument } from "./model.js";
@@ -22,12 +26,12 @@ export function moduleAssetHashes(doc: CadDocument): string[] {
 export function referencedAssets(doc: CadDocument): Set<string> {
   return new Set([
     ...moduleAssetHashes(doc),
-    ...doc.features.flatMap((f) =>
+    ...resolvedModuleInputFeatures(doc).flatMap((f) =>
       f.type === "referenceImage"
         ? [f.assetId]
         : f.type === "importStep" || f.type === "importMesh"
           ? [f.blob]
-          : [],
+          : [...(resolvedFeatureInputs(f, doc)?.assets ?? [])],
     ),
   ]);
 }

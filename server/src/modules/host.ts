@@ -2,11 +2,13 @@ import {
   PLUGIN_API_VERSION,
   type Dispose,
   type ProjectServiceHandler,
+  type ServerRegister,
   type ServerContext,
   type StartKernelJob,
 } from "@rockett/plugin-api";
 import {
   createRegistry,
+  featureModule,
   moduleEnabledSetting,
   moduleHostSettings,
   parseManifest,
@@ -82,6 +84,25 @@ const starter =
     });
   };
 
+function registerExtensionSpecOwned(
+  own: Dispose[],
+  moduleId: string,
+): ServerRegister["extensionSpec"] {
+  return (spec) => {
+    if (!spec.type.startsWith(`${moduleId}.`) || !REGISTRY_ID.test(spec.type))
+      throw new Error(
+        `extension spec ${spec.type} must start with ${moduleId}. and name a valid id`,
+      );
+    if (featureModule(spec.type) !== moduleId)
+      throw new Error(
+        `extension spec ${spec.type} must belong to module ${moduleId}`,
+      );
+    const dispose = registerExtensionSpec(spec);
+    own.push(dispose);
+    return dispose;
+  };
+}
+
 function registrars(own: Dispose[], manifest: ModuleManifest) {
   const moduleId = manifest.id;
   const track =
@@ -99,7 +120,7 @@ function registrars(own: Dispose[], manifest: ModuleManifest) {
       exporter: track(registerExporter),
       importer: track(registerImporter),
       featureKind: track(registerFeatureKind),
-      extensionSpec: track(registerExtensionSpec),
+      extensionSpec: registerExtensionSpecOwned(own, moduleId),
       kernelJob: track((id: string, entry: URL) =>
         registerKernelJob(moduleId, id, entry),
       ),

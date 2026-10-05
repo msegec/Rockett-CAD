@@ -1,3 +1,4 @@
+import { serverRegister } from "./serverRegister.js";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -202,14 +203,10 @@ beforeAll(async () => {
   };
   const context: ServerContext = {
     services: { provide: () => () => {} },
-    register: {
-      routeModule: (module) => {
-        module.mount(api);
-        return () => {};
-      },
-      kernelJob: () => () => {},
-      setting: () => () => {},
-    },
+    register: serverRegister((module) => {
+      module.mount(api);
+      return () => {};
+    }),
     startKernelJob: async (_id, input) => {
       const { setup: s, operation } = input as {
         setup: { id: string };

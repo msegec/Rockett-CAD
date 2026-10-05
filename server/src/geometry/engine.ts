@@ -44,36 +44,20 @@ import {
 } from "./tessellationCache.js";
 import {
   BlockedFeature,
-  CRASH_BLOCKED_MESSAGE,
+  blockedFeatureIds,
   blockedBodies,
   crashStatus,
   evaluateResolved,
   unresolvedRefs,
   type CrashFeature,
 } from "./resolve.js";
+import {
+  checkedFeatureInputs,
+  featureKey,
+  featureKeys,
+} from "../modules/featureInputs.js";
 
-function blockedFeatureIds(
-  doc: CadDocument,
-  statuses: FeatureStatus[],
-  quarantine: CrashFeature[],
-) {
-  const ids = new Set(
-    statuses
-      .filter((status) => status.error === CRASH_BLOCKED_MESSAGE)
-      .map((status) => status.featureId),
-  );
-  for (const entry of quarantine)
-    if (
-      doc.features.some(
-        (feature) =>
-          !feature.suppressed &&
-          feature.id === entry.featureId &&
-          featureKey(feature) === entry.featureKey,
-      )
-    )
-      ids.add(entry.featureId);
-  return ids;
-}
+export { featureKey } from "../modules/featureInputs.js";
 
 interface Snapshot {
   featureKeys: string[];
@@ -130,8 +114,13 @@ function evaluateTracked(
   sources: Sources,
   namingVersion: NamingVersion,
   shouldStop?: () => boolean,
+  doc: Pick<CadDocument, "extensions"> = { extensions: {} },
 ): FeatureOutcome | void {
-  const run = () => evaluateFeature(next, feature, earlier, sources);
+  const inputs = checkedFeatureInputs(feature, doc, sources);
+  const run = () =>
+    inputs
+      ? evaluateFeature(next, feature, earlier, sources, inputs)
+      : evaluateFeature(next, feature, earlier, sources);
   return cancellable(shouldStop, () =>
     withNamingVersion(namingVersion, () =>
       namingVersion === 1 ? run() : evaluateResolved(next, feature, run),
@@ -189,11 +178,12 @@ function evaluateStep(
   sources: Sources,
   namingVersion: NamingVersion,
   snapshots: Snapshot[],
+  doc: CadDocument,
   shouldStop?: () => boolean,
 ): { status: FeatureStatus; deps?: Deps } | undefined {
   try {
     const { outcome, deps } = recorded(state, next, earlier, sources, (e, s) =>
-      evaluateTracked(next, feature, e, s, namingVersion, shouldStop),
+      evaluateTracked(next, feature, e, s, namingVersion, shouldStop, doc),
     );
     return {
       status: okStatus(feature, outcome, state, next),
@@ -207,20 +197,6 @@ function evaluateStep(
       next.blocked = new Set([...state.blocked, ...err.bodies]);
     return { status: failedStatus(err, state, feature) };
   }
-}
-
-export function featureKey(feature: object): string {
-  return JSON.stringify(feature);
-}
-
-function featureKeys(
-  feature: CadDocument["features"][number],
-  key: string,
-  { targets }: FeatureStatus,
-): string[] {
-  return targets && !("targets" in feature)
-    ? [key, featureKey({ ...feature, targets })]
-    : [key];
 }
 
 export interface EvaluateHooks {
@@ -332,7 +308,8 @@ class DocumentEngine {
     );
 
     const keys: string[] = [];
-    const keyAt = (i: number) => (keys[i] ??= featureKey(doc.features[i]!));
+    const keyAt = (i: number) =>
+      (keys[i] ??= featureKey(doc.features[i]!, doc, this.held));
     let valid = 0;
     while (
       this.namingVersion === doc.namingVersion &&
@@ -370,7 +347,7 @@ class DocumentEngine {
       start === 0 ? emptyState() : this.snapshots[start - 1]!.state;
     let statuses: FeatureStatus[] =
       start === 0 ? [] : [...this.snapshots[start - 1]!.statuses];
-    const blockedFeatures = blockedFeatureIds(doc, statuses, this.quarantine);
+    const blocked = blockedFeatureIds(doc, statuses, this.quarantine, keyAt);
 
     let i = start;
     for (; i < upTo && !hooks?.shouldStop?.(); i++) {
@@ -378,12 +355,7 @@ class DocumentEngine {
       let next = { ...state };
       let status: FeatureStatus;
       let deps: Deps | undefined;
-      const crash = crashStatus(
-        feature,
-        keyAt(i),
-        this.quarantine,
-        blockedFeatures,
-      );
+      const crash = crashStatus(feature, keyAt(i), this.quarantine, blocked);
       const old = this.stale.get(i);
       const kept =
         feature.suppressed || crash
@@ -410,6 +382,7 @@ class DocumentEngine {
           this.held,
           doc.namingVersion,
           this.snapshots,
+          doc,
           hooks?.shouldStop,
         );
         if (!evaluated) break;
@@ -417,7 +390,7 @@ class DocumentEngine {
       }
       statuses = statuses.concat(status);
       this.snapshots.push({
-        featureKeys: featureKeys(feature, keyAt(i), status),
+        featureKeys: featureKeys(feature, keyAt(i), status, doc, this.held),
         state: next,
         statuses,
         ...(deps && { deps }),
@@ -467,6 +440,8 @@ class DocumentEngine {
           features.slice(0, index),
           this.held,
           doc.namingVersion,
+          undefined,
+          doc,
         )?.targets;
       } finally {
         releaseSnapshots([{ state: trial }], this.snapshots);

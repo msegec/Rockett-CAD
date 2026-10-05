@@ -5,6 +5,7 @@ import type {
   CadDocument,
   FaceRef as CoreFaceRef,
   FeatureStatus,
+  registerExtensionSpec,
   Health,
   MeasureRequest,
   MeasureResult,
@@ -19,6 +20,11 @@ export type {
   Feature,
   FeatureRef,
   FeatureSpec,
+  ExtensionSpec,
+  FeatureInputContext,
+  FeatureInputResolver,
+  JsonInput,
+  ResolvedFeatureInputs,
   FeatureStatus,
   MeasureRequest,
   MeasureResult,
@@ -34,7 +40,7 @@ export type {
 
 export { StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.11.0";
+export const PLUGIN_API_VERSION = "0.12.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -165,6 +171,7 @@ export type StartKernelJob = (
 ) => Promise<unknown>;
 
 export interface ServerRegister {
+  extensionSpec: typeof registerExtensionSpec;
   routeModule(module: RouteModule): Dispose;
   kernelJob(id: string, entry: URL): Dispose;
   setting(definition: SettingDefinition): Dispose;

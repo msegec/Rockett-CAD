@@ -1,4 +1,4 @@
-import { Type, type TProperties, type TSchema } from "typebox";
+import { Type, type Static, type TProperties, type TSchema } from "typebox";
 import type {
   AxisRef,
   CadDocument,
@@ -13,6 +13,7 @@ import type {
   ProfileRef,
   SketchEntityRef,
 } from "./model.js";
+import type { FeatureInputResolver } from "./featureInputs.js";
 import { createRegistry, REGISTRY_ID } from "./registry.js";
 import {
   extensionFeatureSchema,
@@ -51,6 +52,9 @@ export interface FeatureSpec<F extends Feature = Feature> {
   refs(f: F): FeatureRef[];
   displayOnly: readonly string[];
   migrate?(fromVersion: number, f: F): F;
+  resolveInputs?: FeatureInputResolver<
+    F extends ExtensionFeature<infer P> ? P : never
+  >;
 }
 
 export const featureSpecs = createRegistry<FeatureSpec>(
@@ -194,19 +198,23 @@ export function registerCoreSpec<T extends FeatureType>(
   return registerFeatureSpec(spec);
 }
 
+export interface ExtensionSpec<P extends TSchema> {
+  type: ExtensionType;
+  label: string;
+  version: number;
+  params: P;
+  migrate?: (fromVersion: number, f: ExtensionFeature) => ExtensionFeature;
+  resolveInputs?: FeatureInputResolver<Static<P>>;
+}
+
 export function registerExtensionSpec<P extends TSchema>({
   type,
   label,
   version,
   params,
   migrate,
-}: {
-  type: ExtensionType;
-  label: string;
-  version: number;
-  params: P;
-  migrate?: (fromVersion: number, f: ExtensionFeature) => ExtensionFeature;
-}): () => void {
+  resolveInputs,
+}: ExtensionSpec<P>): () => void {
   const schema = extensionFeatureSchema(type, version, params);
   const spec: FeatureSpec<ExtensionFeature> = {
     type,
@@ -220,6 +228,9 @@ export function registerExtensionSpec<P extends TSchema>({
     refs: () => [],
     displayOnly: [],
     ...(migrate && { migrate }),
+    ...(resolveInputs && {
+      resolveInputs: resolveInputs as FeatureInputResolver,
+    }),
   };
   return registerFeatureSpec(spec);
 }

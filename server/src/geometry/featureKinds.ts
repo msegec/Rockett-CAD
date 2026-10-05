@@ -1,4 +1,9 @@
-import { createRegistry, featureModule, type Feature } from "@rockett/shared";
+import {
+  createRegistry,
+  featureModule,
+  type Feature,
+  type ResolvedFeatureInputs,
+} from "@rockett/shared";
 import {
   cloneState,
   unrecorded,
@@ -15,6 +20,7 @@ export interface EvalContext {
   earlier: Feature[];
   index: number;
   sources: Sources;
+  inputs?: ResolvedFeatureInputs;
 }
 
 export interface FeatureKind<F extends Feature = Feature> {
@@ -35,6 +41,7 @@ export function evaluateFeature(
   feature: Feature,
   earlier: Feature[],
   sources: Sources = new Map(),
+  inputs?: ResolvedFeatureInputs,
 ): FeatureOutcome | void {
   const kind = featureKind(feature.type);
   if (!kind) {
@@ -54,7 +61,13 @@ export function evaluateFeature(
       try {
         const outcome = trackShapeMaps(made, () =>
           kind.evaluate(
-            { state, earlier, index: earlier.length, sources },
+            {
+              state,
+              earlier,
+              index: earlier.length,
+              sources,
+              ...(inputs && { inputs }),
+            },
             feature,
           ),
         );

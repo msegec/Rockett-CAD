@@ -1,3 +1,4 @@
+import { serverRegister } from "./helpers/serverRegister.js";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -153,18 +154,14 @@ beforeAll(async () => {
   const edits = new Map<string, (...args: unknown[]) => Promise<unknown>>();
   await cam.activate({
     services: { provide: () => () => {} },
-    register: {
-      routeModule: (module) => {
-        module.mount({
-          projectRoute: () => {},
-          userRoute: () => {},
-          projectMutation: (r, edit) => edits.set(r.path, edit as never),
-        });
-        return () => {};
-      },
-      kernelJob: () => () => {},
-      setting: () => () => {},
-    },
+    register: serverRegister((module) => {
+      module.mount({
+        projectRoute: () => {},
+        userRoute: () => {},
+        projectMutation: (r, edit) => edits.set(r.path, edit as never),
+      });
+      return () => {};
+    }),
     startKernelJob: (id: string, input: unknown) =>
       kernel.moduleJob(ENTRY, id, input, { shouldStop: () => false }),
     userData: () => ({ read: async () => null, write: async () => null! }),

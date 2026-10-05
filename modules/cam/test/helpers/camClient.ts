@@ -1,3 +1,4 @@
+import { serverRegister } from "./serverRegister.js";
 import { act, createElement as h } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, vi } from "vitest";
@@ -128,14 +129,10 @@ beforeAll(async () => {
   };
   await cam.activate({
     services: { provide: () => () => {} },
-    register: {
-      routeModule: (module) => {
-        module.mount(api);
-        return () => {};
-      },
-      kernelJob: () => () => {},
-      setting: () => () => {},
-    },
+    register: serverRegister((module) => {
+      module.mount(api);
+      return () => {};
+    }),
     startKernelJob: async () => {
       throw new Error("no job runs here");
     },

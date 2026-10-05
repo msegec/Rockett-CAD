@@ -1,3 +1,4 @@
+import { serverRegister } from "./helpers/serverRegister.js";
 import { strFromU8, unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import type {
@@ -165,14 +166,10 @@ async function mounted({
   };
   const context: ServerContext = {
     services: { provide: () => () => {} },
-    register: {
-      routeModule: (module) => {
-        module.mount(api);
-        return () => {};
-      },
-      kernelJob: () => () => {},
-      setting: () => () => {},
-    },
+    register: serverRegister((module) => {
+      module.mount(api);
+      return () => {};
+    }),
     startKernelJob: async (_id, input) => {
       const { setup: s, operation } = input as Input;
       const program = structuredClone(contour);

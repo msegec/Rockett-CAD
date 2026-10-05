@@ -1,3 +1,4 @@
+import { serverRegister } from "./helpers/serverRegister.js";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -224,18 +225,14 @@ async function route() {
     kernel.moduleJob(ENTRY, id, input, { shouldStop: () => false });
   await cam.activate({
     services: { provide: () => () => {} },
-    register: {
-      routeModule: (module) => {
-        module.mount({
-          projectRoute: () => {},
-          userRoute: () => {},
-          projectMutation: (r, edit) => edits.set(r.path, edit as Edit),
-        });
-        return () => {};
-      },
-      kernelJob: () => () => {},
-      setting: () => () => {},
-    },
+    register: serverRegister((module) => {
+      module.mount({
+        projectRoute: () => {},
+        userRoute: () => {},
+        projectMutation: (r, edit) => edits.set(r.path, edit as Edit),
+      });
+      return () => {};
+    }),
     startKernelJob,
     userData: () => ({ read: async () => null, write: async () => null! }),
     files,

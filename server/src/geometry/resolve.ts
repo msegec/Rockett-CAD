@@ -5,6 +5,7 @@ import {
   compareNames,
   LINEAR_TOL,
   UNIT_DOT_TOL,
+  type CadDocument,
   type EdgeRef,
   type FaceRef,
   type Feature,
@@ -302,6 +303,30 @@ export interface CrashFeature {
 
 export const CRASH_BLOCKED_MESSAGE =
   "blocked by kernel crash in a dependent feature";
+
+export function blockedFeatureIds(
+  doc: CadDocument,
+  statuses: FeatureStatus[],
+  quarantine: CrashFeature[],
+  keyAt: (index: number) => string,
+) {
+  const ids = new Set(
+    statuses
+      .filter((status) => status.error === CRASH_BLOCKED_MESSAGE)
+      .map((status) => status.featureId),
+  );
+  for (const entry of quarantine)
+    if (
+      doc.features.some(
+        (feature, index) =>
+          !feature.suppressed &&
+          feature.id === entry.featureId &&
+          keyAt(index) === entry.featureKey,
+      )
+    )
+      ids.add(entry.featureId);
+  return ids;
+}
 
 export function blockedBodies(state: EvalState, feature: Feature) {
   const bodies = inputBodies(feature);
