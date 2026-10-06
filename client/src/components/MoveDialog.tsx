@@ -43,12 +43,14 @@ export function MoveDialog({
   tree,
   item,
   at,
+  browser = true,
   onMove,
   onClose,
 }: {
   tree: FolderTree;
   item: Item;
   at: { x: number; y: number };
+  browser?: boolean;
   onMove: (target: string | null) => void;
   onClose: () => void;
 }) {
@@ -93,7 +95,7 @@ export function MoveDialog({
         <div className="move-tree">
           {row(null, "Projects")}
           <div className="tree-children">{branch(null)}</div>
-          {row(THIS_BROWSER, "This browser")}
+          {browser && row(THIS_BROWSER, "This browser")}
         </div>
       </div>
       <DialogFooter

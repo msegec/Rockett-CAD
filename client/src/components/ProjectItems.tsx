@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { FolderTree, ProjectSummary } from "@rockett/shared";
 import { api } from "../api";
 import {
@@ -16,7 +16,6 @@ import { openBrowserProject } from "../browserSession";
 import { ICONS } from "../icons";
 import { useSession } from "../session";
 import {
-  canMoveTo,
   itemCount,
   projectView,
   THIS_BROWSER,
@@ -26,6 +25,7 @@ import {
 import { ContextMenu, type MenuItem } from "./ContextMenu";
 import { ProjectBreadcrumb, type DropTarget } from "./ProjectBreadcrumb";
 import { MoveDialog } from "./MoveDialog";
+import { useDragMove, useOwnership } from "./dragMove";
 import { RenameInput } from "./RenameInput";
 import {
   editedAt,
@@ -47,49 +47,6 @@ export type Renaming = Pick<Item, "kind" | "id"> | null;
 type Moving = { item: Item; at: Point } | null;
 
 type Menu = { x: number; y: number; items: MenuItem[] } | null;
-
-function useDragMove(
-  tree: FolderTree,
-  move: (item: Item, target: string | null, at?: Point) => void,
-) {
-  const [dragged, setDragged] = useState<Item | null>(null);
-  const [over, setOver] = useState<string | null>();
-  const end = () => {
-    setDragged(null);
-    setOver(undefined);
-  };
-  const source = (item: Item) => ({
-    onDragStart: (e: DragEvent) => {
-      e.dataTransfer.setData("text/plain", item.name);
-      e.dataTransfer.effectAllowed = "move";
-      setDragged(item);
-    },
-    onDragEnd: end,
-  });
-  const target = (id: string | null) => {
-    if (!dragged || !canMoveTo(tree, dragged, id)) return { active: false };
-    const hold = (e: DragEvent) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      setOver(id);
-    };
-    return {
-      active: over === id,
-      onDragEnter: hold,
-      onDragOver: hold,
-      onDragLeave: (e: DragEvent) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null))
-          setOver(undefined);
-      },
-      onDrop: (e: DragEvent) => {
-        e.preventDefault();
-        end();
-        move(dragged, id, { x: e.clientX, y: e.clientY });
-      },
-    };
-  };
-  return { source, target };
-}
 
 function ItemRow({
   item,
@@ -247,8 +204,7 @@ export function ProjectItems({
   const [menu, setMenu] = useState<Menu>(null);
   const [moving, setMoving] = useState<Moving>(null);
   const [sharing, setSharing] = useState<Item | null>(null);
-  const session = useSession();
-  const actor = session.kind === "signed-in" ? session.user : null;
+  const { actor, manages, offersBrowser } = useOwnership(projects);
   const move = (item: Item, target: string | null, at?: Point) =>
     target !== THIS_BROWSER
       ? run(
@@ -257,7 +213,7 @@ export function ProjectItems({
             : api.moveFolder(item.id, target),
         )
       : void intoBrowser(item, run, at);
-  const { source, target } = useDragMove(tree, move);
+  const { source, target } = useDragMove(tree, move, offersBrowser);
   const rename = (item: Item) => (name: string | null) => {
     setRenaming(null);
     if (name === null) return;
@@ -321,7 +277,7 @@ export function ProjectItems({
         const n = itemCount(tree, projects, f.id);
         return row(item, meta(item, count(n, "item")), [
           { label: "Rename", glyph: "✎", run: () => setRenaming(item) },
-          ...(actor && (actor.role === "admin" || f.owner === actor.id)
+          ...(manages(f.owner)
             ? [{ label: "Share", glyph: "♧", run: () => setSharing(item) }]
             : []),
           moveTo(item, setMoving),
@@ -371,7 +327,7 @@ export function ProjectItems({
                 api.deleteProject(p.id, false, p.deleteTag ?? p.revision),
             },
             [
-              ...(actor && (actor.role === "admin" || p.owner === actor.id)
+              ...(manages(p.owner)
                 ? [{ label: "Share", glyph: "♧", run: () => setSharing(item) }]
                 : []),
               moveTo(item, setMoving),
@@ -389,6 +345,7 @@ export function ProjectItems({
           tree={tree}
           item={moving.item}
           at={moving.at}
+          browser={offersBrowser(moving.item)}
           onMove={(t) => {
             setMoving(null);
             move(moving.item, t, moving.at);

@@ -81,23 +81,34 @@ export async function visibleProjects(
   return visible.filter((project) => project !== undefined);
 }
 
+const notFound = (res: Response) =>
+  res.status(404).json({ error: "project not found", code: "not_found" });
+
+async function guardedRole(
+  store: ProjectStore,
+  folders: FolderStore,
+  req: Request,
+  user: User,
+  id: string,
+) {
+  if (await store.temporaryRefuses(id, user.id)) return undefined;
+  if (
+    user.role === "admin" &&
+    req.method === ROUTES.collectBlobs.method &&
+    req.route.path === ROUTES.collectBlobs.path
+  )
+    return "edit";
+  return projectAccess(store, folders, user, id);
+}
+
 export function projectAccessGuard(store: ProjectStore, folders: FolderStore) {
   return (req: Request, res: Response, next: NextFunction, id: string) => {
     if (!isProjectRoute(req)) return next();
     const user: User | undefined = res.locals.user;
     if (!user) return next(new Error("auth middleware missing"));
-    if (
-      user.role === "admin" &&
-      req.method === ROUTES.collectBlobs.method &&
-      req.route.path === ROUTES.collectBlobs.path
-    )
-      return next();
-    projectAccess(store, folders, user, id)
+    guardedRole(store, folders, req, user, id)
       .then((access) => {
-        if (!access)
-          return res
-            .status(404)
-            .json({ error: "project not found", code: "not_found" });
+        if (!access) return notFound(res);
         res.locals.projectRole = access;
         if (
           access === "view" &&
@@ -116,9 +127,7 @@ export function projectAccessGuard(store: ProjectStore, folders: FolderStore) {
         )
           return next();
         if (err instanceof StoreError && err.code === "not_found")
-          return res
-            .status(404)
-            .json({ error: "project not found", code: "not_found" });
+          return notFound(res);
         if (err instanceof StoreError && err.code === "unprocessable")
           return res.status(422).json({ error: err.message, code: err.code });
         next(err);

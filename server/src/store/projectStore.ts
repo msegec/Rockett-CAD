@@ -318,13 +318,21 @@ export class ProjectStore {
   }
 
   async isTemporary(id: string): Promise<boolean> {
-    return (await this.touchedAt(id)) !== undefined;
+    return (await this.marker(id)) !== undefined;
+  }
+
+  async temporaryRefuses(id: string, userId: string): Promise<boolean> {
+    const marker = await this.marker(id);
+    return marker !== undefined && marker.owner !== userId;
   }
 
   async touch(id: string): Promise<void> {
-    const at = await this.touchedAt(id);
-    if (at !== undefined && this.now() - at >= TIMING_MS.temporaryProjectTouch)
-      await this.writeMarker(id);
+    const marker = await this.marker(id);
+    if (
+      marker &&
+      this.now() - marker.touchedAt >= TIMING_MS.temporaryProjectTouch
+    )
+      await this.writeMarker(id, marker.owner);
   }
 
   async temporaryIds(): Promise<string[]> {
@@ -335,10 +343,10 @@ export class ProjectStore {
   }
 
   async expire(id: string): Promise<boolean> {
-    const at = await this.touchedAt(id);
+    const marker = await this.marker(id);
     if (
-      at === undefined ||
-      this.now() - at < TIMING_MS.temporaryProjectLifetime
+      marker === undefined ||
+      this.now() - marker.touchedAt < TIMING_MS.temporaryProjectLifetime
     )
       return false;
     await this.remove(id);
@@ -349,17 +357,19 @@ export class ProjectStore {
     return path.posix.join(this.documents.dir(id), "temporary.json");
   }
 
-  private writeMarker(id: string): Promise<void> {
+  private writeMarker(id: string, owner: string | null): Promise<void> {
     return this.storage.writeAtomic(
       this.markerFile(id),
       JSON.stringify({
-        owner: null,
+        owner,
         touchedAt: new Date(this.now()).toISOString(),
       }),
     );
   }
 
-  private async touchedAt(id: string): Promise<number | undefined> {
+  private async marker(
+    id: string,
+  ): Promise<{ owner: string | null; touchedAt: number } | undefined> {
     let raw: Buffer;
     try {
       raw = await this.storage.read(this.markerFile(id));
@@ -367,9 +377,13 @@ export class ProjectStore {
       return undefined;
     }
     try {
-      return Date.parse(JSON.parse(raw.toString("utf8")).touchedAt) || 0;
+      const { owner, touchedAt } = JSON.parse(raw.toString("utf8"));
+      return {
+        owner: typeof owner === "string" ? owner : null,
+        touchedAt: Date.parse(touchedAt) || 0,
+      };
     } catch {
-      return 0;
+      return { owner: null, touchedAt: 0 };
     }
   }
 
@@ -397,7 +411,7 @@ export class ProjectStore {
     const id = newId();
     const images = new Set(imageBlobs(doc));
     try {
-      if (temporary) await this.writeMarker(id);
+      if (temporary) await this.writeMarker(id, actor);
       for (const [assetId, data] of assets) {
         const label = `asset ${assetId}: `;
         if (!HASH_RE.test(assetId))

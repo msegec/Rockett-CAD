@@ -5,6 +5,7 @@ import {
   keepProjectFile,
   listBrowserProjects,
   moveToServer,
+  takeHandover,
 } from "../browserProjects";
 import { openBrowserProject } from "../browserSession";
 import {
@@ -25,6 +26,17 @@ import { UserMenu } from "./UserMenu";
 export { backToProjects } from "../projectNavigation";
 
 type Load = "loading" | "ready" | { failed: string };
+
+const HANDOVER = "Projects kept in this browser before sign-in are now yours.";
+
+function Tagline({ handedOver }: { handedOver: boolean }) {
+  return (
+    <>
+      <p className="tagline">Your CAD. Your server. Your plugins.</p>
+      {handedOver && <div className="storage-line">{HANDOVER}</div>}
+    </>
+  );
+}
 
 function useLoaded<T>(read: () => Promise<T>, empty: T) {
   const [value, setValue] = useState(empty);
@@ -51,11 +63,15 @@ const readProjects = () =>
 
 function useBrowserProjects() {
   const kept = useLoaded(listBrowserProjects, []);
+  const [handedOver, setHandedOver] = useState(false);
   useEffect(() => {
     window.addEventListener("focus", kept.refresh);
     return () => window.removeEventListener("focus", kept.refresh);
   }, [kept.refresh]);
-  return kept;
+  useEffect(() => {
+    if (kept.load === "ready" && takeHandover()) setHandedOver(true);
+  }, [kept.load]);
+  return { ...kept, handedOver };
 }
 
 function usePlace() {
@@ -215,7 +231,7 @@ export function ProjectList({ onUsers }: { onUsers: () => void }) {
           <span className="logo">⬢</span> Rockett CAD
           <UserMenu onUsers={onUsers} />
         </h1>
-        <p className="tagline">Your CAD. Your server. Your plugins.</p>
+        <Tagline handedOver={kept.handedOver} />
         {error && <div className="error-banner">{error}</div>}
         {typeof load === "object" && (
           <div className="error-banner">

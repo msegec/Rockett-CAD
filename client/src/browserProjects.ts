@@ -38,19 +38,98 @@ export class StaleRecord extends Error {
   }
 }
 
+const SHARED = "rockett";
+const HEIR = "rockett.browserHeir";
+let user: string | null = null;
 let database: Promise<IDBDatabase> | undefined;
+let handedOver = false;
+
+export function browserUser(id: string | null): void {
+  if (id === user) return;
+  user = id;
+  handedOver = false;
+  void database?.then(
+    (db) => db.close(),
+    () => undefined,
+  );
+  database = undefined;
+}
+
+export function takeHandover(): boolean {
+  const shown = handedOver;
+  handedOver = false;
+  return shown;
+}
 
 function open(): Promise<IDBDatabase> {
-  database ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const req = indexedDB.open("rockett", 2);
+  if (user === null)
+    return Promise.reject(
+      new Error("Sign in to keep projects in this browser."),
+    );
+  const name = `${SHARED}-${user}`;
+  database ??= connect(name)
+    .then(async (db) => {
+      await adopt(db, name).catch((e) => {
+        db.close();
+        throw e;
+      });
+      return db;
+    })
+    .catch((e) => {
+      database = undefined;
+      throw e;
+    });
+  return database;
+}
+
+function connect(name: string): Promise<IDBDatabase> {
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const req = indexedDB.open(name, 2);
     req.onupgradeneeded = (e) => upgrade(req, e.oldVersion);
     req.onsuccess = () => resolve(req.result);
     req.addEventListener("error", () => reject(req.error));
-  }).catch((e) => {
-    database = undefined;
-    throw e;
   });
-  return database;
+}
+
+async function adopt(db: IDBDatabase, own: string): Promise<void> {
+  if (!(await indexedDB.databases()).some((d) => d.name === SHARED)) return;
+  localStorage.setItem(HEIR, localStorage.getItem(HEIR) ?? own);
+  if (localStorage.getItem(HEIR) !== own) return;
+  const shared = await connect(SHARED);
+  try {
+    for (const name of [STORE, BACKUPS]) {
+      const records = await run<BrowserProject[]>(
+        shared,
+        name,
+        "readonly",
+        (store, done) => {
+          const req = store.getAll();
+          req.onsuccess = () => done(req.result);
+        },
+      );
+      if (!records.length) continue;
+      await run<void>(
+        db,
+        name,
+        "readwrite",
+        (store) => {
+          for (const r of records) {
+            const req = store.get(r.key);
+            req.onsuccess = () => {
+              if (req.result === undefined) store.put(r);
+            };
+          }
+        },
+        "strict",
+      );
+      await run<void>(shared, name, "readwrite", (store) => {
+        for (const r of records) store.delete(r.key);
+      });
+      handedOver ||= name === STORE;
+    }
+  } finally {
+    shared.close();
+  }
 }
 
 function upgrade(req: IDBOpenDBRequest, oldVersion: number): void {
@@ -68,16 +147,20 @@ function upgrade(req: IDBOpenDBRequest, oldVersion: number): void {
   };
 }
 
-async function transact<T>(
+type Work<T> = (
+  store: IDBObjectStore,
+  done: (value: T) => void,
+  abort: (reason?: unknown) => void,
+) => void;
+
+function run<T>(
+  db: IDBDatabase,
+  name: string,
   mode: IDBTransactionMode,
-  work: (
-    store: IDBObjectStore,
-    done: (value: T) => void,
-    abort: (reason?: unknown) => void,
-  ) => void,
+  work: Work<T>,
   durability: IDBTransactionDurability = "default",
 ): Promise<T> {
-  const tx = (await open()).transaction(STORE, mode, { durability });
+  const tx = db.transaction(name, mode, { durability });
   return new Promise<T>((resolve, reject) => {
     let result: T;
     let failure: unknown;
@@ -86,7 +169,7 @@ async function transact<T>(
       reject(tx.error ?? failure ?? new StaleRecord()),
     );
     work(
-      tx.objectStore(STORE),
+      tx.objectStore(name),
       (value) => (result = value),
       (reason) => {
         failure = reason;
@@ -94,6 +177,14 @@ async function transact<T>(
       },
     );
   });
+}
+
+async function transact<T>(
+  mode: IDBTransactionMode,
+  work: Work<T>,
+  durability?: IDBTransactionDurability,
+): Promise<T> {
+  return run(await open(), STORE, mode, work, durability);
 }
 
 function newKey(): string {

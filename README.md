@@ -103,7 +103,7 @@ everything downstream against persistent topology references.
 
 - **Projects**: organise, create, move, share or delete projects and folders; refuse stale deletes; sort, filter, pick destinations by keyboard.
 - **Sharing**: share a project or folder for View or Edit with your friends; an admin can share with anyone.
-- **This browser**: create, open or move projects here; Move to transfers either way, while Share moves to the server first.
+- **This browser**: one list per signed-in user; create, open, or move projects in and out; Share moves them to the server first.
 - **Project snapshots**: hover or focus a project to see a picture of its model and when it was last edited.
 - **Reload**: refreshing the page reopens the project you had open; Back returns to the list.
 - **Accounts**: admin setup and Users page, username or email sign-in, TOTP, password changes, common-password refusal, sign out, Cloudflare Access.
@@ -273,7 +273,7 @@ with no dates.
 - [ ] Rebind keyboard shortcuts in Settings
 - [ ] Selection filters for bodies, faces, edges and more
 - [ ] A marking menu and a searchable command box
-- [ ] Browser projects that follow the signed-in user
+- [x] Browser projects that follow the signed-in user
 
 ### Kernel and performance
 

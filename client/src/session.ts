@@ -3,6 +3,7 @@ import type { SignInStep, TotpEnrolment, User } from "@rockett/shared";
 import { api, UnauthorizedError, watchUnauthorized } from "./api";
 import { projectIdFromPath, showPath } from "./paths";
 import { leaveBrowserProject } from "./browserSession";
+import { browserUser } from "./browserProjects";
 import { dropCameraSave } from "./cameraSave";
 import { useStore } from "./store";
 import { clearSettings } from "./settings";
@@ -20,6 +21,10 @@ export type Session =
   | { kind: "signed-in"; user: User; screen?: TotpScreen };
 
 export const useSession = create<Session>(() => ({ kind: "loading" }));
+
+useSession.subscribe((s) =>
+  browserUser(s.kind === "signed-in" ? s.user.id : null),
+);
 
 function returnProjectId(): string | null {
   const state = useSession.getState();

@@ -116,7 +116,7 @@ docker run -d --name rockett-cad \
     ├── documents/{assemblyId}.json # an assembly document
     ├── documents/{assemblyId}/history/log.bin  # that assembly's undo history
     ├── settings.json
-    ├── temporary.json          # only on a temporary copy of a browser project
+    ├── temporary.json          # only on a temporary copy of a browser project: owner, touchedAt
     ├── thumbnail.png
     ├── blobs/                  # images and STEP, IGES, BREP sources, named by sha256
     ├── history/log.bin         # undo history, append-only

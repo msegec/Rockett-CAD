@@ -121,6 +121,10 @@ notice routes.
   (`server/src/api/projectAccess.ts`).
 - Folder members inherit their role on the folder's projects: `folderRole`
   in `server/src/api/projectAccess.ts`.
+- A temporary copy answers only the user who opened it, its `temporary.json`
+  `owner`; every other user, admins included, gets 404 on every
+  `/projects/:id` route. A copy stored without an owner answers nobody and
+  is swept 24 hours after its last touch.
 
 ## Document revisions
 
