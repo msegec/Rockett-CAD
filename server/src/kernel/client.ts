@@ -6,6 +6,7 @@ import {
   type EdgeRef,
   type ExportRequest,
   type ExportSource,
+  type ExtrudeFeature,
   type FaceRef,
   type Feature,
   type Formats,
@@ -123,11 +124,11 @@ export interface KernelClient {
     doc: CadDocument,
     query: StateQuery<K>,
   ): Promise<StateAnswers[K]>;
-  visibleTargets(
+  defaultTargets(
     doc: CadDocument,
     index: number,
     hidden: readonly string[],
-  ): Promise<string[] | undefined>;
+  ): Promise<Pick<ExtrudeFeature, "targets" | "autoTargets"> | undefined>;
   signResolved(
     doc: CadDocument,
     requests: SignRequest[],
@@ -367,13 +368,13 @@ export class InProcessKernel implements KernelClient {
     );
   }
 
-  async visibleTargets(
+  async defaultTargets(
     doc: CadDocument,
     index: number,
     hidden: readonly string[],
   ) {
     const { engine, sources } = await this.sourced(doc);
-    return engine.visibleTargets(doc, index, hidden, sources);
+    return engine.defaultTargets(doc, index, hidden, sources);
   }
 
   async signResolved(doc: CadDocument, requests: SignRequest[]) {

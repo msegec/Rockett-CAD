@@ -14,7 +14,6 @@ import {
   edgeRef,
   faceRef,
   featureIdSchema,
-  MAX_TARGETS,
   oneTargetForm,
   originAxis,
   planeRef,
@@ -309,9 +308,7 @@ const extrude = extrudeSource(
   toolFeature("extrude", {
     profiles: profiles(0),
     faces: profileFaces,
-    curves: Type.Optional(
-      Type.Array(sketchEntityRef, { maxItems: MAX_TARGETS, uniqueItems: true }),
-    ),
+    curves: Type.Optional(Type.Array(sketchEntityRef, { uniqueItems: true })),
     distance: Type.Refine(
       coordinate,
       (distance) => Math.abs(distance) >= LINEAR_TOL,

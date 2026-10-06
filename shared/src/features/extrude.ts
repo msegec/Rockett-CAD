@@ -1,10 +1,15 @@
-import { refAt, refsAt, registerCoreSpec } from "../featureSpec.js";
+import {
+  refAt,
+  refsAt,
+  registerCoreSpec,
+  toolTargetRefs,
+} from "../featureSpec.js";
 
 registerCoreSpec("extrude", "Extrude", (f) => [
   ...refsAt("profile", "/profiles", f.profiles),
   ...refsAt("face", "/faces", f.faces),
   ...refsAt("sketchEntity", "/curves", f.curves),
-  ...refsAt("body", "/targets", f.targets),
+  ...toolTargetRefs(f),
   ...(f.startObject ? [refAt("plane", "/startObject", f.startObject)] : []),
   ...(f.extent?.kind !== "toObject"
     ? []

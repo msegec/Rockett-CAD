@@ -484,6 +484,7 @@ export function evalEmboss(state: EvalState, f: EmbossFeature) {
     direction: f.mode === "emboss" ? "normal" : "reverse",
     operation: f.mode === "emboss" ? "join" : "cut",
     ...(f.targets && { targets: f.targets }),
+    ...(f.autoTargets && { autoTargets: f.autoTargets }),
   };
   return evalExtrude(state, pseudo);
 }

@@ -673,9 +673,9 @@ package that understates its expanded sizes fails as 400 at evaluation.
   `registerExtensionSpec` builds a dotted type's spec from its `params`
   schema and `version`; a feature at another version is 400.
 - Feature add and update fill a missing reference `sig` from the model
-  (`server/src/geometry/signature.ts`). They also write `targets`, leaving
-  out bodies the caller's view hides: `server/src/api/routes.ts`. See
-  [CAD_MODEL.md](CAD_MODEL.md), Tool targets.
+  (`server/src/geometry/signature.ts`). They also write the default targets,
+  leaving out bodies the caller's view hides: `server/src/api/featureRoutes.ts`.
+  See [CAD_MODEL.md](CAD_MODEL.md), Tool targets.
 - A validation failure writes nothing.
 
 ## Limits
@@ -694,7 +694,6 @@ package that understates its expanded sizes fails as 400 at evaluation.
 | Reference image                       | `IMAGE_LIMIT_MB`, `server/src/store/projectStore.ts`                                |
 | History labels                        | `LABEL_LIMIT`, `shared/src/schema/history.ts`                                       |
 | History disk bytes, checkpoints       | `HISTORY_LIMITS.bytes`, `HISTORY_LIMITS.checkpoints`, `server/src/tunables.ts`      |
-| Tool targets                          | `MAX_TARGETS`, `shared/src/schema/features.ts`                                      |
 | Previews, jobs, timeouts, size search | `server/src/tunables.ts`                                                            |
 | Settings import                       | `SETTINGS_IMPORT_MAX_BYTES`; nodes and depth in `server/src/store/settingsStore.ts` |
 | Module user data file and file pick   | `MODULE_DATA_MAX_BYTES`, `shared/src/units.ts`                                      |

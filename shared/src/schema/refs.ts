@@ -81,12 +81,8 @@ export const profileRef = Type.Object({
   profileId: Type.String({ minLength: 1, maxLength: 200 }),
 });
 
-export const MAX_TARGETS = 10_000;
-
 export const toolTargets = {
-  targets: Type.Optional(
-    Type.Array(bodyId, { maxItems: MAX_TARGETS, uniqueItems: true }),
-  ),
+  targets: Type.Optional(Type.Array(bodyId, { uniqueItems: true })),
   autoTargets: Type.Optional(
     Type.Object(
       {

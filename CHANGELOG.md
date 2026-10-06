@@ -233,6 +233,11 @@ release workflow remain under development. The core licence is unresolved.
 - Schema 47: join, cut and intersect tools may store the Auto target form,
   `autoTargets`, beside explicit `targets`; earlier documents load unchanged
   after a backup on the first save.
+- A tool left on its default targets stores the Auto form: the bodies of the
+  features that existed at creation, less those hidden then. A body inserted
+  earlier in the timeline stays out, and a 1,000-copy pattern stores one
+  feature id. Version 1 documents still store `targets`; the 10,000-target cap
+  is gone.
 
 ### Known limits
 

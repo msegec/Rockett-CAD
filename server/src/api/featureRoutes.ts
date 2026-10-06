@@ -6,7 +6,6 @@ import {
   nextFeatureName,
   parameterBindingsBody,
   parse,
-  pinTargets,
   ROUTES,
   startFirst,
   ValidationError,
@@ -41,6 +40,13 @@ function retargets(patch: object): boolean {
   return !("targets" in patch) && !keepsTargets(patch);
 }
 
+function keptAuto(feature: Feature, current?: Feature) {
+  if (!("autoTargets" in feature)) return;
+  Reflect.deleteProperty(feature, "autoTargets");
+  if (current && "autoTargets" in current)
+    Object.assign(feature, { autoTargets: current.autoTargets });
+}
+
 export async function signAt(
   kernel: Pick<KernelClient, "stateQuery">,
   doc: CadDocument,
@@ -67,7 +73,7 @@ function featureEdits(context: ApiRoutes) {
   ) {
     const feature = doc.features[index]!;
     if (lacksTargets(feature))
-      pinTargets(feature, await kernel.visibleTargets(doc, index, hidden));
+      Object.assign(feature, await kernel.defaultTargets(doc, index, hidden));
   }
 
   async function written(doc: CadDocument, index: number, user: User) {
@@ -104,6 +110,7 @@ function addFeatureRoute(context: ApiRoutes) {
       knownKeys(feature, feature.type);
       feature.name ||= nextFeatureName(doc, feature.type);
       validateFeature(feature);
+      keptAuto(feature);
       if (doc.features.some((f) => f.id === feature.id))
         throw new ValidationError("duplicate feature id");
       const at = Math.min(doc.timelinePosition, doc.features.length);
@@ -146,12 +153,15 @@ function updateFeatureRoute(context: ApiRoutes) {
       knownKeys(patch, current.type);
       const updated = { ...current, ...patch, id: current.id } as Feature;
       if (retargets(patch)) Reflect.deleteProperty(updated, "targets");
+      if ("targets" in patch && !("autoTargets" in patch))
+        Reflect.deleteProperty(updated, "autoTargets");
       if ("openFaces" in patch && !("body" in patch))
         Reflect.deleteProperty(updated, "body");
       if ("direction" in patch && !("outsideThickness" in patch))
         Reflect.deleteProperty(updated, "outsideThickness");
       dropUnownedBlendFields(updated, patch);
       validateFeature(updated);
+      keptAuto(updated, current);
       const { parameterBindings } = req.body;
       doc.parameterBindings =
         parameterBindings === undefined

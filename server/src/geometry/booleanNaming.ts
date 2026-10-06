@@ -1,4 +1,10 @@
-import { LINEAR_TOL, UNIT_DOT_TOL, type Vec3 } from "@rockett/shared";
+import {
+  autoTarget,
+  LINEAR_TOL,
+  UNIT_DOT_TOL,
+  type AutoTargets,
+  type Vec3,
+} from "@rockett/shared";
 import {
   acquire,
   bboxOf,
@@ -139,9 +145,16 @@ export function missedTarget(operation: string, id: string): Error {
   return new Error(`${operation} target ${id} does not overlap the tool`);
 }
 
-export function overlapping(state: EvalState, tool: Shape): StateBody[] {
+export function overlapping(
+  state: EvalState,
+  tool: Shape,
+  auto?: AutoTargets,
+): StateBody[] {
   return [...state.bodies.values()].filter(
-    (b) => !state.hidden?.has(b.bodyId) && bboxOverlap(b.shape, tool),
+    (b) =>
+      !state.hidden?.has(b.bodyId) &&
+      autoTarget(auto, b.bodyId) &&
+      bboxOverlap(b.shape, tool),
   );
 }
 

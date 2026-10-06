@@ -758,10 +758,9 @@ owns this and runs after the save's evaluation. Evaluation never writes `sig`.
 
 ## Tool targets
 
-Extrude, revolve, sweep, loft and emboss may store `targets`. Stored targets
-give the result the defaults gave. Add and update write them; hidden bodies
-are never default participants; evaluation never reads the view:
-`pinTargets` in `shared/src/topoRefs.ts`.
+Extrude, revolve, sweep, loft and emboss store an explicit pick as `targets`.
+Hidden bodies are never default participants, and evaluation never reads the
+view.
 
 An empty `targets` makes a join a new body. On a cut or intersect it fails
 the feature with `{operation} has no target body` and keeps every body. With
@@ -771,11 +770,23 @@ reports `[]`, so a cut or intersect never pins an empty list
 
 Schema 47 adds the Auto form, `autoTargets: { exclude, features }`: the
 bodies hidden at creation and the ids of the features whose bodies existed
-then. A tool stores `targets` or `autoTargets`, never both, so an explicit
-pick stays `targets`. Earlier documents read the same and the step changes
-only the version. `pinTargets` never adds `targets` beside `autoTargets`, and
-evaluation does not read it yet: such a tool evaluates as one without
-`targets`.
+then. A tool stores `targets` or `autoTargets`, never both. Earlier documents
+read the same and the step changes only the version.
+
+Add and update give a tool that stores neither form the default choice: the
+Auto form in a version 2 document, the `targets` the default gave in a version
+1 document (`DocumentEngine.defaultTargets` in
+`server/src/geometry/engine.ts`). A tool whose evaluation reports no targets,
+such as a new body, stores neither. The server owns the Auto form: a client's
+`autoTargets` only asks for it, and an update keeps the stored one until a
+pick replaces it.
+
+An Auto tool takes the default participants from the bodies a listed feature
+made, less `exclude`, so a body inserted earlier in the timeline stays out and
+a pattern stores one id however many copies it makes. A face join puts its
+start body first so that body keeps its id. A tool with no eligible body acts
+as a tool in a document with no body (`autoTarget` and `autoTargetsAt` in
+`shared/src/topoRefs.ts`, `applyToolOperation`).
 
 ## Loft sections
 

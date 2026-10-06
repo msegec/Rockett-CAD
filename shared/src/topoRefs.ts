@@ -1,6 +1,5 @@
-import type { EdgeRef, FaceRef, Feature } from "./model.js";
+import type { AutoTargets, EdgeRef, FaceRef, Feature } from "./model.js";
 import { featureInputs, featureSpec } from "./featureSpec.js";
-import { MAX_TARGETS } from "./schema/features.js";
 
 export const topoRefPaths = (feature: Feature) =>
   featureInputs(feature).topology;
@@ -35,17 +34,35 @@ export function lacksTargets(feature: Feature): boolean {
 }
 
 export function pinTargets(feature: Feature, targets: string[] | undefined) {
-  if (lacksTargets(feature) && targets && targets.length <= MAX_TARGETS)
-    Object.assign(feature, { targets });
+  if (lacksTargets(feature) && targets) Object.assign(feature, { targets });
+}
+
+export function startBody(feature: Feature): string | undefined {
+  if (feature.type !== "extrude" && feature.type !== "revolve") return;
+  if (feature.operation === "join") return feature.faces?.[0]?.bodyId;
 }
 
 export function startFirst(feature: Feature) {
-  if (feature.type !== "extrude" && feature.type !== "revolve") return;
-  const start = feature.faces?.[0]?.bodyId;
-  if (feature.operation !== "join" || !start) return;
-  if (feature.targets?.includes(start))
+  const start = startBody(feature);
+  if (start && "targets" in feature && feature.targets?.includes(start))
     feature.targets = [start, ...feature.targets.filter((id) => id !== start)];
 }
+
+export const autoTarget = (auto: AutoTargets | undefined, bodyId: string) =>
+  !auto ||
+  (!auto.exclude.includes(bodyId) &&
+    auto.features.some((id) => bodyMadeBy(id, bodyId)));
+
+export const autoTargetsAt = (
+  bodyIds: string[],
+  hidden: readonly string[],
+  earlier: Feature[],
+): AutoTargets => ({
+  exclude: bodyIds.filter((id) => hidden.includes(id)),
+  features: earlier
+    .filter((f) => bodyIds.some((id) => bodyMadeBy(f.id, id)))
+    .map((f) => f.id),
+});
 
 export function compareNames(a: string, b: string): number {
   const x = a.match(/\d+|\D+/g) ?? [];

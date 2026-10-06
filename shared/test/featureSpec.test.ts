@@ -202,7 +202,7 @@ const cases: Record<string, SpecCase> = {
         distance: 5,
         direction: "normal",
         operation: "cut",
-        autoTargets: { exclude: ["b1"], features: ["f1"] },
+        autoTargets: { exclude: ["ref:b1"], features: ["ref:f1"] },
       },
       {
         ...meta,
@@ -348,7 +348,7 @@ const cases: Record<string, SpecCase> = {
         axis: axes[0]!,
         angle: 90,
         operation: "intersect",
-        autoTargets: { exclude: ["b1"], features: ["f1"] },
+        autoTargets: { exclude: ["ref:b1"], features: ["ref:f1"] },
       },
     ],
     invalid: [
@@ -383,7 +383,7 @@ const cases: Record<string, SpecCase> = {
         profiles: [refProfile("p1")],
         depth: 1,
         mode: "emboss",
-        autoTargets: { exclude: ["b1"], features: ["f1"] },
+        autoTargets: { exclude: ["ref:b1"], features: ["ref:f1"] },
       },
     ],
     invalid: [
@@ -417,7 +417,7 @@ const cases: Record<string, SpecCase> = {
         profiles: [refProfile("p1")],
         pathSketchId: "ref:path",
         operation: "cut",
-        autoTargets: { exclude: ["b1"], features: ["f1"] },
+        autoTargets: { exclude: ["ref:b1"], features: ["ref:f1"] },
       },
     ],
     invalid: [
@@ -449,7 +449,7 @@ const cases: Record<string, SpecCase> = {
         type: "loft",
         sections: [refProfile("p1"), refProfile("p2")],
         operation: "join",
-        autoTargets: { exclude: ["b1"], features: ["f1"] },
+        autoTargets: { exclude: ["ref:b1"], features: ["ref:f1"] },
       },
     ],
     invalid: [

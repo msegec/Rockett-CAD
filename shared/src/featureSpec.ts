@@ -1,5 +1,6 @@
 import { Type, type Static, type TProperties, type TSchema } from "typebox";
 import type {
+  AutoTargets,
   AxisRef,
   CadDocument,
   EdgeRef,
@@ -181,6 +182,15 @@ export const refsAt = <K extends RefKind>(
   path: string,
   targets: readonly RefTargets[K][] = [],
 ) => targets.map((target, i) => refAt(kind, `${path}/${i}`, target));
+
+export const toolTargetRefs = (f: {
+  targets?: string[];
+  autoTargets?: AutoTargets;
+}) => [
+  ...refsAt("body", "/targets", f.targets),
+  ...refsAt("body", "/autoTargets/exclude", f.autoTargets?.exclude),
+  ...refsAt("feature", "/autoTargets/features", f.autoTargets?.features),
+];
 
 export function registerCoreSpec<T extends FeatureType>(
   type: T,

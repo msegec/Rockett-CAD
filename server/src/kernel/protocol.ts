@@ -41,9 +41,9 @@ export interface Calls {
     args: [doc: CadDocument, query: StateQuery];
     result: StateAnswers[keyof StateAnswers];
   };
-  visibleTargets: {
-    args: Parameters<KernelClient["visibleTargets"]>;
-    result: string[] | undefined;
+  defaultTargets: {
+    args: Parameters<KernelClient["defaultTargets"]>;
+    result: Awaited<ReturnType<KernelClient["defaultTargets"]>>;
   };
   signResolved: {
     args: Parameters<KernelClient["signResolved"]>;

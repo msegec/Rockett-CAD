@@ -1,6 +1,8 @@
 import {
   LINEAR_TOL,
+  autoTarget,
   compareNames,
+  startBody,
   type CombineFeature,
   type ExtrudeFeature,
   type LoftFeature,
@@ -182,10 +184,13 @@ export function joinEvery(
 ): FeatureOutcome {
   const featureId = f.id;
   const kind = operationKind(f);
+  const start = f.autoTargets && startBody(f);
   const bodies = targets
     ? targets.map((id) => targetBody(state, "join", id, tool.shape))
-    : overlapping(state, tool.shape).toSorted((a, b) =>
-        compareNames(a.bodyId, b.bodyId),
+    : overlapping(state, tool.shape, f.autoTargets).toSorted(
+        (a, b) =>
+          Number(b.bodyId === start) - Number(a.bodyId === start) ||
+          compareNames(a.bodyId, b.bodyId),
       );
 
   const { groups, loose, warning } = contactGroups(bodies, tool);
@@ -226,7 +231,7 @@ export function applyToolOperation(
   f: ToolFeature,
   tool: ToolResult,
 ): FeatureOutcome | void {
-  const { id: featureId, operation, targets } = f;
+  const { id: featureId, operation, targets, autoTargets } = f;
   const kind = operationKind(f);
   const publishTool = () => {
     rejectInvalidBody(kind, tool.shape);
@@ -235,7 +240,10 @@ export function applyToolOperation(
   if (operation === "newBody") return publishTool();
   if (targets?.length === 0 && operation !== "join")
     throw new Error(`${operation} has no target body`);
-  if (targets?.length === 0 || (!targets && state.bodies.size === 0)) {
+  const none =
+    !targets &&
+    ![...state.bodies.keys()].some((id) => autoTarget(autoTargets, id));
+  if (targets?.length === 0 || none) {
     publishTool();
     if (operation !== "join") return;
     return { targets: [] };
@@ -247,7 +255,7 @@ export function applyToolOperation(
   if (operation === "cut") {
     const bodies = targets
       ? targets.map((id) => targetBody(state, "cut", id, tool.shape))
-      : overlapping(state, tool.shape);
+      : overlapping(state, tool.shape, autoTargets);
     if (bodies.length === 0)
       throw new Error("cut tool does not intersect any body");
     const warnings = bodies.map((body) => {
@@ -266,7 +274,7 @@ export function applyToolOperation(
 
   const target = targets
     ? targetBody(state, operation, targets[0]!, tool.shape)
-    : overlapping(state, tool.shape)[0];
+    : overlapping(state, tool.shape, autoTargets)[0];
 
   if (operation === "join") {
     if (!target) {

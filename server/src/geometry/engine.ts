@@ -1,7 +1,12 @@
-import { lazyMesh, resolveDocumentParameters } from "@rockett/shared";
+import {
+  autoTargetsAt,
+  lazyMesh,
+  resolveDocumentParameters,
+} from "@rockett/shared";
 import type {
   CadDocument,
   ConstructionPlanePayload,
+  ExtrudeFeature,
   FeatureStatus,
   MeshedBody,
   MeshedEvaluation,
@@ -419,33 +424,38 @@ class DocumentEngine {
     return source && movePayload(sourceMesh(source, memo), bodyId, copyOf);
   }
 
-  visibleTargets(
+  defaultTargets(
     doc: CadDocument,
     index: number,
     hidden: readonly string[],
     sources?: Sources,
-  ): string[] | undefined {
+  ): Pick<ExtrudeFeature, "targets" | "autoTargets"> | undefined {
     return this.measured(() => {
       const { statuses, features } = this.regenerate(doc, index + 1, sources);
-      const found = statuses[index]?.targets;
-      const excluded = new Set(hidden);
-      if (!found?.some((id) => excluded.has(id))) return found;
       const before =
         index === 0 ? emptyState() : this.snapshots[index - 1]!.state;
-      const trial: EvalState = { ...before, hidden: excluded };
-      try {
-        return evaluateTracked(
-          trial,
-          features[index]!,
-          features.slice(0, index),
-          this.held,
-          doc.namingVersion,
-          undefined,
-          doc,
-        )?.targets;
-      } finally {
-        releaseSnapshots([{ state: trial }], this.snapshots);
+      const excluded = new Set(hidden);
+      let targets = statuses[index]?.targets;
+      if (targets?.some((id) => excluded.has(id))) {
+        const trial: EvalState = { ...before, hidden: excluded };
+        try {
+          targets = evaluateTracked(
+            trial,
+            features[index]!,
+            features.slice(0, index),
+            this.held,
+            doc.namingVersion,
+            undefined,
+            doc,
+          )?.targets;
+        } finally {
+          releaseSnapshots([{ state: trial }], this.snapshots);
+        }
       }
+      if (!targets || doc.namingVersion === 1) return targets && { targets };
+      const ids = [...before.bodies.keys()];
+      const earlier = features.slice(0, index);
+      return { autoTargets: autoTargetsAt(ids, hidden, earlier) };
     });
   }
 
