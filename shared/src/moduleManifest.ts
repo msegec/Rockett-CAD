@@ -9,6 +9,7 @@ import {
   SETTING_KEY,
   type SettingDefinition,
 } from "./settings.js";
+import { moduleBody } from "./topoRefs.js";
 
 const API_RANGE = /^\^(\d+)\.(\d+)$/;
 const HOST_VERSION = /^(\d+)\.(\d+)\.\d+$/;
@@ -142,6 +143,10 @@ export function parseManifest(
   if (core)
     throw new ValidationError(
       `manifest.id ${manifest.id} uses core namespace ${core}`,
+    );
+  if (!moduleBody(`${manifest.id}:`))
+    throw new ValidationError(
+      `manifest.id ${manifest.id} would read as a core body id`,
     );
   for (const point of CONTRIBUTION_POINTS) {
     const error = contributionError(manifest, point);

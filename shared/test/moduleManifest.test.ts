@@ -89,6 +89,7 @@ describe("parseManifest", () => {
     [{ manifestVersion: 2 }, /manifestVersion/],
     [{ id: "Rockett.Cam" }, /id/],
     [{ id: "design.extra" }, /design\.extra uses core namespace design/],
+    [{ id: "b" }, /manifest\.id b would read as a core body id/],
   ])("fails %o", (over, message) => {
     invalid(manifest(over), message);
   });

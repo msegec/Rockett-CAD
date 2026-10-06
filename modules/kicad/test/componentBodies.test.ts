@@ -112,8 +112,8 @@ it("makes each courtyard a 1 mm approximate reference box keyed by link and foot
   const doc = await f.store.load(f.doc.id);
   const first = await f.kernel.evaluate(doc);
   expect(first.featureStatuses.map(({ status }) => status)).toEqual(["ok"]);
-  const r1 = `rockett.kicad:${linkId}:${R1}`;
-  const c1 = `rockett.kicad:${linkId}:${C1}`;
+  const r1 = `rockett.kicad:board:${linkId}:${R1}`;
+  const c1 = `rockett.kicad:board:${linkId}:${C1}`;
   expect(components(first.bodies)).toEqual([
     {
       bodyId: r1,

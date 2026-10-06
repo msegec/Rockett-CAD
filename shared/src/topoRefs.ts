@@ -76,8 +76,12 @@ export function compareNames(a: string, b: string): number {
   return x.length - y.length;
 }
 
-export const bodyMadeBy = (featureId: string, bodyId: string) =>
-  bodyId === `b:${featureId}` || bodyId.startsWith(`b:${featureId}:`);
+export function bodyMadeBy(featureId: string, bodyId: string) {
+  const made = bodyId.slice(bodyId.indexOf(":") + 1);
+  return (
+    made !== bodyId && (made === featureId || made.startsWith(`${featureId}:`))
+  );
+}
 
 export const faceMadeBy = (featureId: string, faceName: string) =>
   /^(?:f|m|p\d+):/.test(faceName) &&
@@ -86,7 +90,10 @@ export const faceMadeBy = (featureId: string, faceName: string) =>
 export const derivedBodyId = (featureId: string, n: number) =>
   `b:${featureId}:${n}`;
 
-export const moduleBodyId = (moduleId: string, key: string) =>
-  `${moduleId}:${key}`;
+export const moduleBodyId = (
+  moduleId: string,
+  featureId: string,
+  key: string,
+) => `${moduleId}:${featureId}:${key}`;
 
 export const moduleBody = (bodyId: string) => !bodyId.startsWith("b:");

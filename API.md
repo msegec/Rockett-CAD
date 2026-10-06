@@ -399,12 +399,15 @@ file. The Modules settings page shows it beside a line naming
   use `^0.18`.
 - API 0.17.0 lets `evaluate` add a `bodies` list beside `shape`, each entry
   `{key, name, shape, faces, reference, approximate}`. Each becomes body
-  `<moduleId>:<key>`; a key is 1 to 128 characters of `a-z`, `0-9`, `_`, `:`
-  and `-`, starting with a letter or digit, so the id survives edits,
-  reorders and reopening. `shape` must be one solid, `faces` labels it as
-  API 0.14.0 does, `name` is 1 to 200 characters without control
-  characters, and the flags are booleans. The module's name replaces the
-  stored `bodyMeta` name on every evaluation; the colour stays the user's.
+  `<moduleId>:<featureId>:<key>`; a key is 1 to 128 characters of `a-z`,
+  `0-9`, `_`, `:` and `-`, starting with a letter or digit, so the id
+  survives edits, reorders and reopening. The body belongs to its feature
+  for Auto targets, tree selection and group pruning, and a manifest id `b`
+  is refused because `b:` starts core body ids. `shape` must be one solid,
+  `faces` labels it as API 0.14.0 does, `name` is 1 to 200 characters
+  without control characters, and the flags are booleans. The module's name
+  replaces the stored `bodyMeta` name on every evaluation; the colour stays
+  the user's.
   A `BodyPayload`, a `ProjectBody` and a `ServerBody` carry
   `reference: true` for a reference body; `BodyPayload` also carries
   `approximate: true`. A default export and a new CAM setup's bodies leave
@@ -496,9 +499,9 @@ file. The Modules settings page shows it beside a line naming
   snapshot order. A wall split into pieces, or a hole in a footprint without
   a uuid, keeps unlabelled names. Each footprint with a uuid and a
   courtyard of nonzero area also makes body
-  `rockett.kicad:<linkId>:<footprintUuid>`, named by its Reference: a box
-  over the courtyard bounds, 1 mm high, on the top face for a front part
-  and under the board for a back part, flagged `reference` and
+  `rockett.kicad:<featureId>:<linkId>:<footprintUuid>`, named by its
+  Reference: a box over the courtyard bounds, 1 mm high, on the top face
+  for a front part and under the board for a back part, flagged `reference` and
   `approximate`. A Reference rename keeps the body id.
 - Service `rockett.kicad.boardNets` takes a `linkId` string and returns
   `{nets: [{name, members: [{footprintUuid, reference, pad}]}]}` in board

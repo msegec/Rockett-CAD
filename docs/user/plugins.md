@@ -84,7 +84,8 @@ acme/
 | `contributes`     | Lists of ids per contribution point. Each id starts with `<id>.`; a setting key starts with `plugin.<id>.`.   |
 
 The ids `design`, `sketch`, `inspect` and `asm`, and ids under them, belong
-to the core and are refused. The shipped modules use `rockett`.
+to the core and are refused, as is `b`, which starts core body ids. The
+shipped modules use `rockett`.
 
 ## API version policy
 
@@ -148,9 +149,9 @@ entry.
 
 Timeline features: `evaluate` may return
 `bodies: [{ key, name, shape, faces, reference?, approximate? }]` beside
-`shape`. Each entry becomes body `<id>:<key>`, so its id survives edits and
-reopening. Your `name` wins on every evaluation, and users cannot rename a
-module body.
+`shape`. Each entry becomes body `<id>:<featureId>:<key>`, so its id survives
+edits and reopening and it belongs to the feature that made it. Your `name`
+wins on every evaluation, and users cannot rename a module body.
 
 DXF: `context.dxf(projectId, user, { sketchId })` or
 `{ face: { kind: "face", bodyId, faceName } }` returns the DXF bytes the

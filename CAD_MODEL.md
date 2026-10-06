@@ -85,8 +85,8 @@ and `compareNames` in `shared/src/topoRefs.ts`.
   1 appends `:{n}` to the target's id.
 - Mirror, pattern and Move copies are `b:{featureId}:{n}`, fixed length at
   any depth. The first `splitBody` piece keeps its id.
-- A module body is `{moduleId}:{key}`, one solid, whatever the feature's
-  id or timeline position (API.md, API 0.17.0).
+- A module body is `{moduleId}:{featureId}:{key}`, one solid, made by that
+  feature whatever its timeline position (API.md, API 0.17.0).
 - A fresh process gives the same ids and names.
 - Display names live in `document.bodyMeta`, set once when a body first
   appears, except a module body's, which follows its module's name on every

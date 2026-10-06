@@ -176,7 +176,7 @@ function kindOf({ spec, evaluate }: TimelineFeature): FeatureKind {
         return {
           made: named(shape, listed, what),
           keyed: keyedBodies(bodies, what).map((entry) => {
-            const id = moduleBodyId(moduleId, entry.key);
+            const id = moduleBodyId(moduleId, feature.id, entry.key);
             const label = `${what} body ${entry.key}`;
             const solid = named(entry.shape, entry.labels, label);
             if (solids(solid.shape).length !== 1)
