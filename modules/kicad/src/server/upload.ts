@@ -10,6 +10,7 @@ import {
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { readBoard } from "../board.js";
+import { diffBoards } from "../diff.js";
 import { child, parseSexpr, SEXPR_LIMITS, str } from "../sexpr.js";
 import {
   dataSchema,
@@ -27,7 +28,10 @@ import { modelName, resolveModel } from "../shared/models.js";
 const encoded = Type.String({
   maxLength: Math.ceil(SEXPR_LIMITS.bytes / 3) * 4,
 });
-const body = Type.Object({ source: encoded }, { additionalProperties: false });
+const body = Type.Object(
+  { source: encoded, linkId: Type.Optional(Type.String({ maxLength: 128 })) },
+  { additionalProperties: false },
+);
 const modelBody = Type.Object(
   { name: Type.String({ maxLength: MODEL_NAME_LENGTH }), source: encoded },
   { additionalProperties: false },
@@ -165,7 +169,7 @@ export function linkOf(doc: CadDocument, linkId: string) {
   return { stored, link };
 }
 
-async function footprintsOf(link: Link, ctx: ProjectRouteContext) {
+async function snapshotOf(link: Link, ctx: ProjectRouteContext) {
   const snapshot: unknown = JSON.parse(
     new TextDecoder().decode(await ctx.blobs.get(link.snapshotAsset)),
   );
@@ -174,7 +178,7 @@ async function footprintsOf(link: Link, ctx: ProjectRouteContext) {
       "KiCad board snapshot is not supported or valid",
       "unprocessable",
     );
-  return snapshot.data.footprints;
+  return snapshot.data;
 }
 
 async function uploadBoard(
@@ -182,28 +186,42 @@ async function uploadBoard(
   req: RouteRequest<typeof uploadRoute>,
   ctx: ProjectMutationContext,
 ) {
+  const { source, linkId: target } = req.body;
   const stored = storedData(doc);
-  const board = uploaded(req.body.source);
+  const previous = target === undefined ? undefined : linkOf(doc, target).link;
+  const before = previous && (await snapshotOf(previous, ctx));
+  const {
+    generator: _generator,
+    generatorVersion: _version,
+    ...kept
+  } = previous ?? {};
+  const board = uploaded(source);
   const [sourceAsset, snapshotAsset] = await keep(doc, stored.links, ctx, [
     board.bytes,
     board.snapshot,
   ]);
-  const linkId = crypto.randomUUID();
+  const linkId = target ?? crypto.randomUUID();
   const link = {
+    outlineOwner: "kicad",
+    ...kept,
     sourceKind: "upload",
     sourceAsset,
     sha256: sourceAsset,
     formatVersion: board.data.formatVersion,
     ...board.metadata,
     snapshotAsset,
-    outlineOwner: "kicad",
   };
   doc.extensions[NAMESPACE] = {
     ...doc.extensions[NAMESPACE],
     version: VERSION,
     data: { ...stored, links: { ...stored.links, [linkId]: link } },
   };
-  return { label: "Upload KiCad board", linkId };
+  if (!before) return { label: "Upload KiCad board", linkId };
+  return {
+    label: "Update KiCad board",
+    linkId,
+    diff: diffBoards(before, board.data),
+  };
 }
 
 async function listModels(
@@ -213,7 +231,7 @@ async function listModels(
 ) {
   const { link } = linkOf(doc, req.params.linkId);
   return {
-    models: (await footprintsOf(link, ctx)).flatMap(
+    models: (await snapshotOf(link, ctx)).footprints.flatMap(
       ({ uuid, reference, models }) =>
         models.map((model) => ({
           footprintUuid: uuid,
@@ -233,11 +251,12 @@ async function uploadModel(
   const { stored, link } = linkOf(doc, linkId);
   const { name } = req.body;
   refusing(() => modelName(name), "Invalid KiCad model name");
-  const referenced = (await footprintsOf(link, ctx)).some(({ models }) =>
-    models.some((model) => {
-      const use = resolveModel(model);
-      return use.status !== "refused" && use.name === name;
-    }),
+  const referenced = (await snapshotOf(link, ctx)).footprints.some(
+    ({ models }) =>
+      models.some((model) => {
+        const use = resolveModel(model);
+        return use.status !== "refused" && use.name === name;
+      }),
   );
   if (!referenced)
     throw new StoreError(`No footprint on this board references ${name}`);

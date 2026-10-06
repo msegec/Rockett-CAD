@@ -512,6 +512,14 @@ file. The Modules settings page shows it beside a line naming
   as `rockett.kicad.v1.v2` before its first version 2 save.
   Source and `{version: 1, data}` snapshot hashes are portable
   assets. Original bytes retain a BOM; JSON caps decoded source below 37.5 MiB.
+  An optional `linkId` updates that link instead, or refuses with 422 when
+  the project has no such link. The update keeps the link id, outline owner
+  and uploaded models, replaces source, snapshot and generator fields in one
+  undoable edit labelled `Update KiCad board`, and returns
+  `diff: {added, removed, moved, modelChanged, outlineChanged, thicknessChanged}`.
+  The lists hold footprint uuids; moved covers position, angle and side.
+  Component bodies keep their ids; a reference to a removed footprint's body
+  reports `missing` until the footprint returns.
 - Footprint model paths resolve by name. A path must start with
   `${KICAD9_3DMODEL_DIR}/`, `${KICAD10_3DMODEL_DIR}/` or `${KIPRJMOD}/`; the
   name is the path with a trailing `.wrl` read as `.step`, and must end in
