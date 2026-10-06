@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { PLUGIN_API_VERSION } from "@rockett/plugin-api";
 import {
   defineSetting,
+  HOST_IMPORTS,
   moduleEnabledSetting,
   moduleHostSettings,
   parseManifest,
@@ -34,6 +35,10 @@ const CODE = /\.(?:mjs|cjs|js)$/;
 const SPECIFIER = /\b(?:import|from|require)\s*\(?\s*(["'`])([^"'`\r\n]+)\1/g;
 
 let closures: readonly (readonly [string, string])[] = [];
+let stageRoot = "";
+
+const stagedFolder = (id: string, closure: string) =>
+  path.join(stageRoot, id, closure);
 
 export const enabledPluginClosures = () => closures;
 
@@ -112,8 +117,11 @@ function closureSha256(tree: Tree) {
   return hash.digest("hex");
 }
 
+const HOST_IMPORT: ReadonlySet<string> = new Set(HOST_IMPORTS);
+
 function inside(from: string, specifier: string) {
   if (isBuiltin(specifier)) return true;
+  if (from === "client.mjs" && HOST_IMPORT.has(specifier)) return true;
   if (!/^\.\.?\//.test(specifier)) return false;
   const target = path.posix.join(path.posix.dirname(from), specifier);
   return target !== ".." && !target.startsWith("../");
@@ -216,7 +224,7 @@ async function plugin(
   const closure = closureSha256(tree);
   const disabled = refusal(id, closure, app);
   if (disabled) return { manifest, status: "disabled", error: disabled };
-  const folder = path.join(dirs.stage, id, closure);
+  const folder = stagedFolder(id, closure);
   closures = [...closures, [id, closure]];
   let server: HostModule["server"] | undefined;
   try {
@@ -230,7 +238,20 @@ async function plugin(
   }
   if (typeof server?.activate !== "function")
     return refuse("server.mjs has no default export with activate", manifest);
-  return { manifest, server, folder: pathToFileURL(`${folder}${path.sep}`) };
+  return {
+    manifest,
+    server,
+    folder: pathToFileURL(`${folder}${path.sep}`),
+    client: tree.has("client.mjs"),
+  };
+}
+
+export async function stagedClient(id: string) {
+  const closure = closures.find(([owner]) => owner === id)?.[1];
+  if (!closure) return undefined;
+  const tree = await readTree(stagedFolder(id, closure)).catch(() => undefined);
+  if (!tree || closureSha256(tree) !== closure) return undefined;
+  return tree.get("client.mjs");
 }
 
 export async function discoverPlugins(
@@ -238,6 +259,7 @@ export async function discoverPlugins(
   app: LayerValues,
 ): Promise<(HostModule | Refusal)[]> {
   closures = [];
+  stageRoot = dirs.stage;
   await wipe(dirs.stage);
   let entries;
   try {

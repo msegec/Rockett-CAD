@@ -30,7 +30,7 @@ import { historyRoutes } from "./historyRoutes.js";
 import { documentRoutes } from "./documentRoutes.js";
 import { bodyRoutes } from "./bodyRoutes.js";
 import { assemblyRoutes } from "../assembly/routes.js";
-import { listModules, moduleLicence } from "../modules/host.js";
+import { listModules, moduleClient, moduleLicence } from "../modules/host.js";
 
 export function createApiRouter(
   store: ProjectStore,
@@ -65,6 +65,13 @@ export function createApiRouter(
   on(ROUTES.moduleLicence, (req, res) => {
     moduleLicence(String(req.params.id)).then(
       (text) => res.json({ text }),
+      (error: unknown) => fail(req, res, error),
+    );
+  });
+  on(ROUTES.pluginClient, (req, res) => {
+    moduleClient(String(req.params.id)).then(
+      (code) =>
+        res.type("text/javascript").set("Cache-Control", "no-cache").send(code),
       (error: unknown) => fail(req, res, error),
     );
   });

@@ -48,7 +48,11 @@ import {
 import { checkModuleType } from "./features.js";
 import { moduleFiles } from "./files.js";
 import { provideService } from "./services.js";
-import { discoverPlugins, type PluginDirs } from "./thirdParty.js";
+import {
+  discoverPlugins,
+  stagedClient,
+  type PluginDirs,
+} from "./thirdParty.js";
 
 type Kernel = Pick<KernelClient, "moduleJob" | "installFeatures"> & BodyKernel;
 
@@ -164,6 +168,7 @@ export interface HostModule {
     migrations?: DataMigrations;
   };
   folder?: URL;
+  client?: boolean;
 }
 
 const ABOUT = ["id", "name", "version", "licence", "author"] as const;
@@ -288,6 +293,15 @@ export async function moduleLicence(id: string): Promise<string> {
   }
 }
 
+export async function moduleClient(id: string): Promise<Buffer> {
+  const code = loaded.some((module) => module.id === id && module.client)
+    ? await stagedClient(id)
+    : undefined;
+  if (!code)
+    throw new StoreError(`module ${id} has no client to serve`, "not_found");
+  return code;
+}
+
 export async function loadModules(
   modules: readonly HostModule[],
   kernel: Kernel,
@@ -308,7 +322,11 @@ export async function loadModules(
     }
     const own: Dispose[] = [];
     const report = await load(module, own, kernel, store, folders, app);
-    reports.push(report);
+    reports.push(
+      report.status === "loaded" && module.client
+        ? { ...report, client: true }
+        : report,
+    );
     if (module.folder) found.set(report.id, module.folder);
     disposers.push(() => disposeAll(own));
   }

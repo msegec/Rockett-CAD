@@ -273,6 +273,7 @@ export const ROUTES = {
     "GET",
     "/modules/:id/licence",
   ),
+  pluginClient: route<never, Blob>()("GET", "/plugins/:id/client.mjs"),
   listProjects: route<never, ProjectSummary[]>()("GET", "/projects"),
   createProject: route<{ name?: string; folderId?: string }, ProjectResponse>()(
     "POST",

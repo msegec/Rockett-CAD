@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+import { HOST_IMPORTS } from "../shared/src/moduleManifest.ts";
 import { DEFAULT_PORT } from "../shared/src/routes.ts";
 import { PALETTES } from "./src/theme/palette.ts";
 
@@ -11,8 +12,6 @@ const alias = {
   ),
 };
 
-const SHARED = ["react", "react/jsx-runtime", "react-dom/client", "three"];
-
 const FACADE = "\0facade:";
 
 function pluginImportMap(): Plugin {
@@ -21,7 +20,7 @@ function pluginImportMap(): Plugin {
     apply: "build",
     options(options) {
       const facades = Object.fromEntries(
-        SHARED.map((spec) => [spec.replace("/", "-"), FACADE + spec]),
+        HOST_IMPORTS.map((spec) => [spec.replace("/", "-"), FACADE + spec]),
       );
       return {
         ...options,

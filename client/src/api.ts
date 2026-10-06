@@ -29,7 +29,7 @@ export { saveDownload, type Download } from "./download";
 import { TIMING_MS } from "./tunables";
 
 export type { Health, MutationResponse } from "@rockett/shared";
-const API = "/api";
+export const API = "/api";
 
 export class ApiError extends Error {
   constructor(

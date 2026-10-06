@@ -362,6 +362,7 @@ export interface ModuleInfo {
   author: string;
   status: ModuleStatus;
   error: string | null;
+  client?: true;
 }
 
 export const SIZE_KEYS = {

@@ -53,6 +53,7 @@ import {
 import { DialogFooter } from "../components/form/DialogFooter";
 import { measureRef } from "../components/selectionMeasure";
 import { pickMode } from "./pick";
+import { thirdPartyModules } from "./thirdParty";
 import {
   AngleField,
   CheckField,
@@ -425,23 +426,30 @@ const disposeAll = (disposers: readonly Dispose[]) => {
   for (const dispose of disposers.toReversed()) dispose();
 };
 
-export async function loadClientModules(
-  modules: readonly HostModule[],
-  report: () => Promise<readonly ModuleInfo[]>,
-): Promise<Dispose> {
+const registerHostSettings = (modules: readonly HostModule[]) => {
   for (const { manifest } of modules)
     registerSettings(
       moduleHostSettings(manifest.id).filter(({ key }) => !SETTINGS.has(key)),
     );
+};
+
+export async function loadClientModules(
+  modules: readonly HostModule[],
+  report: () => Promise<readonly ModuleInfo[]>,
+): Promise<Dispose> {
+  registerHostSettings(modules);
   const reports = await report().catch((error: Error) => {
     useStore.getState().setError(error.message);
     return [];
   });
+  const plugins = thirdPartyModules(reports);
+  registerHostSettings(plugins);
+  if (plugins.length > 0) publish();
   const loaded = new Set(
     reports.filter((m) => m.status === "loaded").map((m) => m.id),
   );
   const disposers: Dispose[] = [];
-  for (const module of modules) {
+  for (const module of [...modules, ...plugins]) {
     if (!loaded.has(module.manifest.id)) continue;
     const own: Dispose[] = [];
     try {

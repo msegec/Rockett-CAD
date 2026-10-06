@@ -89,6 +89,13 @@ const HOST_NAMES = moduleHostSettings("host").map(({ key }) =>
 const isHostSetting = (key: string) =>
   HOST_NAMES.some((name) => key.endsWith(name));
 
+export const HOST_IMPORTS = [
+  "react",
+  "react/jsx-runtime",
+  "react-dom/client",
+  "three",
+] as const;
+
 export interface SettingOwner {
   id: string;
   contributes?: Partial<Record<string, readonly string[]>>;

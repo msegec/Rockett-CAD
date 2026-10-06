@@ -39,6 +39,7 @@ nothing else is: `server/src/api/routes.ts`.
 | `GET /health`                                                                     | `server/src/api/systemRoutes.ts`   |
 | `GET /formats`                                                                    | `server/src/api/systemRoutes.ts`   |
 | `GET /modules`, `GET /modules/:id/licence`                                        | `server/src/api/routes.ts`         |
+| `GET /plugins/:id/client.mjs`                                                     | `server/src/api/routes.ts`         |
 | `GET`, `POST /projects`                                                           | `server/src/api/projectRoutes.ts`  |
 | `GET`, `DELETE /projects/:id`                                                     | `server/src/api/projectRoutes.ts`  |
 | `POST /projects/:id/duplicate`, `/rename`                                         | `server/src/api/projectRoutes.ts`  |
@@ -351,6 +352,8 @@ file. The Modules settings page shows it beside a line naming
 `THIRD-PARTY-NOTICES.md`.
 
 - `status` is `loaded`, `failed`, `incompatible` or `disabled`.
+- `client` is `true` only for a `loaded` third-party plugin that ships
+  `client.mjs`, and absent otherwise.
 - `error` is null for `loaded` and `disabled`. Otherwise it is the manifest
   error, the thrown registration or activation message, or the plugin API
   range reason.
@@ -659,7 +662,8 @@ Third-party plugins are trusted code, not sandboxed (DEC-501). Code:
 (`server/src/tunables.ts`).
 
 - Install by folder drop only: `ROCKETT_PLUGIN_DIR` (default
-  `<DATA_DIR>/plugins`) holds `<id>/manifest.json` and `<id>/server.mjs`.
+  `<DATA_DIR>/plugins`) holds `<id>/manifest.json`, `<id>/server.mjs` and
+  an optional `<id>/client.mjs`.
   No route accepts uploads or writes plugins. The host scans the folder at
   startup and lists every plugin folder through `GET /modules`, after the
   shipped modules, sorted by folder name.
@@ -673,8 +677,9 @@ Third-party plugins are trusted code, not sandboxed (DEC-501). Code:
   when `server.mjs` is missing or has no default export with `activate`,
   or when a `.mjs`, `.cjs` or `.js` file names a module outside the folder:
   a literal `import`, `from` or `require` specifier must be a Node builtin
-  or a relative path that stays inside. A computed specifier is not
-  checked.
+  or a relative path that stays inside. `client.mjs` may also name
+  `HOST_IMPORTS` (`shared/src/moduleManifest.ts`), which the import map
+  resolves to the host. A computed specifier is not checked.
 - An incompatible `apiRange` lists `incompatible` and its code is never
   imported.
 - Otherwise it stays `disabled` until an admin sets the app settings
@@ -689,6 +694,17 @@ Third-party plugins are trusted code, not sandboxed (DEC-501). Code:
 - The closure sha256 of every enabled plugin joins each body fingerprint,
   so a plugin update that keeps its data `version` still makes CAM
   operations stale.
+- `GET /plugins/:id/client.mjs` serves a plugin's staged `client.mjs` as
+  `text/javascript` to signed-in users, read-only, only while `GET /modules`
+  lists it with `client: true`. Each request hashes the staged folder again
+  and answers 404 once it no longer matches the closure sha256 it was
+  enabled with.
+- After the shipped client modules activate, `client/src/modules/thirdParty.ts`
+  imports each listed `client` and calls its default export's `activate`
+  with the same `ClientContext`. A failed import or activation logs
+  `[rockett] module <id> failed: <message>` and skips only that plugin. The
+  client context has no manifest `contributes`, so `settings` refuses every
+  key.
 
 ## Project file
 
