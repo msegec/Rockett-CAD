@@ -238,6 +238,8 @@ release workflow remain under development. The core licence is unresolved.
   earlier in the timeline stays out, and a 1,000-copy pattern stores one
   feature id. Version 1 documents still store `targets`; the 10,000-target cap
   is gone.
+- A reopened Auto tool shows Auto with the bodies it takes, and a picked body
+  stays an explicit pick.
 
 ### Known limits
 

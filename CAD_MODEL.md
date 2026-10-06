@@ -779,7 +779,8 @@ Auto form in a version 2 document, the `targets` the default gave in a version
 `server/src/geometry/engine.ts`). A tool whose evaluation reports no targets,
 such as a new body, stores neither. The server owns the Auto form: a client's
 `autoTargets` only asks for it, and an update keeps the stored one until a
-pick replaces it.
+pick replaces it. The edit dialog resends the stored form and lists the bodies
+`autoTarget` admits: `client/src/toolTargets.ts`.
 
 An Auto tool takes the default participants from the bodies a listed feature
 made, less `exclude`, so a body inserted earlier in the timeline stays out and

@@ -1,4 +1,5 @@
 import {
+  autoTarget,
   ORIGIN_AXES,
   type Units,
   type OriginAxis,
@@ -15,7 +16,7 @@ import {
   clearInput,
   readInput,
 } from "../../commands/featureCommand";
-import { chosenTargets, several } from "../../toolTargets";
+import { chosenTargets, several, storedAuto } from "../../toolTargets";
 import { pickLabel } from "../../selection/labels";
 export { pickLabel } from "../../selection/labels";
 import { ExpressionField, type ExpressionFieldProps } from "./expressionField";
@@ -361,19 +362,27 @@ export function SelInfo({
   );
 }
 
+const body = (bodyId: string): Selection => ({ kind: "body", bodyId });
+
 export function TargetField({ operation }: { operation: string }) {
   const value: string[] | undefined = useStore((s) => featureParams(s).targets);
+  const featureId = useStore((s) => featureParams(s).id);
   const setParams = setFeatureParams;
   const namingVersion = useStore((s) => s.document?.namingVersion);
   const evaluation = useStore((s) => s.evaluation);
   const active = useStore((s) => s.active);
   const hidden = useStore((s) => s.view.hidden.bodies);
+  const document = useStore((s) => s.document);
   if (operation === "newBody") return null;
   const bodies = previewBodies({ active, evaluation });
   const many = several(operation, namingVersion);
   const ids = chosenTargets(operation, value, namingVersion);
   const set = (next: string[]) =>
     setParams({ targets: next.length > 0 ? next : undefined });
+  const auto = ids.length === 0 && storedAuto(document, featureId);
+  const autoIds =
+    auto &&
+    bodies.flatMap((b) => (autoTarget(auto, b.bodyId) ? [b.bodyId] : []));
   const offered = bodies
     .filter(
       (b) => !hidden.includes(b.bodyId) && (!many || !ids.includes(b.bodyId)),
@@ -400,7 +409,16 @@ export function TargetField({ operation }: { operation: string }) {
         ]}
         onChange={(id) => set(many ? [...ids, id] : id === "" ? [] : [id])}
       />
-      <SelInfo label={label} input="targets" hint="Auto, or click a body" />
+      <SelInfo
+        label={label}
+        input="targets"
+        hint="Auto, or click a body"
+        {...(autoIds && {
+          picks: autoIds.map(body),
+          onRemove: (keys) =>
+            set(autoIds.filter((id) => !keys.includes(selectionKey(body(id))))),
+        })}
+      />
     </>
   );
 }

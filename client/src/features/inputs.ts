@@ -66,13 +66,9 @@ export const bodyPicks = (ids: string[]): Selection[] =>
 
 export const bodyTargets = (
   operation: string,
-  params: Pick<SharedInputParams, "targets">,
+  params: Pick<SharedInputParams, "id" | "targets">,
 ) =>
-  toolTargets(
-    operation,
-    params.targets,
-    useStore.getState().document?.namingVersion,
-  );
+  toolTargets(operation, params, useStore.getState().document?.namingVersion);
 
 export const selectedPlane = (selection: Selection[]): PlaneRef | null => {
   const plane = selection.find((x) => x.kind === "plane");
