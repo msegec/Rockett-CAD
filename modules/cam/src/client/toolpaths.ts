@@ -1,10 +1,11 @@
 import * as THREE from "three";
 import { createElement as h, useSyncExternalStore } from "react";
-import type {
-  Dispose,
-  Layer,
-  OpenProject,
-  ProjectView,
+import {
+  themed,
+  type Dispose,
+  type Layer,
+  type OpenProject,
+  type ProjectView,
 } from "@rockett/plugin-api";
 import { programRoute, surfaceRoute } from "../shared/document.js";
 import type { Program } from "../shared/ir.js";
@@ -21,7 +22,7 @@ import {
 import { button, reason } from "./libraryParts.js";
 import { ROLES, programToSegments, type Segments } from "./segments.js";
 import { bodyBoxes, camRead } from "./setup.js";
-import { placeInModel, themed } from "./stockLayer.js";
+import { placeInModel } from "./stockLayer.js";
 
 export const TOOLPATH_LAYER = "rockett.cam.toolpaths";
 

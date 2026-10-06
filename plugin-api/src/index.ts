@@ -24,9 +24,14 @@ export type {
   User,
 } from "@rockett/shared";
 
-export { Placement, placementSchema, StoreError } from "@rockett/shared";
+export {
+  moduleBodyId,
+  Placement,
+  placementSchema,
+  StoreError,
+} from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.22.0";
+export const PLUGIN_API_VERSION = "0.23.0";
 
 export * from "./server.js";
 export * from "./client.js";

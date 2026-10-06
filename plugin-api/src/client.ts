@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import type { Group, Object3D } from "three";
+import type { Color, Group, Material, Object3D } from "three";
 import type {
   CadDocument,
   MeasureRequest,
@@ -85,6 +85,19 @@ export interface ViewportLayer {
   disposeObject(object: Object3D): void;
   disposeGroup(group: Object3D): void;
   clearGroup(group: Object3D): void;
+}
+
+export function themed<M extends Material & { color: Color }>(
+  material: M,
+  token: string,
+): M {
+  material.color.set(
+    getComputedStyle(document.documentElement)
+      .getPropertyValue(`--${token}`)
+      .trim(),
+  );
+  material.userData.themeToken = token;
+  return material;
 }
 
 export interface Layer {

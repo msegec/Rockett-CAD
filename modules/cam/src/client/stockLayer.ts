@@ -1,5 +1,10 @@
 import * as THREE from "three";
-import type { Layer, OpenProject, ProjectView } from "@rockett/plugin-api";
+import {
+  themed,
+  type Layer,
+  type OpenProject,
+  type ProjectView,
+} from "@rockett/plugin-api";
 import {
   stockBox,
   type Box,
@@ -18,19 +23,6 @@ const GOUGE_TOKEN = "err";
 const HOLD_DOWN_TOKEN = "warn";
 const AXIS_TOKENS = ["axis-x", "axis-y", "axis-z"] as const;
 const TRIAD_FRACTION = 0.25;
-
-export function themed<M extends THREE.Material & { color: THREE.Color }>(
-  material: M,
-  token: string,
-): M {
-  material.color.set(
-    getComputedStyle(document.documentElement)
-      .getPropertyValue(`--${token}`)
-      .trim(),
-  );
-  material.userData.themeToken = token;
-  return material;
-}
 
 const line = (points: THREE.Vector3[], token: string) =>
   new THREE.LineSegments(

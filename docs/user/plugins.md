@@ -57,7 +57,7 @@ acme/
   "id": "acme",
   "name": "Acme tools",
   "version": "1.2.0",
-  "apiRange": "^0.22",
+  "apiRange": "^0.23",
   "licence": "MIT OR Apache-2.0",
   "author": "Acme Ltd",
   "dataVersion": 2,
@@ -90,11 +90,11 @@ shipped modules use `rockett`.
 ## API version policy
 
 The host's version is `PLUGIN_API_VERSION` in `plugin-api/src/index.ts`. The
-examples here target 0.22.
+examples here target 0.23.
 
 - `apiRange` is `^MAJOR.MINOR`.
 - While the API is 0.x, each minor is its own line. A host loads only
-  plugins that name its own minor: `^0.22` loads on 0.22.x and nowhere else.
+  plugins that name its own minor: `^0.23` loads on 0.23.x and nowhere else.
   Expect to release for each new minor.
 - From 1.0, `^1.2` loads on any 1.x from 1.2 up. Changes within a major only
   add. A removal is deprecated for one major and lands in a later one.
@@ -157,8 +157,10 @@ entry.
 Timeline features: `evaluate` may return
 `bodies: [{ key, name, shape, faces, reference?, approximate? }]` beside
 `shape`. Each entry becomes body `<id>:<featureId>:<key>`, so its id survives
-edits and reopening and it belongs to the feature that made it. Your `name`
-wins on every evaluation, and users cannot rename a module body.
+edits and reopening and it belongs to the feature that made it.
+`moduleBodyId(id, featureId, key)` builds that id, so a client can match a
+picked body without writing the format. Your `name` wins on every
+evaluation, and users cannot rename a module body.
 `readStep(bytes)` in the `evaluate` scope reads STEP bytes, such as one of
 your `inputs.assets`, through the core importer and returns one shape per
 STEP part, owned by the scope. Bytes over the server's import budget are
@@ -167,6 +169,10 @@ refused before reading, with the message a core import gives.
 Placements: `placementSchema` validates a stored `{ rotation, translation }`
 and `Placement.applyToPoint` or `Placement.applyToDirection` moves geometry
 by one, so a plugin does not carry its own quaternion maths.
+
+Layer colours: `themed(material, token)` sets a three.js material's colour
+from a theme token such as `selection` or `warn` and records the token, so a
+theme switch recolours it.
 
 DXF: `context.dxf(projectId, user, { sketchId })` or
 `{ face: { kind: "face", bodyId, faceName } }` returns the DXF bytes the
@@ -297,7 +303,7 @@ and one settings page on the client.
   "id": "hello",
   "name": "Hello",
   "version": "1.0.0",
-  "apiRange": "^0.22",
+  "apiRange": "^0.23",
   "licence": "MIT",
   "author": "Rockett CAD",
   "contributes": { "exporters": ["hello.text"] }

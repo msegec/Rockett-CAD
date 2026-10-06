@@ -6,12 +6,14 @@ import {
   type ReactNode,
 } from "react";
 import * as THREE from "three";
-import type {
-  ClientContext,
-  Dispose,
-  Layer,
-  PickRef,
-  ProjectView,
+import {
+  moduleBodyId,
+  themed,
+  type ClientContext,
+  type Dispose,
+  type Layer,
+  type PickRef,
+  type ProjectView,
 } from "@rockett/plugin-api";
 import { PROVIDER } from "../boardNets.js";
 import { padsRoute, type BoardPads } from "../server/boardPads.js";
@@ -75,7 +77,7 @@ export const reason = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
 const componentBody = (board: Board, footprintUuid: string) =>
-  `${PROVIDER}:${board.featureId}:${board.linkId}:${footprintUuid}`;
+  moduleBodyId(PROVIDER, board.featureId, `${board.linkId}:${footprintUuid}`);
 
 function pickedFootprint(
   { board, loaded }: NetState,
@@ -96,22 +98,18 @@ function highlightedPads({ loaded, net }: NetState) {
 }
 
 function padPoints(positions: [number, number, number][]) {
-  const material = new THREE.PointsMaterial({
-    size: PAD_SIZE_PX,
-    sizeAttenuation: false,
-    depthTest: false,
-  });
-  material.color.set(
-    getComputedStyle(document.documentElement)
-      .getPropertyValue(`--${PAD_TOKEN}`)
-      .trim(),
-  );
-  material.userData.themeToken = PAD_TOKEN;
   const points = new THREE.Points(
     new THREE.BufferGeometry().setFromPoints(
       positions.map((at) => new THREE.Vector3(...at)),
     ),
-    material,
+    themed(
+      new THREE.PointsMaterial({
+        size: PAD_SIZE_PX,
+        sizeAttenuation: false,
+        depthTest: false,
+      }),
+      PAD_TOKEN,
+    ),
   );
   points.renderOrder = 11;
   return points;

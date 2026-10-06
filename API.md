@@ -397,6 +397,13 @@ file. The Modules settings page shows it beside a line naming
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.23.0 exports `moduleBodyId(moduleId, featureId, key)` from
+  `shared/src/topoRefs.ts`, the one owner of the keyed body id
+  `<moduleId>:<featureId>:<key>`, and `themed(material, token)` on the
+  client, which sets a material's colour from the theme token's CSS
+  variable and records the token so a theme switch recolours it. CAM's
+  stock and toolpath layers and the Electrical pad highlight use both or
+  either. All four first-party manifests use `^0.23`.
 - API 0.22.0 adds `unzstd(bytes, maxBytes)` to project route and mutation
   contexts (`server/src/modules/unzstd.ts`), since modules may not import
   Node builtins. It runs Node's `zstdDecompressSync` with `maxOutputLength`
