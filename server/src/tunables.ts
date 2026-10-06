@@ -77,6 +77,12 @@ export const BACKUP_LIMITS = {
   live: 20,
 } as const;
 
+export const PLUGIN_LIMITS = {
+  plugins: 64,
+  entries: 4096,
+  bytes: 256 * MB,
+} as const;
+
 function megabytesSetting(
   env: NodeJS.ProcessEnv,
   name: string,

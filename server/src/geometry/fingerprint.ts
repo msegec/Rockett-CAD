@@ -10,6 +10,7 @@ import {
   type Placement,
 } from "@rockett/shared";
 import { build } from "../build.js";
+import { enabledPluginClosures } from "../modules/thirdParty.js";
 import { sha256 } from "../store/jsonStore.js";
 import { featureKey } from "./engine.js";
 import type { Sources } from "./importers.js";
@@ -114,6 +115,7 @@ export function bodyFingerprint(
     return bytes ? sha256(bytes) : null;
   };
   const { version, commit } = build();
+  const plugins = enabledPluginClosures();
   return sha256(
     JSON.stringify({
       features: features.map((feature) => featureKey(feature, doc, sources)),
@@ -129,6 +131,7 @@ export function bodyFingerprint(
       placement,
       selection,
       camVersion,
+      ...(plugins.length > 0 && { plugins }),
     }),
   );
 }

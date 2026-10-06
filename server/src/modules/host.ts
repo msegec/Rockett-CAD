@@ -48,6 +48,7 @@ import {
 import { checkModuleType } from "./features.js";
 import { moduleFiles } from "./files.js";
 import { provideService } from "./services.js";
+import { discoverPlugins, type PluginDirs } from "./thirdParty.js";
 
 type Kernel = Pick<KernelClient, "moduleJob" | "installFeatures"> & BodyKernel;
 
@@ -292,12 +293,19 @@ export async function loadModules(
   kernel: Kernel,
   store: ProjectStore,
   folders: FolderStore,
+  plugins?: PluginDirs,
 ): Promise<Dispose> {
   const disposers: Dispose[] = [];
   const reports: ModuleInfo[] = [];
   const found = new Map<string, URL>();
   const app = await store.settings.read({ scope: "app" });
-  for (const module of modules) {
+  const thirdParty = plugins ? await discoverPlugins(plugins, app) : [];
+  for (const module of [...modules, ...thirdParty]) {
+    if ("status" in module) {
+      const { manifest, status, error } = module;
+      reports.push({ ...about(manifest), status, error });
+      continue;
+    }
     const own: Dispose[] = [];
     const report = await load(module, own, kernel, store, folders, app);
     reports.push(report);

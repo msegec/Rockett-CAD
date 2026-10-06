@@ -33,6 +33,10 @@ const PORT = Number(process.env.ROCKETT_PORT || DEFAULT_PORT);
 const DATA_DIR = process.env.DATA_DIR || path.resolve(here, "../../data");
 const MESH_CACHE_DIR =
   process.env.ROCKETT_MESH_CACHE_DIR || path.join(DATA_DIR, "mesh-cache");
+const PLUGIN_DIRS = {
+  root: process.env.ROCKETT_PLUGIN_DIR || path.join(DATA_DIR, "plugins"),
+  stage: path.join(DATA_DIR, "plugin-stage"),
+};
 
 async function run() {
   if (process.argv[2] === "reset-password") {
@@ -95,7 +99,7 @@ async function main(allowedOrigins: string[], cookie: CookieConfig) {
       `[rockett] ${outdated.length} projects predate schema ${SCHEMA_VERSION} or the project manifest; each is backed up and migrated on its next save`,
     );
 
-  await loadModules(serverModules, kernel, store, folders);
+  await loadModules(serverModules, kernel, store, folders, PLUGIN_DIRS);
   for (const { id, status, error } of listModules())
     if (error) console.error(`[rockett] module ${id} ${status}: ${error}`);
 

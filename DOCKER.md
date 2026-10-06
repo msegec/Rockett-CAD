@@ -182,6 +182,7 @@ never writes. Exit 0 when all projects are on version 2, else 1.
 | `ROCKETT_PORT`             | `8788`             | HTTP port inside the container                                    |
 | `DATA_DIR`                 | `/data`            | Persistent root                                                   |
 | `ROCKETT_MESH_CACHE_DIR`   | `/data/mesh-cache` | Served meshes evicted from memory, up to 1 GiB, cleared at start  |
+| `ROCKETT_PLUGIN_DIR`       | `/data/plugins`    | Third-party plugin folders, loaded once an admin enables them     |
 | `ROCKETT_COMMIT`           | empty              | Git revision for `/api/health` (build arg)                        |
 | `ROCKETT_DESCRIBE`         | empty              | `git describe` output for `/api/health` (build arg)               |
 | `ROCKETT_KERNEL`           | unset              | `inprocess` runs the kernel on the main thread                    |

@@ -356,7 +356,8 @@ file. The Modules settings page shows it beside a line naming
   range reason.
 - `disabled` means the app setting `plugin.<moduleId>.enabled` is `false`.
   Only an admin can set it (`PATCH /settings`). The host reads it at startup,
-  so a change applies on the next start.
+  so a change applies on the next start. A third-party plugin is also
+  `disabled` until both of its settings below match.
 - The user setting `plugin.<moduleId>.hidden` (`PATCH /me/settings`) hides
   the module's client UI for that user only. Its status stays `loaded`.
 - Keys ending in `.enabled` or `.hidden` belong to the host; a manifest that
@@ -650,6 +651,44 @@ file. The Modules settings page shows it beside a line naming
   request goes out. Project routes are not reachable: a read goes through
   `project.read` and a document edit through `project.mutate`. A user-data
   etag travels in the JSON body, as `userData` reads and writes it.
+
+### Third-party plugins
+
+Third-party plugins are trusted code, not sandboxed (DEC-501). Code:
+`server/src/modules/thirdParty.ts`, limits in `PLUGIN_LIMITS`
+(`server/src/tunables.ts`).
+
+- Install by folder drop only: `ROCKETT_PLUGIN_DIR` (default
+  `<DATA_DIR>/plugins`) holds `<id>/manifest.json` and `<id>/server.mjs`.
+  No route accepts uploads or writes plugins. The host scans the folder at
+  startup and lists every plugin folder through `GET /modules`, after the
+  shipped modules, sorted by folder name.
+- The executable closure is the whole plugin folder: every file, whatever
+  its name. Its sha256 hashes, in order of relative path (`/`-separated,
+  sorted by UTF-16 code unit), the UTF-8 path, a NUL byte, the decimal byte
+  length, a NUL byte and the file bytes. Empty folders do not count.
+- A plugin `failed` when its folder or anything in it is a symlink or not
+  a file or folder, when it exceeds `PLUGIN_LIMITS`, when the manifest is
+  not JSON or fails `parseManifest`, when its `id` is not the folder name,
+  when `server.mjs` is missing or has no default export with `activate`,
+  or when a `.mjs`, `.cjs` or `.js` file names a module outside the folder:
+  a literal `import`, `from` or `require` specifier must be a Node builtin
+  or a relative path that stays inside. A computed specifier is not
+  checked.
+- An incompatible `apiRange` lists `incompatible` and its code is never
+  imported.
+- Otherwise it stays `disabled` until an admin sets the app settings
+  `plugin.<id>.enabled` to `true` and `plugin.<id>.sha256` to the closure
+  sha256, which the `disabled` error names. Any later change to the folder
+  changes the sha256 and disables it again, with a reason naming the new
+  one.
+- An enabled plugin is copied from the bytes it hashed into
+  `<DATA_DIR>/plugin-stage/<id>/<sha256>/`, read-only, and imported from
+  there, so edits to the source folder never reach running code. The stage
+  is cleared at each start. The rest is the shipped module path above.
+- The closure sha256 of every enabled plugin joins each body fingerprint,
+  so a plugin update that keeps its data `version` still makes CAM
+  operations stale.
 
 ## Project file
 
