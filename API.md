@@ -374,7 +374,7 @@ file. The Modules settings page shows it beside a line naming
   registrations; the others still load.
 - A manifest that fails `parseManifest` reports `failed` with whichever of
   its identity fields are strings; the rest are empty.
-- `activate` receives `ServerContext` (`plugin-api/src/index.ts`):
+- `activate` receives `ServerContext` (`plugin-api/src/server.ts`):
   `register`, `services`, `startKernelJob`, `userData`, `files`,
   `kernelVersion`, `bodies`, `signFaces` and `dxf`. `register.routeModule`,
   `kernelJob`, `timelineFeature`, `setting` and `extensionSpec` take
@@ -393,6 +393,13 @@ file. The Modules settings page shows it beside a line naming
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.19.0 adds `register.menuItem({ id, menu, command, after, before })`
+  to the client context. `menu` must name a core context menu that has core
+  items (`MenuTargets` in `client/src/commands/menus.ts`), and the id must
+  start with the module id and a dot; either failure throws and fails
+  activation. The item joins the same menu registry as core items, ordered
+  by `after` or `before` against a core item id `<menu>.<name>`. All four
+  first-party manifests use `^0.19`.
 - API 0.18.0 adds `dxf(projectId, user, source)` to the server context,
   below. `writeDxf` in `server/src/geometry/dxf.ts` takes an optional layer
   name; without one its output is unchanged. All four first-party manifests
@@ -601,7 +608,7 @@ file. The Modules settings page shows it beside a line naming
 - After sign-in, `client/src/modules/host.ts` activates the client part of
   each listed module that this route reports `loaded`, with `ClientContext`:
   `register`, `project`, `ui`, `settings` and `request`. `register.command`,
-  `toolbarGroup`, `panel`, `workbench`, `layer`, `setting` and
+  `toolbarGroup`, `menuItem`, `panel`, `workbench`, `layer`, `setting` and
   `settingsPage` take `plugin-api` types; `selectionKind` and `pickProvider`
   take core types. Activation is atomic as on the server. A command
   `Control`, a workbench `tree` and `bar` and a settings page draw inside the

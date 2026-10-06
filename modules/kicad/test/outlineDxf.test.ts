@@ -152,7 +152,10 @@ function clientOf(f: Fixture, selection: FaceRef[]) {
   const files: { fileName: string; data: BlobPart; type: string }[] = [];
   const errors: string[] = [];
   const context = {
-    register: { command: (c: Command) => (commands.push(c), () => {}) },
+    register: {
+      command: (c: Command) => (commands.push(c), () => {}),
+      menuItem: () => () => {},
+    },
     project: {
       selection: () => selection,
       get: () => ({

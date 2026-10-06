@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { ContextMenuItem } from "@rockett/plugin-api";
+import type { Anchored, ContextMenuItem } from "@rockett/plugin-api";
 import {
   createRegistry,
   type Feature,
@@ -32,6 +32,7 @@ import { sketchOnPlane } from "./sketchCreate";
 import { moveBodies } from "./treeMove";
 import {
   commandById,
+  placed,
   registerCommand,
   runCommand,
   runnable,
@@ -77,8 +78,7 @@ export type Surface = keyof MenuTargets;
 type Targeted<T> = CommandContext & { viewport: ViewportRef; target: T };
 export type MenuContext<S extends Surface> = Targeted<MenuTargets[S]>;
 
-type SurfaceItem<S extends Surface> = {
-  id: string;
+type SurfaceItem<S extends Surface> = Anchored & {
   surface: S;
   command: string;
   when?(ctx: MenuContext<S>): boolean;
@@ -92,6 +92,9 @@ const menuRegistry = createRegistry<MenuItem>("menu item", (i) => i.id);
 
 export const registerMenuItem = menuRegistry.register;
 
+export const isMenu = (menu: string): menu is Surface =>
+  menuRegistry.list().some((item) => item.surface === menu);
+
 export function menuItems<S extends Surface>(
   surface: S,
   target: MenuTargets[S],
@@ -103,8 +106,8 @@ export function menuItems<S extends Surface>(
     target,
   });
   const ctx = context();
-  return menuRegistry.list().flatMap((entry): ContextMenuItem[] => {
-    if (entry.surface !== surface) return [];
+  const entries = menuRegistry.list().filter((e) => e.surface === surface);
+  return placed(entries).flatMap((entry): ContextMenuItem[] => {
     const item = entry as SurfaceItem<Surface> as SurfaceItem<S>;
     const command = commandById(item.command);
     if (!command?.run || item.when?.(ctx) === false) return [];

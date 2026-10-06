@@ -18,6 +18,7 @@ release workflow remain under development. The core licence is unresolved.
 
 - KiCad board upload API stores original bytes and parsed snapshots as portable
   project assets, with undo and a KiCad 9 minimum.
+- Export board outline DXF sits beside Export DXF on a face's right-click menu.
 - Accounts with first-admin setup, username or email sign-in, password changes,
   TOTP, persistent sessions and an offline password-reset command. Cloudflare
   Access can map a verified identity to an existing account.
@@ -75,7 +76,7 @@ release workflow remain under development. The core licence is unresolved.
   import or delete JSON posts and download an AI post kit to adapt an old post.
 - Beginner CAM guide and an example plate project ready to generate.
 - First-party modules with an admin enable switch and per-user visibility.
-  The plugin API 0.18.0 supports commands, toolbars, panels, settings pages,
+  The plugin API 0.19.0 supports commands, toolbars, context menu items, panels, settings pages,
   routes, scene contributions, kernel jobs, timeline features with labelled faces and keyed
   reference bodies, DXF of a sketch or planar face on a named layer, project
   services, source blobs, viewport pick modes, length and angle formatting, measure queries, saved

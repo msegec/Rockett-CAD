@@ -32,5 +32,11 @@ export default defineClientModule({
         }
       },
     });
+    register.menuItem({
+      id: "rockett.kicad.exportOutline",
+      menu: "design.viewport.face",
+      after: "design.viewport.face.exportDxf",
+      command: "rockett.kicad.exportOutline",
+    });
   },
 });

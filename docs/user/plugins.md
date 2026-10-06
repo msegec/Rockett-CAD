@@ -57,7 +57,7 @@ acme/
   "id": "acme",
   "name": "Acme tools",
   "version": "1.2.0",
-  "apiRange": "^0.18",
+  "apiRange": "^0.19",
   "licence": "MIT OR Apache-2.0",
   "author": "Acme Ltd",
   "dataVersion": 2,
@@ -90,11 +90,11 @@ shipped modules use `rockett`.
 ## API version policy
 
 The host's version is `PLUGIN_API_VERSION` in `plugin-api/src/index.ts`. The
-examples here target 0.18.
+examples here target 0.19.
 
 - `apiRange` is `^MAJOR.MINOR`.
 - While the API is 0.x, each minor is its own line. A host loads only
-  plugins that name its own minor: `^0.18` loads on 0.18.x and nowhere else.
+  plugins that name its own minor: `^0.19` loads on 0.19.x and nowhere else.
   Expect to release for each new minor.
 - From 1.0, `^1.2` loads on any 1.x from 1.2 up. Changes within a major only
   add. A removal is deprecated for one major and lands in a later one.
@@ -102,9 +102,10 @@ examples here target 0.18.
   versions in the reason, and never imports its code.
 
 The `@rockett/plugin-api` package is not published. Its types in
-`plugin-api/src/index.ts` are the reference. `defineServerModule` and
-`defineClientModule` return their argument, so a plain object with
-`activate` works.
+`plugin-api/src/` are the reference: `server.ts` for the server context,
+`client.ts` for the client context, both exported from `index.ts`.
+`defineServerModule` and `defineClientModule` return their argument, so a
+plain object with `activate` works.
 
 ## Entry points
 
@@ -138,8 +139,14 @@ console.
 | `sceneLayers`    | client | `register.layer({ id, mount })`                                  | `acme.grid`            |
 | `selectionKinds` | client | `register.selectionKind(kind)`                                   | `acme.pin`             |
 | `pickProviders`  | client | `register.pickProvider(provider)`                                | `acme.pins`            |
+| `menuItems`      | client | `register.menuItem({ id, menu, command, after })`                | `acme.copy`            |
 | `postProcessors` | none   | No call yet. CAM posts ship inside the CAM module.               | `acme.grbl`            |
-| `menuItems`      | none   | No call yet.                                                     | `acme.copy`            |
+
+Menu items: `menu` names a core context menu, such as `design.viewport.face`
+or `design.tree.sketch`; an unknown menu fails activation. `after` or
+`before` names an item of that menu, `<menu>.<name>`, such as
+`design.viewport.face.exportDxf`. The item has no icon, takes its command's
+label and shows only while that command is registered and its `when` holds.
 
 `register.exporter`, `register.importer`, `register.selectionKind` and
 `register.pickProvider` exist on the host contexts but are not typed in
@@ -277,7 +284,7 @@ and one settings page on the client.
   "id": "hello",
   "name": "Hello",
   "version": "1.0.0",
-  "apiRange": "^0.18",
+  "apiRange": "^0.19",
   "licence": "MIT",
   "author": "Rockett CAD",
   "contributes": { "exporters": ["hello.text"] }

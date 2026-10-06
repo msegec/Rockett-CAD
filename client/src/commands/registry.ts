@@ -70,7 +70,7 @@ export function runCommand(id: string, viewport?: ViewportRef): unknown {
   return command.run(ctx);
 }
 
-function placed<T extends Anchored>(items: readonly T[]): T[] {
+export function placed<T extends Anchored>(items: readonly T[]): T[] {
   const out = items.filter((i) => !i.after && !i.before);
   let rest = items.filter((i) => i.after || i.before);
   while (rest.length > 0) {

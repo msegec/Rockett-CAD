@@ -21,6 +21,7 @@ describe("KiCad first-party module", () => {
       features: ["rockett.kicad.board"],
       commands: ["rockett.kicad.exportOutline"],
       routes: ["rockett.kicad.upload", "rockett.kicad.outline"],
+      menuItems: ["rockett.kicad.exportOutline"],
     });
     expect(
       serverModules.find((entry) => entry.manifest.id === manifest.id),

@@ -5,6 +5,7 @@ import type {
   Dispose,
   FaceRef,
   Layer,
+  MenuItem,
   ModuleSettings,
   NumberFieldProps,
   OpenProject,
@@ -35,6 +36,7 @@ import {
 } from "@rockett/shared";
 import { api, request, send, type MutationResponse } from "../api";
 import { activeOwner } from "../commands/active";
+import { isMenu, registerMenuItem } from "../commands/menus";
 import {
   registerCommand,
   registerToolbarGroup,
@@ -154,6 +156,13 @@ function ownId(moduleId: string, kind: string, id: string) {
 function registerModuleLayer(moduleId: string, layer: Layer) {
   ownId(moduleId, "layer", layer.id);
   return registerLayer(guardedLayer(layer));
+}
+
+function registerModuleMenuItem(moduleId: string, { menu, ...item }: MenuItem) {
+  ownId(moduleId, "menu item", item.id);
+  if (!isMenu(menu))
+    throw new Error(`menu item ${item.id} names unknown menu ${menu}`);
+  return registerMenuItem({ ...item, surface: menu });
 }
 
 function registerClientSetting(
@@ -384,6 +393,7 @@ function moduleContext(own: Dispose[], manifest: SettingOwner) {
     command: (item: ModuleCommand) =>
       command(guarded(owned(iconed(moduleId, item)))),
     toolbarGroup: shown(registerToolbarGroup),
+    menuItem: track((item: MenuItem) => registerModuleMenuItem(moduleId, item)),
     panel: shown(registerPanel),
     workbench: (item: Workbench) => workbench(guardedWorkbench(item)),
     selectionKind: track(registerSelectionKind),
