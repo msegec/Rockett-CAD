@@ -1,5 +1,6 @@
 import {
   defineTimelineFeature,
+  Placement,
   placementSchema,
   StoreError,
   type KernelJobScope,
@@ -8,63 +9,29 @@ import {
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { circle, TAU } from "../boardGeometry.js";
+import {
+  dataSchema,
+  drillSchema,
+  hashSchema,
+  loop,
+  NAMESPACE,
+  point,
+  READ_VERSIONS,
+  snapshotSchema,
+  type Snapshot,
+} from "../shared/data.js";
+import { modelPlacement, resolveModel } from "../shared/models.js";
 
 type Shape = { delete(): void };
 type Claim = [face: Shape, label: string];
 
-const point = Type.Tuple([Type.Number(), Type.Number()]);
-const segment = Type.Union([
-  Type.Object({ kind: Type.Literal("line"), from: point, to: point }),
-  Type.Object({
-    kind: Type.Literal("arc"),
-    from: point,
-    to: point,
-    centre: point,
-    sweep: Type.Number(),
-  }),
-]);
-const loop = Type.Array(segment, { minItems: 1 });
-const drillSchema = Type.Object({
-  shape: Type.Union([Type.Literal("round"), Type.Literal("oval")]),
-  width: Type.Number({ exclusiveMinimum: 0 }),
-  height: Type.Number({ exclusiveMinimum: 0 }),
+const envelopeSchema = Type.Object({
+  version: Type.Union(READ_VERSIONS.map((version) => Type.Literal(version))),
+  data: dataSchema,
 });
-const snapshotSchema = Type.Object({
-  version: Type.Literal(1),
-  data: Type.Object({
-    thickness: Type.Number({ exclusiveMinimum: 0 }),
-    outline: loop,
-    cutouts: Type.Array(loop),
-    footprints: Type.Array(
-      Type.Object({
-        uuid: Type.Optional(Type.String()),
-        reference: Type.Optional(Type.String()),
-        side: Type.Optional(
-          Type.Union([Type.Literal("front"), Type.Literal("back")]),
-        ),
-        courtyard: Type.Optional(Type.Object({ min: point, max: point })),
-        pads: Type.Array(
-          Type.Object({
-            x: Type.Number(),
-            y: Type.Number(),
-            angle: Type.Number(),
-            drill: Type.Optional(drillSchema),
-          }),
-        ),
-      }),
-    ),
-  }),
-});
-const linksSchema = Type.Object({
-  version: Type.Literal(1),
-  data: Type.Object({
-    links: Type.Record(
-      Type.String(),
-      Type.Object({
-        snapshotAsset: Type.String({ pattern: "^[0-9a-f]{64}$" }),
-      }),
-    ),
-  }),
+const identitySchema = Type.Object({
+  snapshot: hashSchema,
+  models: Type.Record(Type.String(), hashSchema),
 });
 
 const paramsSchema = Type.Object({
@@ -77,6 +44,7 @@ type Loop = Static<typeof loop>;
 type Segment = Loop[number];
 type Point = Static<typeof point>;
 type Drill = Static<typeof drillSchema>;
+type Placed = { rotation: readonly number[]; translation: readonly number[] };
 
 const UUID = /^[0-9a-z-]{1,40}$/;
 const PLACEHOLDER_HEIGHT = 1;
@@ -178,7 +146,7 @@ function slot([x, y]: Point, degrees: number, { width, height }: Drill): Loop {
   ];
 }
 
-function tools(data: Static<typeof snapshotSchema>["data"]) {
+function tools(data: Snapshot) {
   const cutouts = data.cutouts.map((segments, c) => ({
     segments,
     prefix: `cutout:${c}`,
@@ -232,15 +200,14 @@ function placed(
   scope: KernelJobScope,
   shape: Shape,
   claims: Claim[],
-  {
-    rotation,
-    translation,
-  }: { rotation: readonly number[]; translation: readonly number[] },
+  { rotation, translation }: Placed,
+  scale = 1,
 ) {
   const { oc, own } = scope;
   const trsf = own(new oc.gp_Trsf_1());
   trsf.SetRotation_2(own(new oc.gp_Quaternion_2(...rotation)));
   trsf.SetTranslationPart(own(new oc.gp_Vec_4(...translation)));
+  if (scale !== 1) trsf.SetScaleFactor(scale);
   const moved = own(
     new oc.BRepBuilderAPI_Transform_2(shape, trsf, false, false),
   );
@@ -255,12 +222,57 @@ function placed(
 
 function components(
   scope: TimelineFeatureScope<typeof paramsSchema>,
-  { thickness, footprints }: Static<typeof snapshotSchema>["data"],
+  { thickness, footprints }: Snapshot,
+  models: Readonly<Record<string, string>>,
+  bytesOf: (hash: string) => Uint8Array,
 ) {
   const { oc, own, params } = scope;
-  return footprints.flatMap(({ uuid, reference, side, courtyard }) => {
-    if (uuid === undefined || !UUID.test(uuid) || !side || !courtyard)
-      return [];
+  const { rotation, translation } = params.placement;
+  const board: Placement = {
+    rotation: [...rotation],
+    translation: [...translation],
+  };
+  const read = new Map<string, Shape[]>();
+  const parts = (hash: string) => {
+    const known = read.get(hash);
+    if (known) return known;
+    const shapes: Shape[] = scope.readStep(bytesOf(hash));
+    read.set(hash, shapes);
+    return shapes;
+  };
+  return footprints.flatMap((footprint) => {
+    const { uuid, reference, side, courtyard } = footprint;
+    if (uuid === undefined || !UUID.test(uuid) || !side) return [];
+    const body = (shape: Shape, approximate: boolean) => [
+      {
+        key: `${params.linkId}:${uuid}`,
+        name: reference?.trim() ? reference : uuid,
+        shape,
+        reference: true,
+        approximate,
+      },
+    ];
+    const uploaded = footprint.models.flatMap((model) => {
+      const use = resolveModel(model, models);
+      return use.status === "uploaded" ? [{ model, sha256: use.sha256 }] : [];
+    });
+    if (uploaded.length && uploaded.length === footprint.models.length) {
+      const builder = own(new oc.BRep_Builder());
+      const compound = own(new oc.TopoDS_Compound());
+      builder.MakeCompound(compound);
+      for (const { model, sha256 } of uploaded) {
+        const { placement, scale } = modelPlacement(
+          footprint,
+          model,
+          thickness,
+        );
+        const at = Placement.compose(board, placement);
+        for (const part of parts(sha256))
+          builder.Add(compound, placed(scope, part, [], at, scale).shape);
+      }
+      return body(compound, false);
+    }
+    if (!courtyard) return [];
     const { min, max } = courtyard;
     if (max[0] <= min[0] || max[1] <= min[1]) return [];
     const z = side === "front" ? thickness : -PLACEHOLDER_HEIGHT;
@@ -270,15 +282,10 @@ function components(
         own(new oc.gp_Pnt_3(max[0], max[1], z + PLACEHOLDER_HEIGHT)),
       ),
     );
-    return [
-      {
-        key: `${params.linkId}:${uuid}`,
-        name: reference?.trim() ? reference : uuid,
-        shape: placed(scope, own(box.Shape()), [], params.placement).shape,
-        reference: true,
-        approximate: true,
-      },
-    ];
+    return body(
+      placed(scope, own(box.Shape()), [], params.placement).shape,
+      true,
+    );
   });
 }
 
@@ -304,8 +311,8 @@ export const board = defineTimelineFeature({
     version: 1,
     params: paramsSchema,
     resolveInputs({ params: { linkId }, extensions }) {
-      const stored = extensions["rockett.kicad"];
-      if (!Value.Check(linksSchema, stored))
+      const stored = extensions[NAMESPACE];
+      if (!Value.Check(envelopeSchema, stored))
         throw new StoreError(
           "KiCad data is missing or not supported",
           "unprocessable",
@@ -318,16 +325,28 @@ export const board = defineTimelineFeature({
           `KiCad board link ${linkId} is not in this project`,
           "unprocessable",
         );
+      const models = link.models ?? {};
       return {
-        identity: { snapshot: link.snapshotAsset },
-        assets: [link.snapshotAsset],
+        identity: { snapshot: link.snapshotAsset, models },
+        assets: [link.snapshotAsset, ...Object.values(models)],
       };
     },
   },
   evaluate(scope) {
-    const bytes = scope.inputs?.assets[0];
-    if (!bytes) throw new Error("KiCad board snapshot is missing");
-    const snapshot: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    const identity = scope.inputs?.identity;
+    if (!Value.Check(identitySchema, identity))
+      throw new Error("KiCad board inputs are missing");
+    const hashes = [
+      ...new Set([identity.snapshot, ...Object.values(identity.models)]),
+    ].toSorted();
+    const bytesOf = (hash: string) => {
+      const bytes = scope.inputs?.assets[hashes.indexOf(hash)];
+      if (!bytes) throw new Error(`KiCad board asset ${hash} is missing`);
+      return bytes;
+    };
+    const snapshot: unknown = JSON.parse(
+      new TextDecoder().decode(bytesOf(identity.snapshot)),
+    );
     if (!Value.Check(snapshotSchema, snapshot))
       throw new Error("KiCad board snapshot is not supported or valid");
     const { thickness, outline } = snapshot.data;
@@ -361,6 +380,10 @@ export const board = defineTimelineFeature({
       unique(scope, result.shape, claims),
       scope.params.placement,
     );
-    return { shape, faces, bodies: components(scope, snapshot.data) };
+    return {
+      shape,
+      faces,
+      bodies: components(scope, snapshot.data, identity.models, bytesOf),
+    };
   },
 });

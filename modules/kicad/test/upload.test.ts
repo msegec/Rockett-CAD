@@ -325,7 +325,7 @@ it("refuses configured budgets for either size ordering without storing the smal
 });
 
 it.each([
-  { version: 2, data: unknown },
+  { version: 3, data: unknown },
   { version: 0, data: { links: {} } },
   { version: 1, data: unknown },
   { version: 1, data: { links: { future: unknown } } },

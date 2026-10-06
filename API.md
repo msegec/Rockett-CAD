@@ -507,9 +507,30 @@ file. The Modules settings page shows it beside a line naming
 - `POST /projects/:id/m/rockett/kicad/upload` takes `{source}` as canonical
   base64 original `.kicad_pcb` bytes and `If-Match`; returns `linkId` with the
   normal edit response. KiCad 9 is the floor; invalid UTF-8 or boards get 400
-  before storage. `extensions["rockett.kicad"]` holds `{version: 1, data: {links}}`.
+  before storage. `extensions["rockett.kicad"]` holds `{version: 2, data: {links}}`;
+  version 1, from before model uploads, still reads, and the host backs it up
+  as `rockett.kicad.v1.v2` before its first version 2 save.
   Source and `{version: 1, data}` snapshot hashes are portable
   assets. Original bytes retain a BOM; JSON caps decoded source below 37.5 MiB.
+- Footprint model paths resolve by name. A path must start with
+  `${KICAD9_3DMODEL_DIR}/`, `${KICAD10_3DMODEL_DIR}/` or `${KIPRJMOD}/`; the
+  name is the path with a trailing `.wrl` read as `.step`, and must end in
+  `.step` or `.stp`. Every root resolves only to uploaded content: the
+  server never reads host files or fetches the network. URLs, other
+  substitutions, `$`, `%`, `\`, braces after the root, and empty, `.` or `..`
+  segments are refused, as is a scale that is not one positive factor on
+  every axis.
+- `GET /projects/:id/m/rockett/kicad/models/:linkId` needs view access and
+  returns `{models: [{footprintUuid, reference, path, status, ...}]}` in
+  board order: `uploaded` with `name` and `sha256`, `missing` with `name`, or
+  `refused` with `reason`. A link outside the project refuses with 422.
+- `POST /projects/:id/m/rockett/kicad/models/:linkId` takes `{name, source}`,
+  `source` canonical base64 STEP bytes, and `If-Match`. It refuses with 400,
+  before storage, a name the rules above refuse or would rewrite, a name no
+  footprint on that board references, and bytes that do not start
+  `ISO-10303-21;`. It stores the bytes as a portable asset and records
+  `models[name] = sha256` on the link, replacing an earlier upload of that
+  name; returns `name` and `sha256` with the normal edit response.
 - Feature `rockett.kicad.board` version 1 takes params
   `{linkId, placement, options}`. `placement` follows the plugin API
   `placementSchema`; `options` is `{}`. It
@@ -526,7 +547,15 @@ file. The Modules settings page shows it beside a line naming
   `rockett.kicad:<featureId>:<linkId>:<footprintUuid>`, named by its
   Reference: a box over the courtyard bounds, 1 mm high, on the top face
   for a front part and under the board for a back part, flagged `reference` and
-  `approximate`. A Reference rename keeps the body id.
+  `approximate`. A Reference rename keeps the body id. When every model of a
+  footprint is uploaded, the same body is instead those STEP parts, placed
+  and not approximate, even without a courtyard. Each STEP hash is read once
+  per evaluation through `readStep`. For column vectors a model goes to
+  `placement * T(x,y,0) * Rz(angle) * B * T(o) * Rz(-rz) * Ry(-ry) * Rx(-rx) * S`
+  with board `x` and `y` (KiCad y negated), angles in degrees, `B` identity
+  on front and `Rx(180)` on back, `S` the model scale, and `o` the model
+  offset with `z` raised by 0.05 plus the board thickness on front, or by
+  0.05 alone on back.
 - `GET /projects/:id/m/rockett/kicad/outline/sketch/:sketchId` and
   `GET /projects/:id/m/rockett/kicad/outline/face/:bodyId/:faceName` need
   view access and return, as a JSON string, the DXF R12 text the export menu
