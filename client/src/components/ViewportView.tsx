@@ -1666,7 +1666,8 @@ export function ViewportView({
           ts.clicks = [];
           clearToolPreview(viewportRef.current);
         }
-      } else if (ts.clicks.length === 1) handleHover(e);
+      } else if (ts.clicks.length === 1 && dimFieldsFor(tool, units))
+        handleHover(e);
       return;
     }
 
