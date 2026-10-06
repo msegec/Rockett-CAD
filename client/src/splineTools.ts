@@ -60,10 +60,10 @@ function points(clicks: UV[], construction: boolean | undefined) {
 
 export function createFitSpline(clicks: UV[]): Created | null {
   const fit = distinctClicks(clicks);
+  if (fit.length < 2) return null;
   const at = fit.map(xy);
   const handles = defaultHandles(at);
-  if (fit.length < 2 || typeof interpolateFit(at, handles) === "string")
-    return null;
+  if (typeof interpolateFit(at, handles) === "string") return null;
   const made = points(fit, undefined);
   const ends = handles.map(([x, y]) => {
     const id = newId("pt");
