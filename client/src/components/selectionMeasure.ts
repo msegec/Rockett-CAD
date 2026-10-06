@@ -108,8 +108,13 @@ export function measureRef(pick: Selection): ExactRef | undefined {
   }
 }
 
-function exactRefs(selection: Selection[]): ExactRef[] | null {
-  const refs = selection.flatMap((pick) => measureRef(pick) ?? []);
+function exactRefs(
+  selection: Selection[],
+  bodies: BodyPayload[],
+): ExactRef[] | null {
+  const refs = selection
+    .flatMap((pick) => measureRef(pick) ?? [])
+    .filter((ref) => bodies.some((b) => b.bodyId === ref.bodyId));
   if (selection.length === 2 && refs.length === 2) return refs;
   const summed = refs.filter((r) => r.kind === "face" || r.kind === "body");
   return summed.length > 0 ? summed : null;
@@ -165,6 +170,7 @@ function useExactMeasure(
     bodies: BodyPayload[];
     outcome: Outcome;
   } | null>(null);
+  const busy = useStore((s) => s.busy);
   const key = projectId && refs ? JSON.stringify(refs) : null;
   const held =
     reply?.key === key &&
@@ -174,7 +180,7 @@ function useExactMeasure(
       ? reply.outcome
       : null;
   useEffect(() => {
-    if (!projectId || !refs || !key || held) return;
+    if (!projectId || !refs || !key || held || busy) return;
     let live = true;
     const land = (outcome: Outcome) => {
       if (live) setReply({ key, projectId, document, bodies, outcome });
@@ -189,7 +195,7 @@ function useExactMeasure(
       live = false;
       clearTimeout(timer);
     };
-  }, [key, projectId, document, bodies]);
+  }, [key, projectId, document, bodies, busy]);
   return key ? (held ?? "pending") : null;
 }
 
@@ -212,7 +218,7 @@ export function useSelectionMeasures(): string[] {
   };
   const wanted =
     bodies === evaluation?.bodies && active?.id !== "module.pick"
-      ? exactRefs(selection)
+      ? exactRefs(selection, bodies)
       : null;
   const over = (wanted?.length ?? 0) > MEASURE_MAX_REFS;
   const refs = over ? null : wanted;
