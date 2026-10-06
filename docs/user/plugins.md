@@ -57,7 +57,7 @@ acme/
   "id": "acme",
   "name": "Acme tools",
   "version": "1.2.0",
-  "apiRange": "^0.17",
+  "apiRange": "^0.18",
   "licence": "MIT OR Apache-2.0",
   "author": "Acme Ltd",
   "dataVersion": 2,
@@ -89,11 +89,11 @@ to the core and are refused. The shipped modules use `rockett`.
 ## API version policy
 
 The host's version is `PLUGIN_API_VERSION` in `plugin-api/src/index.ts`. The
-examples here target 0.17.
+examples here target 0.18.
 
 - `apiRange` is `^MAJOR.MINOR`.
 - While the API is 0.x, each minor is its own line. A host loads only
-  plugins that name its own minor: `^0.17` loads on 0.17.x and nowhere else.
+  plugins that name its own minor: `^0.18` loads on 0.18.x and nowhere else.
   Expect to release for each new minor.
 - From 1.0, `^1.2` loads on any 1.x from 1.2 up. Changes within a major only
   add. A removal is deprecated for one major and lands in a later one.
@@ -151,6 +151,11 @@ Timeline features: `evaluate` may return
 `shape`. Each entry becomes body `<id>:<key>`, so its id survives edits and
 reopening. Your `name` wins on every evaluation, and users cannot rename a
 module body.
+
+DXF: `context.dxf(projectId, user, { sketchId })` or
+`{ face: { kind: "face", bodyId, faceName } }` returns the DXF bytes the
+export menu writes for that sketch or planar face. Add `layer: "Edge.Cuts"`
+to put the outline on a named layer. A curved face is refused.
 
 Routes: a route is a plain `{ method, path }` object; a project mutation
 adds `effect: "document"`. A user route lives under `/m/<id>/`, a project
@@ -271,7 +276,7 @@ and one settings page on the client.
   "id": "hello",
   "name": "Hello",
   "version": "1.0.0",
-  "apiRange": "^0.17",
+  "apiRange": "^0.18",
   "licence": "MIT",
   "author": "Rockett CAD",
   "contributes": { "exporters": ["hello.text"] }

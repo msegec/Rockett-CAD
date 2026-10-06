@@ -134,6 +134,7 @@ beforeAll(async () => {
       list: async () => [],
     },
     kernelVersion: null,
+    dxf: async () => new Uint8Array(),
     signFaces: async () => [],
     bodies: async () => [],
   };

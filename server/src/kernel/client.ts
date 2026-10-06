@@ -98,6 +98,7 @@ export interface SignRequest {
 
 export interface ExportJob extends Omit<ExportRequest, "retain"> {
   hidden: readonly string[];
+  layer?: string;
 }
 
 export interface Imported {
@@ -401,7 +402,10 @@ export class InProcessKernel implements KernelClient {
         doc,
         ...source(state, job, quality),
         colorOf: (bodyId) => bodyLabel(state, doc, bodyId).color,
-        options: { quality },
+        options: {
+          quality,
+          ...(job.layer !== undefined && { layer: job.layer }),
+        },
       }),
       mime: exporter.mime,
       ext: exporter.ext,

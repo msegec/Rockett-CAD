@@ -140,6 +140,7 @@ beforeAll(async () => {
     files,
     kernelVersion: null,
     bodies: async () => [serverBody],
+    dxf: async () => new Uint8Array(),
     signFaces: async (_id, _user, refs) => {
       signed.push([...refs]);
       return refs.map((ref) => ({ ...ref, sig }) as never);

@@ -26,7 +26,7 @@ const problem = (status: FeatureStatus) =>
   status.status === "cancelled" ||
   (status.refs?.length ?? 0) > 0;
 
-export async function canView(
+async function canView(
   store: ProjectStore,
   folders: FolderStore,
   user: User,
@@ -40,10 +40,17 @@ export async function canView(
   }
 }
 
-export const finalModel = (doc: CadDocument): CadDocument => ({
-  ...doc,
-  timelinePosition: doc.features.length,
-});
+export async function finalModel(
+  store: ProjectStore,
+  folders: FolderStore,
+  user: User,
+  projectId: string,
+): Promise<CadDocument> {
+  if (!(await canView(store, folders, user, projectId)))
+    throw new StoreError("project not found", "not_found");
+  const doc = await store.load(projectId);
+  return { ...doc, timelinePosition: doc.features.length };
+}
 
 export function moduleBodies(
   kernel: BodyKernel,
@@ -51,9 +58,7 @@ export function moduleBodies(
   folders: FolderStore,
 ): ServerContext["bodies"] {
   return async (projectId, user) => {
-    if (!(await canView(store, folders, user, projectId)))
-      throw new StoreError("project not found", "not_found");
-    const doc = finalModel(await store.load(projectId));
+    const doc = await finalModel(store, folders, user, projectId);
     const evaluation = await kernel.evaluate(doc);
     const { bodies, featureStatuses } = evaluation;
     if (bodies.length === 0) return [];

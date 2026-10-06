@@ -163,6 +163,7 @@ beforeAll(async () => {
     userData: () => ({ read: async () => null, write: async () => null! }),
     files: moduleFiles(new LocalStorage(dir, fs), "rockett.cam"),
     kernelVersion: null,
+    dxf: async () => new Uint8Array(),
     signFaces: async () => [],
     bodies: async () => bodies,
   });

@@ -197,6 +197,7 @@ beforeAll(async () => {
     userData: () => ({ read: async () => null, write: async () => null! }),
     files,
     kernelVersion: null,
+    dxf: async () => new Uint8Array(),
     signFaces: async () => [],
     bodies: async () => {
       modelReads++;

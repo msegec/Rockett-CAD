@@ -187,6 +187,7 @@ async function mounted({
     }),
     files,
     kernelVersion: { occt: "7.9.1", commit: "abc1234" },
+    dxf: async () => new Uint8Array(),
     signFaces: async () => [],
     bodies: async () => [body],
   };

@@ -34,17 +34,12 @@ import { registerImporter } from "../api/importers.js";
 import { registerRouteModule } from "../api/routeModules.js";
 import { registerExporter } from "../geometry/exporters.js";
 import { registerFeatureKind } from "../geometry/featureKinds.js";
-import type { KernelClient } from "../kernel/client.js";
+import type { ExportJob, KernelClient } from "../kernel/client.js";
 import type { FolderStore } from "../store/folderStore.js";
 import { registerDataMigrations } from "../store/migrations.js";
 import { moduleUserData } from "../store/moduleData.js";
 import { StoreError, type ProjectStore } from "../store/projectStore.js";
-import {
-  canView,
-  finalModel,
-  moduleBodies,
-  type BodyKernel,
-} from "./bodies.js";
+import { finalModel, moduleBodies, type BodyKernel } from "./bodies.js";
 import { checkModuleType } from "./features.js";
 import { moduleFiles } from "./files.js";
 import { provideService } from "./services.js";
@@ -54,7 +49,8 @@ import {
   type PluginDirs,
 } from "./thirdParty.js";
 
-type Kernel = Pick<KernelClient, "moduleJob" | "installFeatures"> & BodyKernel;
+type Kernel = Pick<KernelClient, "moduleJob" | "installFeatures" | "export"> &
+  BodyKernel;
 
 declare const KERNEL_BUNDLES: Readonly<Record<string, string>>;
 
@@ -204,9 +200,7 @@ const signFaces =
     folders: FolderStore,
   ): ServerContext["signFaces"] =>
   async (projectId, user, refs) => {
-    if (!(await canView(store, folders, user, projectId)))
-      throw new StoreError("project not found", "not_found");
-    const doc = finalModel(await store.load(projectId));
+    const doc = await finalModel(store, folders, user, projectId);
     const faces = refs.map(({ bodyId, faceName }): FaceRef => ({
       kind: "face",
       bodyId,
@@ -220,6 +214,49 @@ const signFaces =
         );
       return { kind, bodyId, faceName, sig };
     });
+  };
+
+const DXF_SOURCE =
+  "dxf takes { sketchId } or { face }, and an optional layer name";
+
+const named = (value: unknown): value is string =>
+  typeof value === "string" && value !== "";
+
+function dxfSource(
+  source: unknown,
+): Pick<ExportJob, "sketchId" | "face" | "layer"> {
+  const { sketchId, face, layer } = Object(source) as Record<string, unknown>;
+  const { kind, bodyId, faceName } = Object(face) as Record<string, unknown>;
+  if (layer !== undefined && typeof layer !== "string")
+    throw new ValidationError(DXF_SOURCE);
+  const onLayer = layer === undefined ? {} : { layer };
+  if (face === undefined && named(sketchId)) return { sketchId, ...onLayer };
+  if (
+    sketchId === undefined &&
+    kind === "face" &&
+    named(bodyId) &&
+    named(faceName)
+  )
+    return { face: { kind, bodyId, faceName }, ...onLayer };
+  throw new ValidationError(DXF_SOURCE);
+}
+
+const drawDxf =
+  (
+    kernel: Kernel,
+    store: ProjectStore,
+    folders: FolderStore,
+  ): ServerContext["dxf"] =>
+  async (projectId, user, source) => {
+    const job = dxfSource(source);
+    const doc = await finalModel(store, folders, user, projectId);
+    const { data } = await kernel.export(doc, {
+      format: "dxf",
+      bodyIds: [],
+      hidden: [],
+      ...job,
+    });
+    return data;
   };
 
 async function load(
@@ -263,6 +300,7 @@ async function load(
       },
       bodies: moduleBodies(kernel, store, folders),
       signFaces: signFaces(kernel, store, folders),
+      dxf: drawDxf(kernel, store, folders),
     });
   } catch (error) {
     disposeAll(own.splice(0));

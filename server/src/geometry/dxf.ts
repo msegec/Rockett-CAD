@@ -9,6 +9,7 @@ import {
   type SketchEntity,
   type SketchPoint,
   type Vec3,
+  ValidationError,
 } from "@rockett/shared";
 import { pointToUV, V } from "./frames.js";
 import { acquire, getKernel, scoped, type Shape } from "./kernel.js";
@@ -35,6 +36,8 @@ const MAX_SPLITS = 16;
 
 const CONSTRUCTION = "CONSTRUCTION";
 
+const LAYER_NAME = /^[!-~]{1,255}$/;
+
 function real(v: number): string {
   const s = v.toFixed(9).replace(/0+$/, "").replace(/\.$/, ".0");
   return s === "-0.0" ? "0.0" : s;
@@ -59,7 +62,8 @@ function section(name: string, body: Pair[]): Pair[] {
   return [[0, "SECTION"], [2, name], ...body, [0, "ENDSEC"]];
 }
 
-function layerTable(): Pair[] {
+function layerTable(onLayer: string): Pair[] {
+  const names = [...new Set(["0", onLayer, CONSTRUCTION])];
   return [
     [0, "TABLE"],
     [2, "LTYPE"],
@@ -74,14 +78,13 @@ function layerTable(): Pair[] {
     [0, "ENDTAB"],
     [0, "TABLE"],
     [2, "LAYER"],
-    [70, "2"],
-    ...layer("0", 7),
-    ...layer(CONSTRUCTION, 8),
+    [70, String(names.length)],
+    ...names.flatMap((name) => layer(name, name === CONSTRUCTION ? 8 : 7)),
     [0, "ENDTAB"],
   ];
 }
 
-function entityPairs(entities: readonly SketchEntity[]) {
+function entityPairs(entities: readonly SketchEntity[], onLayer: string) {
   const points = new Map<string, SketchPoint>();
   const used = new Set<string>();
   for (const e of entities) {
@@ -100,9 +103,10 @@ function entityPairs(entities: readonly SketchEntity[]) {
   ];
   const out: Pair[] = [];
   for (const e of entities) {
+    const entityLayer = e.construction ? CONSTRUCTION : onLayer;
     const head = (type: string): Pair[] => [
       [0, type],
-      [8, e.construction ? CONSTRUCTION : "0"],
+      [8, entityLayer],
     ];
     if (e.kind === "point" && !used.has(e.id))
       out.push(...head("POINT"), ...xyz(e));
@@ -112,12 +116,7 @@ function entityPairs(entities: readonly SketchEntity[]) {
       out.push(...head("CIRCLE"), ...xyz(at(e.center)), [40, real(e.radius)]);
     if (e.kind === "ellipse" || e.kind === "spline" || e.kind === "fitSpline")
       for (const curve of sketchCurves([e, ...points.values()], true))
-        out.push(
-          ...polylinePairs(
-            [sampled(curve)],
-            e.construction ? CONSTRUCTION : "0",
-          ),
-        );
+        out.push(...polylinePairs([sampled(curve)], entityLayer));
     if (e.kind === "arc") {
       const c = at(e.center);
       const s = at(e.start);
@@ -143,7 +142,10 @@ function sampled(curve: SketchCurve): Polyline {
   ]);
 }
 
-function polylinePairs(polylines: readonly Polyline[], onLayer = "0"): Pair[] {
+function polylinePairs(
+  polylines: readonly Polyline[],
+  onLayer: string,
+): Pair[] {
   const xy = ([x, y]: [number, number]): Pair[] => [
     [10, real(x)],
     [20, real(y)],
@@ -237,16 +239,21 @@ export function faceDrawing(
 export function writeDxf(
   entities: readonly SketchEntity[],
   polylines: readonly Polyline[] = [],
+  onLayer = "0",
 ): Buffer {
+  if (!LAYER_NAME.test(onLayer))
+    throw new ValidationError(
+      "A DXF layer name is 1 to 255 printable ASCII characters without spaces",
+    );
   const pairs = [
     ...section("HEADER", [
       [9, "$ACADVER"],
       [1, "AC1009"],
     ]),
-    ...section("TABLES", layerTable()),
+    ...section("TABLES", layerTable(onLayer)),
     ...section("ENTITIES", [
-      ...entityPairs(entities),
-      ...polylinePairs(polylines),
+      ...entityPairs(entities, onLayer),
+      ...polylinePairs(polylines, onLayer),
     ]),
     [0, "EOF"] as Pair,
   ];

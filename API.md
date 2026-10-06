@@ -376,7 +376,7 @@ file. The Modules settings page shows it beside a line naming
   its identity fields are strings; the rest are empty.
 - `activate` receives `ServerContext` (`plugin-api/src/index.ts`):
   `register`, `services`, `startKernelJob`, `userData`, `files`,
-  `kernelVersion`, `bodies` and `signFaces`. `register.routeModule`,
+  `kernelVersion`, `bodies`, `signFaces` and `dxf`. `register.routeModule`,
   `kernelJob`, `timelineFeature`, `setting` and `extensionSpec` take
   `plugin-api` types;
   `exporter`, `importer` and `featureKind` take core types. Each call is
@@ -393,6 +393,10 @@ file. The Modules settings page shows it beside a line naming
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.18.0 adds `dxf(projectId, user, source)` to the server context,
+  below. `writeDxf` in `server/src/geometry/dxf.ts` takes an optional layer
+  name; without one its output is unchanged. All four first-party manifests
+  use `^0.18`.
 - API 0.17.0 lets `evaluate` add a `bodies` list beside `shape`, each entry
   `{key, name, shape, faces, reference, approximate}`. Each becomes body
   `<moduleId>:<key>`; a key is 1 to 128 characters of `a-z`, `0-9`, `_`, `:`
@@ -559,6 +563,17 @@ file. The Modules settings page shows it beside a line naming
   Nothing is cached: each call evaluates, writes BREP for every body, reads
   its face names from the evaluated name map and hashes the import
   sources. Code: `server/src/modules/bodies.ts`.
+- `dxf(projectId, user, { sketchId } | { face })` returns the DXF R12 bytes
+  the export route writes for that sketch or planar face of the final model,
+  under the same access rule as `bodies`. An optional `layer` puts every
+  non-construction entity on that layer and lists it in the layer table;
+  construction stays on `CONSTRUCTION`. A layer name is 1 to 255 printable
+  ASCII characters without spaces. A source that is not exactly one of a
+  non-empty `sketchId` or a `{ kind: "face", bodyId, faceName }`, or a
+  non-string layer, is refused as "dxf takes { sketchId } or { face }, and
+  an optional layer name"; a non-planar face as "face <name> is not planar";
+  an unknown sketch as "sketch <id> is not in the model". Each refusal is a
+  `ValidationError`. Code: `server/src/modules/host.ts`.
 - `startKernelJob(id, input, { onProgress, signal })` runs one of the
   module's own jobs in the kernel worker and resolves to its result. A job is
   synchronous; one that returns a promise is refused. The job

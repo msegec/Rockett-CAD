@@ -138,6 +138,7 @@ async function surface(
     userData: () => ({ read: async () => null, write: async () => null! }),
     files: {} as never,
     kernelVersion: null,
+    dxf: async () => new Uint8Array(),
     signFaces: async () => [],
     bodies: async () => bodies(),
   });

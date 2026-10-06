@@ -42,11 +42,15 @@ export type {
 
 export { placementSchema, StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.17.0";
+export const PLUGIN_API_VERSION = "0.18.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
 export type SignedFaceRef = FaceRef & Required<Pick<CoreFaceRef, "sig">>;
+
+export type DxfSource = (
+  { sketchId: string; face?: never } | { face: FaceRef; sketchId?: never }
+) & { layer?: string };
 
 export type Dispose = () => void;
 
@@ -245,6 +249,7 @@ export interface ServerContext {
     user: User,
     refs: readonly FaceRef[],
   ): Promise<SignedFaceRef[]>;
+  dxf(projectId: string, user: User, source: DxfSource): Promise<Uint8Array>;
 }
 
 export interface Anchored {

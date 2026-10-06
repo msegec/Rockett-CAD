@@ -172,6 +172,7 @@ async function featuresRead() {
     userData: () => ({ read: async () => null, write: async () => null! }),
     files: undefined!,
     kernelVersion: null,
+    dxf: async () => new Uint8Array(),
     signFaces: async () => [],
     bodies: async () => [body],
   });

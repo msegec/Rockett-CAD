@@ -200,7 +200,7 @@ export interface ExportContext extends Drawing {
   doc: CadDocument;
   bodies: NamedBody[];
   colorOf(bodyId: string): string | undefined;
-  options: { quality: number };
+  options: { quality: number; layer?: string };
 }
 
 export interface Exporter extends ExportFormat {
@@ -280,5 +280,6 @@ registerExporter({
   ext: "dxf",
   mime: "image/vnd.dxf",
   source: ["sketch", "face"],
-  write: ({ sketch, polylines }) => writeDxf(sketch, polylines),
+  write: ({ sketch, polylines, options }) =>
+    writeDxf(sketch, polylines, options.layer),
 });
