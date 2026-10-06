@@ -3,7 +3,7 @@
   "id": "rockett.measure",
   "name": "Measure",
   "version": "0.1.0",
-  "apiRange": "^0.20",
+  "apiRange": "^0.21",
   "licence": "UNLICENSED",
   "author": "Rockett CAD",
   "contributes": {

@@ -393,6 +393,10 @@ file. The Modules settings page shows it beside a line naming
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.21.0 exports `Placement` from `shared/src/placement.ts`, the one
+  owner of placement maths, as a type and a value: `applyToPoint`,
+  `applyToDirection`, `compose`, `invert` and the other helpers core uses.
+  All four first-party manifests use `^0.21`.
 - API 0.20.0 adds `readStep(bytes)` to a timeline feature's `evaluate`
   scope. It runs the core STEP importer (`readXdeStep` in
   `server/src/geometry/xde.ts`) and returns one shape per STEP part, owned

@@ -57,7 +57,7 @@ acme/
   "id": "acme",
   "name": "Acme tools",
   "version": "1.2.0",
-  "apiRange": "^0.20",
+  "apiRange": "^0.21",
   "licence": "MIT OR Apache-2.0",
   "author": "Acme Ltd",
   "dataVersion": 2,
@@ -90,11 +90,11 @@ shipped modules use `rockett`.
 ## API version policy
 
 The host's version is `PLUGIN_API_VERSION` in `plugin-api/src/index.ts`. The
-examples here target 0.20.
+examples here target 0.21.
 
 - `apiRange` is `^MAJOR.MINOR`.
 - While the API is 0.x, each minor is its own line. A host loads only
-  plugins that name its own minor: `^0.20` loads on 0.20.x and nowhere else.
+  plugins that name its own minor: `^0.21` loads on 0.21.x and nowhere else.
   Expect to release for each new minor.
 - From 1.0, `^1.2` loads on any 1.x from 1.2 up. Changes within a major only
   add. A removal is deprecated for one major and lands in a later one.
@@ -163,6 +163,10 @@ wins on every evaluation, and users cannot rename a module body.
 your `inputs.assets`, through the core importer and returns one shape per
 STEP part, owned by the scope. Bytes over the server's import budget are
 refused before reading, with the message a core import gives.
+
+Placements: `placementSchema` validates a stored `{ rotation, translation }`
+and `Placement.applyToPoint` or `Placement.applyToDirection` moves geometry
+by one, so a plugin does not carry its own quaternion maths.
 
 DXF: `context.dxf(projectId, user, { sketchId })` or
 `{ face: { kind: "face", bodyId, faceName } }` returns the DXF bytes the
@@ -288,7 +292,7 @@ and one settings page on the client.
   "id": "hello",
   "name": "Hello",
   "version": "1.0.0",
-  "apiRange": "^0.20",
+  "apiRange": "^0.21",
   "licence": "MIT",
   "author": "Rockett CAD",
   "contributes": { "exporters": ["hello.text"] }
