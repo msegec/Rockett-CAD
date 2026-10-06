@@ -40,9 +40,9 @@ export type {
   User,
 } from "@rockett/shared";
 
-export { StoreError } from "@rockett/shared";
+export { placementSchema, StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.15.0";
+export const PLUGIN_API_VERSION = "0.16.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 

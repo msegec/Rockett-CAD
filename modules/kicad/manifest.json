@@ -3,10 +3,11 @@
   "id": "rockett.kicad",
   "name": "KiCad",
   "version": "0.1.0",
-  "apiRange": "^0.15",
+  "apiRange": "^0.16",
   "licence": "UNLICENSED",
   "author": "Rockett CAD",
   "contributes": {
+    "features": ["rockett.kicad.board"],
     "routes": ["rockett.kicad.upload"]
   }
 }

@@ -1,24 +1,15 @@
 import { Type, type Static } from "typebox";
 import { featureNameSchema } from "./schema/coreFeatures.js";
 import { documentSchema } from "./schema/documents.js";
-import { featureIdSchema, vec3 } from "./schema/refs.js";
+import { featureIdSchema } from "./schema/refs.js";
 import { parse, ValidationError } from "./schema/validation.js";
-import { UNIT_DOT_TOL } from "./tolerance.js";
+import { placementSchema } from "./placement.js";
 
 export const ASSEMBLY_SCHEMA_VERSION = 1;
 
 const { revision, savedWith, extensions } = documentSchema.properties;
 const id = featureIdSchema;
 const documentId = featureIdSchema;
-
-const placementSchema = Type.Object({
-  rotation: Type.Refine(
-    Type.Tuple([Type.Number(), Type.Number(), Type.Number(), Type.Number()]),
-    (q) => Math.abs(Math.hypot(...q) - 1) <= UNIT_DOT_TOL,
-    () => "must be a unit quaternion",
-  ),
-  translation: vec3,
-});
 
 const componentRefSchema = Type.Object({
   documentId,

@@ -367,6 +367,11 @@ file. The Modules settings page shows it beside a line naming
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.16.0 exports `placementSchema` from `shared/src/placement.ts`, the
+  one owner of a stored placement: a unit quaternion `rotation`
+  `[x, y, z, w]` within `UNIT_DOT_TOL`, refused as
+  `must be a unit quaternion`, and a `translation` in mm. Assemblies and
+  module feature params use it.
 - API 0.15.0 adds an optional manifest `dataVersion`, an integer from 1, and
   an optional `migrations` member on the server entry,
   `{[from]: (data) => data}`, keyed by the data version each step upgrades
@@ -434,6 +439,18 @@ file. The Modules settings page shows it beside a line naming
   before storage. `extensions["rockett.kicad"]` holds `{version: 1, data: {links}}`.
   Source and `{version: 1, data}` snapshot hashes are portable
   assets. Original bytes retain a BOM; JSON caps decoded source below 37.5 MiB.
+- Feature `rockett.kicad.board` version 1 takes params
+  `{linkId, placement, options}`. `placement` follows the plugin API
+  `placementSchema`; `options` is `{}`. It
+  reads only the link's committed snapshot, extrudes the outline from z=0 by
+  the board thickness and cuts cutouts, round drills and oval slots through
+  it. A link outside the project refuses with 422. Body `b:<featureId>`
+  labels its faces `top`, `bottom`, `edge:<s>` for outline segment `s`,
+  `cutout:<c>:<s>` for segment `s` of cutout `c`, and
+  `drill:<footprintUuid>:<p>:<s>` for wall `s` of pad `p`'s hole (one wall
+  when round; line, arc, line, arc when oval). Indices count from 0 in
+  snapshot order. A wall split into pieces, or a hole in a footprint without
+  a uuid, keeps unlabelled names.
 - Service `rockett.kicad.boardNets` takes a `linkId` string and returns
   `{nets: [{name, members: [{footprintUuid, reference, pad}]}]}` in board
   order. It reads pad nets by name from the link's stored original bytes:
