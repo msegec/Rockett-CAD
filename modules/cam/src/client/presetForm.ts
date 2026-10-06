@@ -96,7 +96,7 @@ const SUGGESTED = [
 
 type Kept = Partial<Pick<Preset, (typeof SUGGESTED)[number]>>;
 
-function suggested(
+export function suggested(
   tool: Tool,
   material: string,
   machine: MachineProfile,

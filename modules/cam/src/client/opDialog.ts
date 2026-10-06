@@ -100,7 +100,7 @@ export function setupList(open: OpenProject): List<CamData["setups"][number]> {
     : { status: "ready", items: read.data.setups };
 }
 
-function copyTool(
+export function copyTool(
   data: CamData,
   tool: Tool,
   { toolId: _link, ...preset }: Preset,

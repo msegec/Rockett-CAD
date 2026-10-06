@@ -37,6 +37,7 @@ import {
   row,
   tree,
 } from "./libraryParts.js";
+import { PLAN_PANEL } from "./planDialog.js";
 import { camRead, editCam, withOperations } from "./setup.js";
 import type { Selection, ToolpathPreview } from "./toolpaths.js";
 
@@ -288,6 +289,7 @@ type Rows = {
   statuses: Statuses;
   times: Times;
   staleItems: ContextMenuItem[];
+  plan(setupId: string): void;
   act(action: () => Promise<void>): () => void;
   opener(items: ContextMenuItem[]): (e: MouseEvent) => void;
 };
@@ -348,6 +350,7 @@ function setupSection(rows: Rows, setup: Setup, index: number, count: number) {
   const operations = setup.operations ?? [];
   const items = [
     ...rows.staleItems,
+    { label: "Plan operations", action: () => rows.plan(setup.id) },
     ...moves(rows, count, index, (by) => moveSetup(rows.project, setup.id, by)),
   ];
   const seconds = rows.times[setup.id]?.seconds;
@@ -410,6 +413,10 @@ export function manufactureBrowser(
             },
           ]
         : [],
+      plan(setupId) {
+        void preview.select({ setupId });
+        ui.openPanel(PLAN_PANEL);
+      },
       opener: (items) => (e) => {
         e.preventDefault();
         if (items.length) setMenu({ x: e.clientX, y: e.clientY, items });

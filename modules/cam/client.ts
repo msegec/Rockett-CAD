@@ -13,6 +13,7 @@ import {
 } from "./src/client/opDialog.js";
 import { holdDownDraft } from "./src/client/holdDowns.js";
 import { NC_PANEL, ncDialog } from "./src/client/ncDialog.js";
+import { registerPlan } from "./src/client/planDialog.js";
 import { postsPage } from "./src/client/postLibrary.js";
 import { SETUP_PANEL, setupDialog } from "./src/client/setupDialog.js";
 import { stockLayer } from "./src/client/stockLayer.js";
@@ -103,6 +104,7 @@ export default defineClientModule({
       icon: "library.svg",
       run: () => ui.openSettings(MACHINES_PAGE),
     });
+    registerPlan(context, preview);
     register.toolbarGroup({
       id: MILL_GROUP,
       label: "MILL",
