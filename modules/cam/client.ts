@@ -33,11 +33,11 @@ const MACHINES_PAGE = "rockett.cam.machines";
 type Dialog = {
   id: string;
   label: string;
-  group: string;
-  icon: `${string}.svg`;
   panel: string;
   component: Panel["component"];
-};
+} & (
+  { group: string; icon: `${string}.svg` } | { group?: never; icon?: never }
+);
 
 function dialog({ register, ui }: ClientContext, item: Dialog) {
   const { panel, component, ...command } = item;
@@ -121,10 +121,9 @@ export default defineClientModule({
       dialog(context, {
         id: op.type,
         label: op.label,
-        group: op.group,
-        icon: op.icon,
+        ...op.toolbar,
         panel: dialogPanel(op),
-        component: operationDialog(context, op),
+        component: operationDialog(context, op, preview),
       });
     register.toolbarGroup({
       id: PROGRAM_GROUP,

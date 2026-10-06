@@ -37,6 +37,7 @@ import {
   row,
   tree,
 } from "./libraryParts.js";
+import { dialogPanel, OPERATION_DIALOGS } from "./opDialog.js";
 import { PLAN_PANEL } from "./planDialog.js";
 import { camRead, editCam, withOperations } from "./setup.js";
 import type { Selection, ToolpathPreview } from "./toolpaths.js";
@@ -289,7 +290,7 @@ type Rows = {
   statuses: Statuses;
   times: Times;
   staleItems: ContextMenuItem[];
-  plan(setupId: string): void;
+  open(setupId: string, panel: string): void;
   act(action: () => Promise<void>): () => void;
   opener(items: ContextMenuItem[]): (e: MouseEvent) => void;
 };
@@ -350,7 +351,14 @@ function setupSection(rows: Rows, setup: Setup, index: number, count: number) {
   const operations = setup.operations ?? [];
   const items = [
     ...rows.staleItems,
-    { label: "Plan operations", action: () => rows.plan(setup.id) },
+    {
+      label: "Plan operations",
+      action: () => rows.open(setup.id, PLAN_PANEL),
+    },
+    ...OPERATION_DIALOGS.filter(({ toolbar }) => !toolbar).map((op) => ({
+      label: `Add ${op.label.toLowerCase()}`,
+      action: () => rows.open(setup.id, dialogPanel(op)),
+    })),
     ...moves(rows, count, index, (by) => moveSetup(rows.project, setup.id, by)),
   ];
   const seconds = rows.times[setup.id]?.seconds;
@@ -413,9 +421,9 @@ export function manufactureBrowser(
             },
           ]
         : [],
-      plan(setupId) {
+      open(setupId, panel) {
         void preview.select({ setupId });
-        ui.openPanel(PLAN_PANEL);
+        ui.openPanel(panel);
       },
       opener: (items) => (e) => {
         e.preventDefault();

@@ -14,9 +14,11 @@ import type {
 } from "@rockett/plugin-api";
 import { signRoute, type CamData } from "../shared/document.js";
 import { machineKind, type MachineProfile } from "../shared/machine.js";
-import { toolRefusal } from "../shared/operations.js";
+import { toolRefusal, type OperationType } from "../shared/operations.js";
 import {
+  adaptiveParams,
   contourParams,
+  drillParams,
   laserParams,
   paramsOf,
   pocketParams,
@@ -26,41 +28,40 @@ import { banner, button, libraryOf, reason } from "./libraryParts.js";
 import { resuggested, useDefaultMill } from "./presetForm.js";
 import { faceKeys, firstChoices, schemaFields } from "./schemaForm.js";
 import { camRead, editCam, withOperations } from "./setup.js";
+import type { ToolpathPreview } from "./toolpaths.js";
 
 export const MILL_GROUP = "rockett.cam.group.mill";
 export const LASER_GROUP = "rockett.cam.group.laser";
 
-export const OPERATION_DIALOGS = [
+export type OperationDialog = {
+  type: OperationType;
+  label: string;
+  schema: TObject;
+  toolbar?: { icon: `${string}.svg`; group: string };
+};
+
+export const OPERATION_DIALOGS: readonly OperationDialog[] = [
   {
     type: "rockett.cam.contour",
     label: "Contour",
-    icon: "contour.svg",
-    group: MILL_GROUP,
     schema: contourParams,
+    toolbar: { icon: "contour.svg", group: MILL_GROUP },
   },
   {
     type: "rockett.cam.pocket",
     label: "Pocket",
-    icon: "pocket.svg",
-    group: MILL_GROUP,
     schema: pocketParams,
+    toolbar: { icon: "pocket.svg", group: MILL_GROUP },
   },
+  { type: "rockett.cam.adaptive", label: "Adaptive", schema: adaptiveParams },
+  { type: "rockett.cam.drill", label: "Drill", schema: drillParams },
   {
     type: "rockett.cam.laser",
     label: "Laser",
-    icon: "laser.svg",
-    group: LASER_GROUP,
     schema: laserParams,
+    toolbar: { icon: "laser.svg", group: LASER_GROUP },
   },
-] as const satisfies readonly {
-  type: string;
-  label: string;
-  icon: `${string}.svg`;
-  group: string;
-  schema: TObject;
-}[];
-
-export type OperationDialog = (typeof OPERATION_DIALOGS)[number];
+];
 
 export const dialogPanel = ({ type }: OperationDialog) => `${type}.dialog`;
 
@@ -326,13 +327,36 @@ const listTexts = ({
   },
 });
 
-export function operationDialog(context: ClientContext, op: OperationDialog) {
+function useSetup(
+  project: ClientContext["project"],
+  preview: ToolpathPreview,
+  id: string,
+) {
+  const open = useSyncExternalStore(project.subscribe, project.get);
+  const { selection } = useSyncExternalStore(preview.subscribe, preview.get);
+  const setups = setupList(open);
+  return {
+    open,
+    setups,
+    setup: chosen(setups, id || selection?.setupId || ""),
+  };
+}
+
+const faceHint = (schema: TObject, blank: string[]) =>
+  faceKeys(schema).some((key) => blank.includes(key))
+    ? "Select a face in the viewport."
+    : null;
+
+export function operationDialog(
+  context: ClientContext,
+  op: OperationDialog,
+  preview: ToolpathPreview,
+) {
   const { ui, project, request } = context;
   const close = () => ui.closePanel(dialogPanel(op));
   const usable = (tool: Tool) => !toolRefusal(op.type, tool.kind);
   const texts = listTexts(op);
   return function OperationDialog() {
-    const open = useSyncExternalStore(project.subscribe, project.get);
     const selected = useSyncExternalStore(project.subscribe, project.selection);
     const [params, setParams] = useState<Params>(() =>
       withFaces(op.schema, firstChoices(op.schema), project.selection()[0]),
@@ -345,15 +369,12 @@ export function operationDialog(context: ClientContext, op: OperationDialog) {
       () => setParams((now) => withFaces(op.schema, now, selected[0])),
       [selected],
     );
-    const setups = setupList(open);
-    const setup = chosen(setups, ids.setup);
+    const { open, setups, setup } = useSetup(project, preview, ids.setup);
     const tool = chosen(tools, ids.tool);
     const offered = fitting(presets, tool);
     const preset = chosen(offered, ids.preset);
     const blank = unset(op.schema, params);
-    const hint = faceKeys(op.schema).some((key) => blank.includes(key))
-      ? "Select a face in the viewport."
-      : null;
+    const hint = faceHint(op.schema, blank);
     const ready = setup && tool && preset && blank.length === 0;
     const resuggest = useResuggest(context, setup, tool, preset);
     const save = async () => {

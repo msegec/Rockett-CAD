@@ -35,6 +35,25 @@ export const pocketParams = Type.Object({
   rampAngle: Type.Number({ title: "Ramp angle", parameterUnit: "deg" }),
 });
 
+export const adaptiveParams = Type.Object({
+  ...pocketParams.properties,
+  engagement: Type.Number({
+    title: "Maximum engagement",
+    parameterUnit: "deg",
+    exclusiveMinimum: 0,
+    maximum: 180,
+  }),
+});
+
+export const drillParams = Type.Object({
+  diameter: Type.Number({
+    title: "Hole diameter",
+    parameterUnit: "mm",
+    exclusiveMinimum: 0,
+  }),
+  points: Type.Optional(Type.Array(Type.Tuple([Type.Number(), Type.Number()]))),
+});
+
 export const MIN_TOLERANCE = 0.001;
 export const GOUGE_TOLERANCE = 0.01;
 

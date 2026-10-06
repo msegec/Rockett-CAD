@@ -8,7 +8,7 @@ import type {
   User,
 } from "@rockett/plugin-api";
 import cam from "../server.js";
-import { acceptPlan, reviewed } from "../src/client/planDialog.js";
+import { acceptPlan } from "../src/client/planDialog.js";
 import {
   planOperations,
   type PlanFeatures,
@@ -226,9 +226,7 @@ const planning = {
 };
 
 it("accepting with one unchecked adds the rest in order as one history entry", async () => {
-  const plan = reviewed(
-    planOperations(setup, features(20), planning.tools, machine),
-  );
+  const plan = planOperations(setup, features(20), planning.tools, machine);
   expect(plan.operations.map(({ name }) => name)).toEqual([
     "Face stock top",
     "Pocket, Slot",
@@ -277,36 +275,43 @@ it("accepting with one unchecked adds the rest in order as one history entry", a
   expect(pocket.params).toEqual({ floor: face("f:slot", 10), rampAngle: 5 });
 });
 
-it("lists unregistered operations and the rests that follow them as not planned", () => {
-  const plan = reviewed(
-    planOperations(
-      setup,
-      {
-        ...features(30),
-        holes: [
-          { centre: [5, 5], diameter: 3, top: 18, bottom: 10, blocked: false },
-        ],
-      },
-      [flat12, flat4, drill3],
-      machine,
-    ),
+it("adds the drill and adaptive the planner proposes, and the rest after the adaptive", async () => {
+  const tools = [flat12, flat4, drill3];
+  const plan = planOperations(
+    setup,
+    {
+      ...features(30),
+      holes: [
+        { centre: [5, 5], diameter: 3, top: 18, bottom: 10, blocked: false },
+      ],
+    },
+    tools,
+    machine,
   );
-  expect(plan.operations.map(({ name }) => name)).toEqual([
-    "Face stock top",
-    "Contour, outer, 4 tabs",
+  expect(plan.unplanned).toEqual([]);
+  const { view, stored } = projectView();
+
+  await acceptPlan(view, { ...planning, tools }, plan.operations);
+
+  const [{ operations = [] }] = stored().setups as [CamData["setups"][number]];
+  expect(operations.map(({ type, name }) => [type, name])).toEqual([
+    ["rockett.cam.facing", "Face stock top"],
+    ["rockett.cam.drill", "Drill 1 x 3 mm"],
+    ["rockett.cam.adaptive", "Adaptive, Slot"],
+    ["rockett.cam.pocket", "Rest, Slot corners"],
+    ["rockett.cam.contour", "Contour, outer, 4 tabs"],
   ]);
-  expect(plan.unplanned).toEqual([
-    {
-      feature: "Drill 1 x 3 mm",
-      reason: "operation rockett.cam.drill is not supported",
-    },
-    {
-      feature: "Adaptive, Slot",
-      reason: "operation rockett.cam.adaptive is not supported",
-    },
-    {
-      feature: "Rest, Slot corners",
-      reason: "needs Adaptive, Slot, which is not planned",
-    },
-  ]);
+  const [, drill, adaptive, rest] = operations as [
+    (typeof operations)[number],
+    (typeof operations)[number],
+    (typeof operations)[number],
+    (typeof operations)[number] & { prior?: string },
+  ];
+  expect(drill.params).toEqual({ diameter: 3, points: [[5, 5]] });
+  expect(adaptive.params).toEqual({
+    floor: face("f:slot", 10),
+    rampAngle: 5,
+    engagement: 60,
+  });
+  expect(rest.prior).toBe(adaptive.id);
 });

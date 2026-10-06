@@ -53,3 +53,58 @@ it("a relocated server bundle loads its adjacent exact blend module", async (con
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+it("a relocated CAM kernel bundle loads its adjacent exact adaptive engine", async (context) => {
+  const dir = mkdtempSync(join(tmpdir(), "adaptive-bundle-"));
+  try {
+    const bundle = join(dir, "probe.mjs");
+    await build({
+      entryPoints: [
+        fileURLToPath(
+          new URL(
+            "../../../modules/cam/src/kernel/generate.ts",
+            import.meta.url,
+          ),
+        ),
+      ],
+      outfile: bundle,
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      define: { ADAPTIVE_WASM_URL: JSON.stringify("./adaptive.wasm") },
+    });
+    copyFileSync(
+      new URL(
+        "../../../modules/cam/wasm/adaptive/adaptive.wasm",
+        import.meta.url,
+      ),
+      join(dir, "adaptive.wasm"),
+    );
+    const running = promisify(execFile)(
+      process.execPath,
+      [
+        "--input-type=module",
+        "-e",
+        `import { adaptiveEngine } from ${JSON.stringify(bundle)}; console.log(JSON.stringify(WebAssembly.Module.exports(adaptiveEngine()).map(({ name }) => name).filter((name) => name === "adaptive")));`,
+      ],
+      {
+        encoding: "utf8",
+        cwd: tmpdir(),
+        signal: context.signal,
+        killSignal: "SIGKILL",
+        maxBuffer: 1 << 20,
+      },
+    );
+    const closed = new Promise<void>((resolve) => {
+      running.child.once("close", () => resolve());
+    });
+    try {
+      const { stdout } = await running;
+      expect(JSON.parse(stdout)).toEqual(["adaptive"]);
+    } finally {
+      await closed;
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

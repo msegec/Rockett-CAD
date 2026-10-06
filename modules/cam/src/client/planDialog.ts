@@ -18,7 +18,6 @@ import {
 } from "../plan/plan.js";
 import { featuresRoute, type CamData } from "../shared/document.js";
 import type { MachineProfile } from "../shared/machine.js";
-import { isOperation, toolRefusal } from "../shared/operations.js";
 import { defaultMachine } from "../shared/settings.js";
 import {
   newPreset,
@@ -47,22 +46,6 @@ type Planned = { key: string } & (
   | { plan: Plan; planning: Planning; unchecked: ReadonlySet<string> }
   | { error: string }
 );
-
-export function reviewed({ operations, unplanned }: Plan): Plan {
-  const kept: PlannedOperation[] = [];
-  const left = [...unplanned];
-  for (const op of operations) {
-    const prior = op.prior && operations.find(({ id }) => id === op.prior);
-    const refusal = !isOperation(op.type)
-      ? toolRefusal(op.type)
-      : prior && !kept.includes(prior)
-        ? `needs ${prior.name}, which is not planned`
-        : undefined;
-    if (refusal) left.push({ feature: op.name, reason: refusal });
-    else kept.push(op);
-  }
-  return { operations: kept, unplanned: left };
-}
 
 function presetOf(
   planning: Planning,
@@ -151,13 +134,11 @@ async function planFor(
   };
   return {
     planning,
-    plan: reviewed(
-      planOperations(
-        { ...setup, clearance, fixtures: setup.fixtures ?? [] },
-        features,
-        planning.tools,
-        planning.machine,
-      ),
+    plan: planOperations(
+      { ...setup, clearance, fixtures: setup.fixtures ?? [] },
+      features,
+      planning.tools,
+      planning.machine,
     ),
   };
 }

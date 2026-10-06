@@ -77,6 +77,21 @@ it("contour and pocket each open a dialog built from its schema", async () => {
   }
 });
 
+it("adaptive and drill open dialogs built from their schemas", async () => {
+  const adaptive = await open("Adaptive", "rockett.cam.adaptive");
+  expect(fieldLabels(adaptive)).toEqual([
+    "Setup",
+    "Tool",
+    "Preset",
+    "Floor",
+    "Ramp angle (°)",
+    "Maximum engagement (°)",
+  ]);
+  const drill = await open("Drill", "rockett.cam.drill");
+  expect(fieldLabels(drill)).toEqual(["Setup", "Preset", "Hole diameter (mm)"]);
+  expect(hints(drill)).toContain("No tool in your library can cut a drill.");
+});
+
 it("with no face selected Save is blocked with text, and the face field takes the selection", async () => {
   const panel = await open("Contour", "rockett.cam.contour");
   expect(field(panel, "Face").value).toBe("");
