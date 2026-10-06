@@ -1410,16 +1410,23 @@ export function ViewportView({
     const ts = toolState.current;
     const d = dimRef.current;
     if (ts.clicks.length !== 1 || !d) return;
-    if (
-      d.fields.some(
-        (f) => f.locked && tools.lockedValue(d.fields, f.key) === null,
-      )
-    ) {
-      refreshDim();
-      return;
-    }
     const first = ts.clicks[0]!;
     const second = resolveDimCursor(tool, first, cursor, d.fields);
+    const size = liveDimValues(tool, first, second);
+    const unset = d.fields.find((f) =>
+      f.locked
+        ? tools.lockedValue(d.fields, f.key) === null
+        : f.unit !== "°" && !((size[f.key] ?? 0) > 0),
+    );
+    if (unset) {
+      refreshDim();
+      s.setError(
+        unset.unit === "°"
+          ? `Type a number for ${unset.label}; nothing was placed.`
+          : `${unset.label} needs a size above zero; nothing was placed.`,
+      );
+      return;
+    }
     const result = buildFromClicks(
       tool,
       [first, second],
@@ -1659,7 +1666,7 @@ export function ViewportView({
           ts.clicks = [];
           clearToolPreview(viewportRef.current);
         }
-      }
+      } else if (ts.clicks.length === 1) handleHover(e);
       return;
     }
 
