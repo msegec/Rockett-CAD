@@ -4,6 +4,7 @@ import type { RouteModuleApi, ServerContext, User } from "@rockett/plugin-api";
 import manifest from "../../manifest.json";
 import { checkProgram } from "../post/check.js";
 import { formatProgram, type FormatOptions } from "../post/format.js";
+import { linked } from "../post/link.js";
 import { normalise } from "../post/normalise.js";
 import { commentForm, type Post } from "../post/schema.js";
 import {
@@ -148,15 +149,20 @@ async function posted(
     job.setup.bodies.map((id) => [id, model.get(id)!.bbox]),
   );
   const { min, max } = stockBox(job.setup, boxes);
-  const program = combined(setup.id, job.setup.wcs.offsetIndex, made);
+  const checked = {
+    ...job.setup,
+    name: setup.name ?? setup.id,
+    tolerance: 0,
+    fixtures: setup.fixtures ?? [],
+  };
+  const program = linked(combined(setup.id, job.setup.wcs.offsetIndex, made), {
+    setup: checked,
+    stock: { max },
+    spinUpSeconds: machine.spinUpSeconds,
+  });
   const { problems } = checkProgram({
     program,
-    setup: {
-      ...job.setup,
-      name: setup.name ?? setup.id,
-      tolerance: 0,
-      fixtures: setup.fixtures ?? [],
-    },
+    setup: checked,
     stock: { min, max },
     operations: made.map(({ op }) => ({ id: op.id, type: op.type ?? "" })),
     machine,

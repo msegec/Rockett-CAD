@@ -31,6 +31,14 @@ const byAxis = (max: Xyz, unit: Xyz) =>
 const sameSpindle = (a: Section["spindle"], b: Section["spindle"]) =>
   a?.rpm === b?.rpm && a?.dir === b?.dir;
 
+const changes = (before: Section | undefined, section: Section) =>
+  !before ||
+  before.toolId !== section.toolId ||
+  !sameSpindle(before.spindle, section.spindle);
+
+export const spinsUp = (before: Section | undefined, section: Section) =>
+  section.spindle !== undefined && changes(before, section);
+
 const share = (profile: number) => (6 - profile) / 5;
 
 export const byAcceleration = ({ motion, cruise }: SectionTime) =>
@@ -171,12 +179,8 @@ export function estimateTime(
 
   program.sections.forEach((section, s) => {
     const before = program.sections[s - 1];
-    const changed =
-      !before ||
-      before.toolId !== section.toolId ||
-      !sameSpindle(before.spindle, section.spindle);
-    if (changed || before.coolant !== section.coolant) stop();
-    if (changed && section.spindle)
+    if (changes(before, section) || before?.coolant !== section.coolant) stop();
+    if (spinsUp(before, section))
       times[s]!.seconds += machine.spinUpSeconds ?? 0;
     for (const item of section.moves) {
       move(s, item);

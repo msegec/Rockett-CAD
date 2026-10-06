@@ -104,22 +104,27 @@ function travelAxes(span: Span, ctx: Context): Axis[] {
 }
 
 function retractProblems({ program, safe, report }: Context) {
-  for (const [s, section] of program.sections.entries()) {
-    let at: Xyz | undefined;
-    let last = -1;
-    for (const [m, move] of section.moves.entries()) {
-      const next = endOf(move, at);
-      if (next !== at) last = m;
-      at = next;
-    }
-    if (at && at[2] < safe)
+  let end: { s: number; m: number; at: Xyz } | undefined;
+  const changeTool = () => {
+    if (end && end.at[2] < safe)
       report(
         "retract",
-        `the section ends at Z ${at[2]}, below safe Z ${safe}`,
-        s,
-        last,
+        `the section ends at Z ${end.at[2]}, below safe Z ${safe}`,
+        end.s,
+        end.m,
       );
+    end = undefined;
+  };
+  for (const [s, section] of program.sections.entries()) {
+    if (program.sections[s - 1]?.toolId !== section.toolId) changeTool();
+    let at = end?.at;
+    for (const [m, move] of section.moves.entries()) {
+      const next = endOf(move, at);
+      if (next && next !== at) end = { s, m, at: next };
+      at = next;
+    }
   }
+  changeTool();
 }
 
 export function motionProblems(ctx: Context, travelKnown: boolean): Travel {

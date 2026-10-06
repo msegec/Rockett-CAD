@@ -1,4 +1,6 @@
 import type { RegionLoop } from "../kernel/regions.js";
+import { reachOf } from "../post/checkSweep.js";
+import { liftOver } from "../post/link.js";
 import type { Section, Xy, Xyz } from "../shared/ir.js";
 import type { Fixture, Setup } from "../shared/setup.js";
 import {
@@ -345,28 +347,34 @@ function near(from: Xyz, move: Motion, shape: Pocket) {
 }
 
 function guarded(moves: Motion[], shape: Pocket): Motion[] {
-  const { setup, stock } = shape.input;
+  const { setup, stock, tool } = shape.input;
   const safe = stock.max[2] + setup.safeHeight;
   const out: Motion[] = [];
   let at: Xyz | undefined;
   for (const move of moves) {
-    const hit = at && near(at, move, shape);
-    if (at && hit) {
-      if (move.kind !== "rapid" || at[2] !== move.to[2] || at[2] >= safe)
+    if (at && move.kind === "rapid" && at[2] === move.to[2]) {
+      const to = move.to;
+      const lift = liftOver(
+        [at[0], at[1]],
+        [to[0], to[1]],
+        reachOf(tool),
+        shape.input,
+      );
+      if (lift.z > safe)
+        throw new RangeError(
+          `fixture ${lift.fixture?.name} reaches above the safe height`,
+        );
+      if (lift.z > at[2])
+        out.push(
+          { kind: "rapid", to: [at[0], at[1], lift.z] },
+          { kind: "rapid", to: [to[0], to[1], lift.z] },
+        );
+    } else {
+      const hit = at && near(at, move, shape);
+      if (hit)
         throw new RangeError(
           `pocket comes within the ${setup.clearance} mm clearance of fixture ${hit.name}`,
         );
-      const over: Motion = {
-        kind: "rapid",
-        to: [move.to[0], move.to[1], safe],
-      };
-      const rise: Xyz = [at[0], at[1], safe];
-      const above = near(rise, over, shape);
-      if (above)
-        throw new RangeError(
-          `fixture ${above.name} reaches above the safe height`,
-        );
-      out.push({ kind: "rapid", to: rise }, over);
     }
     out.push(move);
     at = move.to;

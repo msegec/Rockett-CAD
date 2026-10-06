@@ -284,7 +284,7 @@ describe("pocket", () => {
     ).toThrow("toe clamp 1");
   });
 
-  it("raises a clearance rapid over a fixture to the safe height", () => {
+  it("raises a clearance rapid over a fixture to its top plus the clearance", () => {
     const changes = {
       boundary: dumbbell,
       stock: { min: [-10, -10, -10], max: [60, 30, 0] } as PocketInput["stock"],
@@ -307,7 +307,7 @@ describe("pocket", () => {
       },
     });
     expect(crossing(clamped).length).toBe(crossing(clear).length);
-    for (const { move } of crossing(clamped)) expect(move.to[2]).toBe(15);
+    for (const { move } of crossing(clamped)) expect(move.to[2]).toBe(8);
     expect(() =>
       cut({
         ...changes,
