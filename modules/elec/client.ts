@@ -1,26 +1,23 @@
 import { defineClientModule } from "@rockett/plugin-api";
+import {
+  NET_PANEL,
+  netPanel,
+  reason,
+  selectedBoard,
+} from "./src/client/netPanel.js";
 import { pinsRoute } from "./src/server/pinTable.js";
 
+const NO_BOARD = "Select a face of one KiCad board";
+
 export default defineClientModule({
-  activate({ register, project, ui }) {
-    const board = () => {
-      const picked = project.selection();
-      if (picked.length !== 1) return undefined;
-      const { bodyId } = picked[0]!;
-      const feature = project
-        .get()
-        .document?.features.find(
-          ({ id, type }) =>
-            type === "rockett.kicad.board" && `b:${id}` === bodyId,
-        );
-      const linkId =
-        feature && "params" in feature ? feature.params.linkId : undefined;
-      return typeof linkId === "string" ? { bodyId, linkId } : undefined;
-    };
+  activate(context) {
+    const { register, project, ui } = context;
+    const board = () => selectedBoard(project);
+    const panel = netPanel(context);
     register.command({
       id: "rockett.elec.exportPins",
       label: "Export connector pin table CSV",
-      enabled: () => (board() ? true : "Select a face of one KiCad board"),
+      enabled: () => (board() ? true : NO_BOARD),
       async run() {
         const picked = board();
         if (!picked) return;
@@ -35,7 +32,7 @@ export default defineClientModule({
             type: "text/csv",
           });
         } catch (error) {
-          ui.showError(error instanceof Error ? error.message : String(error));
+          ui.showError(reason(error));
         }
       },
     });
@@ -45,5 +42,27 @@ export default defineClientModule({
       after: "rockett.kicad.exportOutline",
       command: "rockett.elec.exportPins",
     });
+    register.command({
+      id: "rockett.elec.openPanel",
+      label: "Nets and connectors",
+      enabled: () => (board() ? true : NO_BOARD),
+      async run() {
+        const picked = board();
+        if (picked) await panel.show(picked);
+      },
+    });
+    register.menuItem({
+      id: "rockett.elec.openPanel",
+      menu: "design.viewport.face",
+      after: "rockett.elec.exportPins",
+      command: "rockett.elec.openPanel",
+    });
+    register.panel({
+      id: NET_PANEL,
+      title: "Electrical",
+      when: (_state, open) => open.includes(NET_PANEL),
+      component: panel.NetPanel,
+    });
+    register.layer(panel.layer);
   },
 });

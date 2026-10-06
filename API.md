@@ -610,6 +610,19 @@ file. The Modules settings page shows it beside a line naming
   refuses as they do. Command `rockett.elec.exportPins`, after the outline
   item in the face menu, downloads the selected KiCad board's table as
   `<body name> pins.csv`.
+- `GET /projects/:id/m/rockett/elec/boards/:linkId/pads` needs view access
+  and returns `{nets, footprints}`: the net names in board order, and each
+  footprint with a uuid and side as
+  `{footprintUuid, reference, connector, pins}`, each pin
+  `{pad, net, position}` with the position in mm in model space, and
+  `connector` by the ELEC-003 Reference rule. It reads both kicad services
+  and refuses as they do. Command `rockett.elec.openPanel`, after the pin
+  table item in the face menu, opens panel `rockett.elec.panel` on the
+  selected board: searchable Nets and Connectors lists, and the Reference
+  and nets of a selected component body
+  `rockett.kicad:<featureId>:<linkId>:<footprintUuid>`. Clicking a net
+  draws its pads, and only its pads, in the `selection` colour on layer
+  `rockett.elec.nets`.
 - `register.kernelJob(id, entry)` registers a kernel job: `id` starts with
   the module id and a dot, and `entry` is the URL of a file whose default
   export, from `defineKernelJobs`, holds the job under that id.

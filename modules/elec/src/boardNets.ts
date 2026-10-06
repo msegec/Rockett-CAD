@@ -7,7 +7,7 @@ import {
 import { Type, type Static, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 
-const PROVIDER = "rockett.kicad";
+export const PROVIDER = "rockett.kicad";
 const id = Type.String({ minLength: 1 });
 export const boardNetsSchema = Type.Object({
   nets: Type.Array(

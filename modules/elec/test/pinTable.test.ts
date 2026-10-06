@@ -146,6 +146,8 @@ it("downloads the selected board's pin table from the face menu", async () => {
     register: {
       command: (c: Command) => (commands.push(c), () => {}),
       menuItem: (item: MenuItem) => (items.push(item), () => {}),
+      panel: () => () => {},
+      layer: () => () => {},
     },
     project: {
       selection: () => selection,
@@ -170,6 +172,12 @@ it("downloads the selected board's pin table from the face menu", async () => {
       menu: "design.viewport.face",
       after: "rockett.kicad.exportOutline",
       command: "rockett.elec.exportPins",
+    },
+    {
+      id: "rockett.elec.openPanel",
+      menu: "design.viewport.face",
+      after: "rockett.elec.exportPins",
+      command: "rockett.elec.openPanel",
     },
   ]);
   const [command] = commands;

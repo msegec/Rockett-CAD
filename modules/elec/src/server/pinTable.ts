@@ -1,11 +1,16 @@
 import {
   placementSchema,
+  type ProjectServices,
   type Route,
   type RouteModule,
 } from "@rockett/plugin-api";
 import { Type } from "typebox";
 import { boardNetsSchema, provided } from "../boardNets.js";
-import { connectors, type Connector } from "../connectors.js";
+import {
+  connectors,
+  type Connector,
+  type ConnectorSnapshot,
+} from "../connectors.js";
 
 const text = Type.Optional(Type.String());
 const boardSchema = Type.Object({
@@ -23,6 +28,21 @@ const boardSchema = Type.Object({
     }),
   ),
 });
+
+export async function boardSnapshot(
+  services: ProjectServices,
+  linkId: string,
+): Promise<ConnectorSnapshot> {
+  const board = await provided(services, "board", boardSchema, "board", linkId);
+  const { nets } = await provided(
+    services,
+    "boardNets",
+    boardNetsSchema,
+    "board nets",
+    linkId,
+  );
+  return { ...board, nets };
+}
 
 const field = (value: string) =>
   /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
@@ -56,22 +76,8 @@ export const pinsRoute: Route<
 export const pinsModule: RouteModule = {
   id: "rockett.elec.pins",
   mount(api) {
-    api.projectRoute(pinsRoute, async (_doc, { params }, { services }) => {
-      const board = await provided(
-        services,
-        "board",
-        boardSchema,
-        "board",
-        params.linkId,
-      );
-      const { nets } = await provided(
-        services,
-        "boardNets",
-        boardNetsSchema,
-        "board nets",
-        params.linkId,
-      );
-      return pinTable(connectors({ ...board, nets }, {}));
-    });
+    api.projectRoute(pinsRoute, async (_doc, { params }, { services }) =>
+      pinTable(connectors(await boardSnapshot(services, params.linkId), {})),
+    );
   },
 };

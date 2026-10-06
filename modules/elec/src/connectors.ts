@@ -21,13 +21,23 @@ export type ConnectorFlags = Readonly<
   Record<string, { connector?: true; mating?: Vec3 }>
 >;
 
+export type Pin = { pad: string; net?: string; position: Vec3 };
+
+export type PlacedFootprint = {
+  footprintUuid: string;
+  libId?: string | undefined;
+  reference: string;
+  side: Side;
+  pins: Pin[];
+};
+
 export type Connector = {
   footprintUuid: string;
   reference: string;
   side: Side;
   suggested: Vec3;
   mating?: { direction: Vec3; source: "metadata" | "frame" };
-  pins: { pad: string; net?: string; position: Vec3 }[];
+  pins: Pin[];
 };
 
 const CONNECTOR_REFERENCE = /^(?:J|P|X|CN)/;
@@ -37,10 +47,12 @@ function vertical(libId: string | undefined) {
   return name.split("_").includes("Vertical");
 }
 
-export function connectors(
-  { thickness, placement, footprints, nets }: ConnectorSnapshot,
-  flags: ConnectorFlags,
-): Connector[] {
+export function placedFootprints({
+  thickness,
+  placement,
+  footprints,
+  nets,
+}: ConnectorSnapshot): PlacedFootprint[] {
   const netOf = new Map(
     nets.flatMap(({ name, members }) =>
       members.map(
@@ -50,29 +62,13 @@ export function connectors(
   );
   return footprints.flatMap(({ uuid, libId, reference = "", side, pads }) => {
     if (!uuid || (side !== "front" && side !== "back")) return [];
-    const flag = flags[uuid];
-    if (!flag?.connector && !CONNECTOR_REFERENCE.test(reference)) return [];
-    const suggested = Placement.applyToDirection(placement, [
-      0,
-      0,
-      side === "front" ? 1 : -1,
-    ]);
     const z = side === "front" ? thickness : 0;
-    const mating: Connector["mating"] = flag?.mating
-      ? {
-          direction: Placement.applyToDirection(placement, flag.mating),
-          source: "frame",
-        }
-      : vertical(libId)
-        ? { direction: suggested, source: "metadata" }
-        : undefined;
     return [
       {
         footprintUuid: uuid,
+        libId,
         reference,
         side,
-        suggested,
-        ...(mating && { mating }),
         pins: pads.flatMap(({ number, x, y }) => {
           if (!number) return [];
           const net = netOf.get(`${uuid}\0${number}`);
@@ -84,6 +80,48 @@ export function connectors(
             },
           ];
         }),
+      },
+    ];
+  });
+}
+
+export const isConnector = (
+  { footprintUuid, reference }: PlacedFootprint,
+  flags: ConnectorFlags,
+) => !!flags[footprintUuid]?.connector || CONNECTOR_REFERENCE.test(reference);
+
+export function connectors(
+  snapshot: ConnectorSnapshot,
+  flags: ConnectorFlags,
+): Connector[] {
+  return placedFootprints(snapshot).flatMap((placed) => {
+    if (!isConnector(placed, flags)) return [];
+    const { footprintUuid, libId, reference, side, pins } = placed;
+    const flag = flags[footprintUuid];
+    const suggested = Placement.applyToDirection(snapshot.placement, [
+      0,
+      0,
+      side === "front" ? 1 : -1,
+    ]);
+    const mating: Connector["mating"] = flag?.mating
+      ? {
+          direction: Placement.applyToDirection(
+            snapshot.placement,
+            flag.mating,
+          ),
+          source: "frame",
+        }
+      : vertical(libId)
+        ? { direction: suggested, source: "metadata" }
+        : undefined;
+    return [
+      {
+        footprintUuid,
+        reference,
+        side,
+        suggested,
+        ...(mating && { mating }),
+        pins,
       },
     ];
   });
