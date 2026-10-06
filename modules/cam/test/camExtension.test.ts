@@ -53,9 +53,27 @@ describe("CAM data validator", () => {
   });
 });
 
+const held = (fixture: object) => ({
+  setups: [{ id: "s1", fixtures: [fixture] }],
+  tools: [],
+});
+
+describe("CAM data validator, hold-downs", () => {
+  it("accepts named fixture boxes on a setup and refuses a malformed one", () => {
+    const clamp = { name: "toe clamp 1", min: [0, 0, 0], max: [4, 4, 9] };
+    expect(isCamData(held(clamp))).toBe(true);
+    for (const bad of [
+      { ...clamp, name: "" },
+      { ...clamp, min: [0, 0] },
+      { min: clamp.min, max: clamp.max },
+    ])
+      expect(isCamData(held(bad))).toBe(false);
+  });
+});
+
 describe("CAM migration hook", () => {
   it("reads a project saved before CAM as empty data", () => {
-    expect(CAM_VERSION).toBe(3);
+    expect(CAM_VERSION).toBe(4);
     expect(migrateCam(undefined)).toEqual({
       status: "ready",
       data: { setups: [], tools: [] },
@@ -83,12 +101,12 @@ describe("CAM migration hook", () => {
   });
 
   it("keeps newer data unchanged and read only", () => {
-    const stored = { version: 4, data: { future: true } };
+    const stored = { version: 5, data: { future: true } };
     expect(migrateCam(stored)).toEqual({
       status: "kept",
-      reason: "CAM data version 4 is newer than this module reads (3)",
+      reason: "CAM data version 5 is newer than this module reads (4)",
     });
-    expect(stored).toEqual({ version: 4, data: { future: true } });
+    expect(stored).toEqual({ version: 5, data: { future: true } });
   });
 
   it.each([

@@ -9,8 +9,8 @@ import { MIN_TOLERANCE } from "./params.js";
 import { storedPresetSchema, toolSchema } from "./tools.js";
 
 export const CAM_EXTENSION = "rockett.cam";
-export const CAM_VERSION = 3;
-const READ_VERSIONS = new Set([1, 2, CAM_VERSION]);
+export const CAM_VERSION = 4;
+const READ_VERSIONS = new Set([1, 2, 3, CAM_VERSION]);
 
 export const entry = Type.Object({ id: Type.String({ minLength: 1 }) });
 
@@ -104,6 +104,12 @@ const wcsSchema = Type.Object({
   ]),
 });
 
+const fixtureSchema = Type.Object({
+  name: Type.String({ minLength: 1 }),
+  min: xyz,
+  max: xyz,
+});
+
 export const POST_MAX_BYTES = 64 * 1024;
 export const USER_POST_PREFIX = "user.";
 
@@ -152,6 +158,7 @@ const docSetup = Type.Intersect([
       ]),
       postId: Type.String({ minLength: 1 }),
       tolerance: Type.Number({ minimum: MIN_TOLERANCE }),
+      fixtures: Type.Array(fixtureSchema),
     }),
   ),
 ]);

@@ -2,11 +2,10 @@ import { endOf, type Xyz } from "../shared/ir.js";
 import { checkTravel, type Box, type Travel } from "../shared/setup.js";
 import type { Tool } from "../shared/tools.js";
 import type { CheckInput, Report } from "./check.js";
-import { exempt, hits, spans, type Region, type Span } from "./checkSweep.js";
+import { exempt, hits, keepOut, spans, type Span } from "./checkSweep.js";
 
 export type Context = CheckInput & {
   safe: number;
-  clear: number;
   report: Report;
 };
 
@@ -36,18 +35,8 @@ function entryProblems(span: Span, tool: Tool | undefined, ctx: Context) {
     );
 }
 
-function grown({ min, max }: Box, by: number, top: number, reach: number) {
-  const region: Region = {
-    min: [min[0] - by, min[1] - by],
-    max: [max[0] + by, max[1] + by],
-    top,
-    reach,
-  };
-  return region;
-}
-
 function stockProblems({ s, m, segments }: Span, reach: number, ctx: Context) {
-  const region = grown(ctx.stock, ctx.setup.clearance, ctx.clear, reach);
+  const region = keepOut(ctx.stock, ctx.setup.clearance, reach);
   const deepest = new Map<string, number>();
   const through = segments.some((segment) => {
     const { to, rapid, from } = segment;
@@ -73,7 +62,7 @@ function fixtureProblems(
 ) {
   const g = ctx.setup.clearance;
   for (const fixture of ctx.setup.fixtures) {
-    const region = grown(fixture, g, fixture.max[2] + g, reach);
+    const region = keepOut(fixture, g, reach);
     if (segments.some((segment) => hits(segment, region)))
       ctx.report(
         "fixture",

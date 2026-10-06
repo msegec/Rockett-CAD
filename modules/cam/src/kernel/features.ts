@@ -1,5 +1,6 @@
 import { defineKernelJobs, type KernelJobScope } from "@rockett/plugin-api";
 import type {
+  Footprint,
   PlanFeatures,
   PocketFeature,
   ProfileFeature,
@@ -19,7 +20,7 @@ import {
   offsetLoops,
   pieces,
 } from "../toolpath/geometry.js";
-import { holesOf, solidLeft, zRange, type Hole } from "./holes.js";
+import { boundsOf, holesOf, solidLeft, zRange, type Hole } from "./holes.js";
 import {
   planeOf,
   read,
@@ -86,6 +87,11 @@ function partOf(scope: KernelJobScope, body: FaceBody, at: Placement): Part {
     top,
     holes: holesOf(scope, shape),
   };
+}
+
+function footprintOf(scope: KernelJobScope, shape: any): Footprint {
+  const [min, max] = boundsOf(scope, shape);
+  return { min: [min.X(), min.Y()], max: [max.X(), max.Y()] };
 }
 
 function refOf(scope: KernelJobScope, { body, model }: Part, index: number) {
@@ -290,6 +296,7 @@ function pocketsOf(
         name: `Pocket ${count()}`,
         floor,
         z: flat.z,
+        footprint: footprintOf(scope, outer),
         width: inscribedWidth(outerLoop, inner),
         cornerRadius: Math.min(
           smallestCorner(outerLoop, 1),
@@ -324,6 +331,7 @@ function profilesOf(
             name: `Outline ${count.outline()}`,
             face,
             z,
+            footprint: footprintOf(scope, outer),
             side: "outside",
           },
         ]
@@ -342,6 +350,7 @@ function profilesOf(
         name: `Opening ${count.opening()}`,
         face,
         z,
+        footprint: footprintOf(scope, wire),
         side: "inside",
         width: inscribedWidth(loop, []),
         cornerRadius: smallestCorner(loop, 1),
@@ -370,6 +379,10 @@ export default defineKernelJobs({
     const count = { outline: counter(), opening: counter() };
     return {
       stockTop: stock.max[2],
+      stockOutline: {
+        min: [stock.min[0], stock.min[1]],
+        max: [stock.max[0], stock.max[1]],
+      },
       modelTop,
       holes: parts.flatMap(({ holes }) => holes),
       pockets: parts.flatMap((each) =>

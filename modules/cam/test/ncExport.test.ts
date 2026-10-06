@@ -324,6 +324,22 @@ describe("GET /projects/:id/m/rockett/cam/nc", () => {
       });
   });
 
+  it("blocks a program that passes a stored hold-down, naming the operation and the hold-down", async () => {
+    const route = await mounted();
+    const doc = project(setup("s1", "Setup 1"));
+    await route.generate(doc);
+    camData(doc).setups[0]!.fixtures = [
+      { name: "toe clamp 1", min: [15, 34, 0], max: [25, 54, 10] },
+    ];
+    const blocker = {
+      kind: "check",
+      setupId: "s1",
+      rule: "fixture",
+      reason: "Contour 1: the tool comes within 2 mm of toe clamp 1",
+    };
+    expect(await route.nc(doc)).toEqual({ blocked: [blocker, blocker] });
+  });
+
   it("posts a laser profile with its laserPowerMax", async () => {
     const laser: MachineProfile = {
       ...mill,

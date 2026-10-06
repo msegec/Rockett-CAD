@@ -11,6 +11,7 @@ import {
   OPERATION_DIALOGS,
   operationDialog,
 } from "./src/client/opDialog.js";
+import { holdDownDraft } from "./src/client/holdDowns.js";
 import { NC_PANEL, ncDialog } from "./src/client/ncDialog.js";
 import { postsPage } from "./src/client/postLibrary.js";
 import { SETUP_PANEL, setupDialog } from "./src/client/setupDialog.js";
@@ -72,6 +73,7 @@ export default defineClientModule({
   activate(context) {
     const { register, project, ui } = context;
     const preview = toolpathPreview(project);
+    const draft = holdDownDraft();
     settingsPages(context);
     register.workbench({
       id: MANUFACTURE,
@@ -92,7 +94,7 @@ export default defineClientModule({
       group: SETUP_GROUP,
       icon: "setup.svg",
       panel: SETUP_PANEL,
-      component: setupDialog(context),
+      component: setupDialog(context, draft),
     });
     register.command({
       id: "rockett.cam.library",
@@ -136,7 +138,7 @@ export default defineClientModule({
       panel: NC_PANEL,
       component: ncDialog(context),
     });
-    register.layer(stockLayer(project, preview));
+    register.layer(stockLayer(project, preview, draft));
     register.layer(toolpathLayer(preview));
   },
 });

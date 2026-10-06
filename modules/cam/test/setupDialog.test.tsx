@@ -146,7 +146,7 @@ it("saves each new row and reads it back after the project reloads", async () =>
     post: { ...mine, libraryRef: { id: mine.id } },
     tolerance: 0.05,
   };
-  expect(stored().version).toBe(3);
+  expect(stored().version).toBe(4);
   expect(setups()[1]).toMatchObject(setup);
 
   await act(async () => useStore.getState().openProject("p1"));
@@ -184,6 +184,34 @@ it("a new setup leaves a reference body out of its bodies until the Bodies field
   } finally {
     evaluation.bodies.pop();
   }
+});
+
+it("places hold-downs by numbers, saves the keep-out ones as fixtures and drops tape", async () => {
+  await withSettings({});
+  const panel = await open("Setup 2", "rockett.cam.setup");
+  const empty = "No hold-downs. The stock must be held another way.";
+  expect(hints(panel)).toContain(empty);
+  await press(panel, "Add hold-down");
+  expect(hints(panel)).not.toContain(empty);
+  await type(panel, "X (mm)", "10");
+  await type(panel, "Y (mm)", "50");
+  await press(panel, "Add hold-down");
+  await press(panel, "Add hold-down");
+  const second = panel.querySelector('[aria-label="Hold-down 2"]')!;
+  await choose(second, "Hold-down", "tape");
+  expect(hints(second)).toEqual(["holds the whole stock, no keep-out"]);
+  await act(async () =>
+    panel
+      .querySelector<HTMLButtonElement>('[aria-label="Remove hold-down 3"]')!
+      .click(),
+  );
+  expect(panel.querySelectorAll('[role="group"]')).toHaveLength(2);
+  await press(panel, "OK");
+
+  expect(stored().version).toBe(4);
+  expect(setups()[1]!.fixtures).toEqual([
+    { name: "toe clamp 1", min: [10, 50, 0], max: [50, 70, 25] },
+  ]);
 });
 
 it("a new setup takes the default machine, its post and the default tolerance from the CAM settings", async () => {

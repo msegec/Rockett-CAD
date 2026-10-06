@@ -79,10 +79,15 @@ function merged(pieces: Piece[]): Hole[] {
   return found;
 }
 
-export function zRange({ oc, own }: KernelJobScope, shape: any) {
+export function boundsOf({ oc, own }: KernelJobScope, shape: any) {
   const bounds = own(new oc.Bnd_Box_1());
   oc.BRepBndLib.AddOptimal(shape, bounds, false, false);
-  return [own(bounds.CornerMin()).Z(), own(bounds.CornerMax()).Z()] as const;
+  return [own(bounds.CornerMin()), own(bounds.CornerMax())];
+}
+
+export function zRange(scope: KernelJobScope, shape: any) {
+  const [min, max] = boundsOf(scope, shape);
+  return [min.Z(), max.Z()] as const;
 }
 
 export function solidLeft({ oc, own }: KernelJobScope, made: any) {

@@ -88,6 +88,7 @@ const hole = (
 
 const plate: PlanFeatures = {
   stockTop: 12,
+  stockOutline: { min: [0, 0], max: [60, 60] },
   modelTop: 10,
   holes: [hole([10, 10], 6, 0), hole([50, 50], 3, 4, true)],
   pockets: [
@@ -98,6 +99,7 @@ const plate: PlanFeatures = {
       z: 5,
       width: 30,
       cornerRadius: 2,
+      footprint: { min: [0, 0], max: [40, 40] },
     },
     {
       id: "slotB",
@@ -106,6 +108,7 @@ const plate: PlanFeatures = {
       z: 7,
       width: 7,
       cornerRadius: 1,
+      footprint: { min: [0, 0], max: [40, 40] },
     },
   ],
   profiles: [
@@ -117,6 +120,7 @@ const plate: PlanFeatures = {
       side: "inside",
       width: 20,
       cornerRadius: 3,
+      footprint: { min: [0, 0], max: [40, 40] },
     },
     {
       id: "outline",
@@ -124,11 +128,12 @@ const plate: PlanFeatures = {
       face: face("f:bottom", 0),
       z: 0,
       side: "outside",
+      footprint: { min: [0, 0], max: [40, 40] },
     },
   ],
 };
 
-const setup = { material: "aluminium6061" };
+const setup = { material: "aluminium6061", clearance: 3, fixtures: [] };
 
 const machine = (toolChange: MachineProfile["toolChange"]): MachineProfile => ({
   ...newMachine(0),
@@ -195,7 +200,12 @@ describe("planOperations", () => {
   });
 
   it("reports a tool with no preset when the setup names no material", () => {
-    const plan = planOperations({}, plate, tools, machine("perFile"));
+    const plan = planOperations(
+      { clearance: 3, fixtures: [] },
+      plate,
+      tools,
+      machine("perFile"),
+    );
     expect(plan.unplanned).toContainEqual({
       feature: "Window",
       reason: "T2 4 mm flat has no preset and the setup names no material",

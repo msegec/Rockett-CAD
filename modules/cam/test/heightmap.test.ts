@@ -14,6 +14,7 @@ import {
   simulateJob,
   type SimulationJob,
 } from "../src/client/heightmap.js";
+import { holdDownDraft } from "../src/client/holdDowns.js";
 import { STOCK_LAYER, stockLayer } from "../src/client/stockLayer.js";
 import {
   toolpathBarView,
@@ -275,7 +276,7 @@ function mounted(project: ProjectView, preview: ToolpathPreview) {
       children.forEach(release);
     },
   };
-  const unmount = stockLayer(project, preview).mount(layer);
+  const unmount = stockLayer(project, preview, holdDownDraft()).mount(layer);
   const meshes = () => {
     const found: THREE.Mesh<THREE.BufferGeometry, THREE.Material>[] = [];
     group.traverse((o) => o instanceof THREE.Mesh && found.push(o));

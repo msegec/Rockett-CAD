@@ -7,6 +7,7 @@ import {
   type Xy,
   type Xyz,
 } from "../shared/ir.js";
+import type { Box } from "../shared/setup.js";
 import { normalise } from "./normalise.js";
 
 export type Segment = { from: Xyz; to: Xyz; rapid: boolean; grow: number };
@@ -22,6 +23,17 @@ export type Step = {
 export type Span = Omit<Step, "at"> & { segments: Segment[] };
 
 export type Region = { min: Xy; max: Xy; top: number; reach: number };
+
+export const keepOut = (
+  { min, max }: Box,
+  clearance: number,
+  reach: number,
+): Region => ({
+  min: [min[0] - clearance, min[1] - clearance],
+  max: [max[0] + clearance, max[1] + clearance],
+  top: max[2] + clearance,
+  reach,
+});
 
 const EXPAND = {
   id: "rockett.cam.check",
@@ -117,6 +129,18 @@ function distance(p: Xy, q: Xy, region: Region): number {
       return rectDistance([p[0] + u * d[0], p[1] + u * d[1]], region);
     }),
   );
+}
+
+export function intrudes(
+  { min, max }: Pick<Region, "min" | "max">,
+  z: number,
+  region: Region,
+): boolean {
+  const [x, y] = ([0, 1] as const).map((i) =>
+    Math.max(region.min[i] - max[i], min[i] - region.max[i]),
+  ) as Xy;
+  const apart = Math.hypot(Math.max(x, 0), Math.max(y, 0));
+  return z < region.top && ((x < 0 && y < 0) || apart < region.reach);
 }
 
 export function hits({ from, to, grow }: Segment, region: Region): boolean {

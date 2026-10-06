@@ -1,6 +1,13 @@
 import * as THREE from "three";
 import type { Layer, OpenProject, ProjectView } from "@rockett/plugin-api";
-import { stockBox, type Placement, type StockSetup } from "../shared/setup.js";
+import {
+  stockBox,
+  type Box,
+  type Fixture,
+  type Placement,
+  type StockSetup,
+} from "../shared/setup.js";
+import type { HoldDownDraft } from "./holdDowns.js";
 import { bodyBoxes, camRead } from "./setup.js";
 import type { Simulation, ToolpathPreview } from "./toolpaths.js";
 
@@ -8,6 +15,7 @@ export const STOCK_LAYER = "rockett.cam.stock";
 
 const STOCK_TOKEN = "border";
 const GOUGE_TOKEN = "err";
+const HOLD_DOWN_TOKEN = "warn";
 const AXIS_TOKENS = ["axis-x", "axis-y", "axis-z"] as const;
 const TRIAD_FRACTION = 0.25;
 
@@ -45,8 +53,7 @@ export function placeInModel<O extends THREE.Object3D>(
   return object;
 }
 
-function stockObject(setup: StockSetup, open: OpenProject) {
-  const { min, max, modelToSetup } = stockBox(setup, bodyBoxes(open));
+function boxLines({ min, max }: Box, token: string) {
   const [a, b] = [new THREE.Vector3(...min), new THREE.Vector3(...max)];
   const corners = [0, 1, 2, 3, 4, 5, 6, 7].map(
     (i) =>
@@ -61,8 +68,21 @@ function stockObject(setup: StockSetup, open: OpenProject) {
       .filter((bit) => !(i & bit))
       .flatMap((bit) => [corner, corners[i | bit]!]),
   );
+  return line(edges, token);
+}
+
+const holdDowns = (fixtures: Fixture[]) =>
+  fixtures.map((fixture) => boxLines(fixture, HOLD_DOWN_TOKEN));
+
+function stockObject(
+  setup: StockSetup,
+  fixtures: Fixture[],
+  open: OpenProject,
+) {
+  const { min, max, modelToSetup } = stockBox(setup, bodyBoxes(open));
+  const [a, b] = [new THREE.Vector3(...min), new THREE.Vector3(...max)];
   const object = new THREE.Group();
-  object.add(line(edges, STOCK_TOKEN));
+  object.add(boxLines({ min, max }, STOCK_TOKEN), ...holdDowns(fixtures));
   const reach = TRIAD_FRACTION * Math.max(...b.clone().sub(a).toArray());
   AXIS_TOKENS.forEach((token, i) =>
     object.add(
@@ -75,15 +95,20 @@ function stockObject(setup: StockSetup, open: OpenProject) {
   return placeInModel(object, modelToSetup);
 }
 
-function drawn(open: OpenProject) {
+function drawn(open: OpenProject, draft: HoldDownDraft) {
   const read = camRead(open);
-  if (read.status === "kept") return [];
   const present = new Set(open.bodies.map(({ id }) => id));
-  return read.data.setups.flatMap(({ bodies, stock, wcs }) =>
+  const setups = read.status === "kept" ? [] : read.data.setups;
+  const saved = setups.flatMap(({ bodies, stock, wcs, fixtures = [] }) =>
     bodies?.length && bodies.every((id) => present.has(id)) && stock && wcs
-      ? [stockObject({ bodies, stock, wcs }, open)]
+      ? [stockObject({ bodies, stock, wcs }, fixtures, open)]
       : [],
   );
+  const live = draft.get();
+  if (!live?.fixtures.length || !live.setup.bodies.length) return saved;
+  const { modelToSetup } = stockBox(live.setup, bodyBoxes(open));
+  const object = new THREE.Group().add(...holdDowns(live.fixtures));
+  return [...saved, placeInModel(object, modelToSetup)];
 }
 
 function mesh(
@@ -138,6 +163,7 @@ function surfaceObject({
 export const stockLayer = (
   project: ProjectView,
   preview: ToolpathPreview,
+  draft: HoldDownDraft,
 ): Layer => ({
   id: STOCK_LAYER,
   mount({ group, requestRender, clearGroup }) {
@@ -148,7 +174,7 @@ export const stockLayer = (
     const drawBoxes = () => {
       clearGroup(boxes);
       try {
-        for (const object of drawn(project.get())) boxes.add(object);
+        for (const object of drawn(project.get(), draft)) boxes.add(object);
       } catch (error) {
         console.error(`[rockett] ${STOCK_LAYER}: ${String(error)}`);
       }
@@ -164,11 +190,11 @@ export const stockLayer = (
     };
     drawBoxes();
     drawSurface();
-    const stopBoxes = project.subscribe(drawBoxes);
-    const stopSurface = preview.subscribe(drawSurface);
-    return () => {
-      stopBoxes();
-      stopSurface();
-    };
+    const stops = [
+      project.subscribe(drawBoxes),
+      draft.subscribe(drawBoxes),
+      preview.subscribe(drawSurface),
+    ];
+    return () => stops.forEach((stop) => stop());
   },
 });

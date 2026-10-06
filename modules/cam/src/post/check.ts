@@ -168,7 +168,6 @@ export function checkProgram(input: CheckInput): CheckResult {
   const ctx: Context = {
     ...input,
     safe,
-    clear: top + input.setup.clearance,
     report,
   };
   const known = input.setup.wcs.machine.kind === "known";

@@ -203,7 +203,7 @@ describe("CAM setup post copies", () => {
     const data = doc.extensions[CAM_EXTENSION]!.data as CamData;
     data.setups[0]!.post = copyOf({ ...grbl, label: "Shadow" }) as never;
     await expect(nc(doc, "grbl")).rejects.toThrow(
-      "CAM data version 3 is not valid",
+      "CAM data version 4 is not valid",
     );
   });
 

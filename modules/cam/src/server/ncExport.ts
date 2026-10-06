@@ -155,7 +155,7 @@ async function posted(
       ...job.setup,
       name: setup.name ?? setup.id,
       tolerance: 0,
-      fixtures: [],
+      fixtures: setup.fixtures ?? [],
     },
     stock: { min, max },
     operations: made.map(({ op }) => ({ id: op.id, type: op.type ?? "" })),

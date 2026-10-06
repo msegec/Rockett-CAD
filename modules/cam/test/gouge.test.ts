@@ -16,6 +16,7 @@ import {
   simulateJob,
   type SimulationJob,
 } from "../src/client/heightmap.js";
+import { holdDownDraft } from "../src/client/holdDowns.js";
 import { stockLayer } from "../src/client/stockLayer.js";
 import { toolpathBarView, toolpathPreview } from "../src/client/toolpaths.js";
 import {
@@ -385,7 +386,7 @@ function project(floor: number, top: unknown, tolerance?: number): ProjectView {
 
 function layer(view: ProjectView, preview: ReturnType<typeof toolpathPreview>) {
   const group = new THREE.Group();
-  stockLayer(view, preview).mount({
+  stockLayer(view, preview, holdDownDraft()).mount({
     group,
     requestRender: () => {},
     disposeObject: () => {},

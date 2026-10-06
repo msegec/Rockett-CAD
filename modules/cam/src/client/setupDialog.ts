@@ -1,4 +1,4 @@
-import { createElement as h, Fragment, useState } from "react";
+import { createElement as h, Fragment, useEffect, useState } from "react";
 import type {
   ClientContext,
   NumberFieldProps,
@@ -11,6 +11,12 @@ import type { MachineProfile } from "../shared/machine.js";
 import { MIN_TOLERANCE } from "../shared/params.js";
 import { defaultMachine, setupDefaults } from "../shared/settings.js";
 import type { Stock } from "../shared/setup.js";
+import {
+  fixturesOf,
+  holdDownRows,
+  type HoldDown,
+  type HoldDownDraft,
+} from "./holdDowns.js";
 import { lostPost, MACHINE_TEXTS, postChoices } from "./ncDialog.js";
 import { chosen, picker, useLibrary } from "./opDialog.js";
 import {
@@ -243,20 +249,28 @@ const heightRows = (ui: ClientContext["ui"], setup: DialogSetup, edit: Edit) =>
     ),
   );
 
-export function setupDialog(context: ClientContext) {
+export function setupDialog(context: ClientContext, draft: HoldDownDraft) {
   const { ui, project, settings } = context;
   return function SetupDialog() {
     const [setup, setSetup] = useState(() =>
       newSetup(project.get(), setupDefaults(settings)),
     );
+    const [holdDowns, setHoldDowns] = useState<HoldDown[]>([]);
     const [pending, setPending] = useState(false);
+    const fixtures = fixturesOf(holdDowns);
+    useEffect(
+      () => draft.set({ setup, fixtures: fixturesOf(holdDowns) }),
+      [setup, holdDowns],
+    );
+    useEffect(() => () => draft.set(null), []);
     const target = useTarget(context);
     const open = project.get();
     const edit: Edit = (patch) => setSetup((now) => ({ ...now, ...patch }));
     const close = () => ui.closePanel(SETUP_PANEL);
     const save = () => {
       setPending(true);
-      void saveSetup(project, target.stored(setup)).then(close, () =>
+      const held = fixtures.length ? { ...setup, fixtures } : setup;
+      void saveSetup(project, target.stored(held)).then(close, () =>
         setPending(false),
       );
     };
@@ -294,6 +308,7 @@ export function setupDialog(context: ClientContext) {
       target.rows,
       placementRows(ui, setup, open, edit),
       heightRows(ui, setup, edit),
+      holdDownRows(ui, holdDowns, setHoldDowns),
     );
     const footer = h(ui.DialogFooter, {
       onOk: save,

@@ -1,5 +1,6 @@
 import { suggestFeeds, type Suggestion } from "../feeds/suggest.js";
 import type { Hole } from "../kernel/holes.js";
+import { intrudes, keepOut } from "../post/checkSweep.js";
 import type { Xy } from "../shared/ir.js";
 import type { MachineProfile } from "../shared/machine.js";
 import type { FaceRef } from "../shared/params.js";
@@ -9,6 +10,8 @@ import { drill } from "../toolpath/drill.js";
 
 export type PlanTool = Tool & { presets: Preset[] };
 
+export type Footprint = { min: Xy; max: Xy };
+
 export type PocketFeature = {
   id: string;
   name: string;
@@ -16,6 +19,7 @@ export type PocketFeature = {
   z: number;
   width: number;
   cornerRadius: number;
+  footprint: Footprint;
 };
 
 export type ProfileFeature = {
@@ -23,12 +27,14 @@ export type ProfileFeature = {
   name: string;
   face: FaceRef;
   z: number;
+  footprint: Footprint;
 } & (
   { side: "outside" } | { side: "inside"; width: number; cornerRadius: number }
 );
 
 export type PlanFeatures = {
   stockTop: number;
+  stockOutline: Footprint;
   modelTop: number;
   holes: Hole[];
   pockets: PocketFeature[];
@@ -55,9 +61,17 @@ type Staged = PlannedOperation & { floor: number };
 
 type Draft = Omit<Staged, "toolId" | "feeds">;
 
+type PlanSetup = Pick<Setup, "material" | "clearance" | "fixtures">;
+
 type Context = {
   stockTop: number;
   unplanned: Unplanned[];
+  blocked: (
+    feature: string,
+    at: Footprint,
+    z: number,
+    reach?: number,
+  ) => boolean;
   flats: (depth: number) => PlanTool[];
   add: (stage: Staged[], feature: string, tool: PlanTool, op: Draft) => boolean;
 };
@@ -78,6 +92,8 @@ const TABS = { count: 4, width: 6, height: 2 };
 
 const mm = (value: number) => Number(value.toFixed(3));
 const shown = ([x, y]: Xy) => `(${mm(x)}, ${mm(y)})`;
+const holeName = ({ diameter, centre }: Pick<Hole, "diameter" | "centre">) =>
+  `Hole ${mm(diameter)} mm at ${shown(centre)}`;
 
 const largestFirst = (a: Tool, b: Tool) =>
   b.diameter - a.diameter || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -86,7 +102,7 @@ const reaches = (tool: Tool, radius: number) =>
   tool.diameter / 2 <= radius + LENGTH;
 
 function context(
-  setup: Pick<Setup, "material">,
+  setup: PlanSetup,
   stockTop: number,
   tools: PlanTool[],
   machine: MachineProfile,
@@ -107,6 +123,13 @@ function context(
   return {
     stockTop,
     unplanned,
+    blocked(feature, at, z, reach = 0) {
+      const hit = setup.fixtures.find((fixture) =>
+        intrudes(at, z, keepOut(fixture, setup.clearance, reach)),
+      );
+      if (hit) unplanned.push({ feature, reason: `blocked by ${hit.name}` });
+      return Boolean(hit);
+    },
     flats: (depth) =>
       tools
         .filter(
@@ -128,7 +151,10 @@ function context(
   };
 }
 
-function planFacing(plan: Context, modelTop: number): Staged[] {
+function planFacing(
+  plan: Context,
+  { modelTop, stockOutline }: PlanFeatures,
+): Staged[] {
   const facing: Staged[] = [];
   if (!(plan.stockTop > modelTop + LENGTH)) return facing;
   const depth = plan.stockTop - modelTop;
@@ -138,7 +164,9 @@ function planFacing(plan: Context, modelTop: number): Staged[] {
       feature: "Stock top",
       reason: `no flat tool reaches ${mm(depth)} mm deep`,
     });
-  else
+  else if (
+    !plan.blocked("Stock top", stockOutline, modelTop, tool.diameter / 2)
+  )
     plan.add(facing, "Stock top", tool, {
       id: "facing",
       type: "rockett.cam.facing",
@@ -200,7 +228,7 @@ function planHoles(plan: Context, holes: Hole[], tools: PlanTool[]) {
       )!;
       pocketables.push({
         id: `hole:${mm(centre[0])},${mm(centre[1])}`,
-        name: `Hole ${mm(diameter)} mm at ${shown(centre)}`,
+        name: holeName({ centre, diameter }),
         z: bottom,
         width: diameter,
         cornerRadius: diameter / 2,
@@ -288,6 +316,8 @@ function planProfile(
     });
     return;
   }
+  const reach = outside ? tool.diameter / 2 : 0;
+  if (plan.blocked(profile.name, profile.footprint, profile.z, reach)) return;
   plan.add(outside ? outers : insides, profile.name, tool, {
     id: profile.id,
     type: "rockett.cam.contour",
@@ -318,24 +348,33 @@ function ordered(stages: Staged[][], manual: boolean): PlannedOperation[] {
   return operations;
 }
 
+const around = ({ centre: [x, y], diameter }: Hole): Footprint => ({
+  min: [x - diameter / 2, y - diameter / 2],
+  max: [x + diameter / 2, y + diameter / 2],
+});
+
 export function planOperations(
-  setup: Pick<Setup, "material">,
+  setup: PlanSetup,
   features: PlanFeatures,
   tools: PlanTool[],
   machine: MachineProfile,
 ): Plan {
   const plan = context(setup, features.stockTop, tools, machine);
-  const facing = planFacing(plan, features.modelTop);
-  const { drilling, pocketables } = planHoles(plan, features.holes, tools);
+  const facing = planFacing(plan, features);
+  const holes = features.holes.filter(
+    (hole) => !plan.blocked(holeName(hole), around(hole), hole.bottom),
+  );
+  const { drilling, pocketables } = planHoles(plan, holes, tools);
   const roughing: Staged[] = [];
   const rests: Staged[][] = [];
-  for (const { floor, ...pocket } of features.pockets)
-    planPocket(
-      plan,
-      { ...pocket, params: { floor, rampAngle: RAMP_ANGLE } },
-      roughing,
-      rests,
-    );
+  for (const { floor, footprint, ...pocket } of features.pockets)
+    if (!plan.blocked(pocket.name, footprint, pocket.z))
+      planPocket(
+        plan,
+        { ...pocket, params: { floor, rampAngle: RAMP_ANGLE } },
+        roughing,
+        rests,
+      );
   for (const pocket of pocketables) planPocket(plan, pocket, roughing, rests);
   const insides: Staged[] = [];
   const outers: Staged[] = [];

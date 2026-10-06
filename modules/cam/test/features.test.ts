@@ -196,11 +196,14 @@ describe("rockett.cam.features", () => {
   it("finds the pocket, the through hole and the outside outline of a block", async () => {
     const found = await features();
     expect(found.stockTop).toBeCloseTo(0, 9);
+    expect(found.stockOutline).toEqual({ min: [0, 0], max: [80, 60] });
     expect(found.modelTop).toBeCloseTo(-2, 6);
     expect(found.pockets).toHaveLength(1);
     const [pocket] = found.pockets;
     near(pocket!.width, 20);
     near(pocket!.cornerRadius, 3);
+    const { min, max } = pocket!.footprint;
+    [...min, ...max].forEach((v, i) => near(v, [10, 10, 30, 40][i]!));
     expect(pocket!.z).toBeCloseTo(-10, 6);
     expect(pocket!.floor.bodyId).toBe("b1");
     expect(pocket!.floor.sig.point[2]).toBeCloseTo(12, 6);
@@ -211,6 +214,10 @@ describe("rockett.cam.features", () => {
     expect(found.profiles).toHaveLength(1);
     expect(found.profiles[0]).toMatchObject({ side: "outside" });
     expect(found.profiles[0]!.z).toBeCloseTo(-22, 6);
+    const outline = found.profiles[0]!.footprint;
+    [...outline.min, ...outline.max].forEach((v, i) =>
+      near(v, [0, 0, 80, 60][i]!),
+    );
   }, 120_000);
 
   it("returns the same features for the setup through the route", async () => {
@@ -236,6 +243,8 @@ describe("rockett.cam.features", () => {
     const [opening] = found.profiles;
     expect(opening).toMatchObject({ side: "inside", cornerRadius: 0 });
     near((opening as { width: number }).width, 10);
+    const hole = opening!.footprint;
+    [...hole.min, ...hole.max].forEach((v, i) => near(v, [5, 10, 15, 30][i]!));
     expect(opening!.z).toBeCloseTo(-12, 6);
   }, 120_000);
 });

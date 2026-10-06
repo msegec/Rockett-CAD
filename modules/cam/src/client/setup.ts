@@ -21,7 +21,10 @@ export type DialogSetup = Pick<
   "id" | "name" | "safeHeight" | "clearance"
 > &
   StockSetup &
-  Pick<DocSetup, "material" | "machine" | "postId" | "post" | "tolerance">;
+  Pick<
+    DocSetup,
+    "material" | "machine" | "postId" | "post" | "tolerance" | "fixtures"
+  >;
 
 export const camRead = ({ document }: OpenProject): CamRead =>
   migrateCam(document?.extensions[CAM_EXTENSION]);
