@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
+import { zstdCompressSync } from "node:zlib";
 import { afterEach, expect, expectTypeOf, it, vi } from "vitest";
 import { Type } from "typebox";
 import { PLUGIN_API_VERSION, type RouteModule } from "@rockett/plugin-api";
 import {
+  MB,
   parseManifest,
   route,
   ROUTES,
@@ -25,6 +27,15 @@ const body = Type.Object({
   hash: Type.Optional(Type.String()),
   projectId: Type.Optional(Type.String()),
 });
+const zstdBody = Type.Object({
+  bytes: Type.Array(Type.Integer({ minimum: 0, maximum: 255 })),
+  maxBytes: Type.Integer(),
+});
+const heap = () => {
+  const { heapUsed, arrayBuffers } = process.memoryUsage();
+  return heapUsed + arrayBuffers;
+};
+let grown = 0;
 
 const module: RouteModule = {
   id: "blobs.routes",
@@ -72,6 +83,26 @@ const module: RouteModule = {
         };
       },
     );
+    api.projectRoute(
+      route<{ bytes: number[]; maxBytes: number }, unknown>()(
+        "POST",
+        "/projects/:id/m/blobs/unzstd",
+        zstdBody,
+      ),
+      async (_doc, req, ctx) => {
+        expectTypeOf(ctx.unzstd).parameters.toEqualTypeOf<
+          [bytes: Uint8Array, maxBytes: number]
+        >();
+        expectTypeOf(ctx.unzstd).returns.toEqualTypeOf<Uint8Array>();
+        const bytes = Uint8Array.from(req.body.bytes);
+        const before = heap();
+        try {
+          return { bytes: Array.from(ctx.unzstd(bytes, req.body.maxBytes)) };
+        } finally {
+          grown = heap() - before;
+        }
+      },
+    );
     api.userRoute(
       route<never, unknown>()("GET", "/m/blobs/context"),
       async (_req, ctx) => ({ methods: Object.keys(ctx).toSorted() }),
@@ -87,8 +118,8 @@ afterEach(async () => {
   close = async () => {};
 });
 
-async function fixture() {
-  const f = await moduleProjectFixture(module, { importBytes: budget });
+async function fixture(importBytes = budget) {
+  const f = await moduleProjectFixture(module, { importBytes });
   close = f.close;
   const { store, doc, request, editor, viewer, outsider, storage } = f;
   const base = `/projects/${doc.id}`;
@@ -294,4 +325,51 @@ it("retains module bytes through undo, blob collection, redo and a cold store re
   expect(Array.from(await reloaded.blob(f.doc.id, digest(original)))).toEqual(
     original,
   );
+});
+
+it("decodes zstd through the route context and refuses input or output over its budget", async () => {
+  const f = await fixture(4096);
+  const decode = async (bytes: Uint8Array, maxBytes: number) => {
+    const response = await f.request(`/projects/${f.doc.id}/m/blobs/unzstd`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bytes: Array.from(bytes), maxBytes }),
+    });
+    return { status: response.status, body: await response.json() };
+  };
+  const text = Buffer.from("(embedded_file (name pad.step))\n".repeat(40));
+  const packed = zstdCompressSync(text);
+  expect(await decode(packed, text.byteLength)).toEqual({
+    status: 200,
+    body: { bytes: Array.from(text) },
+  });
+  expect(await decode(packed, text.byteLength - 1)).toEqual({
+    status: 413,
+    body: {
+      code: "too_large",
+      error: "The compressed data expands past 0.00122 MB, the limit.",
+    },
+  });
+  expect(await decode(new Uint8Array(4097), MB)).toEqual({
+    status: 413,
+    body: {
+      code: "too_large",
+      error: "This file is 0.003907 MB; imports are limited to 0.003906 MB.",
+    },
+  });
+  expect(await decode(Uint8Array.from([1, 2, 3, 4]), MB)).toEqual({
+    status: 400,
+    body: {
+      code: "validation",
+      error: "The compressed data is not valid Zstandard.",
+    },
+  });
+  const uncapped = 64 * MB;
+  const frame = zstdCompressSync(new Uint8Array(MB));
+  const bomb = Buffer.concat(
+    Array.from({ length: uncapped / MB }, () => frame),
+  );
+  expect(bomb.byteLength).toBeLessThan(4096);
+  expect(await decode(bomb, MB)).toMatchObject({ status: 413 });
+  expect(grown).toBeLessThan(uncapped);
 });

@@ -26,7 +26,7 @@ export type {
 
 export { Placement, placementSchema, StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.21.0";
+export const PLUGIN_API_VERSION = "0.22.0";
 
 export * from "./server.js";
 export * from "./client.js";

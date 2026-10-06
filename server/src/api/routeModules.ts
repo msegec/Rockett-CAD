@@ -16,6 +16,7 @@ import {
 import type { KernelClient } from "../kernel/client.js";
 import type { ProjectStore } from "../store/projectStore.js";
 import { projectServices } from "../modules/services.js";
+import { unzstd } from "../modules/unzstd.js";
 import { withinImportBudget } from "./importers.js";
 import { projectAssets } from "./projectAssets.js";
 
@@ -63,14 +64,25 @@ type RouterApi = {
   mutateProject(edit: Edit): RequestHandler;
 };
 
+function projectContext(
+  { store, importBytes }: Pick<RouterApi, "store" | "importBytes">,
+  doc: CadDocument,
+  id: string,
+  ctx: RouteContext,
+) {
+  const get = async (hash: string) =>
+    Uint8Array.from(await store.blob(id, hash));
+  const scope = { ...ctx, blobs: { get } };
+  return {
+    ...scope,
+    services: projectServices(doc, scope),
+    unzstd: (bytes: Uint8Array, maxBytes: number) =>
+      unzstd(bytes, maxBytes, importBytes),
+  };
+}
+
 export function mountRouteModule(router: RouterApi, module: RouteModule): void {
   const { kernel, store, importBytes, on, wrap, mutateProject } = router;
-  const getBlob = (id: string) => async (hash: string) =>
-    Uint8Array.from(await store.blob(id, hash));
-  const projectContext = (doc: CadDocument, id: string, ctx: RouteContext) => {
-    const scope = { ...ctx, blobs: { get: getBlob(id) } };
-    return { ...scope, services: projectServices(doc, scope) };
-  };
   const inside = (route: Route, start = projectPrefix(module.id)) => {
     if (!route.path.startsWith(start))
       throw new Error(
@@ -90,7 +102,11 @@ export function mountRouteModule(router: RouterApi, module: RouteModule): void {
         wrap(async (req, res, ctx) => {
           const doc = await store.load(req.params.id);
           res.json(
-            await read(doc, req, projectContext(doc, req.params.id, ctx)),
+            await read(
+              doc,
+              req,
+              projectContext(router, doc, req.params.id, ctx),
+            ),
           );
         }),
       );
@@ -105,7 +121,7 @@ export function mountRouteModule(router: RouterApi, module: RouteModule): void {
         route,
         mutateProject(async (doc, req, ctx) => {
           const id = req.params.id;
-          const context = projectContext(doc, id, ctx);
+          const context = projectContext(router, doc, id, ctx);
           const assets = projectAssets(doc, module.namespace);
           const result = await edit(doc, req, {
             ...context,

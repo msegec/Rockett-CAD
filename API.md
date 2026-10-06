@@ -397,6 +397,18 @@ file. The Modules settings page shows it beside a line naming
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.22.0 adds `unzstd(bytes, maxBytes)` to project route and mutation
+  contexts (`server/src/modules/unzstd.ts`), since modules may not import
+  Node builtins. It runs Node's `zstdDecompressSync` with `maxOutputLength`
+  set to `maxBytes`, so oversized output stops at the cap instead of being
+  allocated. Input over the import budget is 413 with the core import's
+  message. Output over `maxBytes` is 413:
+  `The compressed data expands past <maxBytes>, the limit.`
+  Input Node cannot decode is 400:
+  `The compressed data is not valid Zstandard.`
+  A truncated frame returns short output, possibly empty, without an error,
+  so callers check the size or content they expect. All four first-party
+  manifests use `^0.22`.
 - API 0.21.0 exports `Placement` from `shared/src/placement.ts`, the one
   owner of placement maths, as a type and a value: `applyToPoint`,
   `applyToDirection`, `compose`, `invert` and the other helpers core uses.
@@ -857,7 +869,7 @@ before. Duplicate copies only the requesting user's view.
 
 Imports and project files stream to disk under `uploads/`. A file over the
 import budget is 413 before it is read: `withinImportBudget` in
-`server/src/api/importers.ts`, which a module's `readStep` also uses. Imported
+`server/src/api/importers.ts`, which modules' `readStep` and `unzstd` use. Imported
 STEP and mesh sources live in the project blob store; the feature holds the
 hash in `blob`, and `GET /projects/:id/assets/:assetId` serves any project
 blob, so a `.rockett` file and a browser project carry them as assets. A 3MF

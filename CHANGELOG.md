@@ -76,9 +76,9 @@ release workflow remain under development. The core licence is unresolved.
   import or delete JSON posts and download an AI post kit to adapt an old post.
 - Beginner CAM guide and an example plate project ready to generate.
 - First-party modules with an admin enable switch and per-user visibility.
-  The plugin API 0.21.0 supports commands, toolbars, context menu items, panels, settings pages,
+  The plugin API 0.22.0 supports commands, toolbars, context menu items, panels, settings pages,
   routes, scene contributions, kernel jobs, timeline features with labelled faces, keyed
-  reference bodies and STEP reads through the core importer, DXF of a sketch or planar face on a named layer, project
+  reference bodies, STEP reads through the core importer, capped Zstandard decoding, DXF of a sketch or planar face on a named layer, project
   services, source blobs, viewport pick modes, length and angle formatting, measure queries, saved
   module panel positions, versioned module data migrations, a shared placement schema and placement maths and the core error line;
   CAM is the first shipped module. Project reads can fetch immutable bytes;

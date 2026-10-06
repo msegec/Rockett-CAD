@@ -76,6 +76,7 @@ export interface ProjectServices {
 
 export interface ProjectRouteContext extends ProjectServiceContext {
   readonly services: ProjectServices;
+  unzstd(bytes: Uint8Array, maxBytes: number): Uint8Array;
 }
 
 export interface ProjectMutationContext extends ProjectRouteContext {

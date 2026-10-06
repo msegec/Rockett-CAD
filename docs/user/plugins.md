@@ -57,7 +57,7 @@ acme/
   "id": "acme",
   "name": "Acme tools",
   "version": "1.2.0",
-  "apiRange": "^0.21",
+  "apiRange": "^0.22",
   "licence": "MIT OR Apache-2.0",
   "author": "Acme Ltd",
   "dataVersion": 2,
@@ -90,11 +90,11 @@ shipped modules use `rockett`.
 ## API version policy
 
 The host's version is `PLUGIN_API_VERSION` in `plugin-api/src/index.ts`. The
-examples here target 0.21.
+examples here target 0.22.
 
 - `apiRange` is `^MAJOR.MINOR`.
 - While the API is 0.x, each minor is its own line. A host loads only
-  plugins that name its own minor: `^0.21` loads on 0.21.x and nowhere else.
+  plugins that name its own minor: `^0.22` loads on 0.22.x and nowhere else.
   Expect to release for each new minor.
 - From 1.0, `^1.2` loads on any 1.x from 1.2 up. Changes within a major only
   add. A removal is deprecated for one major and lands in a later one.
@@ -178,6 +178,11 @@ adds `effect: "document"`. A user route lives under `/m/<id>/`, a project
 route under `/projects/:id/m/<id>/`, both behind `/api`, with the dots of a
 dotted id as slashes. On the client, `context.request("GET", "greeting")`
 calls `/m/<id>/greeting`.
+Project routes and mutations get `unzstd(bytes, maxBytes)`, which decodes
+Zstandard bytes. It refuses input over the server's import budget, input
+that is not Zstandard, and output over `maxBytes`, which it stops at the cap
+instead of allocating. A truncated frame returns short output without an
+error, so check the size you expect.
 
 Known limits today:
 
@@ -292,7 +297,7 @@ and one settings page on the client.
   "id": "hello",
   "name": "Hello",
   "version": "1.0.0",
-  "apiRange": "^0.21",
+  "apiRange": "^0.22",
   "licence": "MIT",
   "author": "Rockett CAD",
   "contributes": { "exporters": ["hello.text"] }

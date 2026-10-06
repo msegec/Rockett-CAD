@@ -131,7 +131,7 @@ everything downstream against persistent topology references.
 
 ### Modules and plugins
 
-- **First-party modules**: CAM and Measure ship as modules on the plugin API, version 0.21.0.
+- **First-party modules**: CAM and Measure ship as modules on the plugin API, version 0.22.0.
 - **KiCad upload API**: save KiCad 9 or later board bytes and parsed snapshots with a project, including portable `.rockett` files.
 - **KiCad board update API**: re-upload a board to its link and get added, removed, moved and changed footprints.
 - **KiCad 3D models API**: upload the STEP models footprints name, list missing ones, and place them on the board.
