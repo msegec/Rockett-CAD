@@ -25,6 +25,7 @@ function projectCreationRoutes(context: ApiRoutes) {
     friends,
     uploadBytes,
     importBytes,
+    assemblies,
   } = context;
   on(
     ROUTES.listProjects,
@@ -77,11 +78,11 @@ function projectCreationRoutes(context: ApiRoutes) {
     }),
   );
 
-  on(ROUTES.downloadProjectFile, wrap(downloadProjectFile(store)));
+  on(ROUTES.downloadProjectFile, wrap(downloadProjectFile(store, assemblies)));
   on(
     ROUTES.uploadProjectFile,
     receiveProjectFile(store.uploads, uploadBytes),
-    wrap(uploadProjectFile(store, folders, importBytes)),
+    wrap(uploadProjectFile(store, assemblies, folders, importBytes)),
   );
 }
 
@@ -96,6 +97,7 @@ function projectDocumentRoutes(context: ApiRoutes) {
     kernel,
     meshCache,
     editable,
+    assemblies,
   } = context;
   on(
     ROUTES.getProject,
@@ -117,7 +119,8 @@ function projectDocumentRoutes(context: ApiRoutes) {
           checkRevision(await store.load(req.params.id), revision);
         }
       }
-      await history.remove(req.params.id);
+      await store.remove(req.params.id);
+      history.forget(req.params.id);
       kernel.drop(req.params.id);
       meshCache.drop(req.params.id);
       await folders.place(req.params.id, null);
@@ -134,6 +137,10 @@ function projectDocumentRoutes(context: ApiRoutes) {
         req.body.name ? req.body.name.slice(0, NAME_LENGTH) : undefined,
         ctx.user.id,
       );
+      await assemblies.copy(req.params.id, copy).catch(async (err) => {
+        await store.remove(copy.id);
+        throw err;
+      });
       await store.setView(copy.id, ctx.user.id, view);
       res.json({ document: copy });
     }),

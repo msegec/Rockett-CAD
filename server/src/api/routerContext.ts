@@ -15,6 +15,7 @@ import type { ProjectStore } from "../store/projectStore.js";
 import type { FolderStore } from "../store/folderStore.js";
 import type { ProjectQueue } from "../store/projectQueue.js";
 import { HistoryStore, Previews } from "../store/historyStore.js";
+import { AssemblyStore } from "../assembly/store.js";
 import type { KernelClient } from "../kernel/client.js";
 import { MeshCache } from "../kernel/meshCache.js";
 import { JSON_BODY_LIMIT_BYTES } from "./uploads.js";
@@ -116,6 +117,7 @@ export function createRouterContext(
   const { uploadBytes, importBytes } = { ...IMPORT_LIMITS, ...limits };
   const router = Router();
   const history = new HistoryStore(store.documents.options.storage, store);
+  const assemblies = new AssemblyStore(store);
   const previews = new Previews();
   const meshCache = new MeshCache({}, meshDir);
   const jobs = createJobRoutes(store, kernel, fail);
@@ -168,6 +170,7 @@ export function createRouterContext(
     uploadBytes,
     importBytes,
     history,
+    assemblies,
     previews,
     meshCache,
     jobs,

@@ -23,7 +23,7 @@ import {
   ManifestStore,
   type ProjectAccess,
 } from "./manifestStore.js";
-import { documentMigrations } from "./migrations.js";
+import { documentMigrations, migrate } from "./migrations.js";
 import { SettingsStore } from "./settingsStore.js";
 import type { Storage } from "./storage.js";
 import { ThumbnailStore } from "./thumbnailStore.js";
@@ -45,7 +45,7 @@ export class ProjectStore {
   private views: ViewStore;
   private heldViews = new Map<string, Map<string, ProjectView>>();
   private users: UserStore;
-  private manifests: ManifestStore;
+  readonly manifests: ManifestStore;
   readonly uploads: Uploads;
   readonly settings: SettingsStore;
   readonly thumbnails: ThumbnailStore;
@@ -169,6 +169,22 @@ export class ProjectStore {
 
   async loadDocument(projectId: string, documentId: string) {
     return (await this.part(projectId, documentId)).doc;
+  }
+
+  historyDir(id: string): string {
+    return this.documents.dir(id);
+  }
+
+  async storedRevision(id: string): Promise<number> {
+    const { revision } = (await this.documents.stored(id)) as {
+      revision?: unknown;
+    };
+    return typeof revision === "number" ? revision : 0;
+  }
+
+  restored(stored: unknown, current: CadDocument): CadDocument {
+    const document = migrate<CadDocument>(documentMigrations, stored);
+    return { ...document, name: current.name };
   }
 
   private async documentView(id: string): Promise<ProjectView> {

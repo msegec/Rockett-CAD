@@ -36,6 +36,7 @@ import type {
 import type { ProjectMember } from "./model.js";
 import { settingsRoutes } from "./settingsRoutes.js";
 import { refRepairRoutes } from "./refRepairRoutes.js";
+import { assemblyRoutes } from "./assembly.js";
 import { MEASURE_MAX_REFS, VIEW_VERSION } from "./api.js";
 import { VIEW_PROJECTION } from "./settings.js";
 import {
@@ -374,6 +375,7 @@ export const ROUTES = {
     "document",
   ),
   ...refRepairRoutes(route),
+  ...assemblyRoutes(route),
   undo: route<never, MutationResponse>()(
     "POST",
     "/projects/:id/undo",

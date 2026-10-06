@@ -29,6 +29,7 @@ import { previewRoutes } from "./previewRoutes.js";
 import { historyRoutes } from "./historyRoutes.js";
 import { documentRoutes } from "./documentRoutes.js";
 import { bodyRoutes } from "./bodyRoutes.js";
+import { assemblyRoutes } from "../assembly/routes.js";
 import { listModules, moduleLicence } from "../modules/host.js";
 
 export function createApiRouter(
@@ -76,6 +77,7 @@ export function createApiRouter(
   tangentEdgesRoute(api);
   mountRouteModule(api, bodyRoutes);
   documentRoutes(api);
+  assemblyRoutes(api);
   sizeLimitRoute(api);
   mountRouteModules(api);
   exportAssetRoutes(api);

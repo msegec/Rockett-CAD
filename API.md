@@ -69,6 +69,7 @@ nothing else is: `server/src/api/routes.ts`.
 | `POST /projects/:id/export`                                                       | `server/src/api/geometryRoutes.ts` |
 | `POST /projects/:id/assets`, `GET /projects/:id/assets/:assetId`                  | `server/src/api/geometryRoutes.ts` |
 | `/folders` and below, `PUT /projects/:id/folder`                                  | `server/src/api/folderRoutes.ts`   |
+| `/projects/:id/assemblies` and below                                              | `server/src/assembly/routes.ts`    |
 
 ## Errors
 
@@ -134,6 +135,23 @@ quoted SHA256 of the stored document bytes. An unreadable manifest also binds
 its stored bytes into the tag; only an admin may delete such a project. Deletion
 needs that exact tag and refuses changed or now-readable contents. Storage
 failures refuse listing and deletion. Temporary cleanup needs no revision.
+
+## Assemblies
+
+An assembly is a project document of manifest type `assembly`
+(`shared/src/assembly.ts`), stored as `documents/<id>.json` beside the part
+and validated on every load; a corrupt or invalid one is 422, and an id the
+manifest does not list as an assembly is 404. `POST /projects/:id/assemblies`
+creates an empty one and lists it in the manifest. The instance routes add
+(`POST .../instances`), update (`PATCH .../instances/:instance` with any of
+`name`, `placement`, `grounded`) and remove (`DELETE`) one instance each.
+They, `undo` and `redo` are document edits on the assembly: its `revision` is
+their `ETag` and `If-Match`, and each saves one history entry. An instance
+must name a part the manifest lists, else 400 at `/instance/documentId`; the
+first instance of a part adds its `ComponentRef` at the part's revision, and
+removing its last instance drops it. Each assembly keeps its own history log
+at `documents/<id>/history/log.bin`, so undo in one document never reaches
+another's entries: `server/src/assembly/store.ts`.
 
 ## History
 
@@ -643,6 +661,13 @@ is 422 on load: `server/src/store/projectStore.ts`, which also owns temporary
 projects.
 
 Version 2 adds an optional `view`, the `PUT /projects/:id/view` body.
+Version 3 adds `assemblies`, every assembly the manifest lists, in its order.
+Download always writes it. Upload validates each one and every component must
+name the file's part; the import, like Duplicate, rewrites those refs to the
+new part id, keeps an acknowledged revision that matched the part's as the new
+part's revision and sets any other to 0. A file without `assemblies` carries
+none. A browser project cannot hold an assembly, so keeping such a file in the
+browser fails and leaves the server copy.
 Download writes the requesting user's view; upload stores it as the
 uploader's, and a browser project keeps it in its record. A `view` that fails
 that schema is 400 like a bad document. A file without one, such as any

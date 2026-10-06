@@ -99,8 +99,8 @@ export function createEmptyDocument(id: string, name: string): CadDocument {
   };
 }
 
-export const MANIFEST_VERSION = 2;
-export const DOCUMENT_TYPES = ["part"] as const;
+export const MANIFEST_VERSION = 3;
+export const DOCUMENT_TYPES = ["part", "assembly"] as const;
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 export type ProjectMember = { userId: string; role: "view" | "edit" };
 

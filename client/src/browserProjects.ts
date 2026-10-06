@@ -328,6 +328,10 @@ export async function toProjectFile(r: BrowserProject): Promise<ProjectFile> {
 }
 
 export function fromProjectFile(file: ProjectFile): BrowserProject {
+  if (file.assemblies?.length)
+    throw new Error(
+      "This project has assemblies, which a browser project cannot hold yet.",
+    );
   const assets = Object.fromEntries(
     Object.entries(file.assets).map(([name, base64]) => [
       name,

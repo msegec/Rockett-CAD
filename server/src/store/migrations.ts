@@ -1,4 +1,5 @@
 import {
+  ASSEMBLY_SCHEMA_VERSION,
   compareNames,
   createRegistry,
   featureSpec,
@@ -6,6 +7,7 @@ import {
   SCHEMA_VERSION,
   UNITS_LENGTH,
   VIEW_VERSION,
+  type AssemblyDocument,
   type CadDocument,
   type ExtensionData,
   type FeatureSpec,
@@ -373,5 +375,14 @@ export const manifestMigrations: Migrations<ProjectManifest> = {
   field: "version",
   steps: {
     1: (manifest) => ({ ...manifest, owner: null, members: [] }),
+    2: (manifest) => manifest,
   },
+};
+
+export const assemblyMigrations: Migrations<AssemblyDocument> = {
+  namespace: "assembly",
+  current: ASSEMBLY_SCHEMA_VERSION,
+  field: "schemaVersion",
+  steps: {},
+  nested: moduleData,
 };

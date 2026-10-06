@@ -113,6 +113,8 @@ docker run -d --name rockett-cad \
 └── projects/{projectId}/
     ├── project.json            # manifest: version and documents
     ├── documents/{projectId}.json  # the part document (full history)
+    ├── documents/{assemblyId}.json # an assembly document
+    ├── documents/{assemblyId}/history/log.bin  # that assembly's undo history
     ├── settings.json
     ├── temporary.json          # only on a temporary copy of a browser project
     ├── thumbnail.png

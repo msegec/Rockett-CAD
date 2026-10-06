@@ -32,10 +32,7 @@ import {
   upgradeLog,
   type Project,
 } from "./historyUpgrade.js";
-import { sha256, StoreError } from "./jsonStore.js";
-import { ID_RE } from "./manifestStore.js";
-import { documentMigrations, migrate } from "./migrations.js";
-import type { ProjectStore } from "./projectStore.js";
+import { sha256, StoreError, type Write } from "./jsonStore.js";
 import type { Storage } from "./storage.js";
 import { HISTORY_LIMITS, PREVIEW_LIMITS, TIMING_MS } from "../tunables.js";
 
@@ -60,6 +57,15 @@ type Records = (
   text: string,
 ) => Promise<Buffer[]>;
 
+export interface HistoryDocuments<T> {
+  save(doc: T, actor: string | null, write: Write<T>): Promise<void>;
+  exclusive<R>(id: string, operation: () => Promise<R>): Promise<R>;
+  isTemporary(id: string): Promise<boolean>;
+  historyDir(id: string): string;
+  storedRevision(id: string): Promise<number>;
+  restored(stored: unknown, current: T): T;
+}
+
 interface Opened {
   heads: HistoryRecord[];
   bodies: Map<string, [number, number]>;
@@ -68,22 +74,23 @@ interface Opened {
   stamp: string | undefined;
 }
 
-export class HistoryStore {
+export class HistoryStore<
+  T extends { id: string; revision: number } = CadDocument,
+> {
   private readonly opened = new Map<string, Opened>();
 
   constructor(
     private readonly storage: Storage,
-    private readonly store: ProjectStore,
+    private readonly store: HistoryDocuments<T>,
     private readonly budget: number = HISTORY_LIMITS.bytes,
   ) {}
 
-  async remove(id: string): Promise<void> {
-    await this.store.remove(id);
+  forget(id: string): void {
     this.opened.delete(id);
   }
 
   save(
-    doc: CadDocument,
+    doc: T,
     label?: string,
     tx?: string,
     actor: string | null = null,
@@ -124,9 +131,9 @@ export class HistoryStore {
   }
 
   async peek(
-    current: CadDocument,
+    current: T,
     step: -1 | 1,
-  ): Promise<{ document: CadDocument; cursor: number }> {
+  ): Promise<{ document: T; cursor: number }> {
     const state = await this.read(current.id);
     const cursor = (state?.position ?? 0) + step;
     if (!state || cursor < 0 || cursor > state.entries.length)
@@ -139,9 +146,9 @@ export class HistoryStore {
   }
 
   async restore(
-    current: CadDocument,
+    current: T,
     hash: string,
-  ): Promise<{ document: CadDocument; label: string }> {
+  ): Promise<{ document: T; label: string }> {
     const state = await this.read(current.id);
     const mark = [
       ...(state?.checkpoints ?? []),
@@ -154,20 +161,11 @@ export class HistoryStore {
     };
   }
 
-  private async restored(
-    current: CadDocument,
-    hash: string,
-  ): Promise<CadDocument> {
-    const stored = await this.snapshot(current.id, hash);
-    const document = migrate<CadDocument>(documentMigrations, stored);
-    return { ...document, name: current.name };
+  private async restored(current: T, hash: string): Promise<T> {
+    return this.store.restored(await this.snapshot(current.id, hash), current);
   }
 
-  move(
-    doc: CadDocument,
-    cursor: number,
-    actor: string | null = null,
-  ): Promise<void> {
+  move(doc: T, cursor: number, actor: string | null = null): Promise<void> {
     return this.commit(doc, actor, async (opened, revision) => {
       if (!opened)
         throw new StoreError(`project ${doc.id} has no history to move`);
@@ -186,7 +184,7 @@ export class HistoryStore {
   }
 
   private async commit(
-    doc: CadDocument,
+    doc: T,
     actor: string | null,
     makeRecords?: Records,
   ): Promise<void> {
@@ -300,15 +298,11 @@ export class HistoryStore {
   }
 
   private path(id: string, file: string): string {
-    if (!ID_RE.test(id)) throw new StoreError("invalid project id");
-    return path.posix.join("projects", id, file);
+    return path.posix.join(this.store.historyDir(id), file);
   }
 
-  private async revision(id: string): Promise<number> {
-    const stored = (await this.store.documents.stored(id)) as {
-      revision?: unknown;
-    };
-    return typeof stored.revision === "number" ? stored.revision : 0;
+  private revision(id: string): Promise<number> {
+    return this.store.storedRevision(id);
   }
 
   private async append(

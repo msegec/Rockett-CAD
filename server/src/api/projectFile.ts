@@ -15,6 +15,11 @@ import {
 import type { Request, Response } from "express";
 import type { FolderStore } from "../store/folderStore.js";
 import type { ProjectStore } from "../store/projectStore.js";
+import {
+  fileAssemblies,
+  rehome,
+  type AssemblyStore,
+} from "../assembly/store.js";
 import { documentMigrations, migrate, splitView } from "../store/migrations.js";
 import { HASH_RE, PendingBlobs } from "../store/blobStore.js";
 import { validateDocument } from "./validate.js";
@@ -57,7 +62,7 @@ function decodeAsset(name: string, base64: string | undefined): Buffer {
 }
 
 export const downloadProjectFile =
-  (store: ProjectStore) =>
+  (store: ProjectStore, assemblies: AssemblyStore) =>
   async (req: Request, res: Response, ctx: { user: User }) => {
     const document = await store.load(String(req.params.id));
     const assets: Record<string, string> = {};
@@ -67,6 +72,7 @@ export const downloadProjectFile =
       format: PROJECT_FILE_FORMAT,
       version: PROJECT_FILE_VERSION,
       document,
+      assemblies: await assemblies.all(document.id),
       assets,
       view: await store.view(document.id, ctx.user.id),
     };
@@ -89,6 +95,7 @@ function placement(fields: Record<string, unknown> = {}) {
 
 export const uploadProjectFile = (
   store: ProjectStore,
+  assemblies: AssemblyStore,
   folders: FolderStore,
   importBytes: number,
 ) =>
@@ -120,6 +127,7 @@ export const uploadProjectFile = (
     const { doc, shown } = splitView(file.document);
     const document = migrate(documentMigrations, doc, pending);
     validateDocument(document);
+    const carried = fileAssemblies(file.assemblies ?? [], document.id);
     const view = withShown({ ...emptyView(), ...file.view }, shown);
     const referenced = referencedAssets(document);
     for (const name of Object.keys(file.assets))
@@ -133,8 +141,22 @@ export const uploadProjectFile = (
         pending.blobs.get(name) ?? decodeAsset(name, file.assets[name]),
       ]),
     );
-    const imported = () =>
-      store.importProject(document, assets, view, temporary, ctx.user.id);
+    const imported = async () => {
+      const project = await store.importProject(
+        document,
+        assets,
+        view,
+        temporary,
+        ctx.user.id,
+      );
+      await assemblies
+        .adopt(project.id, rehome(carried, document, project))
+        .catch(async (err: unknown) => {
+          await store.remove(project.id);
+          throw err;
+        });
+      return project;
+    };
     res.json({
       document:
         folderId === undefined

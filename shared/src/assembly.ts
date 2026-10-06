@@ -1,4 +1,6 @@
 import { Type, type Static } from "typebox";
+import type { HistoryStatus } from "./api.js";
+import type { route as defineRoute } from "./routes.js";
 import { featureNameSchema } from "./schema/coreFeatures.js";
 import { documentSchema } from "./schema/documents.js";
 import { featureIdSchema } from "./schema/refs.js";
@@ -16,13 +18,13 @@ const componentRefSchema = Type.Object({
   acknowledgedRevision: revision,
 });
 
-const instanceSchema = Type.Object({
-  id,
+const instanceFields = {
   name: featureNameSchema,
-  documentId,
   placement: placementSchema,
   grounded: Type.Boolean(),
-});
+};
+
+const instanceSchema = Type.Object({ id, documentId, ...instanceFields });
 
 const assemblySchema = Type.Object({
   schemaVersion: Type.Literal(ASSEMBLY_SCHEMA_VERSION),
@@ -38,6 +40,64 @@ const assemblySchema = Type.Object({
 export type ComponentRef = Static<typeof componentRefSchema>;
 export type Instance = Static<typeof instanceSchema>;
 export type AssemblyDocument = Static<typeof assemblySchema>;
+export type InstanceInput = Omit<Instance, "id">;
+export type InstanceEdit = Partial<Omit<InstanceInput, "documentId">>;
+
+export interface AssemblyResponse {
+  document: AssemblyDocument;
+  history: HistoryStatus;
+}
+
+const strict = { additionalProperties: false } as const;
+
+export function assemblyRoutes(route: typeof defineRoute) {
+  return {
+    createAssembly: route<never, AssemblyResponse>()(
+      "POST",
+      "/projects/:id/assemblies",
+    ),
+    getAssembly: route<never, AssemblyResponse>()(
+      "GET",
+      "/projects/:id/assemblies/:doc",
+    ),
+    addInstance: route<{ instance: InstanceInput }, AssemblyResponse>()(
+      "POST",
+      "/projects/:id/assemblies/:doc/instances",
+      Type.Object(
+        { instance: Type.Object({ documentId, ...instanceFields }, strict) },
+        strict,
+      ),
+      "document",
+    ),
+    updateInstance: route<{ instance: InstanceEdit }, AssemblyResponse>()(
+      "PATCH",
+      "/projects/:id/assemblies/:doc/instances/:instance",
+      Type.Object(
+        { instance: Type.Partial(Type.Object(instanceFields, strict)) },
+        strict,
+      ),
+      "document",
+    ),
+    removeInstance: route<never, AssemblyResponse>()(
+      "DELETE",
+      "/projects/:id/assemblies/:doc/instances/:instance",
+      undefined,
+      "document",
+    ),
+    undoAssembly: route<never, AssemblyResponse>()(
+      "POST",
+      "/projects/:id/assemblies/:doc/undo",
+      undefined,
+      "document",
+    ),
+    redoAssembly: route<never, AssemblyResponse>()(
+      "POST",
+      "/projects/:id/assemblies/:doc/redo",
+      undefined,
+      "document",
+    ),
+  };
+}
 
 const reject = (path: string, message: string): never => {
   throw new ValidationError(
