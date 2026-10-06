@@ -157,6 +157,7 @@ export interface TimelineFeatureScope<
     readonly identity: ResolvedFeatureInputs["identity"];
     readonly assets: readonly Uint8Array[];
   };
+  readStep(bytes: Uint8Array): any[];
 }
 
 export interface TimelineFeature<S extends ParamsSchema = ParamsSchema> {

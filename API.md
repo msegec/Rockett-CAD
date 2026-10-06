@@ -393,6 +393,15 @@ file. The Modules settings page shows it beside a line naming
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.20.0 adds `readStep(bytes)` to a timeline feature's `evaluate`
+  scope. It runs the core STEP importer (`readXdeStep` in
+  `server/src/geometry/xde.ts`) and returns one shape per STEP part, owned
+  by the scope like any `own`ed handle. Bytes over the import budget
+  (`ROCKETT_IMPORT_BUDGET_MB`) are refused before reading with the core
+  import's message, `This file is <size>; imports are limited to <budget>.`;
+  bytes the reader cannot parse fail with `STEP file could not be read`.
+  Either refusal fails the feature and keeps the previous bodies. All four
+  first-party manifests use `^0.20`.
 - API 0.19.0 adds `register.menuItem({ id, menu, command, after, before })`
   to the client context. `menu` must name a core context menu that has core
   items (`MenuTargets` in `client/src/commands/menus.ts`), and the id must
@@ -786,7 +795,8 @@ version 1 file, takes its view from the document's old visibility flags as
 before. Duplicate copies only the requesting user's view.
 
 Imports and project files stream to disk under `uploads/`. A file over the
-import budget is 413 before it is read: `server/src/api/uploads.ts`. Imported
+import budget is 413 before it is read: `withinImportBudget` in
+`server/src/api/importers.ts`, which a module's `readStep` also uses. Imported
 STEP and mesh sources live in the project blob store; the feature holds the
 hash in `blob`, and `GET /projects/:id/assets/:assetId` serves any project
 blob, so a `.rockett` file and a browser project carry them as assets. A 3MF

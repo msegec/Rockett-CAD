@@ -131,7 +131,7 @@ everything downstream against persistent topology references.
 
 ### Modules and plugins
 
-- **First-party modules**: CAM and Measure ship as modules on the plugin API, version 0.19.0.
+- **First-party modules**: CAM and Measure ship as modules on the plugin API, version 0.20.0.
 - **KiCad upload API**: save KiCad 9 or later board bytes and parsed snapshots with a project, including portable `.rockett` files.
 - **Board outline DXF API**: get a sketch or planar face outline as DXF on layer `Edge.Cuts` for KiCad's graphics import.
 - **Board nets API**: list a saved KiCad board's nets with each footprint pad, through the electrical module.

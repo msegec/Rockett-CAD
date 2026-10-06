@@ -7,6 +7,7 @@ import {
   registerExtensionSpec,
   type ExtensionFeature,
 } from "@rockett/shared";
+import { withinImportBudget } from "../api/importers.js";
 import { engineCache } from "../geometry/engine.js";
 import {
   registerFeatureKind,
@@ -28,6 +29,8 @@ import {
 } from "../geometry/kernel.js";
 import { ShapeMap } from "../geometry/shapeMap.js";
 import { sourceNames } from "../geometry/signature.js";
+import { readXdeStep } from "../geometry/xde.js";
+import { IMPORT_LIMITS } from "../tunables.js";
 
 export interface FeatureBundle {
   moduleId: string;
@@ -84,6 +87,13 @@ function labelsOf(own: Own, shape: Shape, listed: unknown, what: string) {
   if (found.length !== labels.size)
     throw new Error(`${what} labels a face it did not emit`);
   return labels;
+}
+
+function readStep(bytes: unknown, what: string) {
+  if (!(bytes instanceof Uint8Array))
+    throw new Error(`${what} readStep takes a Uint8Array`);
+  withinImportBudget({ size: bytes.byteLength }, IMPORT_LIMITS.importBytes);
+  return readXdeStep(bytes).bodies.map(({ shape }) => shape);
 }
 
 const KEY = /^[a-z0-9][a-z0-9_:-]{0,127}$/;
@@ -154,6 +164,7 @@ function kindOf({ spec, evaluate }: TimelineFeature): FeatureKind {
             progress() {
               if (cancelRequested()) throw new Error(`${what} cancelled`);
             },
+            readStep: (bytes) => readStep(bytes, what),
             params: structuredClone((feature as ExtensionFeature).params),
             ...(inputs && {
               inputs: {

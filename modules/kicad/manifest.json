@@ -3,7 +3,7 @@
   "id": "rockett.kicad",
   "name": "KiCad",
   "version": "0.1.0",
-  "apiRange": "^0.19",
+  "apiRange": "^0.20",
   "licence": "UNLICENSED",
   "author": "Rockett CAD",
   "contributes": {

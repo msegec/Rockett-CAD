@@ -7,7 +7,7 @@ import {
   type ApiErrorBody,
   type ImportFormat,
 } from "@rockett/shared";
-import { IMAGE_LIMIT_MB, StoreError } from "../store/projectStore.js";
+import { IMAGE_LIMIT_MB } from "../store/projectStore.js";
 import { THUMBNAIL_RULE } from "../store/thumbnailStore.js";
 import type { Staged, Uploads } from "../store/blobStore.js";
 import { megabytes } from "./importers.js";
@@ -69,17 +69,6 @@ export const receiveProjectFile = (uploads: Uploads, bytes: number) =>
     `Upload one .rockett project file, up to ${megabytes(bytes)}.`,
     staging(uploads),
   );
-
-export function withinImportBudget(
-  file: Pick<Staged, "size">,
-  bytes: number,
-): void {
-  if (file.size > bytes)
-    throw new StoreError(
-      `This file is ${megabytes(file.size)}; imports are limited to ${megabytes(bytes)}.`,
-      "too_large",
-    );
-}
 
 export const receiveImport = (
   uploads: Uploads,

@@ -16,7 +16,7 @@ import {
 import type { KernelClient } from "../kernel/client.js";
 import type { ProjectStore } from "../store/projectStore.js";
 import { projectServices } from "../modules/services.js";
-import { withinImportBudget } from "./uploads.js";
+import { withinImportBudget } from "./importers.js";
 import { projectAssets } from "./projectAssets.js";
 
 export type Edit = (

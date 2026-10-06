@@ -1,6 +1,7 @@
 import {
   createRegistry,
   MB,
+  StoreError,
   ValidationError,
   type Feature,
   type ImportFormat,
@@ -27,6 +28,14 @@ export const registerImporter = importers.register;
 
 export const megabytes = (bytes: number) =>
   `${Number((bytes / MB).toPrecision(4))} MB`;
+
+export function withinImportBudget(file: { size: number }, bytes: number) {
+  if (file.size > bytes)
+    throw new StoreError(
+      `This file is ${megabytes(file.size)}; imports are limited to ${megabytes(bytes)}.`,
+      "too_large",
+    );
+}
 
 export async function importFile(upload: ImportUpload | undefined) {
   const name = upload?.name.toLowerCase() ?? "",

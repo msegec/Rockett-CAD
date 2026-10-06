@@ -24,7 +24,8 @@ import { documentMigrations, migrate, splitView } from "../store/migrations.js";
 import { HASH_RE, PendingBlobs } from "../store/blobStore.js";
 import { validateDocument } from "./validate.js";
 import { requireFolderDestination } from "./folderRoutes.js";
-import { discarding, withinImportBudget } from "./uploads.js";
+import { withinImportBudget } from "./importers.js";
+import { discarding } from "./uploads.js";
 
 const ATTR_CHAR = /[A-Za-z0-9!#$&+.^_`|~-]/;
 
