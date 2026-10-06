@@ -192,7 +192,7 @@ function section(scope: KernelJobScope, body: any, z: number): RegionLoop[] {
   );
 }
 
-function planeOf({ oc, own }: KernelJobScope, face: any) {
+export function planeOf({ oc, own }: KernelJobScope, face: any) {
   const surface = own(new oc.BRepAdaptor_Surface_2(face, true));
   if (surface.GetType() !== oc.GeomAbs_SurfaceType.GeomAbs_Plane)
     return undefined;
@@ -221,10 +221,13 @@ function planeOf({ oc, own }: KernelJobScope, face: any) {
   };
 }
 
+export const unstable = (faceName: string | undefined) =>
+  !faceName || faceName.includes("~?");
+
 function picked(scope: KernelJobScope, body: FaceBody, ref: FaceRef) {
   const { faceName, sig } = ref;
   const what = `face ${faceName} of body ${body.id}`;
-  if (!faceName || faceName.includes("~?"))
+  if (unstable(faceName))
     throw new RangeError(
       `face name "${faceName}" of body ${body.id} is not a stable name; pick the face again`,
     );
@@ -252,7 +255,7 @@ function picked(scope: KernelJobScope, body: FaceBody, ref: FaceRef) {
   return face;
 }
 
-function wireLoop(scope: KernelJobScope, wire: any, z: number) {
+export function wireLoop(scope: KernelJobScope, wire: any, z: number) {
   const edges = [...shapes(scope, wire, "TopAbs_EDGE")];
   const [loop, ...more] = chain(
     edges.map((shape) => edge(scope, shape, z)),

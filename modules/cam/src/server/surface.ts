@@ -4,7 +4,7 @@ import { surfaceRoute } from "../shared/document.js";
 import { MIN_TOLERANCE } from "../shared/params.js";
 import { stockBox } from "../shared/setup.js";
 import type { Mesh } from "../surface/dropCutter.js";
-import { cam, readModel, setupBodies } from "./generate.js";
+import { stockSetup } from "./generate.js";
 
 const SURFACE_JOB = "rockett.cam.surfaceMesh";
 
@@ -56,21 +56,16 @@ export function mountSurface(
   context: Pick<ServerContext, "bodies" | "startKernelJob">,
 ) {
   api.projectRoute(surfaceRoute, async (doc, req, { user }) => {
-    const { id, setupId } = req.params;
     const tolerance = Number(req.params.tolerance);
     if (!(Number.isFinite(tolerance) && tolerance >= MIN_TOLERANCE))
       return {
         reason: `gouge tolerance must be at least ${MIN_TOLERANCE} mm`,
       };
-    const setup = cam(doc).setups.find((item) => item.id === setupId);
-    if (!setup) return { reason: `setup ${setupId} is not in this project` };
-    const { bodies: ids, stock, wcs } = setup;
-    if (!ids?.length || !stock || !wcs)
-      return { reason: `setup ${setupId} needs bodies, stock and WCS` };
-    const bodies = setupBodies(await readModel(context, id, user), ids);
-    if ("reason" in bodies) return { reason: bodies.reason };
+    const found = await stockSetup(context, doc, req.params, user);
+    if ("reason" in found) return found;
+    const { setup, bodies } = found;
     const box = stockBox(
-      { bodies: ids, stock, wcs },
+      setup,
       Object.fromEntries(bodies.map(({ id: key, bbox }) => [key, bbox])),
     );
     const grid = gridOf(box, cellSize(box));

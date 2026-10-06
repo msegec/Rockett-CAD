@@ -6,6 +6,7 @@ import {
   saveCam,
   signRoute,
 } from "./src/shared/document.js";
+import { mountFeatures } from "./src/server/features.js";
 import { mountGenerate } from "./src/server/generate.js";
 import { mountLibrary } from "./src/server/library.js";
 import { mountExport } from "./src/server/ncExport.js";
@@ -26,6 +27,10 @@ export default defineServerModule({
     );
     register.kernelJob(
       "rockett.cam.surfaceMesh",
+      new URL("./kernel.ts", import.meta.url),
+    );
+    register.kernelJob(
+      "rockett.cam.features",
       new URL("./kernel.ts", import.meta.url),
     );
     register.routeModule({
@@ -50,6 +55,7 @@ export default defineServerModule({
         mountLibrary(api, userData);
         mountExport(api, context, mountGenerate(api, context));
         mountSurface(api, context);
+        mountFeatures(api, context);
       },
     });
   },

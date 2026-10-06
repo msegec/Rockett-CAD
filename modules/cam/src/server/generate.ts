@@ -24,6 +24,7 @@ import {
 } from "../shared/document.js";
 import type { Program } from "../shared/ir.js";
 import { isOperation, OPERATION_VERSIONS } from "../shared/operations.js";
+import type { StockSetup } from "../shared/setup.js";
 import { toolSchema, type Tool } from "../shared/tools.js";
 import { programCache, type ProgramCache } from "./cache.js";
 
@@ -111,6 +112,22 @@ export function setupBodies(
     bodies.push(body);
   }
   return bodies;
+}
+
+export async function stockSetup(
+  context: Pick<ServerContext, "bodies">,
+  doc: CadDocument,
+  { id, setupId }: { id: string; setupId: string },
+  user: User,
+): Promise<{ setup: StockSetup; bodies: ServerBody[] } | { reason: string }> {
+  const setup = cam(doc).setups.find((item) => item.id === setupId);
+  if (!setup) return { reason: `setup ${setupId} is not in this project` };
+  const { bodies: ids, stock, wcs } = setup;
+  if (!ids?.length || !stock || !wcs)
+    return { reason: `setup ${setupId} needs bodies, stock and WCS` };
+  const bodies = setupBodies(await readModel(context, id, user), ids);
+  if ("reason" in bodies) return { reason: bodies.reason };
+  return { setup: { bodies: ids, stock, wcs }, bodies };
 }
 
 async function prepare(model: Model, job: Job): Promise<Blocked | Ready> {

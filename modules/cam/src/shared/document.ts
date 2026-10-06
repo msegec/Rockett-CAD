@@ -1,6 +1,7 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import type { CadDocument, Route, SignedFaceRef } from "@rockett/plugin-api";
+import type { PlanFeatures } from "../plan/plan.js";
 import { validatePost, type Post } from "../post/schema.js";
 import type { Program, Xy } from "./ir.js";
 import { machineSchema } from "./machine.js";
@@ -231,6 +232,15 @@ export const surfaceRoute: Route<
 > = {
   method: "GET",
   path: "/projects/:id/m/rockett/cam/setups/:setupId/surface/:tolerance",
+};
+
+export const featuresRoute: Route<
+  "/projects/:id/m/rockett/cam/setups/:setupId/features",
+  unknown,
+  PlanFeatures | { reason: string }
+> = {
+  method: "GET",
+  path: "/projects/:id/m/rockett/cam/setups/:setupId/features",
 };
 
 export const signRoute: Route<

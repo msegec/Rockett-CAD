@@ -79,10 +79,23 @@ function merged(pieces: Piece[]): Hole[] {
   return found;
 }
 
-function topOf({ oc, own }: KernelJobScope, body: any): number {
+export function zRange({ oc, own }: KernelJobScope, shape: any) {
   const bounds = own(new oc.Bnd_Box_1());
-  oc.BRepBndLib.Add(body, bounds, false);
-  return own(bounds.CornerMax()).Z();
+  oc.BRepBndLib.AddOptimal(shape, bounds, false, false);
+  return [own(bounds.CornerMin()).Z(), own(bounds.CornerMax()).Z()] as const;
+}
+
+export function solidLeft({ oc, own }: KernelJobScope, made: any) {
+  if (!made.IsDone() || made.HasErrors()) return true;
+  const props = own(new oc.GProp_GProps_1());
+  oc.BRepGProp.VolumeProperties_1(
+    own(made.Shape()),
+    props,
+    false,
+    false,
+    false,
+  );
+  return Math.abs(props.Mass()) > VOLUME;
 }
 
 function blocked(scope: KernelJobScope, body: any, hole: Hole, top: number) {
@@ -102,39 +115,33 @@ function blocked(scope: KernelJobScope, body: any, hole: Hole, top: number) {
       ),
     ).Shape(),
   );
-  const common = own(
-    new oc.BRepAlgoAPI_Common_3(
-      body,
-      column,
-      own(new oc.Message_ProgressRange_1()),
+  return solidLeft(
+    scope,
+    own(
+      new oc.BRepAlgoAPI_Common_3(
+        body,
+        column,
+        own(new oc.Message_ProgressRange_1()),
+      ),
     ),
   );
-  if (!common.IsDone() || common.HasErrors()) return true;
-  const props = own(new oc.GProp_GProps_1());
-  oc.BRepGProp.VolumeProperties_1(
-    own(common.Shape()),
-    props,
-    false,
-    false,
-    false,
+}
+
+export function holesOf(scope: KernelJobScope, body: any): Hole[] {
+  const [, top] = zRange(scope, body);
+  const found = merged(
+    [...shapes(scope, body, "TopAbs_FACE")].flatMap(
+      (face) => piece(scope, face) ?? [],
+    ),
   );
-  return Math.abs(props.Mass()) > VOLUME;
+  for (const hole of found) hole.blocked = blocked(scope, body, hole, top);
+  return found;
 }
 
 export default defineKernelJobs({
-  "rockett.cam.holes": (input: HolesInput, scope): Hole[] => {
-    const body = toSetup(
+  "rockett.cam.holes": (input: HolesInput, scope): Hole[] =>
+    holesOf(
       scope,
-      read(scope, input.brep, "holes"),
-      input.modelToSetup,
-    );
-    const top = topOf(scope, body);
-    const found = merged(
-      [...shapes(scope, body, "TopAbs_FACE")].flatMap(
-        (face) => piece(scope, face) ?? [],
-      ),
-    );
-    for (const hole of found) hole.blocked = blocked(scope, body, hole, top);
-    return found;
-  },
+      toSetup(scope, read(scope, input.brep, "holes"), input.modelToSetup),
+    ),
 });
