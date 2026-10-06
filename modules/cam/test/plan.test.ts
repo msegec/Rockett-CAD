@@ -118,6 +118,7 @@ const plate: PlanFeatures = {
       face: face("f:window", 0),
       z: 0,
       side: "inside",
+      opening: 0,
       width: 20,
       cornerRadius: 3,
       footprint: { min: [0, 0], max: [40, 40] },

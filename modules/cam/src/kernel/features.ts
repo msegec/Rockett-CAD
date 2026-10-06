@@ -352,6 +352,7 @@ function profilesOf(
         z,
         footprint: footprintOf(scope, wire),
         side: "inside",
+        opening: index,
         width: inscribedWidth(loop, []),
         cornerRadius: smallestCorner(loop, 1),
       },

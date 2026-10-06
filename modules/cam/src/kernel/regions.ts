@@ -21,7 +21,12 @@ export type RegionsInput = {
 };
 type Edge = { from: Xy; segment: Segment };
 
-export type PlanarFace = { z: number; outer: RegionLoop; inner: RegionLoop[] };
+export type PlanarFace = {
+  z: number;
+  down: boolean;
+  outer: RegionLoop;
+  inner: RegionLoop[];
+};
 
 export type FaceBody = {
   id: string;
@@ -271,13 +276,15 @@ export function planarFace(
   body: FaceBody,
   ref: FaceRef,
   at: Placement,
+  downward = false,
 ): PlanarFace {
   const { oc, own } = scope;
   const face = own(
     oc.TopoDS.Face_1(toSetup(scope, picked(scope, body, ref), at)),
   );
   const found = planeOf(scope, face)!;
-  if (found.direction[2] < FACING)
+  const down = downward && found.direction[2] <= -FACING;
+  if (!down && found.direction[2] < FACING)
     throw new RangeError(
       `face ${ref.faceName} of body ${body.id} does not face up in the setup`,
     );
@@ -288,6 +295,7 @@ export function planarFace(
   );
   return {
     z,
+    down,
     outer: wireLoop(scope, outer, z),
     inner: inner.map((wire) => wireLoop(scope, wire, z)),
   };

@@ -1,25 +1,29 @@
 import { serverRegister } from "./helpers/serverRegister.js";
-import { promises as fs } from "node:fs";
+import { promises as fs, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CadDocument, ServerBody, User } from "@rockett/plugin-api";
 import cam from "../server.js";
+import type { FeaturesInput } from "../src/kernel/features.js";
+import type { PlanFeatures, ProfileFeature } from "../src/plan/plan.js";
 import {
   CAM_EXTENSION,
+  CAM_VERSION,
   generateRoute,
   type CamData,
 } from "../src/shared/document.js";
 import { formatProgram } from "../src/post/format.js";
 import { normalise } from "../src/post/normalise.js";
 import { validateProgram, type Program } from "../src/shared/ir.js";
-import type { Box } from "../src/shared/setup.js";
+import type { Box, Fixture } from "../src/shared/setup.js";
 import type { Preset } from "../src/shared/tools.js";
 import { contour } from "../src/toolpath/contour.js";
 import { facing } from "../src/toolpath/facing.js";
 import { chorded } from "../src/toolpath/geometry.js";
 import { pocket } from "../src/toolpath/pocket.js";
 import { lines, loadPost } from "./goldens.js";
+import { blockSetup, featureBlock, openedBlock } from "./helpers/blocks.js";
 import { box, brep, cut, oc, scoped, startKernel } from "./helpers/kernel.js";
 
 const ENTRY = new URL("../kernel.ts", import.meta.url).href;
@@ -219,7 +223,7 @@ function data({ preset: change, pocket: pocketChange }: Change = {}): CamData {
 
 type Edit = (doc: CadDocument, req: unknown, ctx: unknown) => Promise<any>;
 
-async function route() {
+async function route(of = () => body) {
   const edits = new Map<string, Edit>();
   const startKernelJob = (id: string, input: unknown) =>
     kernel.moduleJob(ENTRY, id, input, { shouldStop: () => false });
@@ -239,12 +243,14 @@ async function route() {
     kernelVersion: null,
     dxf: async () => new Uint8Array(),
     signFaces: async () => [],
-    bodies: async () => [body],
+    bodies: async () => [of()],
   });
   return (camData: CamData, operationId: string) =>
     edits.get(generateRoute.path)!(
       {
-        extensions: { [CAM_EXTENSION]: { version: 1, data: camData } },
+        extensions: {
+          [CAM_EXTENSION]: { version: CAM_VERSION, data: camData },
+        },
       } as unknown as CadDocument,
       { params: { id: "p1" }, body: { setupId: "s1", operationId } },
       { user: mark },
@@ -271,6 +277,17 @@ describe("contour and pocket through rockett.cam.generate", () => {
       expect(program.sections.map((s) => s.operationId)).toEqual([id]);
       expect(program.sections[0]!.moves.length).toBeGreaterThan(10);
     }
+  }, 120_000);
+
+  it("keeps an upward face's contour program byte for byte", async () => {
+    const generate = await route();
+    const golden = readFileSync(
+      new URL("golden/ir/contourFace.json", import.meta.url),
+      "utf8",
+    );
+    expect(JSON.stringify((await generate(data(), "contour")).program)).toBe(
+      JSON.stringify(JSON.parse(golden)),
+    );
   }, 120_000);
 
   it("emits G187 P4 before the finish pass of a preset with profile 4", async () => {
@@ -407,5 +424,139 @@ describe("contour and pocket through rockett.cam.generate", () => {
         2,
       );
     }
+  }, 120_000);
+});
+
+const profilesOf = async (of: ServerBody) =>
+  (
+    (await kernel.moduleJob(
+      ENTRY,
+      "rockett.cam.features",
+      {
+        setup: blockSetup,
+        bodies: [of].map(({ id, bbox, brep: text, faceNames }) => ({
+          id,
+          bbox,
+          brep: text,
+          faceNames,
+        })),
+      } satisfies FeaturesInput,
+      { shouldStop: () => false },
+    )) as PlanFeatures
+  ).profiles;
+
+const planned = (profile: ProfileFeature, fixtures: Fixture[] = []) => ({
+  setups: [
+    {
+      id: "s1",
+      name: "Setup 1",
+      ...blockSetup,
+      safeHeight: 15,
+      clearance: 3,
+      ...(fixtures.length && { fixtures }),
+      operations: [
+        {
+          id: "contour",
+          type: "rockett.cam.contour",
+          name: profile.name,
+          toolId: "t1",
+          presetId: "p1",
+          params: {
+            face: profile.face,
+            side: profile.side,
+            bottomOffset: 0,
+            ...(profile.side === "inside" && { opening: profile.opening }),
+          } as Record<string, unknown>,
+        },
+      ],
+    },
+  ],
+  tools: [{ ...tool, fluteLength: 30, presets: [preset] }],
+});
+
+const bottomPass = (program: Program, z: number) => {
+  const moves = program.sections[0]!.moves;
+  const plunge = moves.findLastIndex(
+    (move) => move.kind === "feed" && move.role === "plunge",
+  );
+  const start = moves[plunge]!;
+  const pass = moves
+    .slice(plunge + 1)
+    .filter((move) => move.kind === "feed" || move.kind === "arc");
+  if (start.kind !== "feed") throw new Error("no plunge");
+  expect(Math.abs(start.to[2] - z)).toBeLessThanOrEqual(0.01);
+  for (const move of pass)
+    expect(Math.abs(move.to[2] - z)).toBeLessThanOrEqual(0.01);
+  expect(pass.at(-1)!.to).toEqual(start.to);
+  return pass.map(({ to }) => [to[0], to[1]] as const);
+};
+
+const outside = (
+  [x, y]: readonly [number, number],
+  [x0, y0, x1, y1]: number[],
+) => Math.hypot(Math.max(x0! - x, 0, x - x1!), Math.max(y0! - y, 0, y - y1!));
+
+const inside = (
+  [x, y]: readonly [number, number],
+  [x0, y0, x1, y1]: number[],
+) => Math.min(x - x0!, x1! - x, y - y0!, y1! - y);
+
+const clamp = (name: string, min: number[], max: number[]) =>
+  ({ name, min, max }) as Fixture;
+
+describe("planned profile contours through rockett.cam.generate", () => {
+  it("cuts a closed pass around the outline at the bottom Z", async () => {
+    const block = featureBlock();
+    const [outline] = await profilesOf(block);
+    expect(outline).toMatchObject({ side: "outside" });
+    const { program } = await (
+      await route(() => block)
+    )(planned(outline!), "contour");
+    expect(validateProgram(program)).toEqual([]);
+    const pass = bottomPass(program, outline!.z);
+    expect(pass.length).toBeGreaterThan(4);
+    for (const point of pass)
+      expect(Math.abs(outside(point, [0, 0, 80, 60]) - 2)).toBeLessThanOrEqual(
+        0.01,
+      );
+  }, 120_000);
+
+  it("cuts a closed pass inside the opening at the bottom Z", async () => {
+    const block = openedBlock();
+    const [opening] = await profilesOf(block);
+    expect(opening).toMatchObject({ side: "inside" });
+    const generate = await route(() => block);
+    const { program } = await generate(planned(opening!), "contour");
+    expect(validateProgram(program)).toEqual([]);
+    for (const at of [undefined, 1]) {
+      const unnamed = planned(opening!);
+      unnamed.setups[0]!.operations[0]!.params.opening = at;
+      await expect(generate(unnamed, "contour")).rejects.toThrow(
+        /inside contour on bottom face f:block:\d+ of body b1 must name one of its openings$/,
+      );
+    }
+    const pass = bottomPass(program, opening!.z);
+    expect(pass.length).toBeGreaterThan(3);
+    for (const point of pass)
+      expect(Math.abs(inside(point, [5, 10, 15, 30]) - 2)).toBeLessThanOrEqual(
+        0.01,
+      );
+  }, 120_000);
+
+  it("refuses a contour that meets a hold-down, naming it", async () => {
+    const block = featureBlock();
+    const [outline] = await profilesOf(block);
+    const generate = await route(() => block);
+    await expect(
+      generate(
+        planned(outline!, [clamp("toe clamp 1", [30, -5, 0], [50, 10, 10])]),
+        "contour",
+      ),
+    ).rejects.toThrow(/3 mm clearance of fixture toe clamp 1$/);
+    const { program } = await generate(
+      planned(outline!, [clamp("toe clamp 2", [100, 20, 0], [120, 40, 10])]),
+      "contour",
+    );
+    expect(validateProgram(program)).toEqual([]);
   }, 120_000);
 });

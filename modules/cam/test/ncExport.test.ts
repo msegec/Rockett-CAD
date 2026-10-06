@@ -332,6 +332,18 @@ describe("GET /projects/:id/m/rockett/cam/nc", () => {
     camData(doc).setups[0]!.fixtures = [
       { name: "toe clamp 1", min: [15, 34, 0], max: [25, 54, 10] },
     ];
+    expect(await route.nc(doc)).toEqual({
+      blocked: [
+        {
+          kind: "operation",
+          setupId: "s1",
+          operationId: "op1",
+          name: "Contour 1",
+          status: "stale",
+        },
+      ],
+    });
+    await route.generate(doc);
     const blocker = {
       kind: "check",
       setupId: "s1",

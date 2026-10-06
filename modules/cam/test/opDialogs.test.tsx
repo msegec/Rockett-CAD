@@ -31,12 +31,24 @@ import {
   useStore,
 } from "./helpers/camClient.js";
 
-const titles = (schema: typeof contourParams | typeof pocketParams) =>
-  Object.values(schema.properties).map(
-    (property) => (property as { title?: string }).title,
+type Params = typeof contourParams | typeof pocketParams;
+
+const titleOf = (property: unknown) => (property as { title?: string }).title;
+
+const titles = (schema: Params) =>
+  Object.values(schema.properties).flatMap((property) => {
+    const title = titleOf(property);
+    return title === undefined ? [] : [title];
+  });
+
+const untitled = (schema: Params) =>
+  Object.entries(schema.properties).flatMap(([key, property]) =>
+    titleOf(property) === undefined ? [key] : [],
   );
 
 it("contour and pocket each open a dialog built from its schema", async () => {
+  expect(untitled(contourParams)).toEqual(["opening"]);
+  expect(untitled(pocketParams)).toEqual([]);
   for (const [label, command, schema, labels] of [
     [
       "Contour",

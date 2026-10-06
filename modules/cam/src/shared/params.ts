@@ -27,6 +27,7 @@ export const contourParams = Type.Object({
   face: faceRef("Face"),
   side: Type.Union([outside, inside], { title: "Side" }),
   bottomOffset: Type.Number({ title: "Bottom offset", parameterUnit: "mm" }),
+  opening: Type.Optional(Type.Integer({ minimum: 0 })),
 });
 
 export const pocketParams = Type.Object({

@@ -7,7 +7,8 @@ import {
   type Xy,
   type Xyz,
 } from "../shared/ir.js";
-import type { Box } from "../shared/setup.js";
+import type { Box, Fixture } from "../shared/setup.js";
+import type { Tool } from "../shared/tools.js";
 import { normalise } from "./normalise.js";
 
 export type Segment = { from: Xyz; to: Xyz; rapid: boolean; grow: number };
@@ -34,6 +35,10 @@ export const keepOut = (
   top: max[2] + clearance,
   reach,
 });
+
+export const reachOf = (
+  tool: Pick<Tool, "diameter" | "shankDiameter"> | undefined,
+) => (tool ? Math.max(tool.diameter, tool.shankDiameter) / 2 : 0);
 
 const EXPAND = {
   id: "rockett.cam.check",
@@ -165,3 +170,14 @@ export function exempt(
     to[2] >= from[2] || to[2] >= (deepest.get(`${to[0]},${to[1]}`) ?? Infinity)
   );
 }
+
+export const fixturesMet = (
+  segments: Segment[],
+  fixtures: readonly Fixture[],
+  clearance: number,
+  reach: number,
+) =>
+  fixtures.filter((fixture) => {
+    const region = keepOut(fixture, clearance, reach);
+    return segments.some((segment) => hits(segment, region));
+  });

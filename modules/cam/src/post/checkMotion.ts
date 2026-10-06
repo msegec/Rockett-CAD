@@ -2,7 +2,15 @@ import { endOf, type Xyz } from "../shared/ir.js";
 import { checkTravel, type Box, type Travel } from "../shared/setup.js";
 import type { Tool } from "../shared/tools.js";
 import type { CheckInput, Report } from "./check.js";
-import { exempt, hits, keepOut, spans, type Span } from "./checkSweep.js";
+import {
+  exempt,
+  fixturesMet,
+  hits,
+  keepOut,
+  reachOf,
+  spans,
+  type Span,
+} from "./checkSweep.js";
 
 export type Context = CheckInput & {
   safe: number;
@@ -61,16 +69,13 @@ function fixtureProblems(
   ctx: Context,
 ) {
   const g = ctx.setup.clearance;
-  for (const fixture of ctx.setup.fixtures) {
-    const region = keepOut(fixture, g, reach);
-    if (segments.some((segment) => hits(segment, region)))
-      ctx.report(
-        "fixture",
-        `the tool comes within ${g} mm of ${fixture.name}`,
-        s,
-        m,
-      );
-  }
+  for (const fixture of fixturesMet(segments, ctx.setup.fixtures, g, reach))
+    ctx.report(
+      "fixture",
+      `the tool comes within ${g} mm of ${fixture.name}`,
+      s,
+      m,
+    );
 }
 
 function safeProblems({ setup, safe, report }: Context) {
@@ -124,7 +129,7 @@ export function motionProblems(ctx: Context, travelKnown: boolean): Travel {
   for (const span of spans(program)) {
     const tool = tools.get(program.sections[span.s]!.toolId);
     entryProblems(span, tool, ctx);
-    const reach = tool ? Math.max(tool.diameter, tool.shankDiameter) / 2 : 0;
+    const reach = reachOf(tool);
     stockProblems(span, reach, ctx);
     fixtureProblems(span, reach, ctx);
     const axes = travelKnown ? travelAxes(span, ctx) : [];

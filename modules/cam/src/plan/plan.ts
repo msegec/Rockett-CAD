@@ -29,7 +29,8 @@ export type ProfileFeature = {
   z: number;
   footprint: Footprint;
 } & (
-  { side: "outside" } | { side: "inside"; width: number; cornerRadius: number }
+  | { side: "outside" }
+  | { side: "inside"; opening: number; width: number; cornerRadius: number }
 );
 
 export type PlanFeatures = {
@@ -328,7 +329,7 @@ function planProfile(
       face: profile.face,
       side: profile.side,
       bottomOffset: 0,
-      ...(outside && { tabs: TABS }),
+      ...(outside ? { tabs: TABS } : { opening: profile.opening }),
     },
     floor: profile.z,
   });

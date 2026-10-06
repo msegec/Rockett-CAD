@@ -10,6 +10,7 @@ import {
   waterlineParams,
   type FaceRef,
 } from "../shared/params.js";
+import { fixturesMet, reachOf, spans } from "../post/checkSweep.js";
 import { stockBox, type Box, type Setup } from "../shared/setup.js";
 import type { Preset, Tool } from "../shared/tools.js";
 import type { Mesh } from "../surface/dropCutter.js";
@@ -21,14 +22,20 @@ import { checkParallel, parallel } from "../toolpath/parallel.js";
 import { pocket } from "../toolpath/pocket.js";
 import { checkWaterline, waterline } from "../toolpath/waterline.js";
 import offset, { type OffsetInput } from "./offset.js";
-import { planarFace, type FaceBody, type RegionLoop } from "./regions.js";
+import {
+  planarFace,
+  type FaceBody,
+  type PlanarFace,
+  type RegionLoop,
+} from "./regions.js";
 import surfaceMesh, { type SurfaceMeshInput } from "./surfaceMesh.js";
 
 export type GenerateInput = {
   setup: Pick<
     Setup,
     "id" | "bodies" | "stock" | "wcs" | "safeHeight" | "clearance"
-  >;
+  > &
+    Partial<Pick<Setup, "fixtures">>;
   operation: { id: string; type: string; params: unknown };
   tool: Tool & { number: number };
   preset: Preset;
@@ -64,12 +71,54 @@ function modelTop({ setup }: GenerateInput, at: Record<string, Box>) {
   );
 }
 
-function faceOf(input: GenerateInput, scope: KernelJobScope, ref: FaceRef) {
+function faceOf(
+  input: GenerateInput,
+  scope: KernelJobScope,
+  ref: FaceRef,
+  downward = false,
+) {
   const body = input.bodies.find(({ id }) => id === ref.bodyId);
   if (!body)
     throw new RangeError(`face body ${ref.bodyId} is not a setup body`);
   const stock = stockBox(input.setup, boxes(input));
-  return { stock, face: planarFace(scope, body, ref, stock.modelToSetup) };
+  return {
+    stock,
+    face: planarFace(scope, body, ref, stock.modelToSetup, downward),
+  };
+}
+
+function openingOf({ inner }: PlanarFace, ref: FaceRef, opening?: number) {
+  const loop = opening === undefined ? undefined : inner[opening];
+  if (!loop)
+    throw new RangeError(
+      `an inside contour on bottom face ${ref.faceName} of body ${ref.bodyId} must name one of its openings`,
+    );
+  return loop;
+}
+
+const programOf = (
+  { setup, tool }: GenerateInput,
+  sections: Section[],
+): Program => ({
+  irVersion: 1,
+  units: "mm",
+  setupId: setup.id,
+  offsetIndex: setup.wcs.offsetIndex,
+  tools: [tool],
+  sections,
+});
+
+function clear(input: GenerateInput, section: Section) {
+  const { fixtures = [], clearance } = input.setup;
+  const swept = spans(programOf(input, [section])).flatMap(
+    ({ segments }) => segments,
+  );
+  const [hit] = fixturesMet(swept, fixtures, clearance, reachOf(input.tool));
+  if (hit)
+    throw new RangeError(
+      `contour comes within the ${clearance} mm clearance of fixture ${hit.name}`,
+    );
+  return section;
 }
 
 function surface(
@@ -123,20 +172,28 @@ const GENERATORS: Readonly<Record<OperationType, Generator>> = {
       face: ref,
       side,
       bottomOffset,
+      opening,
     } = paramsOf(contourParams, type, params);
-    const { stock, face } = faceOf(input, scope, ref);
+    const { stock, face } = faceOf(input, scope, ref, true);
+    const loop =
+      face.down && side === "inside"
+        ? openingOf(face, ref, opening)
+        : face.outer;
     return [
-      contour(
-        {
-          ...cut(input),
-          stock,
-          bottom: face.z - bottomOffset,
-          loop: face.outer,
-          side,
-          direction: "climb",
-          start: face.outer.start,
-        },
-        (loop) => offsetJob(loop, scope),
+      clear(
+        input,
+        contour(
+          {
+            ...cut(input),
+            stock,
+            bottom: face.z - bottomOffset,
+            loop,
+            side,
+            direction: "climb",
+            start: loop.start,
+          },
+          (each) => offsetJob(each, scope),
+        ),
       ),
     ];
   },
@@ -206,7 +263,6 @@ function profiled(sections: Section[], { profile }: Preset): Section[] {
 }
 
 function generate(input: GenerateInput, scope: KernelJobScope): Program {
-  const { setup, tool } = input;
   const { type } = input.operation;
   if (!isOperation(type)) throw new Error(`operation ${type} is unknown`);
   scope.progress(0, 1, type);
@@ -216,14 +272,7 @@ function generate(input: GenerateInput, scope: KernelJobScope): Program {
     sections.reduce((sum, { moves }) => sum + moves.length, 0),
   );
   scope.progress(1, 1, type);
-  return {
-    irVersion: 1,
-    units: "mm",
-    setupId: setup.id,
-    offsetIndex: setup.wcs.offsetIndex,
-    tools: [tool],
-    sections,
-  };
+  return programOf(input, sections);
 }
 
 export default defineKernelJobs({ "rockett.cam.generate": generate });

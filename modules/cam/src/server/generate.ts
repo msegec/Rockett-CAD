@@ -212,7 +212,7 @@ const find = (data: CamData, { setupId, operationId }: Target) => {
 
 export function inputs(data: CamData, at: Target): Job | string {
   const { setup, op } = find(data, at);
-  const { bodies, stock, wcs, safeHeight, clearance } = setup;
+  const { bodies, stock, wcs, safeHeight, clearance, fixtures } = setup;
   if (!bodies || !stock || !wcs || safeHeight === undefined)
     return `setup ${setup.id} needs bodies, stock, WCS and heights`;
   if (clearance === undefined || !op.type)
@@ -225,7 +225,15 @@ export function inputs(data: CamData, at: Target): Job | string {
   const preset = presets?.find((item) => item.id === op.presetId);
   if (!preset) return `operation ${op.id} needs a preset of its tool`;
   return structuredClone({
-    setup: { id: setup.id, bodies, stock, wcs, safeHeight, clearance },
+    setup: {
+      id: setup.id,
+      bodies,
+      stock,
+      wcs,
+      safeHeight,
+      clearance,
+      ...(fixtures && { fixtures }),
+    },
     operation: { id: op.id, type: op.type, params: op.params ?? {} },
     tool: tool as Tool & { number: number },
     preset,

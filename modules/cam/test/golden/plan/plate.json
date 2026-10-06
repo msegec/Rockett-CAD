@@ -131,7 +131,8 @@
           }
         },
         "side": "inside",
-        "bottomOffset": 0
+        "bottomOffset": 0,
+        "opening": 0
       },
       "toolId": "t2",
       "feeds": {
