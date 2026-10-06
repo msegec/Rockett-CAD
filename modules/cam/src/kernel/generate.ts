@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { defineKernelJobs, type KernelJobScope } from "@rockett/plugin-api";
 import {
   FINISH_PROFILE,
@@ -19,13 +18,8 @@ import {
   type FaceRef,
 } from "../shared/params.js";
 import { fixturesMet, reachOf, spans } from "../post/checkSweep.js";
-import {
-  stockBox,
-  type Box,
-  type Placement,
-  type Setup,
-} from "../shared/setup.js";
-import type { Preset, Tool } from "../shared/tools.js";
+import { stockBox, type Box, type Placement } from "../shared/setup.js";
+import type { Preset } from "../shared/tools.js";
 import type { Mesh } from "../surface/dropCutter.js";
 import { adaptive } from "../toolpath/adaptive.js";
 import { contour } from "../toolpath/contour.js";
@@ -37,28 +31,17 @@ import { checkParallel, parallel } from "../toolpath/parallel.js";
 import { pocket } from "../toolpath/pocket.js";
 import { checkWaterline, waterline } from "../toolpath/waterline.js";
 import { holesOf } from "./holes.js";
+import adaptiveWasm from "../../wasm/adaptive/adaptive.wasm?inline";
+import type { GenerateInput } from "./input.js";
 import offset, { type OffsetInput } from "./offset.js";
 import {
   planarFace,
   read,
   toSetup,
-  type FaceBody,
   type PlanarFace,
   type RegionLoop,
 } from "./regions.js";
 import surfaceMesh, { type SurfaceMeshInput } from "./surfaceMesh.js";
-
-export type GenerateInput = {
-  setup: Pick<
-    Setup,
-    "id" | "bodies" | "stock" | "wcs" | "safeHeight" | "clearance"
-  > &
-    Partial<Pick<Setup, "fixtures">>;
-  operation: { id: string; type: string; params: unknown };
-  tool: Tool & { number: number };
-  preset: Preset;
-  bodies: (FaceBody & { bbox: Box })[];
-};
 
 type Generator = (input: GenerateInput, scope: KernelJobScope) => Section[];
 
@@ -72,19 +55,13 @@ const meshJob = surfaceMesh["rockett.cam.surfaceMesh"] as (
   scope: KernelJobScope,
 ) => Mesh;
 
-declare const ADAPTIVE_WASM_URL: string;
-
 let engine: WebAssembly.Module | undefined;
 
 export const adaptiveEngine = () =>
   (engine ??= new WebAssembly.Module(
-    readFileSync(
-      new URL(
-        typeof ADAPTIVE_WASM_URL === "string"
-          ? ADAPTIVE_WASM_URL
-          : "../../wasm/adaptive/adaptive.wasm",
-        import.meta.url,
-      ),
+    Uint8Array.from(
+      atob(adaptiveWasm.slice(adaptiveWasm.indexOf(",") + 1)),
+      (c) => c.charCodeAt(0),
     ),
   ));
 

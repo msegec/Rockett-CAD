@@ -18,6 +18,5 @@ for entry in ../modules/*/kernel.ts; do
     bundles="$bundles${bundles:+,}\"rockett.$name\":\"./$name.kernel.mjs\""
 done
 
-esbuild server=src/index.ts kernel-worker=src/kernel/worker.ts $jobs --bundle --platform=node --format=esm --outdir="$outdir" --out-extension:.js=.mjs --external:opencascade.js --external:express --external:multer --external:fflate --banner:js="import { createRequire } from 'module'; const require = createRequire(import.meta.url);" --define:BLEND_WASM_URL='"./blend.wasm"' --define:ADAPTIVE_WASM_URL='"./adaptive.wasm"' --define:KERNEL_BUNDLES="{$bundles}" "$@"
+esbuild server=src/index.ts kernel-worker=src/kernel/worker.ts $jobs --bundle --platform=node --format=esm --outdir="$outdir" --out-extension:.js=.mjs --external:opencascade.js --external:express --external:multer --external:fflate --banner:js="import { createRequire } from 'module'; const require = createRequire(import.meta.url);" --define:BLEND_WASM_URL='"./blend.wasm"' --loader:.wasm=dataurl --define:KERNEL_BUNDLES="{$bundles}" "$@"
 cp ../modules/kernel/blend/blend.wasm "$outdir/blend.wasm"
-cp ../modules/cam/wasm/adaptive/adaptive.wasm "$outdir/adaptive.wasm"

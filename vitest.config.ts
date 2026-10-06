@@ -65,6 +65,6 @@ export default defineConfig({
     allowOnly: false,
     passWithNoTests: false,
     maxWorkers: "50%",
-    projects: projects.map((test) => ({ test })),
+    projects: projects.map((test) => ({ test, assetsInclude: ["**/*.wasm"] })),
   },
 });

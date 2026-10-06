@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { GenerateInput } from "../src/kernel/generate.js";
+import type { GenerateInput } from "../src/kernel/input.js";
 import type { RegionLoop } from "../src/kernel/regions.js";
 import { checkProgram } from "../src/post/check.js";
 import { formatProgram } from "../src/post/format.js";

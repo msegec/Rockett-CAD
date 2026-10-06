@@ -9,7 +9,7 @@ import {
   type ServerContext,
   type User,
 } from "@rockett/plugin-api";
-import type { GenerateInput } from "../kernel/generate.js";
+import type { GenerateInput } from "../kernel/input.js";
 import {
   CAM_EXTENSION,
   CAM_VERSION,
