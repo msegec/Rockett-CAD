@@ -3,6 +3,7 @@ import {
   placementSchema,
   StoreError,
   type KernelJobScope,
+  type TimelineFeatureScope,
 } from "@rockett/plugin-api";
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
@@ -37,6 +38,11 @@ const snapshotSchema = Type.Object({
     footprints: Type.Array(
       Type.Object({
         uuid: Type.Optional(Type.String()),
+        reference: Type.Optional(Type.String()),
+        side: Type.Optional(
+          Type.Union([Type.Literal("front"), Type.Literal("back")]),
+        ),
+        courtyard: Type.Optional(Type.Object({ min: point, max: point })),
         pads: Type.Array(
           Type.Object({
             x: Type.Number(),
@@ -61,12 +67,19 @@ const linksSchema = Type.Object({
   }),
 });
 
+const paramsSchema = Type.Object({
+  linkId: Type.String({ minLength: 1, maxLength: 128 }),
+  placement: placementSchema,
+  options: Type.Object({}, { additionalProperties: false }),
+});
+
 type Loop = Static<typeof loop>;
 type Segment = Loop[number];
 type Point = Static<typeof point>;
 type Drill = Static<typeof drillSchema>;
 
 const UUID = /^[0-9a-z-]{1,40}$/;
+const PLACEHOLDER_HEIGHT = 1;
 
 function edge({ oc, own }: KernelJobScope, s: Segment, z: number) {
   const at = ([x, y]: Point) => own(new oc.gp_Pnt_3(x, y, z));
@@ -240,6 +253,35 @@ function placed(
   };
 }
 
+function components(
+  scope: TimelineFeatureScope<typeof paramsSchema>,
+  { thickness, footprints }: Static<typeof snapshotSchema>["data"],
+) {
+  const { oc, own, params } = scope;
+  return footprints.flatMap(({ uuid, reference, side, courtyard }) => {
+    if (uuid === undefined || !UUID.test(uuid) || !side || !courtyard)
+      return [];
+    const { min, max } = courtyard;
+    if (max[0] <= min[0] || max[1] <= min[1]) return [];
+    const z = side === "front" ? thickness : -PLACEHOLDER_HEIGHT;
+    const box = own(
+      new oc.BRepPrimAPI_MakeBox_4(
+        own(new oc.gp_Pnt_3(min[0], min[1], z)),
+        own(new oc.gp_Pnt_3(max[0], max[1], z + PLACEHOLDER_HEIGHT)),
+      ),
+    );
+    return [
+      {
+        key: `${params.linkId}:${uuid}`,
+        name: reference?.trim() ? reference : uuid,
+        shape: placed(scope, own(box.Shape()), [], params.placement).shape,
+        reference: true,
+        approximate: true,
+      },
+    ];
+  });
+}
+
 function unique(scope: KernelJobScope, shape: Shape, claims: Claim[]) {
   const { oc, own } = scope;
   const map = own(new oc.TopTools_IndexedMapOfShape_1());
@@ -260,11 +302,7 @@ export const board = defineTimelineFeature({
     type: "rockett.kicad.board",
     label: "KiCad board",
     version: 1,
-    params: Type.Object({
-      linkId: Type.String({ minLength: 1, maxLength: 128 }),
-      placement: placementSchema,
-      options: Type.Object({}, { additionalProperties: false }),
-    }),
+    params: paramsSchema,
     resolveInputs({ params: { linkId }, extensions }) {
       const stored = extensions["rockett.kicad"];
       if (!Value.Check(linksSchema, stored))
@@ -323,6 +361,6 @@ export const board = defineTimelineFeature({
       unique(scope, result.shape, claims),
       scope.params.placement,
     );
-    return { shape, faces };
+    return { shape, faces, bodies: components(scope, snapshot.data) };
   },
 });

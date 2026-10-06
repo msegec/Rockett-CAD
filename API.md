@@ -494,7 +494,12 @@ file. The Modules settings page shows it beside a line naming
   `drill:<footprintUuid>:<p>:<s>` for wall `s` of pad `p`'s hole (one wall
   when round; line, arc, line, arc when oval). Indices count from 0 in
   snapshot order. A wall split into pieces, or a hole in a footprint without
-  a uuid, keeps unlabelled names.
+  a uuid, keeps unlabelled names. Each footprint with a uuid and a
+  courtyard of nonzero area also makes body
+  `rockett.kicad:<linkId>:<footprintUuid>`, named by its Reference: a box
+  over the courtyard bounds, 1 mm high, on the top face for a front part
+  and under the board for a back part, flagged `reference` and
+  `approximate`. A Reference rename keeps the body id.
 - Service `rockett.kicad.boardNets` takes a `linkId` string and returns
   `{nets: [{name, members: [{footprintUuid, reference, pad}]}]}` in board
   order. It reads pad nets by name from the link's stored original bytes:
