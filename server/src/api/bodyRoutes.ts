@@ -1,5 +1,6 @@
 import {
   bodyMadeBy,
+  moduleBody,
   NAME_LENGTH,
   ROUTES,
   type CadDocument,
@@ -48,6 +49,11 @@ export const bodyRoutes: RouteModule = {
       const meta = doc.bodyMeta[bodyId]!;
       const { name, color } = req.body;
       if (name !== undefined) {
+        if (moduleBody(bodyId))
+          throw new StoreError(
+            `${meta.name} takes its name from its module`,
+            "unprocessable",
+          );
         const label = `Rename ${meta.name}`;
         meta.name = name.slice(0, NAME_LENGTH);
         return { label };

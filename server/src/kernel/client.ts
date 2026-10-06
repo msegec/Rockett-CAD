@@ -239,9 +239,11 @@ function brepText(shape: unknown): string {
 }
 
 function exportBodies(state: EvalState, { bodyIds, hidden }: ExportJob) {
-  const blocked = [...state.blocked].filter((id) =>
-    bodyIds.length > 0 ? bodyIds.includes(id) : !hidden.includes(id),
-  );
+  const wanted = (id: string) =>
+    bodyIds.length > 0
+      ? bodyIds.includes(id)
+      : !hidden.includes(id) && !state.imported.get(id)?.reference;
+  const blocked = [...state.blocked].filter(wanted);
   if (blocked.length)
     throw new StoreError(
       `export bodies depend on unresolved references: ${blocked.join(", ")}`,
@@ -252,11 +254,7 @@ function exportBodies(state: EvalState, { bodyIds, hidden }: ExportJob) {
     throw new ValidationError(
       `export bodies not in the model: ${missing.join(", ")}`,
     );
-  const chosen = [...state.bodies.values()].filter((b) =>
-    bodyIds.length > 0
-      ? bodyIds.includes(b.bodyId)
-      : !hidden.includes(b.bodyId),
-  );
+  const chosen = [...state.bodies.values()].filter((b) => wanted(b.bodyId));
   if (chosen.length === 0) throw new ValidationError("no bodies to export");
   return { bodies: chosen, sketch: [], polylines: [] };
 }

@@ -1,6 +1,7 @@
 import { Router, json, type RequestHandler } from "express";
 import {
   DOCUMENT_EDITS,
+  moduleBody,
   NAME_LENGTH,
   ROUTES,
   type BodyPayload,
@@ -91,10 +92,13 @@ function synchronisedEvaluation(
     const evaluation = await evaluate(doc, position);
     let metaChanged = pruneGroups(doc, evaluation, position);
     for (const body of evaluation.bodies) {
-      if (!doc.bodyMeta[body.bodyId]) {
-        doc.bodyMeta[body.bodyId] = { name: seededName(doc, body) };
-        metaChanged = true;
-      }
+      const meta = doc.bodyMeta[body.bodyId];
+      const owned = moduleBody(body.bodyId);
+      if (meta && (!owned || meta.name === body.name)) continue;
+      doc.bodyMeta[body.bodyId] = owned
+        ? { ...meta, name: body.name }
+        : { name: seededName(doc, body) };
+      metaChanged = true;
     }
     if (metaChanged)
       for (const body of evaluation.bodies)

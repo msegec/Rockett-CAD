@@ -35,6 +35,9 @@ function camData(project: OpenProject): CamData {
 export const bodyBoxes = ({ bodies }: OpenProject): Record<string, Box> =>
   Object.fromEntries(bodies.map(({ id, bbox }) => [id, bbox]));
 
+export const defaultBodies = ({ bodies }: OpenProject) =>
+  bodies.filter(({ reference }) => !reference).map(({ id }) => id);
+
 const MARGINS = { xMin: 2, xMax: 2, yMin: 2, yMax: 2, zMin: 2, zMax: 1 };
 
 export function newSetup(
@@ -44,7 +47,7 @@ export function newSetup(
   return {
     id: crypto.randomUUID(),
     name: `Setup ${camData(project).setups.length + 1}`,
-    bodies: project.bodies.map(({ id }) => id),
+    bodies: defaultBodies(project),
     stock: { kind: "boxAround", margins: MARGINS },
     wcs: {
       origin: { kind: "stockCorner", x: "min", y: "min", z: "max" },

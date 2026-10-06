@@ -208,9 +208,9 @@ it too.
 
 - Evaluate answers `EvaluateResult` and mutations `MutationResponse`
   (`shared/src/routes.ts`). Each `BodyPayload` carries `bodyId`, `name`,
-  `color`, `meshKey`, `bbox` and `mesh`, the hash and byte size of its
-  mesh, never the mesh itself. A B-Rep body with at least 1,024 triangles
-  whose mesh at 12 times the viewport deflection has at most half of them
+  `color`, `reference`, `approximate`, `meshKey`, `bbox` and `mesh`, the
+  hash and byte size of its mesh, never the mesh itself. A B-Rep body with
+  at least 1,024 triangles whose mesh at 12 times the viewport deflection has at most half of them
   also carries `coarse`, that level's hash and byte size; the mesh route
   serves both. The client
   fetches each hash from the mesh route once: `client/src/three/meshes.ts`.
@@ -220,7 +220,8 @@ it too.
 - `PUT /projects/:id/bodies/:bodyId` sends exactly one of `name` or `color`,
   each its own undo step. `color` is lowercase `#rrggbb`, or `null` to clear
   it. Anything else, an unknown key included, is a 400; a body id that is not
-  an own key of `bodyMeta` is a 404.
+  an own key of `bodyMeta` is a 404. Renaming a module body is a 422
+  `unprocessable`, `<name> takes its name from its module`.
 - A STEP `importStep` status carries `importTree`: each assembly and part
   instance with its name, its `path` of child indices from the file's roots
   and, for a part, the body ids its solids became. It is derived on every
@@ -301,6 +302,9 @@ key grammar, so removed plugin values survive:
 - Export refuses a body blocked by an unresolved reference (`namingVersion` 2)
   with 422 `unprocessable`, and an id that is not a body with 400.
   Measure answers 400 for a body or name the live evaluation lacks.
+- An empty `bodyIds` exports every body the user's view shows except
+  reference bodies; the export panel sends the same list unless bodies are
+  selected. Naming a reference body exports it.
 - Measure takes face and body refs, up to `MEASURE_MAX_REFS`
   (`shared/src/api.ts`), and edge or vertex refs only when it has at most two
   refs; either breach answers 400 saying so. `items` holds one entry per ref,
@@ -389,6 +393,20 @@ file. The Modules settings page shows it beside a line naming
   another user or project. Providers and consumers validate their own input
   and result schemas. User routes get no services; the host stores no
   service data.
+- API 0.17.0 lets `evaluate` add a `bodies` list beside `shape`, each entry
+  `{key, name, shape, faces, reference, approximate}`. Each becomes body
+  `<moduleId>:<key>`; a key is 1 to 128 characters of `a-z`, `0-9`, `_`, `:`
+  and `-`, starting with a letter or digit, so the id survives edits,
+  reorders and reopening. `shape` must be one solid, `faces` labels it as
+  API 0.14.0 does, `name` is 1 to 200 characters without control
+  characters, and the flags are booleans. The module's name replaces the
+  stored `bodyMeta` name on every evaluation; the colour stays the user's.
+  A `BodyPayload`, a `ProjectBody` and a `ServerBody` carry
+  `reference: true` for a reference body; `BodyPayload` also carries
+  `approximate: true`. A default export and a new CAM setup's bodies leave
+  reference bodies out until the user picks them. An invalid or repeated
+  key, an invalid name or flag, a shape of two solids, or an id an earlier
+  feature already made fails the feature and keeps the previous bodies.
 - API 0.16.0 exports `placementSchema` from `shared/src/placement.ts`, the
   one owner of a stored placement: a unit quaternion `rotation`
   `[x, y, z, w]` within `UNIT_DOT_TOL`, refused as
@@ -509,8 +527,8 @@ file. The Modules settings page shows it beside a line naming
   rule as a project route. A user without view access and a missing project
   get the same `not_found` rejection, "project not found", which a route
   answers as 404. It returns
-  `{ id, name, bbox, brep, faceNames, fingerprint, problems }` for each body
-  at the end of the timeline, whatever the Design rollback, in model
+  `{ id, name, reference, bbox, brep, faceNames, fingerprint, problems }`
+  for each body at the end of the timeline, whatever the Design rollback, in model
   millimetres. `brep` is the OCCT BREP text of the body. `faceNames` holds
   one regen face name per face, in the order `TopExp_Explorer` visits the
   faces of the shape read back from `brep`, so a kernel job resolves a

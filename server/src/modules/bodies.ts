@@ -67,7 +67,7 @@ export function moduleBodies(
       features: resolveDocumentParameters(doc).features,
     };
     const statusOf = new Map(featureStatuses.map((s) => [s.featureId, s]));
-    return bodies.map(({ bodyId, name, bbox }, i) => {
+    return bodies.map(({ bodyId, name, reference, bbox }, i) => {
       const inputs: BodyInputs = {
         doc: resolved,
         bodyId,
@@ -86,6 +86,7 @@ export function moduleBodies(
       return {
         id: bodyId,
         name,
+        ...(reference && { reference }),
         bbox,
         brep: breps[i]!.brep,
         faceNames: breps[i]!.faceNames,

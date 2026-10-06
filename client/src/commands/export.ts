@@ -22,7 +22,7 @@ export function exportBodyIds(s: CommandContext): string[] {
   if (selected.length) return selected;
   const hidden = new Set(s.view.hidden.bodies);
   return (s.evaluation?.bodies ?? [])
-    .filter((entry) => !hidden.has(entry.bodyId))
+    .filter((entry) => !hidden.has(entry.bodyId) && !entry.reference)
     .map((entry) => entry.bodyId);
 }
 

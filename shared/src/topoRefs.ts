@@ -85,3 +85,8 @@ export const faceMadeBy = (featureId: string, faceName: string) =>
 
 export const derivedBodyId = (featureId: string, n: number) =>
   `b:${featureId}:${n}`;
+
+export const moduleBodyId = (moduleId: string, key: string) =>
+  `${moduleId}:${key}`;
+
+export const moduleBody = (bodyId: string) => !bodyId.startsWith("b:");

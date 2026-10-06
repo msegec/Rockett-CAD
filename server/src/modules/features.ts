@@ -1,6 +1,8 @@
 import type { TimelineFeature } from "@rockett/plugin-api";
 import {
   featureModule,
+  moduleBodyId,
+  NAME_LENGTH,
   REGISTRY_ID,
   registerExtensionSpec,
   type ExtensionFeature,
@@ -84,13 +86,67 @@ function labelsOf(own: Own, shape: Shape, listed: unknown, what: string) {
   return labels;
 }
 
+const KEY = /^[a-z0-9][a-z0-9_:-]{0,127}$/;
+
+function keyedBodies(listed: unknown, what: string) {
+  if (listed === undefined) return [];
+  if (!Array.isArray(listed)) throw new Error(`${what} bodies must be a list`);
+  const keys = new Set<string>();
+  return listed.map((entry) => {
+    const {
+      key,
+      name,
+      shape,
+      faces: labels = [],
+      reference = false,
+      approximate = false,
+    } = Object(entry);
+    if (typeof key !== "string" || !KEY.test(key))
+      throw new Error(
+        `${what} body key ${JSON.stringify(String(key).slice(0, 128))} is invalid`,
+      );
+    if (keys.has(key)) throw new Error(`${what} returns body ${key} twice`);
+    keys.add(key);
+    if (
+      typeof name !== "string" ||
+      !name.trim() ||
+      name.length > NAME_LENGTH ||
+      /\p{Cc}/u.test(name)
+    )
+      throw new Error(`${what} body ${key} name is invalid`);
+    if (typeof reference !== "boolean" || typeof approximate !== "boolean")
+      throw new Error(`${what} body ${key} flags must be true or false`);
+    return { key, name, shape, labels, reference, approximate };
+  });
+}
+
+function namedSolid(
+  own: Own,
+  body: Shape,
+  listed: unknown,
+  kind: string,
+  what: string,
+  featureId: string,
+) {
+  if (!(body instanceof getKernel().TopoDS_Shape))
+    throw new Error(`${what} must return a solid shape`);
+  own(body);
+  if (body.isDeleted() || solids(body).length === 0)
+    throw new Error(`${what} must return a solid shape`);
+  rejectInvalidBody(kind, body);
+  const names = sourceNames(body, featureId, labelsOf(own, body, listed, what));
+  own.keep(own({ delete: () => names.release() }));
+  return { shape: own.keep(body), names };
+}
+
 function kindOf({ spec, evaluate }: TimelineFeature): FeatureKind {
   const what = `timeline feature ${spec.type}`;
+  const moduleId = featureModule(spec.type)!;
   return {
     type: spec.type,
     evaluate({ state, sources, inputs }, feature) {
       const oc = getKernel();
-      const { shape, names } = scoped((own) => {
+      const { made, keyed } = scoped((own) => {
         const result: Shape = synchronous(
           evaluate({
             oc,
@@ -108,24 +164,40 @@ function kindOf({ spec, evaluate }: TimelineFeature): FeatureKind {
           }),
           what,
         );
-        const { shape: body, faces: listed = [] }: Shape =
-          result instanceof oc.TopoDS_Shape
-            ? { shape: result }
-            : Object(result);
-        if (!(body instanceof oc.TopoDS_Shape))
-          throw new Error(`${what} must return a solid shape`);
-        own(body);
-        if (body.isDeleted() || solids(body).length === 0)
-          throw new Error(`${what} must return a solid shape`);
-        rejectInvalidBody(spec.label, body);
-        const labels = labelsOf(own, body, listed, what);
+        const {
+          shape,
+          faces: listed = [],
+          bodies,
+        }: Shape = result instanceof oc.TopoDS_Shape
+          ? { shape: result }
+          : Object(result);
+        const named = (body: Shape, labels: unknown, label: string) =>
+          namedSolid(own, body, labels, spec.label, label, feature.id);
         return {
-          shape: own.keep(body),
-          names: sourceNames(body, feature.id, labels),
+          made: named(shape, listed, what),
+          keyed: keyedBodies(bodies, what).map((entry) => {
+            const id = moduleBodyId(moduleId, entry.key);
+            const label = `${what} body ${entry.key}`;
+            const solid = named(entry.shape, entry.labels, label);
+            if (solids(solid.shape).length !== 1)
+              throw new Error(`${label} must be one solid`);
+            if (state.bodies.has(id))
+              throw new Error(`${what} body ${id} already exists`);
+            return { ...entry, ...solid, id };
+          }),
         };
       });
-      acquire(shape);
-      registerBodySolids(state, `b:${feature.id}`, shape, names);
+      acquire(made.shape);
+      registerBodySolids(state, `b:${feature.id}`, made.shape, made.names);
+      for (const { id, name, reference, approximate, shape, names } of keyed) {
+        acquire(shape);
+        registerBodySolids(state, id, shape, names);
+        state.imported.set(id, {
+          name,
+          ...(reference && { reference }),
+          ...(approximate && { approximate }),
+        });
+      }
     },
   };
 }

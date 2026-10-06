@@ -9,6 +9,7 @@ import {
 import type { MachineProfile } from "../src/shared/machine.js";
 import {
   client,
+  evaluation,
   exports,
   fetchMock,
   flush,
@@ -155,6 +156,34 @@ it("saves each new row and reads it back after the project reloads", async () =>
   );
   expect(read.status).toBe("ready");
   expect((read as { data: CamData }).data.setups[1]).toMatchObject(setup);
+});
+
+it("a new setup leaves a reference body out of its bodies until the Bodies field picks it", async () => {
+  await withSettings({});
+  const [plate] = evaluation.bodies;
+  const pin = {
+    ...plate!,
+    bodyId: "rockett.kicad:l1:r1",
+    name: "R1",
+    reference: true,
+  };
+  evaluation.bodies.push(pin);
+  try {
+    await act(async () => useStore.getState().openProject("p1"));
+    await flush();
+    const panel = await open("Setup 2", "rockett.cam.setup");
+    const options = [...select(panel, "Bodies").options].map((o) => o.text);
+    expect(options).toEqual(["All bodies", "Plate", "R1"]);
+    expect(select(panel, "Bodies").value).toBe("b1");
+    await choose(panel, "Bodies", pin.bodyId);
+    await choose(panel, "Bodies", "");
+    expect(select(panel, "Bodies").value).toBe("b1");
+    await choose(panel, "Bodies", pin.bodyId);
+    await press(panel, "OK");
+    expect(setups()[1]!.bodies).toEqual([pin.bodyId]);
+  } finally {
+    evaluation.bodies.pop();
+  }
 });
 
 it("a new setup takes the default machine, its post and the default tolerance from the CAM settings", async () => {

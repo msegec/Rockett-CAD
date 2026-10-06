@@ -95,6 +95,8 @@ export interface BodyPayload {
   bodyId: string;
   name: string;
   color?: string;
+  reference?: true;
+  approximate?: true;
   meshKey: string;
   mesh?: { hash: string; bytes: number };
   coarse?: { hash: string; bytes: number };

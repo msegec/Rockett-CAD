@@ -1,5 +1,6 @@
 import {
   derivedBodyId,
+  moduleBody,
   type CadDocument,
   type FeatureStatus,
   type PlaneFrame,
@@ -48,6 +49,8 @@ export interface StateBody extends NamedBody {
 export interface ImportedLabel {
   name?: string;
   color?: string;
+  reference?: true;
+  approximate?: true;
 }
 
 export interface EvalState {
@@ -60,8 +63,17 @@ export interface EvalState {
 }
 
 export function bodyLabel(s: EvalState, doc: CadDocument, id: string) {
-  const { name = id, color } = { ...s.imported.get(id), ...doc.bodyMeta[id] };
-  return { name, ...(color && { color }) };
+  const { reference, approximate, ...supplied } = s.imported.get(id) ?? {};
+  const meta = doc.bodyMeta[id];
+  const { name = id, color } = moduleBody(id)
+    ? { ...meta, ...supplied }
+    : { ...supplied, ...meta };
+  return {
+    name,
+    ...(color && { color }),
+    ...(reference && { reference }),
+    ...(approximate && { approximate }),
+  };
 }
 
 export interface ToolResult {

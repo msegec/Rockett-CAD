@@ -14,6 +14,7 @@ import type { Stock } from "../shared/setup.js";
 import { lostPost, MACHINE_TEXTS, postChoices } from "./ncDialog.js";
 import { chosen, picker, useLibrary } from "./opDialog.js";
 import {
+  defaultBodies,
   newSetup,
   saveSetup,
   withStockKind,
@@ -278,7 +279,7 @@ export function setupDialog(context: ClientContext) {
         options: bodyOptions,
         onChange: (id) =>
           edit({
-            bodies: id === ALL_BODIES ? open.bodies.map((b) => b.id) : [id],
+            bodies: id === ALL_BODIES ? defaultBodies(open) : [id],
           }),
       }),
       h(ui.SelectField<string>, {

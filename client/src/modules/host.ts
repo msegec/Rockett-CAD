@@ -210,11 +210,14 @@ const project: Omit<ProjectView, "pick"> = {
     if (!changed(now, seen)) return open;
     const { projectId, document, evaluation } = now;
     seen = { projectId, document, evaluation };
-    const bodies = (evaluation?.bodies ?? []).map(({ bodyId, name, bbox }) => ({
-      id: bodyId,
-      name,
-      bbox,
-    }));
+    const bodies = (evaluation?.bodies ?? []).map(
+      ({ bodyId, name, reference, bbox }) => ({
+        id: bodyId,
+        name,
+        ...(reference && { reference }),
+        bbox,
+      }),
+    );
     open = { projectId, document, bodies };
     return open;
   },

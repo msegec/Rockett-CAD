@@ -225,11 +225,13 @@ export class MeshCache {
 
   private wire(body: MeshedBody): BodyPayload {
     const { fine, coarse } = this.levels(body);
-    const { bodyId, name, color, meshKey, bbox } = body;
+    const { bodyId, name, color, reference, approximate, meshKey, bbox } = body;
     return {
       bodyId,
       name,
       ...(color && { color }),
+      ...(reference && { reference }),
+      ...(approximate && { approximate }),
       meshKey,
       mesh: levelOf(fine),
       ...(coarse && { coarse: levelOf(coarse) }),

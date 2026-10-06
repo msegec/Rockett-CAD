@@ -42,7 +42,7 @@ export type {
 
 export { placementSchema, StoreError } from "@rockett/shared";
 
-export const PLUGIN_API_VERSION = "0.16.0";
+export const PLUGIN_API_VERSION = "0.17.0";
 
 export type FaceRef = Pick<CoreFaceRef, "kind" | "bodyId" | "faceName">;
 
@@ -338,6 +338,7 @@ export interface ProjectBody {
   readonly id: string;
   readonly name: string;
   readonly bbox: BodyPayload["bbox"];
+  readonly reference?: true;
 }
 
 export interface OpenProject {
