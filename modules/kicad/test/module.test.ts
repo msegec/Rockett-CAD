@@ -11,7 +11,7 @@ import server from "../server.js";
 const root = resolve(import.meta.dirname, "../..");
 
 describe("KiCad first-party module", () => {
-  it("registers a compatible upload route and board feature with declared contributions", () => {
+  it("registers compatible upload and outline routes, the outline command and the board feature with declared contributions", () => {
     expect(parseManifest(manifest, PLUGIN_API_VERSION).status).toBe(
       "compatible",
     );
@@ -19,7 +19,8 @@ describe("KiCad first-party module", () => {
     expect(manifest.licence).toBe("UNLICENSED");
     expect(manifest.contributes).toEqual({
       features: ["rockett.kicad.board"],
-      routes: ["rockett.kicad.upload"],
+      commands: ["rockett.kicad.exportOutline"],
+      routes: ["rockett.kicad.upload", "rockett.kicad.outline"],
     });
     expect(
       serverModules.find((entry) => entry.manifest.id === manifest.id),

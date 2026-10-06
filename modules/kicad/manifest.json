@@ -8,6 +8,7 @@
   "author": "Rockett CAD",
   "contributes": {
     "features": ["rockett.kicad.board"],
-    "routes": ["rockett.kicad.upload"]
+    "commands": ["rockett.kicad.exportOutline"],
+    "routes": ["rockett.kicad.upload", "rockett.kicad.outline"]
   }
 }

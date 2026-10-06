@@ -503,6 +503,14 @@ file. The Modules settings page shows it beside a line naming
   Reference: a box over the courtyard bounds, 1 mm high, on the top face
   for a front part and under the board for a back part, flagged `reference` and
   `approximate`. A Reference rename keeps the body id.
+- `GET /projects/:id/m/rockett/kicad/outline/sketch/:sketchId` and
+  `GET /projects/:id/m/rockett/kicad/outline/face/:bodyId/:faceName` need
+  view access and return, as a JSON string, the DXF R12 text the export menu
+  writes for that sketch or planar face of the final model, every
+  non-construction entity on layer `Edge.Cuts` in mm, for KiCad File, Import,
+  Graphics. They call the server context `dxf`, so its refusals apply.
+  Command `rockett.kicad.exportOutline` downloads the one selected face's
+  outline as `<body name>.dxf`.
 - Service `rockett.kicad.boardNets` takes a `linkId` string and returns
   `{nets: [{name, members: [{footprintUuid, reference, pad}]}]}` in board
   order. It reads pad nets by name from the link's stored original bytes:
