@@ -1,10 +1,15 @@
-import { StoreError, type Route, type RouteModule } from "@rockett/plugin-api";
-import { Type, type Static } from "typebox";
+import {
+  StoreError,
+  type ProjectServices,
+  type Route,
+  type RouteModule,
+} from "@rockett/plugin-api";
+import { Type, type Static, type TSchema } from "typebox";
 import { Value } from "typebox/value";
 
 const PROVIDER = "rockett.kicad";
 const id = Type.String({ minLength: 1 });
-const boardNetsSchema = Type.Object({
+export const boardNetsSchema = Type.Object({
   nets: Type.Array(
     Type.Object({
       name: id,
@@ -20,6 +25,25 @@ const boardNetsSchema = Type.Object({
 });
 export type BoardNets = Static<typeof boardNetsSchema>;
 
+export async function provided<S extends TSchema>(
+  services: ProjectServices,
+  service: string,
+  schema: S,
+  label: string,
+  input: string,
+): Promise<Static<S>> {
+  const call = services.get(`${PROVIDER}.${service}`);
+  if (!call)
+    throw new StoreError(`Requires module ${PROVIDER}`, "unprocessable");
+  const result = await call(input);
+  if (!Value.Check(schema, result))
+    throw new StoreError(
+      `Module ${PROVIDER} returned invalid ${label}`,
+      "unprocessable",
+    );
+  return result;
+}
+
 export const netsRoute: Route<
   "/projects/:id/m/rockett/elec/boards/:linkId/nets",
   unknown,
@@ -32,17 +56,14 @@ export const netsRoute: Route<
 export const netsModule: RouteModule = {
   id: "rockett.elec.nets",
   mount(api) {
-    api.projectRoute(netsRoute, async (_doc, { params }, { services }) => {
-      const boardNets = services.get(`${PROVIDER}.boardNets`);
-      if (!boardNets)
-        throw new StoreError(`Requires module ${PROVIDER}`, "unprocessable");
-      const result = await boardNets(params.linkId);
-      if (!Value.Check(boardNetsSchema, result))
-        throw new StoreError(
-          `Module ${PROVIDER} returned invalid board nets`,
-          "unprocessable",
-        );
-      return result;
-    });
+    api.projectRoute(netsRoute, (_doc, { params }, { services }) =>
+      provided(
+        services,
+        "boardNets",
+        boardNetsSchema,
+        "board nets",
+        params.linkId,
+      ),
+    );
   },
 };

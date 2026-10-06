@@ -7,6 +7,8 @@
   "licence": "UNLICENSED",
   "author": "Rockett CAD",
   "contributes": {
-    "routes": ["rockett.elec.nets"]
+    "commands": ["rockett.elec.exportPins"],
+    "routes": ["rockett.elec.nets", "rockett.elec.pins"],
+    "menuItems": ["rockett.elec.exportPins"]
   }
 }

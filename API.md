@@ -570,10 +570,26 @@ file. The Modules settings page shows it beside a line naming
   KiCad 9 `(net <code> "<name>")` and KiCad 10 `(net "<name>")`; an empty
   name is no net. Invalid input, a link outside the authorised project, or a
   missing or invalid source refuses with 422.
+- Service `rockett.kicad.board` takes a `linkId` string and returns
+  `{thickness, placement, footprints}` from the link's stored snapshot, each
+  footprint `{uuid, libId, reference, side, pads: [{number, x, y}]}` in
+  board order, with the placement of the one unsuppressed
+  `rockett.kicad.board` feature on that link. No such feature, or more than
+  one, refuses with 422, as do invalid input, a link outside the authorised
+  project, or a missing or invalid snapshot.
 - `GET /projects/:id/m/rockett/elec/boards/:linkId/nets` needs view access and
   returns those nets after `rockett.elec` validates them with its own schema.
   Without a `rockett.kicad` provider it refuses with 422
   `Requires module rockett.kicad`; an invalid result refuses with 422.
+- `GET /projects/:id/m/rockett/elec/boards/:linkId/pins` needs view access and
+  returns, as a JSON string, the connector pin table as CSV: header
+  `Reference,Pin,Net,X,Y,Z`, then one row per connector pin in board order,
+  positions in mm in model space, rounded to 0.0001, CRLF line ends. A
+  field holding a comma, quote, CR or LF is quoted with its quotes doubled;
+  a pin with no net leaves Net empty. It reads both kicad services and
+  refuses as they do. Command `rockett.elec.exportPins`, after the outline
+  item in the face menu, downloads the selected KiCad board's table as
+  `<body name> pins.csv`.
 - `register.kernelJob(id, entry)` registers a kernel job: `id` starts with
   the module id and a dot, and `entry` is the URL of a file whose default
   export, from `defineKernelJobs`, holds the job under that id.

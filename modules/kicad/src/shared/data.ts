@@ -60,6 +60,7 @@ export const modelSchema = Type.Object({
 });
 const footprintSchema = Type.Object({
   uuid: Type.Optional(Type.String()),
+  libId: Type.Optional(Type.String()),
   reference: Type.Optional(Type.String()),
   side: Type.Optional(
     Type.Union([Type.Literal("front"), Type.Literal("back")]),
@@ -70,6 +71,7 @@ const footprintSchema = Type.Object({
   courtyard: Type.Optional(Type.Object({ min: point, max: point })),
   pads: Type.Array(
     Type.Object({
+      number: Type.Optional(Type.String()),
       x: Type.Number(),
       y: Type.Number(),
       angle: Type.Number(),

@@ -136,6 +136,7 @@ everything downstream against persistent topology references.
 - **KiCad 3D models API**: upload the STEP models footprints name, list missing ones, and place them on the board.
 - **Board outline DXF API**: get a sketch or planar face outline as DXF on layer `Edge.Cuts` for KiCad's graphics import.
 - **Board nets API**: list a saved KiCad board's nets with each footprint pad, through the electrical module.
+- **Connector pin table**: right-click a KiCad board face to download each connector pin's net and position as CSV.
 - **Module switches**: in a module's Settings section, an admin turns it off from the next restart, and each user can hide it.
 - **Plugin API**: modules add commands, toolbars, panels, workbenches, layers, settings, menus, kernel jobs, portable project assets, project services and pick modes.
 - **Module inputs**: changing a committed module source refreshes geometry and CAM; undo restores the previous source.

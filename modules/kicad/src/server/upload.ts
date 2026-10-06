@@ -152,7 +152,7 @@ async function keep(
   return hashes;
 }
 
-function linkOf(doc: CadDocument, linkId: string) {
+export function linkOf(doc: CadDocument, linkId: string) {
   const stored = storedData(doc);
   const link = Object.hasOwn(stored.links, linkId)
     ? stored.links[linkId]
