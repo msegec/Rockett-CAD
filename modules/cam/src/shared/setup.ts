@@ -1,9 +1,7 @@
+import type { Placement } from "@rockett/plugin-api";
 import type { Xyz } from "./ir.js";
 
-export type Placement = {
-  rotation: [number, number, number, number];
-  translation: Xyz;
-};
+export type { Placement };
 
 export type Box = { min: Xyz; max: Xyz };
 
