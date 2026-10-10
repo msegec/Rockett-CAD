@@ -1,6 +1,5 @@
-import crypto from "node:crypto";
 import { parse, user, ValidationError, type User } from "@rockett/shared";
-import { JsonStore, StoreError } from "../store/jsonStore.js";
+import { JsonStore, newId, StoreError } from "../store/jsonStore.js";
 import { ProjectQueue } from "../store/projectQueue.js";
 import type { Storage } from "../store/storage.js";
 import { matchTotp } from "./totp.js";
@@ -139,7 +138,7 @@ export class UserStore {
 
   private insert(users: UserRecord[], input: NewUser, at: string): UserRecord {
     const record = check({
-      id: crypto.randomBytes(6).toString("hex"),
+      id: newId(),
       username: normalise(input.username),
       displayName: input.displayName,
       role: input.role,

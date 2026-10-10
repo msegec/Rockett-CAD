@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import path from "node:path";
 import {
   ASSEMBLY_SCHEMA_VERSION,
@@ -10,15 +9,13 @@ import {
 } from "@rockett/shared";
 import { build } from "../build.js";
 import { HistoryStore } from "../store/historyStore.js";
-import type { Write } from "../store/jsonStore.js";
+import { newId, type Write } from "../store/jsonStore.js";
 import { ID_RE } from "../store/manifestStore.js";
 import { assemblyMigrations, migrate } from "../store/migrations.js";
 import { ProjectQueue } from "../store/projectQueue.js";
 import type { ProjectStore } from "../store/projectStore.js";
 
 type Part = Pick<CadDocument, "id" | "revision">;
-
-export const newId = () => crypto.randomBytes(6).toString("hex");
 
 export function readAssembly(value: unknown): AssemblyDocument {
   try {

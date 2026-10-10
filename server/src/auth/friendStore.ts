@@ -1,5 +1,4 @@
-import crypto from "node:crypto";
-import { JsonStore, StoreError } from "../store/jsonStore.js";
+import { JsonStore, newId, StoreError } from "../store/jsonStore.js";
 import { ProjectQueue } from "../store/projectQueue.js";
 import type { Storage } from "../store/storage.js";
 
@@ -100,7 +99,7 @@ export class FriendStore {
       )
         throw new StoreError("friend request already exists", "conflict");
       file.requests.push({
-        id: crypto.randomBytes(6).toString("hex"),
+        id: newId(),
         from,
         email,
       });

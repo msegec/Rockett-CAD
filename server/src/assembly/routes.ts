@@ -8,7 +8,7 @@ import {
 import type { ApiRoutes } from "../api/projectMutations.js";
 import { RevisionConflict, transactionId } from "../api/revision.js";
 import type { HistoryStore } from "../store/historyStore.js";
-import { newId } from "./store.js";
+import { newId } from "../store/jsonStore.js";
 
 type Edit = (doc: AssemblyDocument, req: any) => Promise<string>;
 

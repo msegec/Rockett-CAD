@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import {
   FOLDERS_VERSION,
   foldersFile,
@@ -9,7 +8,7 @@ import {
   type FolderTree,
   type ProjectMember,
 } from "@rockett/shared";
-import { JsonStore, StoreError } from "./jsonStore.js";
+import { JsonStore, newId, StoreError } from "./jsonStore.js";
 import { ProjectQueue } from "./projectQueue.js";
 import type { Storage } from "./storage.js";
 
@@ -56,7 +55,7 @@ export class FolderStore {
     return this.change((tree) => {
       exists(tree, parentId, "/parentId");
       const folder = {
-        id: crypto.randomBytes(6).toString("hex"),
+        id: newId(),
         name,
         parentId,
         owner,

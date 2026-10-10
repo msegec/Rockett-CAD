@@ -9,7 +9,7 @@ import {
 import { BACKUP_LIMITS, TIMING_MS } from "../tunables.js";
 import { ProjectQueue } from "./projectQueue.js";
 import { sha256 } from "./storeTags.js";
-export { sha256, etag, sameTag } from "./storeTags.js";
+export { sha256, newId, etag, sameTag } from "./storeTags.js";
 import { readFirst, storagePath, type Storage } from "./storage.js";
 
 export const BACKUP_RECORD = "migrating.json";

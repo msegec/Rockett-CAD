@@ -1,5 +1,4 @@
 import path from "node:path";
-import crypto from "node:crypto";
 import {
   createEmptyDocument,
   emptyView,
@@ -15,7 +14,7 @@ import { imageBlobs, projectSources } from "../modules/featureInputs.js";
 import { UserStore } from "../auth/userStore.js";
 import { build } from "../build.js";
 import { BlobStore, HASH_RE, PendingBlobs, Uploads } from "./blobStore.js";
-import { JsonStore, sameTag, sha256, StoreError } from "./jsonStore.js";
+import { JsonStore, newId, sameTag, sha256, StoreError } from "./jsonStore.js";
 import type { Inventory, Write } from "./jsonStore.js";
 import {
   checkManifest,
@@ -38,7 +37,6 @@ export { IMAGE_LIMIT_MB } from "./projectAssets.js";
 
 const LEGACY = "document.json";
 const DOCUMENTS = "documents";
-const newId = () => crypto.randomBytes(6).toString("hex");
 
 export class ProjectStore {
   readonly documents: JsonStore<CadDocument, PendingBlobs>;
