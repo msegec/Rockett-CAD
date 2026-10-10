@@ -278,7 +278,7 @@ export function accepted(
   return [sel];
 }
 
-export function hoverPick(s: Store, sel: Selection | null): Selection | null {
+function hoverPick(s: Store, sel: Selection | null): Selection | null {
   if (featureParams(s).repick) return sel;
   return accepted(activeInput(s), sel, s)[0] ?? null;
 }
@@ -338,7 +338,7 @@ function following(key: string, s: Store): PickInput | undefined {
   );
 }
 
-export function pickInto(picks: readonly Selection[], additive: boolean) {
+function pickInto(picks: readonly Selection[], additive: boolean) {
   const s = useStore.getState();
   const i = activeInput(s);
   const taken = picks.flatMap((p) => accepted(i, p, s));

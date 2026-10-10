@@ -105,7 +105,7 @@ function translation(params: MoveParams): [number, number, number] {
   return [num(params, "tx", 0), num(params, "ty", 0), num(params, "tz", 0)];
 }
 
-export function moveGizmo(context: FeatureGizmoContext<MoveParams>) {
+function moveGizmo(context: FeatureGizmoContext<MoveParams>) {
   const state = useStore.getState();
   const ids = new Set(bodyIds(state.selection));
   const selectedBodies = baseBodies(state).filter((body) =>

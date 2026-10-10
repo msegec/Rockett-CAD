@@ -26,7 +26,7 @@ export function storedExpression(
   )?.expression;
 }
 
-export function nextBindings(
+function nextBindings(
   doc: Pick<CadDocument, "parameterBindings">,
   feature: Feature,
   expressions: FieldExpressions | undefined,
@@ -54,17 +54,14 @@ export function nextBindings(
 const picked = (value: unknown) =>
   JSON.stringify(value, (key, v) => (key === "sig" ? undefined : v));
 
-export function featureChanges(
-  stored: Feature | undefined,
-  patch: Partial<Feature>,
-) {
+function featureChanges(stored: Feature | undefined, patch: Partial<Feature>) {
   const was: Record<string, unknown> = { targets: [], ...stored };
   return Object.entries({ targets: [], body: undefined, ...patch }).some(
     ([k, v]) => picked(was[k]) !== picked(v),
   );
 }
 
-export function stagedLinks(
+function stagedLinks(
   feature: Feature,
   expressions: FieldExpressions | undefined,
 ): { links?: ParameterBinding[]; relinked: boolean } {

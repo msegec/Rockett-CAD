@@ -142,7 +142,7 @@ export const sketchTools: {
   { id: "offset", label: "Offset", keys: [] },
 ];
 
-export const curveTools: { id: CurveTool; label: string; keys: string[] }[] = [
+const curveTools: { id: CurveTool; label: string; keys: string[] }[] = [
   { id: "fitSpline", label: "Fit Point Spline", keys: ["N"] },
   { id: "controlSpline", label: "Control Point Spline", keys: ["B"] },
   { id: "conic", label: "Conic", keys: ["K"] },

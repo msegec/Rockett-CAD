@@ -44,7 +44,7 @@ export function rayLineIntersection(
   return { x: A.x + t * r.x, y: A.y + t * r.y };
 }
 
-export const PERP_SNAP_DEG = 4;
+const PERP_SNAP_DEG = 4;
 
 export function perpendicularSnap(
   from: UV,

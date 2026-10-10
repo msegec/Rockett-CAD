@@ -101,7 +101,7 @@ export function cameraTween(from: CameraPose, to: CameraPose) {
   };
 }
 
-export const ORBIT_RAD_PER_PX = 0.014;
+const ORBIT_RAD_PER_PX = 0.014;
 
 export function orbitAbout(
   view: { position: THREE.Vector3; up: THREE.Vector3; target: THREE.Vector3 },

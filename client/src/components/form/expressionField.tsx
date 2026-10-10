@@ -64,7 +64,7 @@ export interface FieldSpec {
 export type FieldResult =
   { value: number; linked: string | null } | { error: string };
 
-export function shownValue(value: number, spec: FieldSpec): string {
+function shownValue(value: number, spec: FieldSpec): string {
   if (!Number.isFinite(value)) return "";
   return String(
     spec.dimension === "length"

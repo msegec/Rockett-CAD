@@ -35,7 +35,7 @@ interface Press {
 }
 type Release = (e: PointerEvent, moved: boolean) => unknown;
 
-export function boxSelection(
+function boxSelection(
   current: readonly Selection[],
   found: readonly Selection[],
   keys: Keys,

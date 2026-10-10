@@ -93,7 +93,7 @@ function RevolveForm({ params, setParams }: FeatureFormProps<RevolveParams>) {
   );
 }
 
-export function revolveGizmo(context: FeatureGizmoContext<RevolveParams>) {
+function revolveGizmo(context: FeatureGizmoContext<RevolveParams>) {
   const state = useStore.getState();
   const selected = state.selection.find((s) => s.kind === "profile");
   if (selected?.kind !== "profile") return;

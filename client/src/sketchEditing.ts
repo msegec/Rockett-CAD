@@ -74,7 +74,7 @@ const driven = (c: SketchConstraint) => "driven" in c && c.driven === true;
 
 export type SketchLinks = Readonly<Record<string, string | null>>;
 
-export function sketchBindings(
+function sketchBindings(
   doc: CadDocument,
   saved: SketchFeature,
   draft: SketchFeature,

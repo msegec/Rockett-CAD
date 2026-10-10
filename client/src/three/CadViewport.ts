@@ -77,7 +77,7 @@ export const ORIGIN_PLANE_DEFS: {
   },
 ];
 
-export function frameBasis(frame: PlaneFrame): THREE.Matrix4 {
+function frameBasis(frame: PlaneFrame): THREE.Matrix4 {
   const m = new THREE.Matrix4();
   m.makeBasis(
     new THREE.Vector3(...frame.xAxis),

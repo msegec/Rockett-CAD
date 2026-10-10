@@ -22,7 +22,7 @@ export interface SketchUsage {
   sketches: Set<string>;
 }
 
-export const profileKey = (sketchId: string, profileId: string) =>
+const profileKey = (sketchId: string, profileId: string) =>
   `${sketchId}:${profileId}`;
 
 const inside = (x: number, y: number, p: Profile) =>

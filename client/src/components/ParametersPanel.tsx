@@ -55,7 +55,7 @@ interface Checked {
   value: string | null;
 }
 
-export function checkParameters(rows: UserParameter[]): Checked[] {
+function checkParameters(rows: UserParameter[]): Checked[] {
   const names = rows.map((row, i) =>
     rows.findIndex((other) => other.name === row.name) !== i
       ? "Name is already used"

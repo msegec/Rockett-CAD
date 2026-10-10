@@ -26,7 +26,7 @@ export function subfolders(tree: FolderTree, id: string | null): Folder[] {
   return tree.folders.filter((f) => f.parentId === id).toSorted(byName);
 }
 
-export function projectsIn(
+function projectsIn(
   tree: FolderTree,
   projects: ProjectSummary[],
   id: string | null,

@@ -18,7 +18,7 @@ type XY = [number, number];
 const xy = (p: UV): XY => [p.x, p.y];
 const gap = (a: XY, b: XY) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
-export const distinctClicks = (clicks: UV[]): UV[] =>
+const distinctClicks = (clicks: UV[]): UV[] =>
   clicks.filter(
     (c, i) => i === 0 || gap(xy(c), xy(clicks[i - 1]!)) > LINEAR_TOL,
   );
@@ -45,7 +45,7 @@ function handleFrom(q: XY[]): XY {
   return [q[0]![0] + (d[0] * t[1]!) / 3, q[0]![1] + (d[1] * t[1]!) / 3];
 }
 
-export function defaultHandles(fit: XY[]): [XY, XY] {
+function defaultHandles(fit: XY[]): [XY, XY] {
   return [handleFrom(fit), handleFrom(fit.toReversed())];
 }
 

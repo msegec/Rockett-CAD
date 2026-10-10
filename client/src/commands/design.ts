@@ -27,7 +27,7 @@ export function openDialog(dialog: FeatureType | "export") {
   featureCommand.enter(dialog);
 }
 
-export function toggleProjection(ctx: CommandContext) {
+function toggleProjection(ctx: CommandContext) {
   const vp = ctx.viewport?.current;
   if (!vp) return;
   vp.setProjection(
