@@ -11,7 +11,7 @@ import {
 
 const DEFAULT_NAME = /^Open CASCADE STEP translator \d+(\.\d+)* \d+$/;
 
-export type ImportedSolid = {
+type ImportedSolid = {
   shape: Shape;
   label?: ImportedLabel;
   body?: number;

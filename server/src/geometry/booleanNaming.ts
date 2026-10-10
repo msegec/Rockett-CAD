@@ -45,7 +45,7 @@ export function cylinderAxes(face: Shape): Vec3[] | null {
   });
 }
 
-export function reparametrisedCylinderEdges(shape: Shape): Shape[] {
+function reparametrisedCylinderEdges(shape: Shape): Shape[] {
   return scoped((own) => {
     const k = getKernel();
     const map = acquire(new k.TopTools_IndexedDataMapOfShapeListOfShape_1());

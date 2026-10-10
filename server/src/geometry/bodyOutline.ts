@@ -75,7 +75,7 @@ function boolean(shapes: Shape[], op: (a: Shape, b: Shape) => any): Shape {
   }, shapes[0]);
 }
 
-export function seamOf(face: Shape): (edge: Shape) => boolean {
+function seamOf(face: Shape): (edge: Shape) => boolean {
   const all = scoped((own) => {
     const k = getKernel();
     const E = k.TopAbs_ShapeEnum;

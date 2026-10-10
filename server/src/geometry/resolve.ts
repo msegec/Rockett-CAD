@@ -299,8 +299,7 @@ export interface CrashFeature {
   featureKey: string;
 }
 
-export const CRASH_BLOCKED_MESSAGE =
-  "blocked by kernel crash in a dependent feature";
+const CRASH_BLOCKED_MESSAGE = "blocked by kernel crash in a dependent feature";
 
 export function blockedFeatureIds(
   doc: CadDocument,

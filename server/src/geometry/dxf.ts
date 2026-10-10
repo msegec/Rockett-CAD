@@ -20,7 +20,7 @@ type Pair = [number, string];
 
 type CopyableCurve = Exclude<ExactCurve, { type: "other" }>;
 
-export type Polyline = [number, number][];
+type Polyline = [number, number][];
 
 export interface Drawing {
   sketch: SketchEntity[];

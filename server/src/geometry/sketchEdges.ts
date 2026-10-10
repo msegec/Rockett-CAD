@@ -20,7 +20,7 @@ import { uvTo3d } from "./frames.js";
 type UV = [number, number];
 type Snap = (x: number, y: number) => UV;
 
-export interface CurvePiece {
+interface CurvePiece {
   reversed: boolean;
   trim?: [number, number, number, number];
 }

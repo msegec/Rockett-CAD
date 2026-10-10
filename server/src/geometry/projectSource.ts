@@ -30,7 +30,7 @@ export const sourceNoun = (ref: ProjectionRef): string =>
       ? "sketch entity"
       : ref.kind;
 
-export function sourceLabel(ref: ProjectionRef): string {
+function sourceLabel(ref: ProjectionRef): string {
   if (ref.kind === "section") return `section of ${sourceLabel(ref.of)}`;
   if (ref.kind === "edge") return `edge ${ref.edgeName}`;
   if (ref.kind === "face") return `face ${ref.faceName}`;

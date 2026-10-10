@@ -10,7 +10,7 @@ import type { NamedBody } from "./naming.js";
 import type { TriangleMesh } from "./meshBody.js";
 import { shapeHash, type Shape } from "./kernel.js";
 
-export interface Tessellation {
+interface Tessellation {
   source: Shape | TriangleMesh;
   head: BodyPayload;
   binary: Uint8Array;
@@ -36,11 +36,11 @@ export function payloadBytes(value: unknown): number {
 
 export const sourceOf = (body: NamedBody) => body.mesh ?? body.shape;
 
-export function cacheKey(body: NamedBody): string {
+function cacheKey(body: NamedBody): string {
   return `${body.bodyId}:${body.mesh?.key ?? shapeHash(body.shape)}`;
 }
 
-export function evict(key: string): void {
+function evict(key: string): void {
   const entry = tessCache.entries.get(key);
   if (!entry) return;
   tessCache.entries.delete(key);

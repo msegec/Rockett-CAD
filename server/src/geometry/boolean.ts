@@ -113,7 +113,7 @@ export function fuseNamed(
   throw new Error(failure);
 }
 
-export function contactFuse(a: Shape, b: Shape): any {
+function contactFuse(a: Shape, b: Shape): any {
   if (!bboxOverlap(a, b)) return null;
   const k = getKernel();
   const dist = acquire(
@@ -143,7 +143,7 @@ const TOUCH_WARNING =
 
 type JoinGroup = { bodies: StateBody[]; pieces: ToolResult[]; fuse: any };
 
-export function contactGroups(bodies: StateBody[], tool: ToolResult) {
+function contactGroups(bodies: StateBody[], tool: ToolResult) {
   let groups: JoinGroup[] = [];
   let touching = false;
   const loose: Shape[] = [];

@@ -18,9 +18,9 @@ import {
 import { compound } from "./importers.js";
 import { V } from "./frames.js";
 
-export const TOOL_OUTSIDE =
+const TOOL_OUTSIDE =
   "cut left the body inside out: the kernel kept faces of the cut outside the body; the previous body has been kept";
-export const CUT_EMPTY =
+const CUT_EMPTY =
   "cut removed the whole body: the kernel returned no solid; the previous body has been kept";
 export const CUT_OVERREACH =
   "cut removed more than its tool holds: the kernel dropped part of the body; the previous body has been kept";

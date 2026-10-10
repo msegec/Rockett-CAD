@@ -7,13 +7,13 @@ import {
   type Shape,
 } from "./kernel.js";
 
-export interface XdePart {
+interface XdePart {
   shape: Shape;
   name: string;
   color?: string | undefined;
 }
 
-export interface XdeBody {
+interface XdeBody {
   name: string | null;
   color?: string;
   path: Array<string | null>;

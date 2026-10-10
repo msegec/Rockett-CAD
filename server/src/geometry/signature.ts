@@ -129,7 +129,7 @@ export function signRefs(
   });
 }
 
-export function geometryNames(shape: Shape, featureId: string): NameMap {
+function geometryNames(shape: Shape, featureId: string): NameMap {
   return scoped(() => {
     const provisional = new ShapeMap<string>();
     acquire({ delete: () => provisional.release() });
