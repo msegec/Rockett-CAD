@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { adaptiveClear, type AdaptiveInput } from "./adaptiveEngine";
+import {
+  adaptiveClear,
+  type AdaptiveInput,
+} from "../src/toolpath/adaptiveEngine";
 
 function leb(value: bigint): number[] {
   const bytes: number[] = [];

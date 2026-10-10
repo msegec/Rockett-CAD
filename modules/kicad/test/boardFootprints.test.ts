@@ -1,15 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { readBoard, BOARD_LIMITS } from "./board.js";
-import { parseSexpr } from "./sexpr.js";
+import { readBoard, BOARD_LIMITS } from "../src/board.js";
+import { parseSexpr } from "../src/sexpr.js";
 
 const fixture = (version: number) =>
   parseSexpr(
     readFileSync(
-      new URL(
-        `../test/fixtures/footprints-kicad${version}.kicad_pcb`,
-        import.meta.url,
-      ),
+      new URL(`fixtures/footprints-kicad${version}.kicad_pcb`, import.meta.url),
       "utf8",
     ),
   );
@@ -104,10 +101,7 @@ describe("board footprint reader", () => {
     const renamed = readBoard(
       parseSexpr(
         readFileSync(
-          new URL(
-            "../test/fixtures/footprints-kicad9.kicad_pcb",
-            import.meta.url,
-          ),
+          new URL("fixtures/footprints-kicad9.kicad_pcb", import.meta.url),
           "utf8",
         ).replace('"J1"', '"J7"'),
       ),
