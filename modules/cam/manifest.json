@@ -15,7 +15,12 @@
       "plugin.rockett.cam.tolerance"
     ],
     "routes": ["rockett.cam.document"],
-    "kernelJobs": ["rockett.cam.regions", "rockett.cam.generate"],
+    "kernelJobs": [
+      "rockett.cam.regions",
+      "rockett.cam.generate",
+      "rockett.cam.surfaceMesh",
+      "rockett.cam.features"
+    ],
     "postProcessors": [
       "rockett.cam.fluidnc",
       "rockett.cam.grbl",
