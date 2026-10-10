@@ -233,11 +233,7 @@ export class CadViewport {
     this.renderer.setSize(w, h);
     this.rect = null;
     const aspect = w / h;
-    this.orthoCam.left = -this.zoom * aspect;
-    this.orthoCam.right = this.zoom * aspect;
-    this.orthoCam.top = this.zoom;
-    this.orthoCam.bottom = -this.zoom;
-    this.orthoCam.updateProjectionMatrix();
+    this.fitOrtho(aspect);
     this.perspCam.aspect = aspect;
     this.perspCam.updateProjectionMatrix();
     this.requestRender();
@@ -292,14 +288,18 @@ export class CadViewport {
     return (2 * dist * halfHeightPerDistance(this.perspCam.fov)) / h;
   }
 
-  private applyZoom() {
-    const aspect =
-      (this.container.clientWidth || 1) / (this.container.clientHeight || 1);
+  private fitOrtho(aspect: number) {
     this.orthoCam.left = -this.zoom * aspect;
     this.orthoCam.right = this.zoom * aspect;
     this.orthoCam.top = this.zoom;
     this.orthoCam.bottom = -this.zoom;
     this.orthoCam.updateProjectionMatrix();
+  }
+
+  private applyZoom() {
+    this.fitOrtho(
+      (this.container.clientWidth || 1) / (this.container.clientHeight || 1),
+    );
     this.requestRender();
   }
 
