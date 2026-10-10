@@ -9,7 +9,7 @@ import {
   type IndexedMesh,
   type Mesh,
 } from "../surface/dropCutter.js";
-import { depthLevels } from "./geometry.js";
+import { depthLevels, gap } from "./geometry.js";
 import { dropBudget, type Budget } from "./parallel.js";
 
 export type WaterlineInput = {
@@ -86,7 +86,6 @@ const SPLIT_SADDLES: Record<number, [number, number][]> = {
   ],
 };
 
-const gap = (a: Xy, b: Xy) => Math.hypot(b[0] - a[0], b[1] - a[1]);
 const along = (a: Xy, b: Xy, t: number): Xy => [
   a[0] + (b[0] - a[0]) * t,
   a[1] + (b[1] - a[1]) * t,
