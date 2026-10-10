@@ -39,12 +39,14 @@ import type { FolderStore } from "../store/folderStore.js";
 import { registerDataMigrations } from "../store/migrations.js";
 import { moduleUserData } from "../store/moduleData.js";
 import { StoreError, type ProjectStore } from "../store/projectStore.js";
+import { isMissing } from "../store/storage.js";
 import { finalModel, moduleBodies, type BodyKernel } from "./bodies.js";
 import { checkModuleType } from "./features.js";
 import { moduleFiles } from "./files.js";
 import { provideService } from "./services.js";
 import {
   discoverPlugins,
+  errorMessage,
   stagedClient,
   type PluginDirs,
 } from "./thirdParty.js";
@@ -178,9 +180,6 @@ function about(manifest: unknown): About {
   ) as About;
 }
 
-const message = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
-
 const disposeAll = (disposers: readonly Dispose[]) => {
   for (const dispose of disposers.toReversed()) dispose();
 };
@@ -274,7 +273,7 @@ async function load(
     return {
       ...about(module.manifest),
       status: "failed",
-      error: message(error),
+      error: errorMessage(error),
     };
   }
   const info = about(check.manifest);
@@ -304,7 +303,7 @@ async function load(
     });
   } catch (error) {
     disposeAll(own.splice(0));
-    return { ...info, status: "failed", error: message(error) };
+    return { ...info, status: "failed", error: errorMessage(error) };
   }
   return { ...info, status: "loaded", error: null };
 }
@@ -326,7 +325,7 @@ export async function moduleLicence(id: string): Promise<string> {
   try {
     return await readFile(path.join(fileURLToPath(folder), "LICENSE"), "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw missing;
+    if (isMissing(error)) throw missing;
     throw error;
   }
 }

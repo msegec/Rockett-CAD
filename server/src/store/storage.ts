@@ -34,18 +34,15 @@ export function storagePath(target: string, allowRoot = false): string {
   return parts.join("/");
 }
 
+export const isMissing = (error: unknown) =>
+  (error as NodeJS.ErrnoException | null)?.code === "ENOENT";
+
 export async function readFirst(storage: Storage, files: string[]) {
   for (const file of files) {
     try {
       return { file, data: await storage.read(file) };
     } catch (error) {
-      if (
-        typeof error !== "object" ||
-        error === null ||
-        !("code" in error) ||
-        error.code !== "ENOENT"
-      )
-        throw error;
+      if (!isMissing(error)) throw error;
     }
   }
   return undefined;
@@ -81,7 +78,7 @@ export class LocalStorage implements Storage {
       const s = await this.fs.stat(this.resolve(file), { bigint: true });
       return `${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}`;
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      if (isMissing(err)) return undefined;
       throw err;
     }
   }
@@ -144,7 +141,7 @@ export class LocalStorage implements Storage {
     try {
       return await this.fs.readdir(this.resolve(dir, true));
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+      if (isMissing(err)) return [];
       throw err;
     }
   }
@@ -165,7 +162,7 @@ export class LocalStorage implements Storage {
             .join("/"),
         );
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+      if (isMissing(err)) return [];
       throw err;
     }
   }
@@ -176,7 +173,7 @@ export class LocalStorage implements Storage {
     try {
       await this.sync(path.dirname(full), "r");
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+      if (!isMissing(err)) throw err;
     }
   }
 }

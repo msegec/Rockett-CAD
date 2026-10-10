@@ -15,6 +15,7 @@ import {
   type LayerValues,
   type ModuleStatus,
 } from "@rockett/shared";
+import { isMissing } from "../store/storage.js";
 import { PLUGIN_LIMITS } from "../tunables.js";
 import type { HostModule } from "./host.js";
 
@@ -52,16 +53,13 @@ const closureSetting = (id: string) =>
     schema: { type: "string", pattern: "^([0-9a-f]{64})?$" },
   });
 
-const message = (error: unknown) =>
+export const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
 const reason = (error: unknown) => {
   const { code } = error as NodeJS.ErrnoException;
-  return typeof code === "string" ? `failed with ${code}` : message(error);
+  return typeof code === "string" ? `failed with ${code}` : errorMessage(error);
 };
-
-const missing = (error: unknown) =>
-  (error as NodeJS.ErrnoException).code === "ENOENT";
 
 async function readBounded(file: string, room: number) {
   const handle = await fs.open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -166,7 +164,7 @@ async function wipe(dir: string) {
   try {
     entries = await fs.readdir(dir, { recursive: true, withFileTypes: true });
   } catch (error) {
-    if (missing(error)) return;
+    if (isMissing(error)) return;
     throw error;
   }
   await fs.chmod(dir, 0o755);
@@ -207,7 +205,7 @@ async function plugin(
   try {
     check = parseManifest(manifest, PLUGIN_API_VERSION);
   } catch (error) {
-    return refuse(message(error), manifest);
+    return refuse(errorMessage(error), manifest);
   }
   const { id } = check.manifest;
   if (id !== name) return refuse(`folder ${name} holds manifest id ${id}`);
@@ -265,7 +263,7 @@ export async function discoverPlugins(
   try {
     entries = await fs.readdir(dirs.root, { withFileTypes: true });
   } catch (error) {
-    if (missing(error)) return [];
+    if (isMissing(error)) return [];
     throw error;
   }
   const folders = entries
