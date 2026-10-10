@@ -98,6 +98,27 @@ interface DimLabel {
 
 const NUDGE_EVENTS = ["pointerdown", "pointerup", "wheel"];
 
+const DRAW_TOOLS = new Set([
+  "line",
+  "rect",
+  "centerRect",
+  "circle",
+  "arc3",
+  "ellipse",
+  "polygon",
+  "slot",
+  "fitSpline",
+  "controlSpline",
+  "conic",
+]);
+const TWO_POINT_TOOLS = new Set([
+  "line",
+  "rect",
+  "centerRect",
+  "circle",
+  "polygon",
+]);
+
 function activeSketchFrame(): PlaneFrame | null {
   const s = useStore.getState();
   if (s.active?.id !== "design.sketch") return null;
@@ -237,27 +258,6 @@ export function ViewportView({
     trimDrag: null,
   });
   const trimLayerRef = useRef<LayerHandle | null>(null);
-
-  const DRAW_TOOLS = new Set([
-    "line",
-    "rect",
-    "centerRect",
-    "circle",
-    "arc3",
-    "ellipse",
-    "polygon",
-    "slot",
-    "fitSpline",
-    "controlSpline",
-    "conic",
-  ]);
-  const TWO_POINT_TOOLS = new Set([
-    "line",
-    "rect",
-    "centerRect",
-    "circle",
-    "polygon",
-  ]);
 
   const dimLabelsRef = useRef<DimLabel[]>([]);
   const leaderLayerRef = useRef<LayerHandle | null>(null);
