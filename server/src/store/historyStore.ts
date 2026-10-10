@@ -1,6 +1,4 @@
 import path from "node:path";
-import { promisify } from "node:util";
-import zlib from "node:zlib";
 import {
   HISTORY_VERSION,
   LABEL_LIMIT,
@@ -16,6 +14,7 @@ import {
   compose,
   featureFrames,
   frame,
+  gunzip,
   hashOf,
   LOG,
   logVersion,
@@ -36,7 +35,6 @@ import { sha256, StoreError, type Write } from "./jsonStore.js";
 import type { Storage } from "./storage.js";
 import { HISTORY_LIMITS, PREVIEW_LIMITS, TIMING_MS } from "../tunables.js";
 
-const gunzip = promisify(zlib.gunzip);
 const MARKS = new Set<HistoryRecord["kind"]>(["entry", "checkpoint", "cursor"]);
 
 const tooLarge = () =>

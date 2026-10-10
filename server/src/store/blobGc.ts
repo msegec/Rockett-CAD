@@ -1,6 +1,4 @@
 import path from "node:path";
-import { promisify } from "node:util";
-import zlib from "node:zlib";
 import {
   featureSpec,
   referencedAssets,
@@ -8,7 +6,7 @@ import {
   type CadDocument,
 } from "@rockett/shared";
 import { HASH_RE } from "./blobStore.js";
-import { eachSnapshot, LOG } from "./historyLog.js";
+import { eachSnapshot, inflate, LOG } from "./historyLog.js";
 import {
   BACKUP_RECORD as RECORD,
   BACKUP_DELETED,
@@ -23,7 +21,6 @@ import {
 import type { ProjectStore } from "./projectStore.js";
 import { TIMING_MS } from "../tunables.js";
 
-const gunzip = promisify(zlib.gunzip);
 const DOCUMENT = /^(document\.json|documents\/[^/]+\.json)$/;
 const SNAPSHOT = /^history\/snapshots\/[0-9a-f]{64}$/;
 
@@ -125,7 +122,7 @@ async function roots(
         );
       else if (SNAPSHOT.test(name))
         await root(file, async () =>
-          named(file, await parsed(await read(name))),
+          named(file, await inflate(await read(name))),
         );
       else if (name === LOG)
         await root(file, async () =>
@@ -168,10 +165,6 @@ async function roots(
           kept.add(path.posix.basename(file));
     });
   return kept;
-}
-
-async function parsed(gzipped: Buffer): Promise<unknown> {
-  return JSON.parse((await gunzip(gzipped)).toString("utf8"));
 }
 
 async function root<T>(label: string, read: () => Promise<T>): Promise<T> {

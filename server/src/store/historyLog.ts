@@ -13,7 +13,7 @@ export const LOG = "history/log.bin";
 const FRAME = 8;
 const FAST = { level: zlib.constants.Z_BEST_SPEED };
 const gzip = promisify(zlib.gzip);
-const gunzip = promisify(zlib.gunzip);
+export const gunzip = promisify(zlib.gunzip);
 
 export type History = Omit<HistoryLog, "version">;
 type Bodied = Exclude<HistoryRecord, { kind: "checkpoint" | "cursor" }>;
