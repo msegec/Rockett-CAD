@@ -17,7 +17,7 @@ import type { ProjectStore } from "../store/projectStore.js";
 
 type Part = Pick<CadDocument, "id" | "revision">;
 
-export function readAssembly(value: unknown): AssemblyDocument {
+function readAssembly(value: unknown): AssemblyDocument {
   try {
     return validateAssembly(migrate(assemblyMigrations, value));
   } catch (err) {

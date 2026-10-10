@@ -9,7 +9,7 @@ import type { ProjectAccess } from "../store/manifestStore.js";
 import type { ProjectStore } from "../store/projectStore.js";
 import type { FriendStore } from "../auth/friendStore.js";
 
-export async function updateProjectMembers(
+async function updateProjectMembers(
   store: ProjectStore,
   users: UserStore,
   notices: NoticeStore | undefined,

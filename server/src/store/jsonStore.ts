@@ -20,13 +20,13 @@ export { StoreError };
 export type Files = ReadonlyMap<string, string | Uint8Array>;
 export type Write<T> = (file: string, text: string, value: T) => Promise<void>;
 
-export interface MigrationEffects<C extends MigrationContext> {
+interface MigrationEffects<C extends MigrationContext> {
   context(key: string, stored: unknown): Promise<C>;
   created(key: string, context: C): Promise<Files>;
   retire(key: string, context: C): Promise<void>;
 }
 
-export interface JsonStoreOptions<T, C extends MigrationContext> {
+interface JsonStoreOptions<T, C extends MigrationContext> {
   storage: Storage;
   root: string;
   name: string;
@@ -46,7 +46,7 @@ export interface Inventory {
   failed: Array<{ key: string; error: string }>;
 }
 
-export class NamespaceBackup {
+class NamespaceBackup {
   private readonly dir: string;
   private readonly root: string;
   private readonly record: string;

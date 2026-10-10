@@ -10,7 +10,7 @@ import {
 
 export const driving = (c: SketchConstraint) => !("driven" in c && c.driven);
 
-export interface RankProblem {
+interface RankProblem {
   x0: Float64Array;
   residuals: Residual[];
   deps: number[][];

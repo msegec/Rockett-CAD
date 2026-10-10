@@ -375,7 +375,7 @@ export const UI_TREE_WIDTH = defineSetting({
   schema: Type.Integer({ minimum: PANEL_MIN_PX }),
 });
 
-export const KEYS_OVERRIDES = defineSetting({
+const KEYS_OVERRIDES = defineSetting({
   key: "keys.overrides",
   label: "Keyboard shortcuts",
   scopes: ["app", "user"],
@@ -388,7 +388,7 @@ const COMMAND_IDS = Type.Array(Type.String({ minLength: 1 }), {
   uniqueItems: true,
 });
 
-export const TOOLBAR_LAYOUT = defineSetting({
+const TOOLBAR_LAYOUT = defineSetting({
   key: "toolbar.layout",
   label: "Toolbar layout",
   scopes: ["app", "user"],
@@ -411,7 +411,7 @@ export type ToolbarLayout = SettingOf<typeof TOOLBAR_LAYOUT>;
 
 const PANEL_SIZE = Type.Number({ minimum: 0 });
 
-export const LAYOUT_PANELS = defineSetting({
+const LAYOUT_PANELS = defineSetting({
   key: "layout.panels",
   label: "Panel layout",
   scopes: ["app", "user"],

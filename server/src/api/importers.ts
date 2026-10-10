@@ -7,7 +7,7 @@ import {
   type ImportFormat,
 } from "@rockett/shared";
 
-export interface Importer extends ImportFormat {
+interface Importer extends ImportFormat {
   read(
     bytes: Buffer,
     filename: string,

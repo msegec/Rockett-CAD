@@ -9,7 +9,7 @@ export type JobEvent =
 
 type Subscriber = { response: Response; idle?: NodeJS.Timeout };
 
-export type JobBudget = { stall: number; ceiling: number };
+type JobBudget = { stall: number; ceiling: number };
 
 const BUDGET: JobBudget = {
   stall: TIMING_MS.jobStall,

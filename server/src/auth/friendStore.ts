@@ -2,13 +2,13 @@ import { JsonStore, newId, StoreError } from "../store/jsonStore.js";
 import { ProjectQueue } from "../store/projectQueue.js";
 import type { Storage } from "../store/storage.js";
 
-export interface FriendRequest {
+interface FriendRequest {
   id: string;
   from: string;
   email: string;
 }
 
-export interface Friendship {
+interface Friendship {
   a: string;
   b: string;
 }

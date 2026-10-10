@@ -31,7 +31,7 @@ interface Framed {
   body: [number, number];
 }
 
-export interface Packed {
+interface Packed {
   hash: string;
   body: Buffer;
   features: Map<string, Buffer>;

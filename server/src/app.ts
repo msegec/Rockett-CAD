@@ -147,7 +147,7 @@ export function trustProxyConfig(value: string | undefined): TrustProxy {
   return setting;
 }
 
-export interface AppDeps {
+interface AppDeps {
   store: ProjectStore;
   folders: FolderStore;
   kernel: KernelClient;

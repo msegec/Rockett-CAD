@@ -110,7 +110,7 @@ export function entityPointIds(e: SketchEntity): string[] {
   }
 }
 
-export const arcRadiusGap = (c: At, s: At, e: At): number =>
+const arcRadiusGap = (c: At, s: At, e: At): number =>
   Math.hypot(s.x - c.x, s.y - c.y) - Math.hypot(e.x - c.x, e.y - c.y);
 
 export function axisCosine(c: At, m: At, n: At): number {
@@ -155,10 +155,7 @@ export function ellipseAxes(c: At, m: At, n: At) {
   return { cx: c.x, cy: c.y, a, b, ux: (p.x - c.x) / a, uy: (p.y - c.y) / a };
 }
 
-export const ellipsePoint = (
-  e: Omit<Ellipse, "id" | "kind">,
-  t: number,
-): XY => [
+const ellipsePoint = (e: Omit<Ellipse, "id" | "kind">, t: number): XY => [
   e.cx + e.a * Math.cos(t) * e.ux - e.b * Math.sin(t) * e.uy,
   e.cy + e.a * Math.cos(t) * e.uy + e.b * Math.sin(t) * e.ux,
 ];

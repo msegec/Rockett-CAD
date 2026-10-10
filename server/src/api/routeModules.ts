@@ -26,7 +26,7 @@ export type Edit = (
   ctx: RouteContext,
 ) => Promise<ProjectMutation>;
 
-export interface ModuleApi extends RouteModuleApi {
+interface ModuleApi extends RouteModuleApi {
   kernel: KernelClient;
 }
 

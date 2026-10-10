@@ -7,7 +7,7 @@ import { matchTotp } from "./totp.js";
 const USERS_VERSION = 3;
 const KEY = "users";
 
-export interface TotpState {
+interface TotpState {
   secret: string;
   step: number;
 }

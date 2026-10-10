@@ -12,7 +12,7 @@ export type JsonInput =
   | readonly JsonInput[]
   | { readonly [key: string]: JsonInput };
 
-export type ImmutableInput<T> = T extends object
+type ImmutableInput<T> = T extends object
   ? { readonly [K in keyof T]: ImmutableInput<T[K]> }
   : T;
 

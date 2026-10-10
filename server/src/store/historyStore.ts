@@ -55,7 +55,7 @@ type Records = (
   text: string,
 ) => Promise<Buffer[]>;
 
-export interface HistoryDocuments<T> {
+interface HistoryDocuments<T> {
   save(doc: T, actor: string | null, write: Write<T>): Promise<void>;
   exclusive<R>(id: string, operation: () => Promise<R>): Promise<R>;
   isTemporary(id: string): Promise<boolean>;

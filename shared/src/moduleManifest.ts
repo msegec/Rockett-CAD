@@ -60,7 +60,7 @@ const moduleManifestSchema = Type.Object({
 
 export type ModuleManifest = Static<typeof moduleManifestSchema>;
 
-export type ManifestCheck =
+type ManifestCheck =
   | { status: "compatible"; manifest: ModuleManifest }
   | { status: "incompatible"; manifest: ModuleManifest; reason: string };
 

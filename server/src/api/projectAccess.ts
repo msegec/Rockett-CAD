@@ -22,7 +22,7 @@ export function projectRole(
     : members.find((member) => member.userId === user.id)?.role;
 }
 
-export function folderRole(user: User, folder: Folder) {
+function folderRole(user: User, folder: Folder) {
   return user.role === "admin" ||
     folder.owner === null ||
     folder.owner === user.id

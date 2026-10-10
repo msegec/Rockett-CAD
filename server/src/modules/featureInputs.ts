@@ -13,7 +13,7 @@ import type { Sources } from "../geometry/importers.js";
 import { HASH_RE } from "../store/blobStore.js";
 import { sha256, StoreError } from "../store/jsonStore.js";
 
-export function importBlobs(doc: CadDocument): string[] {
+function importBlobs(doc: CadDocument): string[] {
   return doc.features.flatMap((f) =>
     f.type === "importStep" || f.type === "importMesh" ? [f.blob] : [],
   );

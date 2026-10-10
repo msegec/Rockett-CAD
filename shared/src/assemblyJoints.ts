@@ -3,7 +3,7 @@ import type { Instance } from "./assembly.js";
 import type { TopoRef } from "./model.js";
 import { Placement } from "./placement.js";
 
-export interface JointOrigin {
+interface JointOrigin {
   path: [string, ...string[]];
   ref: TopoRef;
 }
@@ -29,7 +29,7 @@ export interface JointFrames {
   b: PlaneFrame;
 }
 
-export type JointError = "overconstrained" | "unreachable" | "outsideLimits";
+type JointError = "overconstrained" | "unreachable" | "outsideLimits";
 
 const Z: Vec3 = [0, 0, 1];
 

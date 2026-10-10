@@ -68,7 +68,7 @@ export interface Calls {
 
 export type Method = keyof Calls;
 
-export type WireBody = BodyPayload & {
+type WireBody = BodyPayload & {
   binary: ArrayBuffer;
   coarseBinary?: ArrayBuffer;
 };
@@ -77,11 +77,11 @@ export interface WireEvaluation extends EvaluateResult {
   bodies: WireBody[];
 }
 
-export type HeldSources = ReadonlyMap<string, Uint8Array | null>;
+type HeldSources = ReadonlyMap<string, Uint8Array | null>;
 
 export type Payload = HeldSources | ArrayBuffer;
 
-export type WireError =
+type WireError =
   | { kind: "validation"; message: string; detail?: string }
   | { kind: "store"; message: string; code: ApiErrorCode }
   | { kind: "error"; name: string; message: string; stack?: string };

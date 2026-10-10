@@ -17,7 +17,7 @@ export interface Storage {
   remove(target: string): Promise<void>;
 }
 
-export type Fs = Pick<
+type Fs = Pick<
   typeof promises,
   "mkdir" | "open" | "readFile" | "readdir" | "rename" | "rm" | "stat"
 >;

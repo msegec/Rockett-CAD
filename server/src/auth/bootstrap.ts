@@ -17,7 +17,7 @@ import { toPublicUser, type UserStore } from "./userStore.js";
 
 const digest = (value: string) => createHash("sha256").update(value).digest();
 
-export function setupTokenMatches(
+function setupTokenMatches(
   configured: string | undefined,
   supplied: string,
 ): boolean {

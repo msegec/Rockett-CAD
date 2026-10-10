@@ -37,13 +37,12 @@ const assemblySchema = Type.Object({
   extensions,
 });
 
-export type ComponentRef = Static<typeof componentRefSchema>;
 export type Instance = Static<typeof instanceSchema>;
 export type AssemblyDocument = Static<typeof assemblySchema>;
-export type InstanceInput = Omit<Instance, "id">;
-export type InstanceEdit = Partial<Omit<InstanceInput, "documentId">>;
+type InstanceInput = Omit<Instance, "id">;
+type InstanceEdit = Partial<Omit<InstanceInput, "documentId">>;
 
-export interface AssemblyResponse {
+interface AssemblyResponse {
   document: AssemblyDocument;
   history: HistoryStatus;
 }
