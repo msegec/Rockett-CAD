@@ -151,8 +151,6 @@ export class CadViewport {
     return false;
   });
 
-  originPlanesVisible = true;
-
   constructor(container: HTMLElement) {
     this.container = container;
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
