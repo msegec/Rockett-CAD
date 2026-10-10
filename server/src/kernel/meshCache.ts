@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { promises } from "node:fs";
 import {
   coarseOf,
@@ -8,6 +7,7 @@ import {
   type MeshedBody,
   type MeshedEvaluation,
 } from "@rockett/shared";
+import { sha256 } from "../store/jsonStore.js";
 import { LocalStorage } from "../store/storage.js";
 
 const MESH_LIMITS = {
@@ -25,9 +25,6 @@ const levelOf = ({ hash, data }: Entry) => ({ hash, bytes: data.length });
 type Project = { revision?: number; hashes: Set<string>; recent: Set<string> };
 
 const CACHE_FILE = /^[0-9a-f]{64}\.rkm(\.[0-9a-f-]+\.tmp)?$/;
-
-const sha256 = (data: Uint8Array) =>
-  createHash("sha256").update(data).digest("hex");
 
 const reported = (error: unknown) =>
   console.error(`[rockett] mesh disk cache: ${String(error)}`);

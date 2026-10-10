@@ -7,7 +7,6 @@
  * client can do CAD-topology selection (body/face/edge/vertex) on the mesh.
  */
 
-import { createHash } from "node:crypto";
 import {
   coarseOf,
   compareNames,
@@ -47,6 +46,7 @@ import {
   type NamedBody,
   type VertexFaces,
 } from "./naming.js";
+import { sha256 } from "../store/jsonStore.js";
 
 export interface TessellationOptions {
   /** Linear deflection in mm. */
@@ -111,7 +111,7 @@ export function tessellateBody(
     ? drawnTriangles(body.mesh)
     : tessellateShape(body, opts);
   const binary = encodeMesh(mesh);
-  const meshKey = createHash("sha256").update(binary).digest("hex");
+  const meshKey = sha256(binary);
   return lazyMesh(
     { bodyId: body.bodyId, name: meta.name, meshKey, bbox },
     withCoarse(binary, coarse && encodeMesh({ ...mesh, ...coarse })),
@@ -238,9 +238,7 @@ export function movePayload(
   const moved: MeshedBody = {
     ...source,
     bodyId,
-    meshKey: createHash("sha256")
-      .update(JSON.stringify([source.meshKey, offset, prefix]))
-      .digest("hex"),
+    meshKey: sha256(JSON.stringify([source.meshKey, offset, prefix])),
     positions: along(source.positions),
     faces: source.faces.map(face),
     edges: source.edges
