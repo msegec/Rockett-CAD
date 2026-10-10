@@ -47,7 +47,13 @@ import { FeatureGizmos } from "../three/featureGizmos";
 import { GizmoSlot } from "../three/gizmoSlot";
 import { clearToolPreview, updateToolPreview } from "../three/toolPreview";
 import { listenWheel } from "../three/wheel";
-import { previewBodies, useStore, isIdle, type Selection } from "../store";
+import {
+  previewBodies,
+  selectionKey,
+  useStore,
+  isIdle,
+  type Selection,
+} from "../store";
 import { loadPreviewBase, usePreviewBase } from "../previewBase";
 import { projectionPick, projectPicked } from "../sketchProject";
 import { ViewportContext, alignCameraToActiveSketch } from "../viewportRef";
@@ -1708,8 +1714,8 @@ export function ViewportView({
         (r.selection.kind === "sketchEntity" ||
           r.selection.kind === "sketchPoint")
       ) {
-        const key = JSON.stringify(r.selection);
-        const already = s.selection.some((x) => JSON.stringify(x) === key);
+        const key = selectionKey(r.selection);
+        const already = s.selection.some((x) => selectionKey(x) === key);
         if (!already) s.setSelection([r.selection]);
         setCtxMenu({ x: e.clientX, y: e.clientY, sel: r.selection });
       } else {
@@ -1719,8 +1725,8 @@ export function ViewportView({
     }
     const r = vp.pick(e.clientX, e.clientY, IDLE_PICKS);
     if (r) {
-      const key = JSON.stringify(r.selection);
-      if (!s.selection.some((x) => JSON.stringify(x) === key))
+      const key = selectionKey(r.selection);
+      if (!s.selection.some((x) => selectionKey(x) === key))
         s.setSelection([r.selection]);
       setCtxMenu({ x: e.clientX, y: e.clientY, sel: r.selection });
     } else {
