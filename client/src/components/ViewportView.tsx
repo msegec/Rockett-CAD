@@ -2037,16 +2037,11 @@ export function ViewportView({
                 d.moved = true;
               }
               if (!d.moved) return;
-              const vp = viewportRef.current;
               const frame = activeSketchFrame();
-              const s = useStore.getState();
-              const draft = s.draftSketch;
-              if (!vp || !frame || !draft) return;
-              const hit = vp.screenToPlanePoint(e.clientX, e.clientY, frame);
-              if (!hit) return;
-              const dv = hit.clone().sub(new THREE.Vector3(...frame.origin));
-              const u = dv.dot(new THREE.Vector3(...frame.xAxis));
-              const v = dv.dot(new THREE.Vector3(...frame.yAxis));
+              const draft = useStore.getState().draftSketch;
+              const at = planeUV(e);
+              if (!frame || !draft || !at) return;
+              const { x: u, y: v } = at;
               const c = draft.constraints.find((x) => x.id === l.id);
               if (!c) return;
               const base = dimAnchorFor(c, draft.entities);
