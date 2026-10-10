@@ -9,7 +9,7 @@ import {
   type Units,
 } from "@rockett/shared";
 import { api } from "../../api";
-import { PREVIEW_DEBOUNCE_MS } from "../../livePreview";
+import { TIMING_MS } from "../../tunables";
 import { dialogFeatureId, useStore } from "../../store";
 import { featureParams } from "../../commands/featureCommand";
 import { useSetting } from "../../settings";
@@ -141,7 +141,7 @@ export function SizeLimitHint({ draft: built }: { draft: Feature | null }) {
           current &&
           setHint({ key, result: "Could not check the usable size" }),
       );
-    }, PREVIEW_DEBOUNCE_MS);
+    }, TIMING_MS.previewDebounce);
     return () => {
       current = false;
       window.clearTimeout(ask);

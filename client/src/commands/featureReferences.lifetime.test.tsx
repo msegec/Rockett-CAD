@@ -15,7 +15,7 @@ import { expect, it, vi } from "vitest";
 import { createEmptyDocument, type Feature } from "@rockett/shared";
 import { useStore } from "../store";
 import { api } from "../api";
-import { PREVIEW_DEBOUNCE_MS } from "../livePreview";
+import { TIMING_MS } from "../tunables";
 
 it.each(["OK", "Cancel"])(
   "%s after repair keeps its saved repair and commits or rolls back only the later preview",
@@ -26,7 +26,7 @@ it.each(["OK", "Cancel"])(
       evaluate(server.saved),
     );
     await act(async () => button("Accept Edge 3, Body1").click());
-    await wait(PREVIEW_DEBOUNCE_MS);
+    await wait(TIMING_MS.previewDebounce);
     const repaired = structuredClone(server.saved.features[0]);
     const input = host.querySelector('input[type="text"]')!;
     await act(async () => {
@@ -36,7 +36,7 @@ it.each(["OK", "Cancel"])(
       )!.set!.call(input, "3");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    await wait(PREVIEW_DEBOUNCE_MS);
+    await wait(TIMING_MS.previewDebounce);
     expect(server.saved.features[0]).toEqual(repaired);
     expect(useStore.getState().document!.features[0]).toMatchObject({
       radius: 3,

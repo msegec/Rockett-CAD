@@ -5,13 +5,11 @@ import { TIMING_MS } from "./tunables";
 
 type Send<P> = (featureId: string, patch: P) => Promise<void>;
 
-export const PREVIEW_DEBOUNCE_MS = TIMING_MS.previewDebounce;
-
 export function createLivePreview<
   P extends Partial<Feature> = Partial<Feature>,
 >({
   send,
-  dwellMs = PREVIEW_DEBOUNCE_MS,
+  dwellMs = TIMING_MS.previewDebounce,
   now = () => performance.now(),
 }: {
   send: Send<P>;
