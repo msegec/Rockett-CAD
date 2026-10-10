@@ -1,15 +1,14 @@
-client/src/api.ts 585
+client/src/api.ts 583
 client/src/components/DraggablePanel.tsx DraggablePanel 125
 client/src/components/FeatureDialog.tsx DialogBody 104
 client/src/components/ModelTree.tsx 546
 client/src/components/ModelTree.tsx ModelTree 407
-client/src/components/ProjectItems.tsx 535
 client/src/components/ProjectItems.tsx BrowserItems 110
 client/src/components/ProjectItems.tsx ItemRow 97
 client/src/components/ProjectItems.tsx ProjectItems 180
 client/src/components/ProjectList.tsx ProjectList 110
 client/src/components/ShareDialog.tsx ShareDialog 122
-client/src/components/SketchOffsetPanel.tsx SketchOffsetPanel 161
+client/src/components/SketchOffsetPanel.tsx SketchOffsetPanel 160
 client/src/components/Timeline.tsx Timeline 159
 client/src/components/UsersPage.tsx AddUserForm 90
 client/src/components/UsersPage.tsx UserRow 85
@@ -29,15 +28,15 @@ client/src/store.ts 502
 client/src/store.ts useStore 260
 client/src/three/CadViewport.ts 759
 client/src/three/revolveGhost.ts buildRevolveGhost 99
-client/src/three/toolPreview.ts updateToolPreview 147
+client/src/three/toolPreview.ts updateToolPreview 129
 server/src/api/jobRoutes.ts createJobRoutes 119
-server/src/geometry/blend.ts built 209
-server/src/geometry/blend.ts chamferByEnvelope 219
-server/src/geometry/features.ts 897
-server/src/store/projectStore.ts 520
+server/src/geometry/blend.ts built 207
+server/src/geometry/blend.ts chamferByEnvelope 217
+server/src/geometry/features.ts 893
+server/src/store/projectStore.ts 503
 shared/src/sketchModify.ts 735
 shared/src/sketchModify.ts joinOffsetEndpoints 110
 shared/src/sketchModify.ts offsetRoundedChain 124
 shared/src/sketchModify.ts offsetSketch 159
-shared/src/solver.ts 639
-shared/src/solver.ts buildProblem 320
+shared/src/solver.ts 603
+shared/src/solver.ts buildProblem 318
