@@ -48,7 +48,10 @@ export function previewSequence(header: string): number {
   );
 }
 
-export function checkRevision(doc: CadDocument, expected: number): CadDocument {
+export function checkRevision<T extends { revision: number }>(
+  doc: T,
+  expected: number,
+): T {
   if (doc.revision !== expected) throw new RevisionConflict(doc.revision);
   return doc;
 }
@@ -56,7 +59,7 @@ export function checkRevision(doc: CadDocument, expected: number): CadDocument {
 export function reply(
   res: { set(field: string, value: string): { json(body: unknown): unknown } },
   body: {
-    document: CadDocument;
+    document: { revision: number };
     evaluation?: EvaluateResult;
     history?: HistoryStatus;
   },

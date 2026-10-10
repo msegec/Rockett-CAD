@@ -6,7 +6,11 @@ import {
   type AssemblyDocument,
 } from "@rockett/shared";
 import type { ApiRoutes } from "../api/projectMutations.js";
-import { RevisionConflict, transactionId } from "../api/revision.js";
+import {
+  checkRevision,
+  reply as sendRevision,
+  transactionId,
+} from "../api/revision.js";
 import type { HistoryStore } from "../store/historyStore.js";
 import { newId } from "../store/jsonStore.js";
 
@@ -17,9 +21,7 @@ async function reply(
   doc: AssemblyDocument,
   history: HistoryStore<AssemblyDocument>,
 ) {
-  res
-    .set("ETag", `"${doc.revision}"`)
-    .json({ document: doc, history: await history.status(doc.id) });
+  sendRevision(res, { document: doc, history: await history.status(doc.id) });
 }
 
 function instanceOf(doc: AssemblyDocument, id: string) {
@@ -66,9 +68,7 @@ export function assemblyRoutes(context: ApiRoutes) {
 
   const editable = async (req: any, res: any) => {
     const doc = await assemblies.load(req.params.id, req.params.doc);
-    if (doc.revision !== res.locals.revision)
-      throw new RevisionConflict(doc.revision);
-    return doc;
+    return checkRevision(doc, res.locals.revision);
   };
 
   const mutate = (edit: Edit) =>
