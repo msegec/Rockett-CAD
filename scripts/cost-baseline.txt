@@ -13,23 +13,21 @@ client/src/components/SketchOffsetPanel.tsx SketchOffsetPanel 161
 client/src/components/Timeline.tsx Timeline 159
 client/src/components/UsersPage.tsx AddUserForm 90
 client/src/components/UsersPage.tsx UserRow 85
-client/src/components/ViewportView.tsx 2402
-client/src/components/ViewportView.tsx ViewportView 2243
-client/src/components/ViewportView.tsx dimLabelsRef.current.map() 82
-client/src/components/ViewportView.tsx handleHover 99
+client/src/components/ViewportView.tsx 2243
+client/src/components/ViewportView.tsx ViewportView 2041
+client/src/components/ViewportView.tsx handleHover 97
 client/src/components/ViewportView.tsx handlePrimaryUp 90
-client/src/components/ViewportView.tsx handleSketchClick 210
-client/src/components/ViewportView.tsx pointerToSketchUV 221
+client/src/components/ViewportView.tsx handleSketchClick 170
+client/src/components/ViewportView.tsx pointerToSketchUV 207
 client/src/components/ViewportView.tsx useEffect() 132
 client/src/features/constructionPlane.tsx PlaneForm 111
 client/src/features/referenceImage.tsx ReferenceImagePanel 191
 client/src/sketchEditing.ts sketchActions 226
 client/src/sketchEdits.ts sketchEdits 166
-client/src/sketchTools.ts 1041
+client/src/sketchTools.ts 986
 client/src/store.ts 502
 client/src/store.ts useStore 260
-client/src/three/CadViewport.ts 783
-client/src/three/ViewCube.ts constructor 83
+client/src/three/CadViewport.ts 759
 client/src/three/revolveGhost.ts buildRevolveGhost 99
 client/src/three/toolPreview.ts updateToolPreview 147
 server/src/api/jobRoutes.ts createJobRoutes 119
