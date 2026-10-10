@@ -92,7 +92,6 @@ interface DimLabel {
   text: string;
   driven: boolean;
   world: THREE.Vector3;
-  /** Attachment on the measured geometry, independent of label placement. */
   anchorWorld: THREE.Vector3;
   reference?: [THREE.Vector3, THREE.Vector3];
 }
@@ -194,13 +193,6 @@ export function ViewportView({
     y: number;
     text: string;
   } | null>(null);
-  /**
-   * Typed sizes while drawing (Fusion-style): fields follow the cursor until
-   * a value is typed, which locks it; Tab moves between fields and Enter (or
-   * the second click) places the shape honouring the locked values.
-   * `dimRef` is the working copy for the key handler, `dimEntry` its render
-   * snapshot.
-   */
   type DimField = tools.DimField;
   const { fmt2, dimFieldsFor, liveDimValues, resolveDimCursor, pinTypedDims } =
     tools;
@@ -230,9 +222,7 @@ export function ViewportView({
     dimTargets: tools.DimTarget[];
     pickDepth: number;
     lastPickPos: { x: number; y: number };
-    /** press position for drag-to-draw */
     downUV: tools.UV | null;
-    /** last sketch-plane cursor position (Enter places typed sizes here) */
     lastCursor: tools.UV | null;
     trimDrag: { pieces: TrimPiece[]; x: number; y: number } | null;
   }>({
@@ -272,10 +262,6 @@ export function ViewportView({
   const dimLabelsRef = useRef<DimLabel[]>([]);
   const leaderLayerRef = useRef<LayerHandle | null>(null);
 
-  /**
-   * Faint dashed leader lines from repositioned dimension labels back to the
-   * geometry they measure. Rebuilt whenever labels change or one is dragged.
-   */
   function updateDimLeaders() {
     const vp = viewportRef.current;
     if (!vp) return;
@@ -304,7 +290,6 @@ export function ViewportView({
     };
     for (const l of dimLabelsRef.current) {
       if (l.reference) dashed(...l.reference);
-      // only when the label sits away from its geometry (dragged, or far zoom)
       if (l.world.distanceTo(l.anchorWorld) < wpp * 14) continue;
       dashed(l.anchorWorld, l.world);
     }
@@ -323,7 +308,6 @@ export function ViewportView({
     viewportRef.current = vp;
     commandGizmo.current = new FeatureGizmos(vp, setGizmoLabel);
     if ((import.meta as any).env?.DEV) {
-      // console debugging handle (dev only)
       (window as any).__rockett = { vp, store: useStore };
     }
     const stopSnapshots = watchSnapshots(vp);
@@ -413,7 +397,6 @@ export function ViewportView({
     const shown = useStore.getState();
     renderSketches(vp, inputs, shown.selection, shown.hover);
 
-    // dimension labels for the active sketch
     const labels: DimLabel[] = [];
     if (editingId && draftSketch) {
       const sk = evaluation.sketches.find((s) => s.featureId === editingId);
@@ -461,7 +444,6 @@ export function ViewportView({
     }
     dimLabelsRef.current = labels;
     updateDimLeaders();
-    // force label layer re-render
     setLabelTick((t) => t + 1);
   }, [
     evaluation,
@@ -565,7 +547,6 @@ export function ViewportView({
     setGizmoLabel({ ...at, text });
   }
 
-  // switching sketch tools resets pending clicks + previews
   const sketchTool = active?.id === "design.sketch" ? active.state.tool : null;
   useEffect(() => {
     toolState.current.clicks = [];
@@ -710,11 +691,6 @@ export function ViewportView({
     };
   }, []);
 
-  /**
-   * Snap targets projected from the body face the active sketch sits on
-   * (corner vertices, edge midpoints, and the edges themselves), so sketch
-   * geometry can snap to the face outline Fusion-style.
-   */
   const faceSnapCache = useRef<{
     key: string;
     eval: unknown;
@@ -772,7 +748,6 @@ export function ViewportView({
         segs.push(uv);
         addCorner(uv[0]!, uv[1]!);
         addCorner(uv[uv.length - 2]!, uv[uv.length - 1]!);
-        // midpoint by arc length
         let total = 0;
         for (let i = 0; i + 3 < uv.length; i += 2) {
           total += Math.hypot(uv[i + 2]! - uv[i]!, uv[i + 3]! - uv[i + 1]!);
@@ -930,12 +905,8 @@ export function ViewportView({
       }
       if (corner) return { x: corner.x, y: corner.y, snapKind: "point" };
     }
-    // 2) snap to sketch origin
     if (Math.hypot(u, v) < tol) return { x: 0, y: 0, snapKind: "origin" };
 
-    // 2b) snap to line midpoints (tight radius, adds a midpoint constraint);
-    // Face-edge midpoints join this tier; the builder fixes their sketch
-    // position, while sketch-line midpoints get a relational constraint.
     let midBest = vp.worldPerPixel() * 6;
     let mid: { lineId?: string; x: number; y: number } | null = null;
     for (const ent of entities) {
@@ -969,11 +940,6 @@ export function ViewportView({
       };
     }
 
-    // 3) direction locks from the previous point (line chaining): axis
-    // alignment, else within a few degrees of 90° to a line ending there.
-    // These only steer the cursor — curve snapping below still runs, and a
-    // line hit is placed exactly where the locked direction meets that line,
-    // so a shape can be closed onto another line while staying square.
     let ray: { x: number; y: number } | null = null;
     let perp: tools.UV | null = null;
     if (alignFrom) {
@@ -1002,7 +968,6 @@ export function ViewportView({
       }
     }
 
-    // 4) snap onto existing curves (adds pointOnLine / pointOnCircle)
     let snapLineId: string | undefined;
     let snapCircleId: string | undefined;
     let curveBest = tol;
@@ -1022,7 +987,6 @@ export function ViewportView({
         const dd = Math.hypot(u - px, v - py);
         if (dd < curveBest) {
           if (ray && alignFrom) {
-            // keep the locked direction: land where the ray crosses this line
             const hit = tools.rayLineIntersection(alignFrom, ray, a, b, tol);
             if (hit && Math.hypot(hit.x - u, hit.y - v) < tol * 2) {
               px = ray.x === 0 ? alignFrom.x : hit.x;
@@ -1066,7 +1030,6 @@ export function ViewportView({
         }
       }
     }
-    // face boundary edges join the curve tier (position only, no constraint)
     if (faceSnap) {
       for (const seg of faceSnap.segs) {
         for (let i = 0; i + 3 < seg.length; i += 2) {
@@ -1097,8 +1060,6 @@ export function ViewportView({
         y: snapped.y,
         snapLineId,
         snapCircleId,
-        // a perpendicular lock survives a LINE hit (the point is at the exact
-        // crossing); on a circle/arc only the on-curve position is kept
         snapPerpLineId: snapLineId ? perp?.snapPerpLineId : undefined,
         snapKind: "curve",
       };
@@ -1157,7 +1118,6 @@ export function ViewportView({
         const frame = activeSketchFrame();
         if (uv) ts.lastCursor = uv;
         if (uv && frame && ts.clicks.length > 0) {
-          // the ghost honours typed (locked) sizes, exactly as the placed shape will
           const ghostCursor =
             dimRef.current && ts.clicks.length === 1
               ? resolveDimCursor(tool, ts.clicks[0]!, uv, dimRef.current.fields)
@@ -1271,7 +1231,6 @@ export function ViewportView({
     }
   }
 
-  /** Screen position (fixed coords) of a sketch (u,v) point. */
   function sketchUVToScreen(
     u: number,
     v: number,
@@ -1282,7 +1241,6 @@ export function ViewportView({
     return worldToClient(vp.canvasRect(), vp.camera, uv3(frame, u, v));
   }
 
-  /** Show/hide the snap glyph for the current pointer result. */
   function updateSnapMarker(uv: tools.UV | null) {
     if (uv?.snapKind) {
       const pos = sketchUVToScreen(uv.x, uv.y);
@@ -1294,7 +1252,6 @@ export function ViewportView({
     setSnapMarker(null);
   }
 
-  /** Text for the live size readout while pulling a shape out. */
   function toolSizeText(
     tool: string,
     clicks: tools.UV[],
@@ -1363,8 +1320,6 @@ export function ViewportView({
     }
   }
 
-  // ----- typed sizes while drawing (pure helpers live in sketchTools) -----
-
   function refreshDim() {
     const d = dimRef.current;
     setDimEntry(
@@ -1384,8 +1339,6 @@ export function ViewportView({
     setDimEntry(null);
   }
 
-  /** Redraw the rubber-band ghost for the current typed sizes without
-   * waiting for the mouse to move. */
   function refreshGhost() {
     const vp = viewportRef.current;
     const frame = activeSketchFrame();
@@ -1402,7 +1355,6 @@ export function ViewportView({
     );
   }
 
-  /** Place the two-input shape using typed sizes, with the cursor filling the rest. */
   async function placeWithDims(cursor: tools.UV) {
     const s = useStore.getState();
     if (s.active?.id !== "design.sketch") return;
@@ -1707,7 +1659,6 @@ export function ViewportView({
             ? tools.dimensionFor(targets, draft.entities)
             : null;
         if (constraint) {
-          // already dimensioned? edit that one instead of stacking another
           const existing = tools.findExistingDimension(
             draft.constraints,
             constraint,
@@ -1732,7 +1683,6 @@ export function ViewportView({
             });
             return;
           }
-          // open the label editor immediately
           const at = { x: e.clientX, y: e.clientY };
           await commitDimension((cs) => [...cs, constraint], constraint, at);
         }
@@ -1752,7 +1702,6 @@ export function ViewportView({
       return;
     }
     if (s.active?.id === "design.sketch") {
-      // right-click sketch geometry → delete / construction / dimension
       const r = vp.pick(e.clientX, e.clientY, SKETCH_PICKS);
       if (
         r &&
@@ -1761,7 +1710,6 @@ export function ViewportView({
       ) {
         const key = JSON.stringify(r.selection);
         const already = s.selection.some((x) => JSON.stringify(x) === key);
-        // keep an existing multi-selection when right-clicking inside it
         if (!already) s.setSelection([r.selection]);
         setCtxMenu({ x: e.clientX, y: e.clientY, sel: r.selection });
       } else {
@@ -1771,7 +1719,6 @@ export function ViewportView({
     }
     const r = vp.pick(e.clientX, e.clientY, IDLE_PICKS);
     if (r) {
-      // keep an existing multi-selection when right-clicking inside it
       const key = JSON.stringify(r.selection);
       if (!s.selection.some((x) => JSON.stringify(x) === key))
         s.setSelection([r.selection]);
@@ -1854,7 +1801,6 @@ export function ViewportView({
     const s = useStore.getState();
     if (s.active && s.active.id !== "design.sketch") return;
     if (!s.active) {
-      // double-click a sketch curve → edit that sketch
       const vp = viewportRef.current!;
       const r = vp.pick(e.clientX, e.clientY, SKETCH_PICKS);
       if (
@@ -1874,14 +1820,12 @@ export function ViewportView({
         constructionMode,
       );
       if (open) return void applyCreated(open, false);
-      // double-click a curve → edit its size
       const vp = viewportRef.current!;
       const r = vp.pick(e.clientX, e.clientY, SKETCH_PICKS);
       if (r && r.selection.kind === "sketchEntity") {
         void openDimensionEditor((r.selection as any).entityId, e);
         return;
       }
-      // otherwise: finish the current line chain and return to Select
       toolState.current.clicks = [];
       toolState.current.chainPointId = null;
       clearToolPreview(viewportRef.current);
@@ -1925,7 +1869,6 @@ export function ViewportView({
       } else if (e.key === "Backspace" && f.locked) {
         f.text = f.text.slice(0, -1);
         if (!f.text) {
-          // emptied: back to following the cursor
           f.locked = false;
           const live = liveDimValues(
             d.tool,
@@ -2109,7 +2052,6 @@ export function ViewportView({
               const base = dimAnchorFor(c, draft.entities);
               if (!base) return;
               d.pendingOffset = [u - base.x, v - base.y];
-              // live-follow the cursor (onRender projects `world` each frame)
               const entry = dimLabelsRef.current.find((x) => x.id === l.id);
               if (entry) {
                 entry.world = uv3(frame, u, v);
@@ -2250,9 +2192,6 @@ export function ViewportView({
   );
 }
 
-// ---------------------------------------------------------------------------
-
-/** Default label anchor for a dimension, building the lookup maps itself. */
 function dimAnchorFor(
   c: SketchConstraint,
   entities: SketchEntity[],

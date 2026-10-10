@@ -24,12 +24,6 @@ export interface UV {
   snapKind?: "point" | "midpoint" | "curve" | "origin" | "perpendicular";
 }
 
-/**
- * Where the ray from `A` along `r` meets the segment `a→b` (extended by
- * `slack` beyond each end), or null when parallel or behind the ray's start.
- * Used to land a direction-locked line (axis / perpendicular snap) exactly on
- * the curve it is being snapped to instead of merely near it.
- */
 export function rayLineIntersection(
   A: { x: number; y: number },
   r: { x: number; y: number },
@@ -50,21 +44,8 @@ export function rayLineIntersection(
   return { x: A.x + t * r.x, y: A.y + t * r.y };
 }
 
-/** Half-width of the band (degrees) in which a line snaps to 90° from a connected line. */
 export const PERP_SNAP_DEG = 4;
 
-/**
- * Perpendicular inference for the line tool: when the line being drawn from
- * `from` towards `cursor` is within PERP_SNAP_DEG of a right angle to a line
- * that ends at `from`, rotate it onto the exact perpendicular (length kept).
- * Returns null when nothing is close enough, or the line is too short to have
- * a meaningful direction (`minLen`). Reference lines are found by the shared
- * point id, or by an endpoint coinciding with `from`.
- *
- * Axis-aligned results are made exact so createLine's horizontal/vertical
- * auto-constraint fires instead of a perpendicular one (which would be
- * redundant next to a horizontal/vertical reference line).
- */
 export function perpendicularSnap(
   from: UV,
   cursor: { x: number; y: number },
@@ -97,19 +78,16 @@ export function perpendicularSnap(
     if (ll < 1e-9) continue;
     const lx = (b.x - a.x) / ll;
     const ly = (b.y - a.y) / ll;
-    // |cos| of the angle between the two lines = sin of the deviation from 90°
     const off = Math.abs((dx * lx + dy * ly) / len);
     if (off < maxSin && (!best || off < best.off))
       best = { lineId: e.id, off, lx, ly };
   }
   if (!best) return null;
-  // perpendicular direction, on the cursor's side
   const nx = -best.ly;
   const ny = best.lx;
   const sgn = dx * nx + dy * ny < 0 ? -1 : 1;
   const axisTol = 1e-9;
   if (Math.abs(best.lx) < axisTol) {
-    // reference is vertical → new line exactly horizontal
     return {
       x: from.x + (dx < 0 ? -len : len),
       y: from.y,
@@ -117,7 +95,6 @@ export function perpendicularSnap(
     };
   }
   if (Math.abs(best.ly) < axisTol) {
-    // reference is horizontal → new line exactly vertical
     return {
       x: from.x,
       y: from.y + (dy < 0 ? -len : len),
@@ -449,7 +426,6 @@ export function createSlot(c1: UV, c2: UV, r: number): Created {
     lb = newId("ln");
   entities.push({ id: lt, kind: "line", p1: a1, p2: b1 });
   entities.push({ id: lb, kind: "line", p1: b2, p2: a2 });
-  // arc at c2 from b1 to b2 (ccw), arc at c1 from a2 to a1
   entities.push({
     id: newId("arc"),
     kind: "arc",
@@ -674,11 +650,6 @@ export function asConstruction(created: Created): Created {
   };
 }
 
-/**
- * Identity of a dimensional constraint by what it measures (not its id or
- * value): two dimensions with the same key drive the same size and can only
- * fight each other. Non-dimensional constraints return null.
- */
 export function dimensionKey(c: SketchConstraint): string | null {
   const x = c as any;
   switch (c.type) {
@@ -702,7 +673,6 @@ export function dimensionKey(c: SketchConstraint): string | null {
   }
 }
 
-/** The existing dimension measuring the same thing as `candidate`, if any. */
 export function findExistingDimension(
   constraints: SketchConstraint[],
   candidate: SketchConstraint,
@@ -714,11 +684,6 @@ export function findExistingDimension(
   );
 }
 
-/**
- * Drop dimensions that duplicate another one on the same target. The
- * constraint with id `keepId` (the one just edited) always survives;
- * otherwise the first occurrence wins. Order is preserved.
- */
 export function dedupeDimensions(
   constraints: SketchConstraint[],
   keepId?: string,
@@ -735,18 +700,12 @@ export function dedupeDimensions(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Typed sizes while drawing (Fusion-style): the viewport shows one field per
-// size; a typed value locks its field and overrides the cursor when placing.
-// ---------------------------------------------------------------------------
-
 export type DimKey = "length" | "angle" | "width" | "height" | "diameter";
 
 export interface DimField {
   key: DimKey;
   label: string;
   unit: Units | "°" | "";
-  /** shown text: live cursor value until typed, then what the user typed */
   text: string;
   locked: boolean;
 }
@@ -762,7 +721,6 @@ const dimField = (key: DimKey, label: string, unit: Units | "°"): DimField => (
   text: "",
   locked: false,
 });
-/** Which sizes a tool exposes for typing; null = readout only. */
 export function dimFieldsFor(
   tool: string,
   units: Units = "mm",
@@ -780,7 +738,6 @@ export function dimFieldsFor(
   }
 }
 
-/** Sizes implied by the cursor, for the fields the user hasn't typed. */
 export function liveDimValues(
   tool: string,
   a: UV,
@@ -804,7 +761,6 @@ export function liveDimValues(
   }
 }
 
-/** Typed value of a field, or null when it's unlocked / not a usable number. */
 export function lockedValue(fields: DimField[], key: DimKey): number | null {
   const f = fields.find((x) => x.key === key);
   if (!f?.locked) return null;
@@ -817,14 +773,6 @@ export function lockedValue(fields: DimField[], key: DimKey): number | null {
 }
 
 const sgn = (v: number) => (v < 0 ? -1 : 1);
-/**
- * Where the shape's second input effectively is: the cursor, overridden per
- * axis by locked sizes. Axis-aligned results are computed exactly so
- * createLine's horizontal/vertical auto-constraints still fire. Point/curve
- * snap ids are dropped once a size is typed — snapping would fight the
- * number; a perpendicular snap survives a typed length (same direction) but
- * not a typed angle.
- */
 export function resolveDimCursor(
   tool: string,
   a: UV,
@@ -842,7 +790,6 @@ export function resolveDimCursor(
       if (L === null && A === null) return c;
       const length = L ?? len;
       if (A === null) {
-        // direction untouched, so a perpendicular snap stays valid
         const out: UV = { x: a.x + length * dir[0], y: a.y + length * dir[1] };
         if (c.snapPerpLineId) out.snapPerpLineId = c.snapPerpLineId;
         return out;
@@ -917,7 +864,6 @@ export function toggleAngleLock(fields: DimField[], live: number): void {
   f.text = fmt2(live);
 }
 
-/** Dimension constraints that pin the typed sizes onto the created geometry. */
 export function dimConstraintsFor(
   tool: string,
   created: Created,
@@ -939,7 +885,6 @@ export function dimConstraintsFor(
     });
   }
   if ((tool === "rect" || tool === "centerRect") && lines.length >= 2) {
-    // createRect order: l1 = first horizontal side, l2 = first vertical side
     const W = lockedValue(fields, "width");
     const H = lockedValue(fields, "height");
     if (W !== null)

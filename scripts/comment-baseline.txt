@@ -1,15 +1,10 @@
 client/src/App.tsx 1
 client/src/components/SketchOffsetIndicators.tsx 1
-client/src/components/ViewportView.tsx 59
 client/src/dimensionLayout.ts 2
 client/src/panelPlacement.ts 1
-client/src/sketchTools.ts 54
 client/src/sketchUsage.ts 8
-client/src/three/CadViewport.ts 20
-client/src/three/ExtrudeGizmo.ts 23
 client/src/three/MoveGizmo.ts 13
 client/src/three/RevolveGizmo.ts 11
-client/src/three/ViewCube.ts 22
 client/src/three/revolveGhost.ts 9
 client/src/three/toolPreview.ts 8
 server/src/geometry/exporters.ts 12

@@ -1,12 +1,3 @@
-/**
- * Three.js viewport engine.
- *
- * Owns the renderer/scene/cameras and keeps the scene in sync with the
- * evaluated model. The mesh is only a visualisation — every rendered face,
- * edge and vertex carries its persistent CAD topology name so picking
- * resolves to CAD references, not triangles.
- */
-
 import * as THREE from "three";
 import {
   ORIGIN_AXES,
@@ -294,7 +285,6 @@ export class CadViewport {
     this.renderer.setClearColor(tokens["viewport-bg"]);
   }
 
-  /** World units per screen pixel at the target depth. */
   worldPerPixel(): number {
     const h = this.container.clientHeight || 1;
     if (this.projection === "orthographic") {
@@ -303,10 +293,6 @@ export class CadViewport {
     const dist = this.perspCam.position.distanceTo(this.target);
     return (2 * dist * halfHeightPerDistance(this.perspCam.fov)) / h;
   }
-
-  // -------------------------------------------------------------------------
-  // Camera
-  // -------------------------------------------------------------------------
 
   private applyZoom() {
     const aspect =
@@ -391,14 +377,12 @@ export class CadViewport {
   }
 
   zoomBy(factor: number, clientX?: number, clientY?: number) {
-    // zoom toward cursor: keep the world point under the cursor stationary
     let before: THREE.Vector3 | null = null;
     if (clientX !== undefined && clientY !== undefined) {
       before = this.screenToPlanePoint(clientX, clientY, null);
     }
     this.zoom = Math.max(0.05, Math.min(100000, this.zoom * factor));
     this.applyZoom();
-    // perspective: dolly
     const dir = this.perspCam.position.clone().sub(this.target);
     this.perspCam.position.copy(this.target).add(dir.multiplyScalar(factor));
     if (before) {
@@ -438,7 +422,6 @@ export class CadViewport {
     if (zoom) this.zoomBy(zoom.factor, zoom.x, zoom.y);
   }
 
-  /** Project a screen point onto a plane (default: view plane through target). */
   screenToPlanePoint(
     clientX: number,
     clientY: number,
@@ -482,7 +465,6 @@ export class CadViewport {
     );
   }
 
-  /** Fit current bodies (or a bbox) into view. */
   zoomToFit(animate = true) {
     const box = new THREE.Box3();
     let any = false;
@@ -578,10 +560,6 @@ export class CadViewport {
     this.projection = p;
     this.resize();
   }
-
-  // -------------------------------------------------------------------------
-  // Origin display
-  // -------------------------------------------------------------------------
 
   private originPlaneMeshes: THREE.Mesh[] = [];
   private originAxisLines = new Map<OriginAxis, THREE.Line>();

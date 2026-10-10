@@ -1,9 +1,3 @@
-/**
- * Extrude drag manipulator: a Fusion-style arrow at the profile/face that
- * drags the extrude distance along its normal, with zoom-dependent snapping
- * and a live translucent preview of the resulting solid.
- */
-
 import * as THREE from "three";
 import { findProfile, type PlaneFrame, type Profile } from "@rockett/shared";
 import { useStore } from "../store";
@@ -16,18 +10,13 @@ import { themeColor } from "../theme/tokens";
 import { GIZMO_APPEARANCE, PREVIEW_APPEARANCE } from "../tunables";
 
 export interface GizmoSource {
-  /** Base plane frame; the arrow points along frame.normal. */
   frame: PlaneFrame;
-  /** Anchor point (u,v) on the plane. */
   anchorUV: [number, number];
-  /** Profile outline for the drag preview (sketch-profile extrudes). */
   profile?: Profile | undefined;
-  /** Face triangles + boundary polylines for face-extrude previews. */
   faceGhost?:
     | {
         positions: number[];
         indices: number[];
-        /** world-space boundary polylines [x,y,z,...] */
         boundary: number[][];
       }
     | undefined;
@@ -41,13 +30,9 @@ export class ExtrudeGizmo extends Manipulator {
   origin = new THREE.Vector3();
   axis = new THREE.Vector3(0, 0, 1);
 
-  /** Signed distance along the axis (negative = reversed). */
   value = 0;
-  /** Whether the preview shows a cut (red) rather than added material (blue). */
   private cut: boolean;
-  /** Anchor on the profile plane itself (before any start offset). */
   private baseOrigin = new THREE.Vector3();
-  /** Start offset along the axis: the arrow and preview begin this far from the plane. */
   private startOffset = 0;
 
   constructor(
@@ -100,7 +85,6 @@ export class ExtrudeGizmo extends Manipulator {
     this.update(initialValue);
   }
 
-  /** Move the start plane: arrow base and preview shift along the axis. */
   setStartOffset(offset: number) {
     if (this.startOffset === offset) return;
     this.startOffset = offset;
@@ -108,7 +92,6 @@ export class ExtrudeGizmo extends Manipulator {
     this.update(this.value);
   }
 
-  /** Switch the preview between add (blue) and cut (red) without rebuilding. */
   setCut(cut: boolean) {
     if (this.cut === cut) return;
     this.cut = cut;
@@ -143,7 +126,6 @@ export class ExtrudeGizmo extends Manipulator {
     }
   }
 
-  /** Re-position arrow + preview for a (signed) distance value. */
   update(value: number) {
     this.value = value;
     this.layoutArrow();
@@ -222,7 +204,6 @@ export class ExtrudeGizmo extends Manipulator {
       ),
     );
     if (value < 0) {
-      // extrude backwards along the normal
       basis.multiply(new THREE.Matrix4().makeTranslation(0, 0, value));
     }
     geom.applyMatrix4(basis);
@@ -231,17 +212,14 @@ export class ExtrudeGizmo extends Manipulator {
     this.group.add(this.previewMesh);
   }
 
-  /** Translucent prism ghost for a face extrude: offset cap + side walls. */
   private updateFaceGhost(value: number) {
     const ghost = this.source.faceGhost;
     if (!ghost) return;
-    // the prism runs from the start plane (face + startOffset) to start + value
     const start = this.axis.clone().multiplyScalar(this.startOffset);
     const off = this.axis.clone().multiplyScalar(this.startOffset + value);
     const positions: number[] = [];
     const indices: number[] = [];
 
-    // cap: the face's triangles offset along the extrude axis
     for (let i = 0; i + 2 < ghost.positions.length; i += 3) {
       positions.push(
         ghost.positions[i]! + off.x,
@@ -251,8 +229,6 @@ export class ExtrudeGizmo extends Manipulator {
     }
     indices.push(...ghost.indices);
 
-    // side walls: quad strips between each boundary polyline (at the start
-    // plane) and its offset
     for (const poly of ghost.boundary) {
       const base = positions.length / 3;
       const n = poly.length / 3;

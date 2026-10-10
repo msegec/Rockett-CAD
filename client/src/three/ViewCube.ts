@@ -1,18 +1,8 @@
-/**
- * ViewCube: draggable navigation cube in the viewport corner.
- * Clicking faces/edges/corners animates the camera; dragging orbits freely.
- */
-
 import * as THREE from "three";
 import type { CadViewport } from "./CadViewport";
 import { ISO_VIEW } from "./camera";
 import { subscribeTheme, themeColor } from "../theme/tokens";
 
-/**
- * Face label texture. `rotation` counters BoxGeometry's per-face UV
- * orientation so every label reads upright in its face's standard view
- * (Z-up world: side-face UVs put texture-"up" along ±Y, not +Z).
- */
 function paintFace(
   canvas: HTMLCanvasElement,
   label: string,
@@ -43,8 +33,6 @@ function faceTexture(label: string, rotation: number): THREE.CanvasTexture {
   return texture;
 }
 
-// Cube faces: three.js BoxGeometry material order is +x,-x,+y,-y,+z,-z.
-// Rotations make each label upright in that face's standard view.
 const FACES: [string, number][] = [
   ["RIGHT", -Math.PI / 2],
   ["LEFT", Math.PI / 2],
@@ -118,19 +106,12 @@ export class ViewCube {
 
     const el = this.renderer.domElement;
     el.style.cursor = "pointer";
-    // Drag = orbit, click = snap view. The cursor is hidden for the whole
-    // press via CSS on the captured element (pointer capture keeps delivering
-    // moves — and the hidden cursor — wherever the mouse goes). No pointer
-    // lock: engaging it stalls and drops mouse events for a moment, which
-    // made the cube feel like it needed a big shove before it followed.
     const endDrag = (e: PointerEvent) => {
       if (!this.dragging) return;
       this.dragging = false;
       try {
         el.releasePointerCapture(e.pointerId);
-      } catch {
-        // capture already gone
-      }
+      } catch {}
       el.style.cursor = "pointer";
     };
     el.addEventListener("pointerdown", (e) => {
@@ -142,9 +123,7 @@ export class ViewCube {
       el.style.cursor = "none";
       try {
         el.setPointerCapture(e.pointerId);
-      } catch {
-        // no active pointer to capture (synthetic events) — drag still works
-      }
+      } catch {}
     });
     el.addEventListener("pointermove", (e) => {
       if (!this.dragging) return;
@@ -152,13 +131,10 @@ export class ViewCube {
       const dy = e.clientY - this.lastY;
       this.lastX = e.clientX;
       this.lastY = e.clientY;
-      // the first pixel of travel already orbits; only a perfectly still
-      // press-release counts as a click
       if (!this.moved) {
         if (Math.abs(dx) + Math.abs(dy) < 1) return;
         this.moved = true;
       }
-      // trackball grab: the cube (and model) follows the cursor from any view
       this.viewport.orbitTrackball(dx, dy);
     });
     el.addEventListener("pointerup", (e) => {
@@ -195,7 +171,6 @@ export class ViewCube {
     const hits = this.raycaster.intersectObject(this.cube, false);
     const hit = hits[0];
     if (!hit) return;
-    // local hit point → snap direction (face / edge / corner)
     const local = this.cube.worldToLocal(hit.point.clone());
     const half = 0.7;
     const t = 0.42; // threshold for edge/corner detection
