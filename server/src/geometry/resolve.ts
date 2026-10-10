@@ -2,6 +2,7 @@ import {
   collectTopoRefs,
   inputBodies,
   inputFeatures,
+  refName,
   compareNames,
   LINEAR_TOL,
   UNIT_DOT_TOL,
@@ -25,9 +26,6 @@ type Ref = FaceRef | EdgeRef;
 type Kind = Ref["kind"];
 
 const EDGE = /^e\[(.*)\]((?:~\d+)*)$/;
-
-const nameOf = (ref: Ref) =>
-  ref.kind === "face" ? ref.faceName : ref.edgeName;
 
 const untie = (name: string) => name.replace(/~\?\d+/g, "");
 
@@ -143,7 +141,7 @@ function suggestions(
   bodies: ReadonlyMap<string, NamedBody>,
   ref: Ref,
 ): RefCandidate[] {
-  const name = nameOf(ref);
+  const name = refName(ref);
   const parts = faceParts(ref.kind, name);
   const found = [...bodies.values()]
     .filter(
@@ -167,7 +165,7 @@ function renumbered(
   const { kind, sig } = ref;
   if (!sig || namingVersion() === 1) return [];
   if (gap(kind, topology.signature(kind, shape), sig) <= LINEAR_TOL) return [];
-  const family = stem(nameOf(ref));
+  const family = stem(refName(ref));
   const parts = new Set(faceParts(kind, family));
   return [...bodies.values()]
     .filter((body) => [...namesOf(body)].some((face) => parts.has(stem(face))))
@@ -187,7 +185,7 @@ function resolveRef(
   bodies: ReadonlyMap<string, NamedBody>,
   ref: Ref,
 ): RefResolution {
-  const name = nameOf(ref);
+  const name = refName(ref);
   const body = bodies.get(ref.bodyId);
   const tied =
     ref.kind === "edge" &&
@@ -281,8 +279,8 @@ export function unresolvedRefs(
 
 export const describeRef = ({ ref, status, candidates }: UnresolvedRef) =>
   status === "missing"
-    ? `${ref.kind} ${nameOf(ref)} no longer exists on ${ref.bodyId}`
-    : `${ref.kind} ${nameOf(ref)} on ${ref.bodyId} is ${status}${ref.kind === "edge" && ref.sig && nameOf(ref).includes("~?") && status === "ambiguous" ? `: ${candidates.map((candidate) => candidate.name).join(", ")}` : ""}`;
+    ? `${ref.kind} ${refName(ref)} no longer exists on ${ref.bodyId}`
+    : `${ref.kind} ${refName(ref)} on ${ref.bodyId} is ${status}${ref.kind === "edge" && ref.sig && refName(ref).includes("~?") && status === "ambiguous" ? `: ${candidates.map((candidate) => candidate.name).join(", ")}` : ""}`;
 
 export class BlockedFeature extends Error {
   constructor(

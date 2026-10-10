@@ -2,6 +2,7 @@ import {
   compareNames,
   featureRefs,
   LINEAR_TOL,
+  refName,
   topoRefPaths,
   ValidationError,
   type CadDocument,
@@ -40,9 +41,6 @@ const FALLBACK = /:x\d+$/;
 const EDGE = /^e\[(.*)\]$/;
 const COPY = /^((?:p\d+|m):[^:]+):(.+)$/;
 const KEY = /^[0-9a-f]{16}$/;
-
-const nameOf = (ref: Ref) =>
-  ref.kind === "face" ? ref.faceName : ref.edgeName;
 
 function split(kind: Kind, name: string): string[] {
   const plain = name.replace(SUFFIX, "");
@@ -250,7 +248,7 @@ function suggestions(after: Side, kind: Named, name: string, within: string[]) {
 
 function mapRef(before: Side, after: Side, ref: Ref): Found {
   const { kind } = ref;
-  const name = nameOf(ref);
+  const name = refName(ref);
   const body = mapBody(before, after, ref.bodyId);
   const within = body.to
     ? [body.to.bodyId]
@@ -312,7 +310,7 @@ function translate(
   }
   const moved: Ref[] = [];
   for (const [path, ref] of topoRefPaths(feature)) {
-    const from = { bodyId: ref.bodyId, name: nameOf(ref) };
+    const from = { bodyId: ref.bodyId, name: refName(ref) };
     const to = decide(
       feature.id,
       path,

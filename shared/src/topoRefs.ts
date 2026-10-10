@@ -8,8 +8,11 @@ export function collectTopoRefs(feature: Feature): Array<FaceRef | EdgeRef> {
   return topoRefPaths(feature).map(([, ref]) => ref);
 }
 
+export const refName = (ref: FaceRef | EdgeRef) =>
+  ref.kind === "face" ? ref.faceName : ref.edgeName;
+
 const refKey = (ref: FaceRef | EdgeRef) =>
-  `${ref.kind}\n${ref.bodyId}\n${ref.kind === "face" ? ref.faceName : ref.edgeName}`;
+  `${ref.kind}\n${ref.bodyId}\n${refName(ref)}`;
 
 export function unsignedRefs(
   feature: Feature,
