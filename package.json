@@ -13,12 +13,12 @@
   "scripts": {
     "bench:client": "vitest bench --run --reporter=default client/test",
     "build": "npm run build --workspace shared --if-present && npm run build --workspace server && npm run build --workspace client",
-    "check": "run-s lint format:check lint:comments lint:cost lint:writing lint:readme lint:pins lint:notices build test test:browser && { [ ! -f scripts/check-work-order.sh ] || sh scripts/check-work-order.sh; }",
+    "check": "run-s lint format:check lint:comments lint:cost lint:writing lint:readme lint:pins lint:notices build test test:scale test:browser && { [ ! -f scripts/check-work-order.sh ] || sh scripts/check-work-order.sh; }",
     "cost": "node scripts/cost.mjs",
     "dev": "npm-run-all --parallel dev:server dev:client",
     "dev:client": "npm run dev --workspace client",
     "dev:server": "npm run dev --workspace server",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --check --cache .",
     "lint": "oxlint --deny-warnings",
     "lint:comments": "node scripts/cost.mjs --comments",
     "lint:cost": "node scripts/cost.mjs --check",
@@ -32,7 +32,13 @@
     "test:browser": "vitest run --project browser",
     "test:client": "vitest run --project node --project dom client/test",
     "test:focused": "node scripts/test-focused.mjs",
-    "typecheck": "tsc -p shared && tsc -p server && tsc -p client && tsc -p plugin-api && for m in modules/*/package.json; do tsc -p \"${m%/package.json}\" || exit 1; done"
+    "test:scale": "vitest run --project scale",
+    "typecheck": "run-p typecheck:*",
+    "typecheck:client": "tsc -p client --incremental --tsBuildInfoFile node_modules/.cache/tsc/client.tsbuildinfo",
+    "typecheck:modules": "for m in modules/*/package.json; do d=${m%/package.json}; tsc -p $d --incremental --tsBuildInfoFile node_modules/.cache/tsc/${d#modules/}.tsbuildinfo || exit 1; done",
+    "typecheck:plugin-api": "tsc -p plugin-api --incremental --tsBuildInfoFile node_modules/.cache/tsc/plugin-api.tsbuildinfo",
+    "typecheck:server": "tsc -p server --incremental --tsBuildInfoFile node_modules/.cache/tsc/server.tsbuildinfo",
+    "typecheck:shared": "tsc -p shared --incremental --tsBuildInfoFile node_modules/.cache/tsc/shared.tsbuildinfo"
   },
   "devDependencies": {
     "gltf-validator": "2.0.0-dev.3.10",

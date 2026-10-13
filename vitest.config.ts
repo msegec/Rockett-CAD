@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 
 const BROWSER_WAIT_MS = 30_000;
+const SCALE = "**/*.scale.test.ts";
 
 export const projects = [
   {
@@ -19,6 +20,7 @@ export const projects = [
       "**/test/browser/**",
       "**/node_modules/**",
       "server/test/memorySoak.test.ts",
+      SCALE,
     ],
     testTimeout: 30_000,
     benchmark: { include: [] },
@@ -46,6 +48,14 @@ export const projects = [
     benchmark: { include: [] },
   },
   {
+    name: "scale",
+    environment: "node",
+    include: [SCALE],
+    exclude: ["**/node_modules/**"],
+    testTimeout: 30_000,
+    benchmark: { include: [] },
+  },
+  {
     name: "browser",
     environment: "node",
     include: ["client/test/browser/**/*.test.ts"],
@@ -65,6 +75,7 @@ export default defineConfig({
     allowOnly: false,
     passWithNoTests: false,
     maxWorkers: "50%",
+    fsModuleCache: true,
     projects: projects.map((test) => ({ test, assetsInclude: ["**/*.wasm"] })),
   },
 });

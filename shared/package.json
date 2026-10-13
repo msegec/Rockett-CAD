@@ -10,7 +10,7 @@
   "types": "src/index.ts",
   "scripts": {
     "bench": "vitest bench --run --reporter=default --reporter=json --outputFile.json=dist/bench.json",
-    "test": "tsc -p . && vitest run"
+    "test": "tsc -p . && f() { vitest run --root .. --project node --project dom \"${@:-$PWD/}\"; }; f"
   },
   "dependencies": {
     "typebox": "1.3.34"

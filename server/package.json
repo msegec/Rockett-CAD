@@ -8,7 +8,7 @@
     "build": "sh build.sh",
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "start": "node dist/server.mjs",
-    "test": "vitest run"
+    "test": "f() { vitest run --root .. --project node --project dom \"${@:-$PWD/}\"; }; f"
   },
   "dependencies": {
     "@rockett/plugin-api": "0.1.0",
