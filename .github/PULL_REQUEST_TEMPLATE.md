@@ -13,5 +13,5 @@ List the commands you ran and their results.
 - [ ] New dependencies have exact versions and a `THIRD-PARTY-NOTICES.md` entry
 - [ ] No secrets, environment files, real addresses, logs or user data
 
-Mark (`msegec`) or Liam (`llambkin`) reviews and merges. See
+Mark (`msegec`) reviews and merges. See
 [the contributing guide](https://github.com/msegec/Rockett-CAD/blob/main/docs/user/contributing.md).

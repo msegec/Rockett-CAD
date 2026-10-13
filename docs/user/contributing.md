@@ -2,7 +2,7 @@
 
 Send changes as pull requests to `main` on
 [msegec/Rockett-CAD](https://github.com/msegec/Rockett-CAD). Mark (`msegec`)
-or Liam (`llambkin`) reviews each one and merges it into `main`.
+reviews each one and merges it into `main`.
 
 ## Send a change
 
