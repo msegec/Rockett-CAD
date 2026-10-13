@@ -20,7 +20,7 @@
     "dev:server": "npm run dev --workspace server",
     "format:check": "prettier --check .",
     "lint": "oxlint --deny-warnings",
-    "lint:comments": "sh scripts/check-comments.sh",
+    "lint:comments": "node scripts/cost.mjs --comments",
     "lint:cost": "node scripts/cost.mjs --check",
     "lint:notices": "sh scripts/check-notices.sh",
     "lint:pins": "grep -nE '\"[~^*]' package.json shared/package.json server/package.json client/package.json plugin-api/package.json modules/*/package.json; [ $? -eq 1 ]",

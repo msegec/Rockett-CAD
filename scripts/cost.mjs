@@ -1,30 +1,38 @@
 import { spawnSync } from "node:child_process";
 import {
+  existsSync,
   globSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const baselinePath = join(root, "scripts/cost-baseline.txt");
+const linter = join(homedir(), "masterrulez/scripts/lint-comments");
 const FILE_LIMIT = 500;
 const SHOW_LIMIT = 40;
 const FUNCTION_LIMIT = 80;
+const GROWS = "Cost-Grows";
 const mode = process.argv[2] ?? "table";
+const checked = mode === "--comments" ? "comment" : "cost";
+const isolated = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+);
 
 function fail(message) {
-  console.error(`cost check failed: ${message}`);
+  console.error(`${checked} check failed: ${message}`);
   process.exit(1);
 }
 
-function run(command, args) {
+function run(command, args, cwd = root, env = process.env) {
   const result = spawnSync(command, args, {
-    cwd: root,
+    cwd,
+    env,
     encoding: "utf8",
     maxBuffer: 1 << 28,
   });
@@ -33,7 +41,80 @@ function run(command, args) {
   return result.stdout;
 }
 
-function lintSizes() {
+function git(args, cwd = root, env = process.env) {
+  const result = spawnSync("git", args, {
+    cwd,
+    env,
+    encoding: "utf8",
+    maxBuffer: 1 << 28,
+  });
+  return result.status === 0 ? result.stdout : null;
+}
+
+function mustGit(args, cwd, env) {
+  return git(args, cwd, env) ?? fail(`git ${args.join(" ")} failed`);
+}
+
+function findBase() {
+  const head = git(["rev-parse", "--verify", "--quiet", "HEAD"])?.trim();
+  if (!head) return null;
+  const sha = git(["merge-base", "HEAD", "origin/main"])?.trim() || head;
+  const body =
+    sha === head ? "" : mustGit(["log", "--format=%B", `${sha}..HEAD`]);
+  return {
+    sha,
+    short: sha.slice(0, 8),
+    grows: new Set(
+      [...body.matchAll(new RegExp(`^${GROWS}: (.+?)\\s*$`, "gm"))].map(
+        (m) => m[1],
+      ),
+    ),
+  };
+}
+
+function changes(base) {
+  if (!base) return null;
+  const sources = new Map();
+  const fields = mustGit(["diff", "-M", "--name-status", "-z", base.sha]).split(
+    "\0",
+  );
+  for (let i = 0; i + 1 < fields.length;) {
+    const status = fields[i];
+    if (status.startsWith("R")) {
+      sources.set(fields[i + 2], fields[i + 1]);
+      i += 3;
+    } else {
+      sources.set(fields[i + 1], status === "A" ? null : fields[i + 1]);
+      i += 2;
+    }
+  }
+  for (const path of mustGit([
+    "ls-files",
+    "-z",
+    "--others",
+    "--exclude-standard",
+  ]).split("\0"))
+    if (path) sources.set(path, null);
+  return sources;
+}
+
+function atBase(base, sources, paths, work) {
+  const dir = mkdtempSync(join(tmpdir(), "rockett-base-"));
+  try {
+    for (const path of paths) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      writeFileSync(
+        join(dir, path),
+        mustGit(["cat-file", "blob", `${base.sha}:${sources.get(path)}`]),
+      );
+    }
+    return work(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function lintSizes(cwd) {
   const dir = mkdtempSync(join(tmpdir(), "rockett-cost-"));
   const config = join(dir, "oxlintrc.json");
   const size = { max: 0, skipBlankLines: false, skipComments: false };
@@ -49,7 +130,11 @@ function lintSizes() {
   );
   try {
     return JSON.parse(
-      run(join(root, "node_modules/.bin/oxlint"), ["-c", config, "-f", "json"]),
+      run(
+        join(root, "node_modules/.bin/oxlint"),
+        ["-c", config, "-f", "json"],
+        cwd,
+      ),
     ).diagnostics;
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -74,21 +159,20 @@ function deriveName(text, column) {
   return before.match(/([\w$]+)\s*[:=]$/)?.[1] ?? "anonymous";
 }
 
-function measure() {
-  const measured = new Set(
-    run("git", [
-      "ls-files",
-      "-z",
-      "--cached",
-      "--others",
-      "--exclude-standard",
-    ]).split("\0"),
-  );
+function sourceFiles() {
   const isTest =
     /(^|\/)(test|tests|__tests__)\/|\.(test|spec|bench)\.[cm]?[jt]sx?$/;
+  return new Set(
+    run("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"])
+      .split("\0")
+      .filter((path) => !isTest.test(path)),
+  );
+}
+
+function measure(cwd, paths) {
   const files = new Map();
-  for (const d of lintSizes()) {
-    if (!measured.has(d.filename) || isTest.test(d.filename)) continue;
+  for (const d of lintSizes(cwd)) {
+    if (!paths.has(d.filename)) continue;
     const file = files.get(d.filename) ?? {
       path: d.filename,
       lines: 0,
@@ -108,7 +192,7 @@ function measure() {
     }
   }
   for (const file of files.values()) {
-    const text = readFileSync(join(root, file.path), "utf8").split("\n");
+    const text = readFileSync(join(cwd, file.path), "utf8").split("\n");
     for (const f of file.functions)
       f.name ??= deriveName(text[f.line - 1] ?? "", f.column);
     file.functions.sort((a, b) => b.lines - a.lines || a.line - b.line);
@@ -133,64 +217,104 @@ function marked(files) {
   );
 }
 
-function ratchet(files) {
-  let text = "";
-  try {
-    text = readFileSync(baselinePath, "utf8");
-  } catch {
-    if (mode !== "--update")
-      fail(
-        "scripts/cost-baseline.txt is missing; write it with npm run cost -- --update",
+function pathOf(key) {
+  return key.split(" ")[0];
+}
+
+function check() {
+  const current = marked(measure(root, sourceFiles()));
+  const base = findBase();
+  const sources = changes(base);
+  const changed = new Set(
+    [...current.keys()]
+      .map(pathOf)
+      .filter((path) => !sources || sources.has(path)),
+  );
+  const traced = [...changed].filter((path) => sources?.get(path));
+  const before = traced.length
+    ? atBase(base, sources, traced, (dir) =>
+        marked(measure(dir, new Set(traced))),
+      )
+    : new Map();
+  let failed = false;
+  for (const [key, lines] of current) {
+    const path = pathOf(key);
+    const was = before.get(key);
+    if (!changed.has(path) || lines <= (was ?? 0)) continue;
+    const from =
+      was !== undefined
+        ? `was ${was} at ${base.short}`
+        : !base
+          ? "no base commit"
+          : sources.get(path)
+            ? `under the limit at ${base.short}`
+            : "new file";
+    if (key === path && was !== undefined) {
+      console.error(
+        `cost check failed: ${key}: lines ${lines}, ${from}; a file over ${FILE_LIMIT} lines never grows, split it first`,
       );
+      failed = true;
+    } else if (!base?.grows.has(key)) {
+      console.error(
+        `cost check failed: ${key}: lines ${lines}, ${from}; tidy it, or commit it with the body line "${GROWS}: ${key}" and say why`,
+      );
+      failed = true;
+    }
   }
-  const base = new Map(
-    text
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => [
-        l.slice(0, l.lastIndexOf(" ")),
-        Number(l.slice(l.lastIndexOf(" ") + 1)),
-      ]),
-  );
-  const current = marked(files);
-  const grown = [...current].filter(
-    ([key, n]) => !base.has(key) || n > base.get(key),
-  );
-  const report = ([key, n]) =>
-    `${key}: lines ${n}, baseline ${base.get(key) ?? "none"}`;
-  const rises = grown.map(report);
-  const raised = grown
-    .filter(([key]) => base.has(key) && !key.includes(" "))
-    .map(report);
-  const falls = [...base]
-    .filter(([key, n]) => (current.get(key) ?? 0) < n)
-    .map(
-      ([key, n]) =>
-        `${key}: lines ${current.get(key) ?? "under the limit"}, baseline ${n}`,
-    );
-  if (mode === "--update" && raised.length) {
-    for (const rise of raised) console.error(`cost check failed: ${rise}`);
-    fail(
-      "a file over the limit never grows; split it first, then run npm run cost -- --update",
-    );
-  }
-  if (mode === "--update") {
-    for (const change of [...rises, ...falls]) console.log(`updated ${change}`);
-    writeFileSync(
-      baselinePath,
-      [...current].map(([key, n]) => `${key} ${n}\n`).join(""),
-    );
-  } else if (rises.length) {
-    for (const rise of rises) console.error(`cost check failed: ${rise}`);
-    fail(
-      "a marked file or function grew or a new one crossed a limit; tidy it, split a grown file, or run npm run cost -- --update and say why in the commit body",
-    );
-  }
+  if (failed) process.exit(1);
   const functions = [...current.keys()].filter((key) =>
     key.includes(" "),
   ).length;
   console.log(
-    `OK cost baseline: ${current.size - functions} files, ${functions} functions`,
+    `OK cost check against ${base?.short ?? "no base commit"}: ${current.size - functions} files over ${FILE_LIMIT} lines, ${functions} functions over ${FUNCTION_LIMIT}`,
+  );
+}
+
+function commentCounts(cwd, env) {
+  const output = run(process.execPath, [linter], cwd, env);
+  if (!/^lint-comments: /m.test(output))
+    fail(`lint-comments did not finish: ${output}`);
+  return new Map(
+    [...output.matchAll(/^(\S+): (\d+) comment lines? at /gm)].map((m) => [
+      m[1],
+      Number(m[2]),
+    ]),
+  );
+}
+
+function comments() {
+  if (!existsSync(linter))
+    fail(
+      "masterrulez lint-comments is missing; clone masterrulez to ~/masterrulez",
+    );
+  const current = commentCounts(root, process.env);
+  const base = findBase();
+  const sources = changes(base);
+  const changed = [...current.keys()].filter(
+    (path) => !sources || sources.has(path),
+  );
+  const traced = changed.filter((path) => sources?.get(path));
+  const before = traced.length
+    ? atBase(base, sources, traced, (dir) => {
+        mustGit(["init", "-q"], dir, isolated);
+        mustGit(["add", "-A"], dir, isolated);
+        return commentCounts(dir, isolated);
+      })
+    : new Map();
+  const rises = changed.filter(
+    (path) => current.get(path) > (before.get(path) ?? 0),
+  );
+  for (const path of rises)
+    console.error(
+      `comment check failed: ${path}: comment lines ${current.get(path)}, was ${before.get(path) ?? "none"} at ${base?.short ?? "no base commit"}`,
+    );
+  if (rises.length)
+    fail(
+      "code carries no comments; delete the new ones and move the reason to the commit body",
+    );
+  const total = [...current.values()].reduce((sum, n) => sum + n, 0);
+  console.log(
+    `OK comment check against ${base?.short ?? "no base commit"}: ${current.size} files, ${total} lines`,
   );
 }
 
@@ -294,6 +418,7 @@ function table(files) {
   }
 }
 
-if (mode === "table") table(measure());
-else if (mode === "--check" || mode === "--update") ratchet(measure());
-else fail("usage: node scripts/cost.mjs [--check | --update]");
+if (mode === "table") table(measure(root, sourceFiles()));
+else if (mode === "--check") check();
+else if (mode === "--comments") comments();
+else fail("usage: node scripts/cost.mjs [--check | --comments]");
